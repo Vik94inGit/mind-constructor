@@ -1,0 +1,3 @@
+I can create node with map
+I need to create map(goal)
+in this map create goals, nodes

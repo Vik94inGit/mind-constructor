@@ -1,0 +1,196 @@
+Here are the **Thunder Client** endpoints for **Edges & Graph Insights**.
+
+This file continues from `POSTMANmapsANDusers.txt` and `POSTMANnodes.txt` — same three users
+(alice, bob, carol), same `{{mapId}}`. You'll need at least three nodes on the map to see
+clustering do anything interesting; create a few via `POSTMANnodes.txt` first and save their
+`nodeId`s as `{{nodeIdA}}`, `{{nodeIdB}}`, `{{nodeIdC}}`.
+
+**Important:** clusters and attack-indicators are **computed on every request, not stored**.
+There's no "create a cluster" endpoint — you create edges, and the two GET endpoints below
+derive everything from the edge graph as it currently stands.
+
+---
+
+## Edges
+
+### 1. Create an Edge
+```http
+POST /api/edges/{{mapId}}
+```
+
+**Headers**
+```
+Authorization: Bearer {{tokenAlice}}
+Content-Type: application/json
+```
+
+**Body**
+```json
+{
+  "fromNodeId": "{{nodeIdA}}",
+  "toNodeId": "{{nodeIdB}}",
+  "sentiment": "negative"
+}
+```
+
+Map member only. `sentiment` is one of `positive`, `negative`, `neutral` — optional, defaults to
+`neutral` if omitted. `fromNodeId`/`toNodeId` must both be public `nodeId`s (not `_id`), and both
+must belong to `{{mapId}}` — an edge can't cross maps.
+
+**Response 201**
+```json
+{
+  "edgeId": "qP2xN8fRkT",
+  "mapId": "MAP_MONGO_ID",
+  "fromNodeId": "NODE_MONGO_ID_A",
+  "toNodeId": "NODE_MONGO_ID_B",
+  "sentiment": "negative",
+  "userId": "USER_ID_ALICE"
+}
+```
+
+Save `edgeId` as `{{edgeId}}`. 400 if `fromNodeId`/`toNodeId` are missing, equal to each other
+(self-loop), or `sentiment` isn't one of the three allowed values. 404 if either node doesn't
+exist. 400 if a node belongs to a different map than `{{mapId}}`.
+
+---
+
+### 2. Delete an Edge
+```http
+DELETE /api/edges/{{edgeId}}
+```
+
+**Headers**
+```
+Authorization: Bearer {{tokenAlice}}
+```
+
+Creator only — same ownership rule as nodes. 404 if you're not the creator (or it doesn't exist).
+
+---
+
+### 3. List a Map's Edges
+```http
+GET /api/{{mapId}}/edges
+```
+
+**Headers**
+```
+Authorization: Bearer {{tokenAlice}}
+```
+
+Map member only. `fromNodeId`/`toNodeId` come back populated as `{ nodeId, text, type }`, not
+raw Mongo ids.
+
+**Response 200**
+```json
+[
+  {
+    "edgeId": "qP2xN8fRkT",
+    "fromNodeId": { "nodeId": "k4Tz1PqXaB", "text": "First node", "type": "Problem" },
+    "toNodeId": { "nodeId": "9mWs2LdQoY", "text": "Second node", "type": "Option" },
+    "sentiment": "negative",
+    "userId": { "_id": "USER_ID_ALICE", "username": "alice" }
+  }
+]
+```
+
+---
+
+## Graph Insights (computed, nothing persisted)
+
+### 4. Auto-Detect Clusters
+```http
+GET /api/{{mapId}}/clusters?minDegree=2
+```
+
+**Headers**
+```
+Authorization: Bearer {{tokenAlice}}
+```
+
+`minDegree` is optional (default `3`, must be ≥ 1) — how many same-sentiment edges a node needs
+to *other nodes in the same cluster* to count as "dense" (a k-core, not a fuzzy community-detection
+heuristic). Positive and negative edges are analyzed as two separate graphs. If a node qualifies
+for both, it's dropped from the positive cluster — negative wins.
+
+**Response 200**
+```json
+{
+  "success": true,
+  "minDegree": 2,
+  "clusters": [
+    {
+      "clusterId": "a1b2c3d4e5",
+      "sentiment": "negative",
+      "type": "auto",
+      "nodeIds": ["k4Tz1PqXaB", "9mWs2LdQoY", "qP2xN8fRkT"]
+    }
+  ]
+}
+```
+
+`clusterId` is a stable hash of the sorted member list, not random — the same cluster gets the
+same id across repeated calls as long as the underlying graph hasn't changed, even though nothing
+about the cluster itself is stored anywhere. 400 if `minDegree` isn't a positive integer.
+
+**To see this do something:** create a triangle of 3+ negative edges between three nodes
+(A→B, B→C, C→A, all `"sentiment": "negative"`), then call this with `minDegree=2` — you should
+get back one cluster containing all three.
+
+---
+
+### 5. Attack Indicators
+```http
+GET /api/{{mapId}}/attack-indicators?threshold=3
+```
+
+**Headers**
+```
+Authorization: Bearer {{tokenAlice}}
+```
+
+⚠️ **Not the same thing as [Attack a Node](POSTMANnodes.txt) from the combat system.** That's an
+explicit action (weapon, cooldown, health, defeat). This is a passive signal computed from
+incoming `negative` edges — a node can have full `health` and still show up here, or vice versa.
+
+`threshold` is optional (default `3`, must be ≥ 1) — how many incoming negative edges a node
+needs before it's flagged. Weapon suggestion scales with severity relative to the threshold:
+`sword` right at the threshold, `axe` once `threshold + 2` is reached, `spear` at `threshold + 4`.
+
+**Response 200**
+```json
+{
+  "success": true,
+  "threshold": 3,
+  "indicators": [
+    { "nodeId": "9mWs2LdQoY", "incomingNegativeEdges": 5, "weapon": "axe" }
+  ]
+}
+```
+
+**To see this do something:** create 3+ negative edges all pointing *at* the same node (from
+different other nodes), then call this endpoint — that node should show up with `weapon: "sword"`.
+Delete edges until the count drops below the threshold and call it again — it disappears from the
+list on its own; there's no separate "remove the indicator" step, since nothing was ever saved.
+
+---
+
+### Recommended Variables in Thunder Client
+
+| Variable      | Value                                          |
+|---------------|-------------------------------------------------|
+| `baseUrl`     | `http://localhost:3000`                          |
+| `tokenAlice`  | alice's token                                    |
+| `mapId`       | the map's public `mapId`                         |
+| `nodeIdA/B/C` | public `nodeId`s of a few nodes on that map      |
+| `edgeId`      | an edge's public `edgeId` (from Create an Edge)  |
+
+### Complete endpoint list
+```
+POST   /api/edges/{{mapId}}              create an edge              map member
+DELETE /api/edges/{{edgeId}}             delete an edge              edge creator
+GET    /api/{{mapId}}/edges              list a map's edges          map member   (Maps router)
+GET    /api/{{mapId}}/clusters           auto-detected clusters      map member   (Maps router)
+GET    /api/{{mapId}}/attack-indicators  under-fire node indicators  map member   (Maps router)
+```

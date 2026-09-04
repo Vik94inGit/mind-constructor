@@ -1,0 +1,1638 @@
+<title>Mind Constructor API Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#181B24;
+    --ink-soft:#565E72;
+    --paper:#F3F4F7;
+    --surface:#FFFFFF;
+    --surface-2:#EAECF1;
+    --line:#DCE0E8;
+    --accent:#B5651D;
+    --accent-ink:#7A4413;
+    --accent-soft:#F1E1CC;
+
+    --get-bg:#E1EEF0; --get-fg:#1B6E78;
+    --post-bg:#E3EFE0; --post-fg:#2E7D32;
+    --patch-bg:#F5ECD6; --patch-fg:#8A6A1B;
+    --del-bg:#F6E1E3; --del-fg:#A23B3F;
+
+    --n-problem:#C1502E; --n-poption:#B8862E; --n-option:#3B5BA5;
+    --n-solution:#1F7A6C; --n-success:#3F7D53; --n-fail:#B23A48; --n-unknown:#8A8F98;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#ECEEF3; --ink-soft:#A6ADBE; --paper:#12141B; --surface:#1A1D26;
+      --surface-2:#20242F; --line:#2B303C; --accent:#E08A3E; --accent-ink:#F3C08C; --accent-soft:#3B2A18;
+      --get-bg:#12303A; --get-fg:#6FD3E0;
+      --post-bg:#16321C; --post-fg:#7FD98A;
+      --patch-bg:#3A2E13; --patch-fg:#E8C46A;
+      --del-bg:#3A1A1D; --del-fg:#F19099;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#ECEEF3; --ink-soft:#A6ADBE; --paper:#12141B; --surface:#1A1D26;
+    --surface-2:#20242F; --line:#2B303C; --accent:#E08A3E; --accent-ink:#F3C08C; --accent-soft:#3B2A18;
+    --get-bg:#12303A; --get-fg:#6FD3E0;
+    --post-bg:#16321C; --post-fg:#7FD98A;
+    --patch-bg:#3A2E13; --patch-fg:#E8C46A;
+    --del-bg:#3A1A1D; --del-fg:#F19099;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Serif", Georgia, "Times New Roman", serif;
+    line-height:1.65; font-size:16.5px;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4,.mono,nav,.eyebrow,.pill,.tag,code,pre,.path,.chip{
+    font-family:"IBM Plex Sans", system-ui, sans-serif;
+  }
+  code,pre,.mono-text{ font-family:"IBM Plex Mono", "Courier New", monospace; }
+
+  h1,h2,h3{ text-wrap:balance; font-weight:700; color:var(--ink); }
+  a{ color:var(--accent-ink); }
+  a:hover{ color:var(--accent); }
+  a:focus-visible, button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .page{ display:grid; grid-template-columns:250px minmax(0,1fr); gap:0; max-width:1180px; margin:0 auto; }
+  @media (max-width:900px){ .page{ grid-template-columns:1fr; } }
+
+  /* ---------- sidebar ---------- */
+  .sidebar{
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    padding:2rem 1.25rem 2rem 0; border-right:1px solid var(--line);
+  }
+  @media (max-width:900px){
+    .sidebar{ position:static; height:auto; border-right:none; border-bottom:1px solid var(--line);
+      padding:1rem 1.25rem; overflow-x:auto; }
+    .sidebar .navgroup{ display:inline-block; margin-right:1.5rem; vertical-align:top; }
+  }
+  .brand{ font-weight:700; font-size:1.05rem; letter-spacing:-.01em; margin-bottom:.25rem; }
+  .brand small{ display:block; font-weight:400; color:var(--ink-soft); font-size:.78rem; margin-top:.15rem; }
+  .navgroup{ margin-top:1.5rem; }
+  .navgroup h4{ font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); font-weight:600; margin:0 0 .5rem; }
+  .navgroup ul{ list-style:none; margin:0; padding:0; }
+  .navgroup li{ margin-bottom:.15rem; }
+  .navgroup a{
+    display:flex; align-items:center; gap:.4rem; text-decoration:none; color:var(--ink);
+    font-size:.83rem; padding:.28rem .4rem; border-radius:5px;
+  }
+  .navgroup a:hover{ background:var(--surface-2); }
+  .navgroup a .m{ font-size:.62rem; font-weight:600; padding:.05rem .32rem; border-radius:4px; letter-spacing:.02em; }
+
+  /* ---------- content ---------- */
+  .content{ padding:2.5rem 1.75rem 6rem; max-width:780px; }
+  .content > header{ margin-bottom:2.5rem; }
+  .eyebrow{ font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--accent-ink); font-weight:600; }
+  h1.title{ font-size:2.1rem; margin:.4rem 0 .75rem; }
+  .lede{ font-size:1.08rem; color:var(--ink-soft); max-width:62ch; }
+
+  .stack{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:1rem; }
+  .chip{ font-size:.75rem; padding:.28rem .6rem; background:var(--surface-2); border:1px solid var(--line); border-radius:20px; color:var(--ink-soft); }
+
+  section.uc{ margin-top:3.2rem; padding-top:2.4rem; border-top:1px solid var(--line); }
+  section.domain-head{ margin-top:4rem; }
+  section.domain-head h2{ font-size:1.55rem; }
+  section.domain-head p{ color:var(--ink-soft); max-width:60ch; }
+
+  .uc-head{ display:flex; align-items:center; gap:.55rem; flex-wrap:wrap; margin-bottom:.6rem; }
+  .pill{ font-size:.72rem; font-weight:700; padding:.22rem .5rem; border-radius:5px; letter-spacing:.03em; }
+  .pill-get{ background:var(--get-bg); color:var(--get-fg); }
+  .pill-post{ background:var(--post-bg); color:var(--post-fg); }
+  .pill-patch{ background:var(--patch-bg); color:var(--patch-fg); }
+  .pill-delete{ background:var(--del-bg); color:var(--del-fg); }
+  .path{ font-size:.92rem; color:var(--ink); }
+  .tag{
+    margin-left:auto; font-size:.72rem; padding:.22rem .55rem; border-radius:20px;
+    background:var(--accent-soft); color:var(--accent-ink); font-weight:600; white-space:nowrap;
+  }
+  .tag.danger{ background:var(--del-bg); color:var(--del-fg); }
+
+  h3.uc-title{ font-size:1.35rem; margin:.2rem 0 .5rem; }
+  .uc p{ max-width:65ch; }
+
+  .callout{
+    margin:1.2rem 0; padding:.9rem 1.1rem; border-left:3px solid var(--accent);
+    background:var(--surface); border-radius:0 8px 8px 0; font-family:"IBM Plex Sans",sans-serif;
+    font-size:.88rem; color:var(--ink-soft);
+  }
+  .callout strong{ color:var(--ink); }
+  .callout.warn{ border-left-color:var(--del-fg); }
+
+  .pipeline{
+    display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin:1rem 0 1.4rem;
+    font-family:"IBM Plex Mono",monospace; font-size:.78rem;
+  }
+  .pipeline .node{ padding:.35rem .6rem; border:1px solid var(--line); border-radius:6px; background:var(--surface); }
+  .pipeline .arrow{ color:var(--ink-soft); }
+
+  .snippet{ margin:1rem 0; }
+  .snippet .cap{
+    font-family:"IBM Plex Mono",monospace; font-size:.72rem; color:var(--ink-soft);
+    background:var(--surface-2); border:1px solid var(--line); border-bottom:none;
+    padding:.35rem .7rem; border-radius:8px 8px 0 0; display:inline-block; min-width:100%;
+  }
+  pre{
+    margin:0; overflow-x:auto; background:var(--surface); border:1px solid var(--line);
+    border-radius:0 0 8px 8px; padding:.9rem 1rem; font-size:.82rem; line-height:1.55;
+  }
+  .snippet:has(.cap) pre{ border-radius:0 0 8px 8px; }
+  pre code{ color:var(--ink); }
+
+  .io-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin:1.2rem 0; }
+  @media (max-width:640px){ .io-grid{ grid-template-columns:1fr; } }
+  .io-grid .cap{ background:var(--surface-2); }
+
+  figure{ margin:1.4rem 0; }
+  figure .cap{ font-size:.78rem; color:var(--ink-soft); font-family:"IBM Plex Sans",sans-serif; margin-top:.5rem; text-align:center; }
+  pre.mermaid{
+    background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:1rem; overflow-x:auto;
+  }
+
+  .access-table{ width:100%; border-collapse:collapse; margin:1.2rem 0; font-family:"IBM Plex Sans",sans-serif; font-size:.85rem; }
+  .access-table th,.access-table td{ text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--line); }
+  .access-table th{ color:var(--ink-soft); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; }
+
+  hr.rule{ border:none; border-top:1px solid var(--line); margin:2.5rem 0; }
+  footer.end{ margin-top:4rem; padding-top:2rem; border-top:1px solid var(--line); color:var(--ink-soft); font-size:.85rem; font-family:"IBM Plex Sans",sans-serif; }
+</style>
+
+<div class="page">
+
+  <nav class="sidebar" aria-label="Endpoint index">
+    <div class="brand">Mind Constructor <small>Backend field guide</small></div>
+
+    <div class="navgroup">
+      <h4>Start here</h4>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#access">Who can do what</a></li>
+      </ul>
+    </div>
+
+    <div class="navgroup">
+      <h4>Auth &amp; users</h4>
+      <ul>
+        <li><a href="#auth-register"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Register</a></li>
+        <li><a href="#auth-login"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Login</a></li>
+        <li><a href="#auth-logout"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Logout</a></li>
+        <li><a href="#auth-users-list"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>List users</a></li>
+        <li><a href="#auth-users-delete"><span class="m" style="background:var(--del-bg);color:var(--del-fg)">DEL</span>Wipe database</a></li>
+        <li><a href="#auth-user-delete"><span class="m" style="background:var(--del-bg);color:var(--del-fg)">DEL</span>Delete a user</a></li>
+        <li><a href="#auth-user-block"><span class="m" style="background:var(--patch-bg);color:var(--patch-fg)">PATCH</span>Block a user</a></li>
+        <li><a href="#auth-user-unblock"><span class="m" style="background:var(--patch-bg);color:var(--patch-fg)">PATCH</span>Unblock a user</a></li>
+      </ul>
+    </div>
+
+    <div class="navgroup">
+      <h4>Maps</h4>
+      <ul>
+        <li><a href="#map-create"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Create map</a></li>
+        <li><a href="#map-list"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>List my maps</a></li>
+        <li><a href="#map-get"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>Get one map</a></li>
+        <li><a href="#map-update"><span class="m" style="background:var(--patch-bg);color:var(--patch-fg)">PATCH</span>Update map</a></li>
+        <li><a href="#map-delete"><span class="m" style="background:var(--del-bg);color:var(--del-fg)">DEL</span>Delete map</a></li>
+        <li><a href="#map-invite"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Invite member</a></li>
+        <li><a href="#map-color"><span class="m" style="background:var(--patch-bg);color:var(--patch-fg)">PATCH</span>Set my color</a></li>
+        <li><a href="#map-summary"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>Map summary</a></li>
+        <li><a href="#map-nodes-list"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>List nodes</a></li>
+      </ul>
+    </div>
+
+    <div class="navgroup">
+      <h4>Nodes</h4>
+      <ul>
+        <li><a href="#node-create"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Create node</a></li>
+        <li><a href="#node-get"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>Get one node</a></li>
+        <li><a href="#node-update"><span class="m" style="background:var(--patch-bg);color:var(--patch-fg)">PATCH</span>Update node</a></li>
+        <li><a href="#node-delete"><span class="m" style="background:var(--del-bg);color:var(--del-fg)">DEL</span>Delete node</a></li>
+        <li><a href="#node-attack"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Attack a node</a></li>
+        <li><a href="#node-attack-history"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>Attack history</a></li>
+      </ul>
+    </div>
+
+    <div class="navgroup">
+      <h4>Edges &amp; insights</h4>
+      <ul>
+        <li><a href="#edge-create"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Create edge</a></li>
+        <li><a href="#edge-delete"><span class="m" style="background:var(--del-bg);color:var(--del-fg)">DEL</span>Delete edge</a></li>
+        <li><a href="#edge-list"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>List edges</a></li>
+        <li><a href="#circle-select"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Select a circle</a></li>
+        <li><a href="#circle-deselect"><span class="m" style="background:var(--post-bg);color:var(--post-fg)">POST</span>Deselect the circle</a></li>
+        <li><a href="#map-attack-indicators"><span class="m" style="background:var(--get-bg);color:var(--get-fg)">GET</span>Attack indicators</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="content">
+
+    <header id="overview">
+      <div class="eyebrow">Backend field guide</div>
+      <h1 class="title">Mind Constructor, endpoint by endpoint</h1>
+      <p class="lede">
+        Mind Constructor is a collaborative decision-mapping tool. A <strong>Map</strong> is one
+        goal or discussion; a <strong>Node</strong> is one branch hanging off it &mdash; a
+        Problem, an Option, a Solution, an outcome. This guide walks through every route the
+        Express API exposes: what it does, who's allowed to call it, and exactly how the request
+        travels from the client down to MongoDB.
+      </p>
+
+      <svg viewBox="0 0 360 100" width="100%" height="100" style="max-width:420px;margin-top:1.4rem" role="img" aria-label="Problem branches into two options, one leads to a solution">
+        <line x1="40" y1="50" x2="150" y2="24" stroke="var(--line)" stroke-width="2"/>
+        <line x1="40" y1="50" x2="150" y2="76" stroke="var(--line)" stroke-width="2"/>
+        <line x1="150" y1="24" x2="290" y2="24" stroke="var(--line)" stroke-width="2"/>
+        <circle cx="40" cy="50" r="10" fill="var(--n-problem)"/>
+        <circle cx="150" cy="24" r="9" fill="var(--n-option)"/>
+        <circle cx="150" cy="76" r="9" fill="var(--n-poption)"/>
+        <circle cx="290" cy="24" r="10" fill="var(--n-solution)"/>
+        <text x="40" y="72" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="var(--ink-soft)">Problem</text>
+        <text x="150" y="14" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="var(--ink-soft)">Option</text>
+        <text x="150" y="96" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="var(--ink-soft)">Problematic option</text>
+        <text x="290" y="14" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="var(--ink-soft)">Solution</text>
+      </svg>
+
+      <div class="stack">
+        <span class="chip">Express 5</span>
+        <span class="chip">TypeScript</span>
+        <span class="chip">Mongoose 9 / MongoDB Atlas</span>
+        <span class="chip">JWT (jsonwebtoken)</span>
+        <span class="chip">bcryptjs</span>
+        <span class="chip">nanoid public ids</span>
+      </div>
+    </header>
+
+    <figure>
+      <pre class="mermaid">
+flowchart LR
+  client["Client app"] -->|"HTTP + Bearer token"| router{"Express Router"}
+  router --> authR["/api/auth/*"]
+  router --> mapR["/api/*"]
+  router --> nodeR["/api/nodes/*"]
+  router --> edgeR["/api/edges/*"]
+  authR --> authC["authController /<br/>userController"]
+  mapR --> protect1[["protect (+ requireAdmin)"]] --> mapC["mapController"]
+  nodeR --> protect2[["protect"]] --> nodeC["nodeController"]
+  edgeR --> protect3[["protect"]] --> edgeC["edgeController"]
+  authC --> authAbl["authAbl / userAbl"]
+  mapC --> mapAbl["mapAbl / clusterAbl /<br/>attackIndicatorAbl"]
+  nodeC --> nodeAbl["nodeAbl / attackAbl"]
+  edgeC --> edgeAbl["edgeAbl"]
+  authAbl --> userDao[("userDao")]
+  authAbl --> mapsDao2[("mapsDao")]
+  mapAbl --> mapsDao[("mapsDao")]
+  mapAbl --> nodeDao2[("nodeDao")]
+  mapAbl --> edgeDao[("edgeDao")]
+  nodeAbl --> nodeDao[("nodeDao")]
+  nodeAbl --> attackDao[("attackDao")]
+  nodeAbl --> mapsDao3[("mapsDao")]
+  edgeAbl --> edgeDao
+  edgeAbl --> mapsDao4[("mapsDao")]
+  edgeAbl --> nodeDao3[("nodeDao")]
+  userDao --> mongo[("MongoDB Atlas")]
+  mapsDao --> mongo
+  mapsDao2 --> mongo
+  mapsDao3 --> mongo
+  mapsDao4 --> mongo
+  nodeDao --> mongo
+  nodeDao2 --> mongo
+  nodeDao3 --> mongo
+  attackDao --> mongo
+  edgeDao --> mongo
+      </pre>
+      <div class="cap">
+        Every request lands in one of four routers, most pass through <code>protect</code> (verifies the JWT;
+        <code>requireAdmin</code> additionally checks <code>role</code>). From there: a controller parses the
+        request and maps errors to status codes &mdash; nothing else; an <strong>ABL</strong> module validates
+        input (mostly zod schemas now) and orchestrates anything spanning more than one collection; a
+        <strong>DAO</strong> is a single Mongo query with no decisions in it. Not every arrow above is drawn to
+        scale &mdash; simple reads like "get one map" skip ABL entirely and go controller&rarr;DAO directly, because
+        there's no validation or orchestration to do. ABL earns its place only where it's actually doing something.
+        The graph-insights functions (<code>clusterAbl</code>, <code>attackIndicatorAbl</code>) are the most ABL
+        anything gets in this app &mdash; almost pure computation, touching the database only to read.
+      </div>
+    </figure>
+
+    <figure>
+      <pre class="mermaid">
+erDiagram
+  USER ||--o{ MAP : owns
+  USER }o--o{ MAP : "member of"
+  MAP ||--o{ NODE : contains
+  USER ||--o{ NODE : creates
+  NODE ||--o{ NODE : "parent of"
+  USER ||--o{ ATTACK : launches
+  NODE ||--o{ ATTACK : "receives"
+  MAP ||--o{ EDGE : contains
+  NODE ||--o{ EDGE : "from / to"
+  USER ||--o{ EDGE : creates
+
+  USER {
+    ObjectId _id
+    string username
+    string email
+    string passwordHash
+    string role "user (default) or admin"
+    boolean isBlocked "blocked users can't authenticate"
+  }
+  MAP {
+    ObjectId _id
+    string mapId "public id, nanoid"
+    string name
+    ObjectId ownerId
+    ObjectId members "array, refs USER"
+    ObjectId memberColors "array of {userId, color}"
+  }
+  NODE {
+    ObjectId _id
+    string nodeId "public id, nanoid"
+    string text
+    string type "Problem / Option / Solution / ... (mandatory)"
+    ObjectId mapId "refs MAP._id"
+    ObjectId userId "creator, refs USER"
+    ObjectId parentId "nullable, self-ref"
+    number health "starts at 100"
+    boolean defeated "true once health hits 0"
+    boolean isWeapon "true for auto-spawned attack-visual nodes"
+    string weaponIcon "sword / axe / spear — only when isWeapon"
+    ObjectId targetNodeId "which node this weapon points at — only when isWeapon"
+  }
+  ATTACK {
+    ObjectId _id
+    ObjectId mapId "refs MAP._id"
+    ObjectId targetNodeId "refs NODE._id"
+    ObjectId attackerId "refs USER._id"
+    string weapon "nitpick / counterpoint / fatalFlaw"
+    number damage "snapshotted at attack time"
+  }
+  EDGE {
+    ObjectId _id
+    string edgeId "public id, nanoid"
+    ObjectId mapId "refs MAP._id"
+    ObjectId fromNodeId "refs NODE._id"
+    ObjectId toNodeId "refs NODE._id"
+    string sentiment "positive / negative / neutral (default)"
+    ObjectId userId "creator, refs USER"
+  }
+      </pre>
+      <div class="cap">Every document keeps Mongo's own <code>_id</code> as its real primary key internally. Map, Node, and Edge additionally carry a short public <code>mapId</code> / <code>nodeId</code> / <code>edgeId</code> &mdash; routes use those, and a schema-level <code>toJSON</code> transform strips <code>_id</code> (and Mongoose's internal <code>__v</code>) out of every response so the raw Mongo id never leaks out. User and Attack don't have a public id of their own yet, so their <code>_id</code> stays in responses &mdash; only <code>__v</code> is stripped from those.</div>
+    </figure>
+
+    <section id="access">
+      <h2>Who can do what</h2>
+      <p style="color:var(--ink-soft)">Six access levels repeat across every endpoint below. Once you recognize them, the whole API is really just these six rules applied to three resources.</p>
+      <table class="access-table">
+        <tr><th>Level</th><th>Means</th></tr>
+        <tr><td>No auth</td><td>Anyone can call it &mdash; no token needed</td></tr>
+        <tr><td>Any signed-in user</td><td>Valid JWT required; no further check</td></tr>
+        <tr><td>Map member</td><td>Your user id must be in the map's <code>members</code> array (the owner is auto-added on creation)</td></tr>
+        <tr><td>Map owner</td><td>Your user id must equal the map's <code>ownerId</code></td></tr>
+        <tr><td>Node creator</td><td>Your user id must equal the node's <code>userId</code></td></tr>
+        <tr><td>Admin</td><td>Your user document has <code>role: "admin"</code> &mdash; see <a href="#admin-bootstrap">Becoming an admin</a></td></tr>
+      </table>
+      <div class="callout">
+        <strong>The pattern to notice:</strong> the first five are almost never enforced with an <code>if</code>-statement
+        and a 403. They're baked straight into the MongoDB filter &mdash; e.g. <code>Map.findOneAndUpdate({ mapId, ownerId: userId }, ...)</code>
+        simply never matches a document you don't own, so the DAO returns <code>null</code> and the controller turns that into
+        a 404. Fewer branches, and it's structurally impossible to forget the check in one code path but not another.
+        <strong>Admin is the one deliberate exception</strong> &mdash; it's a real <code>if (req.user.role !== "admin")</code>
+        in a dedicated <code>requireAdmin</code> middleware, because "admin" isn't a property of any document being
+        queried, so there's no filter to hide the check inside.
+      </div>
+    </section>
+
+    <!-- ============================================================ AUTH ============================================================ -->
+    <section class="domain-head">
+      <div class="eyebrow">Domain</div>
+      <h2>Auth &amp; users</h2>
+      <p>Accounts, login, and two endpoints that manage the whole user table &mdash; useful for local development, dangerous anywhere else.</p>
+    </section>
+
+    <section class="uc" id="auth-register">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/auth/register</span>
+        <span class="tag">No auth</span>
+      </div>
+      <h3 class="uc-title">Register</h3>
+      <p>Creates a user. The password is never stored &mdash; only a bcrypt hash of it &mdash; and a JWT is issued immediately so the client is logged in the moment they sign up.</p>
+
+      <figure>
+        <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant Ctrl as authController
+  participant Abl as authAbl
+  participant Dao as userDao
+  participant DB as MongoDB
+
+  C->>Ctrl: POST /api/auth/register {username, email, password}
+  Ctrl->>Abl: registerAbl(req.body)
+  Abl->>Abl: zod: username/email/password valid?
+  Abl->>Dao: findUserByEmailDao(email)
+  Dao->>DB: User.findOne({email})
+  DB-->>Abl: null (email is free)
+  Abl->>Dao: createUserDao({username, email, password})
+  Dao->>Dao: bcrypt.hash(password, salt)
+  Dao->>DB: User.create({username, email, passwordHash})
+  DB-->>Abl: new User
+  Abl->>Abl: jwt.sign({id: user._id}, JWT_SECRET, 7d)
+  Abl-->>Ctrl: {user, token}
+  Ctrl-->>C: 201 {token, user}
+        </pre>
+      </figure>
+
+      <div class="snippet">
+        <span class="cap">src/abl/authAbl.ts</span>
+<pre><code>const registerSchema = z.object({
+  username: z.string().min(1, "username is required"),
+  email: z.string().min(1, "email is required").email("must be a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export const registerAbl = async (input: unknown) => {
+  const { username, email, password } = parseOrThrow(registerSchema, input);
+
+  const existing = await findUserByEmailDao(email);
+  if (existing) throw new EmailAlreadyInUseError();
+
+  const user = await createUserDao({ username, email, password });
+  const token = generateToken(user._id.toString());
+  return { user, token };
+};</code></pre>
+      </div>
+      <div class="callout">
+        400 error messages now come straight from the zod schema (e.g. <code>"Password must be at least 6 characters"</code>)
+        instead of a hand-written string in the controller &mdash; same wording as before for this one, but it's no
+        longer duplicated logic if a second endpoint needs the same rule.
+      </div>
+
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY</span>
+<pre><code>{
+  "username": "alice",
+  "email": "alice@test.com",
+  "password": "secret123"
+}</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 201</span>
+<pre><code>{
+  "success": true,
+  "token": "eyJhbGciOi...",
+  "user": {
+    "_id": "665f...",
+    "username": "alice",
+    "email": "alice@test.com"
+  }
+}</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">400 if any field is missing or the password is under 6 characters. 409 if the email is already taken.</p>
+    </section>
+
+    <section class="uc" id="auth-login">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/auth/login</span>
+        <span class="tag">No auth</span>
+      </div>
+      <h3 class="uc-title">Login</h3>
+      <p>Looks the user up by email, compares the submitted password against the stored bcrypt hash, and issues a fresh 7-day JWT on success.</p>
+
+      <figure>
+        <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant Ctrl as authController
+  participant Abl as authAbl
+  participant Dao as userDao
+  participant DB as MongoDB
+
+  C->>Ctrl: POST /api/auth/login {email, password}
+  Ctrl->>Abl: loginAbl(req.body)
+  Abl->>Dao: findUserByEmailDao(email)
+  Dao->>DB: User.findOne({email})
+  DB-->>Abl: user (with passwordHash)
+  Abl->>Abl: bcrypt.compare(password, user.passwordHash)
+  alt matches
+    Abl->>Abl: jwt.sign({id: user._id})
+    Abl-->>Ctrl: {user, token}
+    Ctrl-->>C: 200 {token, user}
+  else no match
+    Abl-->>Ctrl: throws InvalidCredentialsError
+    Ctrl-->>C: 401 Invalid email or password
+  end
+        </pre>
+      </figure>
+
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY</span>
+<pre><code>{
+  "email": "alice@test.com",
+  "password": "secret123"
+}</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>{
+  "success": true,
+  "token": "eyJhbGciOi...",
+  "user": { "_id": "665f...", "username": "alice", "email": "alice@test.com" }
+}</code></pre></div>
+      </div>
+
+      <div class="callout">
+        Every route marked <strong>map member</strong>, <strong>map owner</strong>, or <strong>node creator</strong>
+        below relies on this token. <code>protect</code> (in <code>src/middleware/auth.ts</code>) reads the
+        <code>Authorization: Bearer &lt;token&gt;</code> header, verifies it with <code>jwt.verify</code>, loads the
+        user, and attaches it as <code>req.user</code> before your controller ever runs.
+      </div>
+    </section>
+
+    <section class="uc" id="auth-logout">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/auth/logout</span>
+        <span class="tag">No auth</span>
+      </div>
+      <h3 class="uc-title">Logout</h3>
+      <p>JWTs are stateless &mdash; the server never stores which tokens are "active", so it has nothing to revoke.
+      This endpoint just returns a confirmation message; the actual logout is the client deleting its copy of the token.</p>
+      <div class="pipeline">
+        <span class="node">POST /api/auth/logout</span><span class="arrow">&rarr;</span>
+        <span class="node">logout()</span><span class="arrow">&rarr;</span>
+        <span class="node">200 "remove the token from your client"</span>
+      </div>
+    </section>
+
+    <section class="uc" id="auth-users-list">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/auth/users</span>
+        <span class="tag">Any signed-in user</span>
+      </div>
+      <h3 class="uc-title">List all users</h3>
+      <p>Returns every registered user, with <code>passwordHash</code> stripped by <code>toPublicUser()</code> before it leaves the controller.</p>
+      <div class="pipeline">
+        <span class="node">GET /api/auth/users</span><span class="arrow">&rarr;</span>
+        <span class="node">protect</span><span class="arrow">&rarr;</span>
+        <span class="node">getAllUsers()</span><span class="arrow">&rarr;</span>
+        <span class="node">getAllUsersDao()</span><span class="arrow">&rarr;</span>
+        <span class="node">User.find({})</span>
+      </div>
+      <div class="callout">
+        Deliberately <em>not</em> admin-gated &mdash; every other user needs this to find an id for
+        <a href="#map-invite">Invite a member</a>. Gating it would break invites, not tighten security.
+        Everything below it, on the other hand, is admin-only.
+      </div>
+    </section>
+
+    <section class="uc" id="auth-users-delete">
+      <div class="uc-head">
+        <span class="pill pill-delete">DEL</span><span class="path">/api/auth/users</span>
+        <span class="tag danger">Admin &mdash; wipes everything</span>
+      </div>
+      <h3 class="uc-title">Delete all users (and all their maps &amp; nodes)</h3>
+      <p>Empties the <em>entire</em> <code>User</code>, <code>Map</code>, and <code>Node</code> collections in one call. For resetting a dev/test database.</p>
+      <div class="pipeline">
+        <span class="node">DELETE /api/auth/users</span><span class="arrow">&rarr;</span>
+        <span class="node">protect</span><span class="arrow">&rarr;</span>
+        <span class="node">requireAdmin</span><span class="arrow">&rarr;</span>
+        <span class="node">deleteAll()</span><span class="arrow">&rarr;</span>
+        <span class="node">deleteAllDao()</span>
+      </div>
+      <div class="snippet">
+        <span class="cap">src/dao/userDao.ts</span>
+<pre><code>export const deleteAllDao = async () => {
+  const [users, maps, nodes] = await Promise.all([
+    User.deleteMany({}),
+    Map.deleteMany({}),
+    Node.deleteMany({}),
+  ]);
+  return { users, maps, nodes };
+};</code></pre>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">403 <code>{ "error": "Admin access required" }</code> for anyone without <code>role: "admin"</code>. Still worth treating carefully even as an admin &mdash; it's irreversible and genuinely scoped to everything, not just your own data.</p>
+    </section>
+
+    <section class="uc" id="auth-user-delete">
+      <div class="uc-head">
+        <span class="pill pill-delete">DEL</span><span class="path">/api/auth/users/{id}</span>
+        <span class="tag danger">Admin</span>
+      </div>
+      <h3 class="uc-title">Delete a specific user</h3>
+      <p>The most involved <strong>ABL</strong> orchestration in the app &mdash; deleting a user isn't one query, it's a sequence spanning three collections, which is exactly what doesn't belong stuffed into a controller or a single-purpose DAO function.</p>
+
+      <figure>
+        <pre class="mermaid">
+sequenceDiagram
+  participant C as Client (admin)
+  participant Ctrl as userController
+  participant Abl as userAbl
+  participant MDao as mapsDao
+  participant UDao as userDao
+
+  C->>Ctrl: DELETE /api/auth/users/{id}
+  Ctrl->>Abl: adminDeleteUserAbl(targetId, adminId)
+  Abl->>Abl: targetId === adminId? throw CannotActOnSelfError
+  Abl->>UDao: findUserByIdDao(targetId)
+  UDao-->>Abl: user (or null -> throw UserNotFoundError)
+  Abl->>MDao: listMapsByOwnerDao(targetId)
+  loop each owned map
+    Abl->>MDao: deleteMapDao(map.mapId, targetId)
+    Note right of MDao: cascades to that map's nodes too
+  end
+  Abl->>MDao: removeUserFromMapsDao(targetId)
+  Note right of MDao: pulls them out of members + memberColors elsewhere
+  Abl->>UDao: deleteUserDao(targetId)
+  Abl-->>Ctrl: { deletedUserId, deletedOwnedMaps }
+  Ctrl-->>C: 200
+        </pre>
+      </figure>
+
+      <div class="snippet">
+        <span class="cap">src/abl/userAbl.ts</span>
+<pre><code>export const adminDeleteUserAbl = async (targetUserId, adminId) => {
+  if (targetUserId === adminId) throw new CannotActOnSelfError(...);
+
+  const user = await findUserByIdDao(targetUserId);
+  if (!user) throw new UserNotFoundError();
+
+  // Delete everything they own (deleteMapDao cascades to nodes already).
+  const ownedMaps = await listMapsByOwnerDao(targetUserId);
+  for (const map of ownedMaps) {
+    await deleteMapDao(map.mapId, targetUserId);
+  }
+
+  // Unlink them from maps they were just a member of.
+  await removeUserFromMapsDao(targetUserId);
+
+  await deleteUserDao(targetUserId);
+  return { deletedUserId: targetUserId, deletedOwnedMaps: ownedMaps.length };
+};</code></pre>
+      </div>
+
+      <div class="callout">
+        <strong>What's deliberately left alone:</strong> nodes this user created on maps they don't <em>own</em>
+        (i.e. maps where they were just a contributor) are left in place. Deleting someone's account shouldn't
+        erase other people's shared discussion just because one contributor is gone &mdash; their <code>userId</code>
+        reference on those nodes simply becomes dangling, and <code>populate("userId", "username")</code> resolves
+        it to <code>null</code> from then on.
+      </div>
+
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>{ "success": true, "deletedUserId": "665e...", "deletedOwnedMaps": 2 }</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 400 (deleting yourself)</span>
+<pre><code>{ "success": false, "error": "You can't delete your own account" }</code></pre></div>
+      </div>
+    </section>
+
+    <section class="uc" id="auth-user-block">
+      <div class="uc-head">
+        <span class="pill pill-patch">PATCH</span><span class="path">/api/auth/users/{id}/block</span>
+        <span class="tag danger">Admin</span>
+      </div>
+      <h3 class="uc-title">Block a user</h3>
+      <p>
+        Sets <code>isBlocked: true</code> &mdash; a much gentler moderation tool than deleting: reversible, and it
+        keeps all their data intact. This is the one place in the whole API where you can see the payoff of
+        <a href="#auth-login">the JWT statelessness trade-off</a> discussed earlier: blocking works instantly, on
+        the <em>next</em> request, with no waiting for a token to expire.
+      </p>
+      <div class="snippet">
+        <span class="cap">src/middleware/auth.ts</span>
+<pre><code>const user = await findUserByIdDao(decoded.id); // re-checked on every request
+
+if (user.isBlocked) {
+  return res.status(403).json({ success: false, error: "This account has been blocked" });
+}</code></pre>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">400 if you try to block yourself, 404 if the target doesn't exist.</p>
+    </section>
+
+    <section class="uc" id="auth-user-unblock">
+      <div class="uc-head">
+        <span class="pill pill-patch">PATCH</span><span class="path">/api/auth/users/{id}/unblock</span>
+        <span class="tag danger">Admin</span>
+      </div>
+      <h3 class="uc-title">Unblock a user</h3>
+      <p>Sets <code>isBlocked: false</code>. Same shape as Block, no self-check needed (unblocking yourself isn't a risk).</p>
+    </section>
+
+    <section id="admin-bootstrap" class="callout" style="margin-top:2rem">
+      <strong>Becoming an admin:</strong> there's no in-app promotion endpoint &mdash; that would be a
+      privilege-escalation hole waiting to happen. Instead:
+      <div class="pipeline" style="margin-top:.6rem">
+        <span class="node">npm run admin:promote -- someone@example.com</span>
+      </div>
+      That runs <code>scripts/promoteAdmin.ts</code> locally against the same database the app uses, setting
+      <code>role: "admin"</code> directly. No new login needed &mdash; <code>protect</code> reads <code>role</code>
+      fresh from the database on every request, so an <em>already-issued</em> token becomes an admin token the
+      moment the database record changes.
+    </section>
+
+    <!-- ============================================================ MAPS ============================================================ -->
+    <section class="domain-head">
+      <div class="eyebrow">Domain</div>
+      <h2>Maps</h2>
+      <p>
+        A Map is one goal or discussion board. It's mounted at bare <code>/api</code> (not <code>/api/maps</code>) &mdash;
+        so "create a map" is <code>POST /api/</code>, and "get one map" is <code>GET /api/&lt;mapId&gt;</code>.
+      </p>
+    </section>
+
+    <section class="uc" id="map-create">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/</span>
+        <span class="tag">Any signed-in user</span>
+      </div>
+      <h3 class="uc-title">Create a map</h3>
+      <p>The caller automatically becomes the owner and first member. A short public <code>mapId</code> is generated right here &mdash; that's the id every other Map/Node route uses from now on, never Mongo's own <code>_id</code>. <code>ownerColor</code> is mandatory: you can't create a map without also picking the color your contributions will show up as. An optional <code>template</code> seeds a starting node structure via <code>createNodeAbl</code> right after the map itself is created &mdash; see <code>MAP_TEMPLATES</code> below; omit it (or send <code>"blank"</code>) for today's long-standing behavior of an empty canvas.</p>
+
+      <figure>
+        <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant M as protect
+  participant Ctrl as mapController
+  participant Abl as mapAbl
+  participant Dao as mapsDao
+  participant NodeAbl as nodeAbl
+  participant DB as MongoDB
+
+  C->>M: POST /api/ + Bearer token
+  M->>M: jwt.verify(token) -> req.user
+  M->>Ctrl: createMap(req, res)
+  Ctrl->>Abl: createMapAbl(req.body, ownerId)
+  Abl->>Abl: zod: name required, ownerColor is a hex color, template is one of MAP_TEMPLATES
+  Abl->>Dao: createMapDao({...parsed, ownerId})
+  Dao->>Dao: nanoid(10) -> public mapId
+  Dao->>DB: Map.create({mapId, ownerId, members, memberColors:[{userId, color}]})
+  DB-->>Abl: new Map
+  opt template is set and isn't "blank"
+    Abl->>NodeAbl: createNodeAbl(...) per template node, parent before children
+    NodeAbl-->>Abl: created node (its public nodeId feeds the next child's parentId)
+  end
+  Abl-->>Ctrl: map
+  Ctrl-->>C: 201 map
+        </pre>
+      </figure>
+
+      <div class="snippet">
+        <span class="cap">src/abl/mapAbl.ts</span>
+<pre><code>const MAP_TEMPLATES = {
+  blank: [],
+  "single-problem": [{ text: "Problem", type: "Problem" }],
+  "decision-tree": [{ text: "Problem", type: "Problem", children: [
+    { text: "Option A", type: "Option" },
+    { text: "Option B", type: "Option" },
+  ]}],
+  "pro-con": [{ text: "Topic", type: "unknown", children: [
+    { text: "Solution", type: "Solution" },
+    { text: "Problematic option", type: "Problematic option" },
+  ]}],
+};
+
+const createMapSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  ownerColor: hexColor("ownerColor"),
+  color: hexColor("color").optional(),
+  template: z.enum(Object.keys(MAP_TEMPLATES)).optional(),
+});
+
+export const createMapAbl = async (input: unknown, ownerId: string) => {
+  const { template, ...parsed } = parseOrThrow(createMapSchema, input);
+  const map = await createMapDao({ ...parsed, ownerId });
+  if (template && template !== "blank") {
+    await seedTemplateNodes(MAP_TEMPLATES[template], null, map.mapId, ownerId);
+  }
+  return map;
+};</code></pre>
+      </div>
+
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY</span>
+<pre><code>{
+  "name": "Discussion about AI",
+  "color": "#4f46e5",
+  "ownerColor": "#22c55e",
+  "template": "decision-tree"
+}</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 201</span>
+<pre><code>{
+  "mapId": "aB3xQ9kLm2",
+  "name": "Discussion about AI",
+  "ownerId": "665e...",
+  "members": ["665e..."],
+  "memberColors": [{ "userId": "665e...", "color": "#22c55e" }],
+  "color": "#4f46e5"
+}</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">400 if <code>name</code> or <code>ownerColor</code> is missing, <code>ownerColor</code> isn't a valid hex color (<code>#rgb</code> or <code>#rrggbb</code>), or <code>template</code> isn't one of <code>MAP_TEMPLATES</code>' keys. Don't confuse <code>ownerColor</code> with the map's own <code>color</code> field above &mdash; that's the board's cosmetic color; <code>ownerColor</code>/<code>memberColors</code> is per-person, for telling contributors apart. The response is the map itself, same shape either way &mdash; any seeded template nodes only show up via <code>GET /api/:mapId/nodes</code>, same as if they'd been created one at a time right after.</p>
+    </section>
+
+    <section class="uc" id="map-list">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/?filter=owned</span>
+        <span class="tag">Any signed-in user</span>
+      </div>
+      <h3 class="uc-title">List my maps</h3>
+      <p>Returns maps scoped to the caller. <code>filter</code> is an optional query-string parameter &mdash; <code>"all"</code> (owned + shared, the default), <code>"owned"</code>, or <code>"shared"</code>.</p>
+      <div class="pipeline">
+        <span class="node">GET /api/?filter=owned</span><span class="arrow">&rarr;</span>
+        <span class="node">getAllMaps()</span><span class="arrow">&rarr;</span>
+        <span class="node">getMapsDao(userId, filter)</span>
+      </div>
+      <div class="snippet">
+        <span class="cap">src/dao/mapsDao.ts</span>
+<pre><code>switch (filterType) {
+  case "owned":  return await Map.find({ ownerId: currentUserId });
+  case "shared": return await Map.find({ members: currentUserId, ownerId: { $ne: currentUserId } });
+  case "all":
+  default:       return await Map.find({ $or: [{ members: currentUserId }] });
+}</code></pre>
+      </div>
+    </section>
+
+    <section class="uc" id="map-get">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/{mapId}</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Get one map</h3>
+      <p>One query does the lookup <em>and</em> the authorization check together &mdash; if you're not a member, the filter simply never matches.</p>
+      <div class="snippet">
+        <span class="cap">src/dao/mapsDao.ts</span>
+<pre><code>export const getMapByIdDao = async (publicMapId, userId) => {
+  return await Map.findOne({
+    mapId: publicMapId,
+    $or: [{ members: userId }],
+  }).exec();
+};</code></pre>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">404 <code>Map not found</code> either way &mdash; a non-member gets the same response as a truly nonexistent map, so the API never confirms a map's existence to someone who isn't part of it.</p>
+    </section>
+
+    <section class="uc" id="map-update">
+      <div class="uc-head">
+        <span class="pill pill-patch">PATCH</span><span class="path">/api/{mapId}</span>
+        <span class="tag">Map owner</span>
+      </div>
+      <h3 class="uc-title">Update a map</h3>
+      <p>Send only the fields you're changing. Same pattern as above, but the filter checks <code>ownerId</code> instead of <code>members</code> &mdash; only the owner may rename/recolor/move the map, or flip <code>discussionMode</code> (see <a href="#node-attack">Combat</a>) once it's already live, not just at creation.</p>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY (partial)</span>
+<pre><code>{ "name": "Renamed board", "color": "#22c55e", "discussionMode": true }</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>{ "success": true, "map": { "mapId": "aB3xQ9kLm2", "name": "Renamed board", "discussionMode": true, ... } }</code></pre></div>
+      </div>
+    </section>
+
+    <section class="uc" id="map-delete">
+      <div class="uc-head">
+        <span class="pill pill-delete">DEL</span><span class="path">/api/{mapId}</span>
+        <span class="tag">Map owner</span>
+      </div>
+      <h3 class="uc-title">Delete a map</h3>
+      <p>Owner-only, and cascades: every node on the map is deleted first, then the map itself.</p>
+      <div class="snippet">
+        <span class="cap">src/dao/mapsDao.ts</span>
+<pre><code>export const deleteMapDao = async (publicMapId, userId) => {
+  const map = await Map.findOne({ mapId: publicMapId, $or: [{ ownerId: userId }] });
+  if (!map) return null; // doesn't exist, or you're not the owner
+
+  await Node.deleteMany({ mapId: map._id });
+  return await Map.findByIdAndDelete(map._id);
+};</code></pre>
+      </div>
+    </section>
+
+    <section class="uc" id="map-invite">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/{mapId}/invite</span>
+        <span class="tag">Map owner</span>
+      </div>
+      <h3 class="uc-title">Invite a member</h3>
+      <p>Adds another user's id to the map's <code>members</code> array (via <code>$addToSet</code>, so inviting the same person twice is harmless). Only the owner can invite.</p>
+
+      <figure>
+        <pre class="mermaid">
+sequenceDiagram
+  participant C as Client (owner)
+  participant Ctrl as mapController
+  participant Dao as mapsDao
+  participant DB as MongoDB
+
+  C->>Ctrl: POST /api/{mapId}/invite {userIdToInvite}
+  Ctrl->>Dao: inviteUserToMapDao(mapId, userIdToInvite, currentUserId)
+  Dao->>DB: Map.findOne({mapId})
+  DB-->>Dao: map
+  Dao->>DB: findOneAndUpdate({_id: map._id, ownerId: currentUserId}, addToSet members)
+  alt caller is owner
+    DB-->>Dao: updated map
+    Dao-->>Ctrl: map
+    Ctrl-->>C: 200 {map}
+  else caller is not owner
+    DB-->>Dao: null
+    Dao-->>Ctrl: null
+    Ctrl-->>C: 404 Map not found
+  end
+        </pre>
+      </figure>
+
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY</span>
+<pre><code>{ "userIdToInvite": "665abc..." }</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>{
+  "success": true,
+  "map": { "mapId": "aB3xQ9kLm2", "members": [ { "username": "alice" }, { "username": "bob" } ] }
+}</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)"><code>userIdToInvite</code> is the invitee's Mongo <code>_id</code> &mdash; get it from "List all users" or from your own frontend's user picker.</p>
+    </section>
+
+    <section class="uc" id="map-color">
+      <div class="uc-head">
+        <span class="pill pill-patch">PATCH</span><span class="path">/api/{mapId}/color</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Set my color on this map</h3>
+      <p>
+        There's no "accept invite" step in this API &mdash; <a href="#map-invite">Invite a member</a>
+        adds someone to <code>members</code> immediately. So this is where the "when you're invited,
+        pick your own color" part actually happens: any current member (the owner included) calls
+        this themselves, whenever they like, to set or change their color. Two members can't hold
+        the same color on one map at the same time.
+      </p>
+      <p>
+        Notice the split: <em>whether</em> a color is available is a business rule (does anyone else on this
+        map already have it?) &mdash; that lives in <code>mapAbl.ts</code>. The DAO underneath doesn't know
+        "taken" is a concept; it just pulls the old entry and pushes the new one when told to.
+      </p>
+      <div class="snippet">
+        <span class="cap">src/abl/mapAbl.ts</span>
+<pre><code>export const setMapColorAbl = async (publicMapId, userId, input) => {
+  const { color } = parseOrThrow(setColorSchema, input);
+
+  const map = await getMapByIdDao(publicMapId, userId);
+  if (!map) return null; // doesn't exist, or you're not a member
+
+  const takenByOther = map.memberColors.some(
+    (mc) => mc.userId.toString() !== userId.toString()
+         && mc.color.toLowerCase() === color.toLowerCase(),
+  );
+  if (takenByOther) throw new ColorTakenError();
+
+  return await setMemberColorMutationDao(map._id, userId, color);
+};</code></pre>
+      </div>
+      <div class="snippet">
+        <span class="cap">src/dao/mapsDao.ts</span>
+<pre><code>// Pure mutation — no decisions, just remove the old entry and add the new one.
+export const setMemberColorMutationDao = async (mapInternalId, userId, color) => {
+  await Map.updateOne({ _id: mapInternalId }, { $pull: { memberColors: { userId } } });
+  await Map.updateOne({ _id: mapInternalId }, { $push: { memberColors: { userId, color } } });
+  return await Map.findById(mapInternalId);
+};</code></pre>
+      </div>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY</span>
+<pre><code>{ "color": "#f59e0b" }</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 409 (color taken)</span>
+<pre><code>{ "success": false, "error": "That color is already taken by another member of this map" }</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">400 if <code>color</code> is missing or not a valid hex color. 404 if the map doesn't exist or you're not a member.</p>
+    </section>
+
+    <section class="uc" id="map-summary">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/{mapId}/summary</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Get map summary</h3>
+      <p>Returns the map plus its total node count.</p>
+      <div class="pipeline">
+        <span class="node">GET /api/{mapId}/summary</span><span class="arrow">&rarr;</span>
+        <span class="node">getMapSummary()</span><span class="arrow">&rarr;</span>
+        <span class="node">getMapSummaryDao(mapId, userId)</span><span class="arrow">&rarr;</span>
+        <span class="node">Map.findOne({mapId, members: userId}) + Node.countDocuments</span>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">Now matches every other map-read endpoint's membership check &mdash; 404 for both "doesn't exist" and "you're not a member."</p>
+    </section>
+
+    <section class="uc" id="map-nodes-list">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/{mapId}/nodes</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">List all nodes on a map</h3>
+      <p>The real "give me the whole tree" endpoint &mdash; every node on the map, populated with each creator's username, visible to any member (not just the ones you personally created).</p>
+      <div class="snippet">
+        <span class="cap">src/dao/mapsDao.ts</span>
+<pre><code>export const getNodesByMapDao = async (publicMapId, userId) => {
+  const map = await Map.findOne({ mapId: publicMapId, members: userId });
+  if (!map) return null; // not found, or you're not a member
+
+  return await Node.find({ mapId: map._id }).populate("userId", "username");
+};</code></pre>
+      </div>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>[
+  {
+    "nodeId": "k4Tz1PqXaB",
+    "text": "Ship v1 by Friday", "type": "Problem",
+    "health": 75, "defeated": false,
+    "userId": { "_id": "665e...", "username": "alice" },
+    "parentId": null
+  },
+  {
+    "nodeId": "9mWs2LdQoY",
+    "text": "Cut scope", "type": "Option",
+    "userId": { "_id": "665e...", "username": "bob" },
+    "parentId": "665f..."
+  }
+]</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 404 (not a member)</span>
+<pre><code>{ "success": false, "error": "Map not found" }</code></pre></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ NODES ============================================================ -->
+    <section class="domain-head">
+      <div class="eyebrow">Domain</div>
+      <h2>Nodes</h2>
+      <p>
+        A Node is one entry in the tree hanging off a Map &mdash; mandatorily classified by
+        <code>type</code>
+        (<span class="mono-text" style="color:var(--n-problem)">Problem</span>,
+        <span class="mono-text" style="color:var(--n-poption)">Problematic option</span>,
+        <span class="mono-text" style="color:var(--n-option)">Option</span>,
+        <span class="mono-text" style="color:var(--n-solution)">Solution</span>,
+        <span class="mono-text" style="color:var(--n-success)">Success</span>,
+        <span class="mono-text" style="color:var(--n-fail)">Fail</span>, or
+        <span class="mono-text" style="color:var(--n-unknown)">unknown</span> as a conscious "not
+        categorized yet" choice), and linked to its parent node via <code>parentId</code> for the
+        tree shape. Mounted at <code>/api/nodes</code>.
+      </p>
+      <p>
+        Nodes also carry combat state &mdash; <code>health</code> (starts at 100) and
+        <code>defeated</code> &mdash; used by the Attack endpoints further down.
+      </p>
+      <div class="callout">
+        Reading and writing a node are checked completely differently &mdash; that split is the
+        main thing worth internalizing about this domain:
+      </div>
+    </section>
+
+    <section class="uc" id="node-create">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/nodes/{mapId}</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Create a node</h3>
+      <p>Only members of the target map may add to it. <code>isFirstNode</code> is computed by counting the map's existing nodes before this one is inserted &mdash; a convenience flag for the frontend to know it just created the root node.</p>
+      <div class="callout">
+        The clearest case in the app for why ABL exists: creating a node is a membership check, a zod
+        validation, a count, <em>and</em> an insert &mdash; four steps across two collections, coordinated
+        around one decision (is this the first node?). None of that belongs jammed into the controller or
+        bolted onto a single-purpose DAO function.
+      </div>
+
+      <figure>
+        <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant Ctrl as nodeController
+  participant Abl as nodeAbl
+  participant MDao as mapsDao
+  participant NDao as nodeDao
+  participant DB as MongoDB
+
+  C->>Ctrl: POST /api/nodes/{mapId} {text, type, parentId, ...}
+  Ctrl->>Abl: createNodeAbl(req.body, mapId, userId)
+  Abl->>Abl: zod: text + type required
+  Abl->>MDao: getMapByIdDao(mapId, userId)
+  MDao->>DB: Map.findOne({mapId, members: userId})
+  alt caller is a member
+    DB-->>Abl: map
+    Abl->>NDao: countNodesByMapInternalIdDao(map._id)
+    NDao->>DB: Node.countDocuments({mapId: map._id})
+    DB-->>Abl: count -> isFirstNode
+    Abl->>NDao: createNodeMutationDao(map._id, {...parsed, isFirstNode})
+    NDao->>DB: Node.create({nodeId: nanoid(10), mapId: map._id, ...})
+    DB-->>Abl: new node
+    Abl-->>Ctrl: node
+    Ctrl-->>C: 201 node
+  else not a member
+    DB-->>Abl: null
+    Abl-->>Ctrl: throws MapNotFoundError
+    Ctrl-->>C: 404 Map not found
+  end
+        </pre>
+      </figure>
+
+      <div class="snippet">
+        <span class="cap">src/abl/nodeAbl.ts</span>
+<pre><code>export const createNodeAbl = async (input, publicMapId, userId) => {
+  const parsed = parseOrThrow(createNodeSchema, input);
+
+  const map = await getMapByIdDao(publicMapId, userId);
+  if (!map) throw new MapNotFoundError();
+
+  const isFirstNode = (await countNodesByMapInternalIdDao(map._id)) === 0;
+
+  return await createNodeMutationDao(map._id, { ...parsed, userId, isFirstNode });
+};</code></pre>
+      </div>
+
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY</span>
+<pre><code>{
+  "text": "Ship v1 by Friday",
+  "type": "Problem",
+  "x": 100, "y": 200,
+  "parentId": null
+}</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 201</span>
+<pre><code>{
+  "nodeId": "k4Tz1PqXaB",
+  "text": "Ship v1 by Friday", "type": "Problem",
+  "mapId": "665d...", "userId": "665e...",
+  "isFirstNode": true, "parentId": null,
+  "health": 100, "defeated": false
+}</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">
+        <code>type</code> is <strong>mandatory</strong> &mdash; 400 if it's missing or isn't one of the
+        seven values above. That's deliberate: it forces whoever's adding a node to actually decide what
+        kind of claim it is, rather than leaving everything uncategorized by default. For a child node,
+        pass an existing node's <code>nodeId</code> as <code>parentId</code>.
+      </p>
+    </section>
+
+    <section class="uc" id="node-get">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/nodes/{nodeId}</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Get one node</h3>
+      <p>Fetches a single node &mdash; but the permission check isn't on the node itself, it's on <em>the map the node belongs to</em>.</p>
+      <div class="snippet">
+        <span class="cap">src/dao/nodeDao.ts</span>
+<pre><code>export const findNodeDao = async (publicNodeId, userId) => {
+  const node = await findNodeByPublicIdDao(publicNodeId);
+  if (!node) return null;
+
+  const isMember = await isMapMemberDao(node.mapId, userId);
+  if (!isMember) return null;
+
+  return node;
+};</code></pre>
+      </div>
+    </section>
+
+    <section class="uc" id="node-update">
+      <div class="uc-head">
+        <span class="pill pill-patch">PATCH</span><span class="path">/api/nodes/{nodeId}</span>
+        <span class="tag">Node creator</span>
+      </div>
+      <h3 class="uc-title">Update a node</h3>
+      <p>Narrower than reading: only whoever <em>created</em> this specific node can edit it &mdash; being a fellow map member isn't enough. Includes <code>symbolOverride</code> (<code>"check"</code> | <code>"cross"</code> | <code>null</code>) &mdash; manually forces the OutcomeBadge inner symbol regardless of <code>type</code>; <code>null</code> clears it back to the type's own default. Only meaningful on an outcome type (not <code>"unknown"</code>), but nothing stops setting it on any type &mdash; it simply won't be visible until the node's type would draw an OutcomeBadge at all.</p>
+      <div class="snippet">
+        <span class="cap">src/dao/nodeDao.ts</span>
+<pre><code>export const updateNodeDao = async (publicNodeId, userId, updates) => {
+  return await Node.findOneAndUpdate(
+    { nodeId: publicNodeId, userId }, // must be the creator
+    { $set: updates },
+    { new: true, runValidators: true },
+  );
+};</code></pre>
+      </div>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY (partial)</span>
+<pre><code>{ "text": "Ship v1 by next Friday", "type": "Solution" }</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 404 (not your node)</span>
+<pre><code>{ "success": false, "error": "Node not found" }</code></pre></div>
+      </div>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY (symbol override)</span>
+<pre><code>{ "symbolOverride": "check" }</code></pre></div>
+        <div class="snippet"><span class="cap">REQUEST BODY (clear it)</span>
+<pre><code>{ "symbolOverride": null }</code></pre></div>
+      </div>
+    </section>
+
+    <section class="uc" id="node-delete">
+      <div class="uc-head">
+        <span class="pill pill-delete">DEL</span><span class="path">/api/nodes/{nodeId}</span>
+        <span class="tag">Node creator</span>
+      </div>
+      <h3 class="uc-title">Delete a node</h3>
+      <p>Same ownership filter as update &mdash; only the creator can remove it. Deleting a node with children currently leaves those children in place with a <code>parentId</code> pointing at a node that no longer exists; the frontend should decide how to display that (e.g. re-parent to root).</p>
+      <div class="pipeline">
+        <span class="node">DELETE /api/nodes/{nodeId}</span><span class="arrow">&rarr;</span>
+        <span class="node">deleteNode()</span><span class="arrow">&rarr;</span>
+        <span class="node">deleteNodeDao(nodeId, userId)</span><span class="arrow">&rarr;</span>
+        <span class="node">Node.findOneAndDelete({nodeId, userId})</span>
+      </div>
+    </section>
+
+    <figure style="margin-top:3rem">
+      <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant Ctrl as nodeController
+  participant NDao as nodeDao
+  participant MDao as mapsDao
+  participant DB as MongoDB
+
+  Note over C,DB: Reading — checked against MAP MEMBERSHIP
+  C->>Ctrl: GET /api/nodes/{nodeId}
+  Ctrl->>NDao: findNodeDao(nodeId, userId)
+  NDao->>DB: Node.findOne({nodeId})
+  DB-->>NDao: node
+  NDao->>MDao: isMapMemberDao(node.mapId, userId)
+  MDao->>DB: Map.exists({_id: node.mapId, members: userId})
+  DB-->>MDao: true / false
+  NDao-->>Ctrl: node or null
+  Ctrl-->>C: 200 or 404
+
+  Note over C,DB: Editing / deleting — checked against NODE OWNERSHIP
+  C->>Ctrl: PATCH or DELETE /api/nodes/{nodeId}
+  Ctrl->>NDao: updateNodeDao / deleteNodeDao(nodeId, userId)
+  NDao->>DB: findOneAndUpdate/Delete({nodeId, userId})
+  DB-->>NDao: node or null (null if you're not the creator)
+  Ctrl-->>C: 200 or 404
+      </pre>
+      <div class="cap">The same "any member can read, only the creator can write" split shows up nowhere else this explicitly &mdash; it's the one rule in this API worth memorizing on its own.</div>
+    </figure>
+
+    <section class="domain-head" style="margin-top:3.5rem">
+      <div class="eyebrow">Domain</div>
+      <h2>Combat</h2>
+      <p>
+        A third access rule, on top of the two above: a map member can <strong>attack</strong> any
+        other member's node with one of three weapons. Attacking depletes the target's
+        <code>health</code>; hitting 0 flags it <code>defeated</code> &mdash; still visible, just
+        marked as lost the fight, no more attacks land on it.
+      </p>
+      <p>
+        <code>Map.discussionMode</code> (toggle via <code>PATCH /api/:mapId</code>) inverts who an
+        attack can land on, not whether attacking works at all: normal rules require the target be
+        someone <em>else's</em> node; discussion mode requires the opposite &mdash; you can only
+        attack your <em>own</em> node (self-critique instead of combat). See
+        <a href="#node-attack">Attack a node</a>'s 400 responses below for both directions of that
+        check.
+      </p>
+      <table class="access-table">
+        <tr><th>Weapon</th><th>Damage</th><th>Cooldown</th></tr>
+        <tr><td>nitpick</td><td>10</td><td>none &mdash; spammable</td></tr>
+        <tr><td>counterpoint</td><td>25</td><td>5 minutes</td></tr>
+        <tr><td>fatalFlaw</td><td>50</td><td>30 minutes</td></tr>
+      </table>
+      <p style="font-size:.85rem;color:var(--ink-soft)">Cooldowns are per attacker, per weapon &mdash; using <code>fatalFlaw</code> doesn't touch your <code>nitpick</code> cooldown. Every attack is logged to a separate <code>Attack</code> collection with a snapshot of the damage dealt, which is both the cooldown's source of truth and the attack-history endpoint below.</p>
+    </section>
+
+    <section class="uc" id="node-attack">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/nodes/{nodeId}/attack</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Attack a node</h3>
+      <p>
+        Can't target your own node, and can't attack one that's already defeated. Two things happen
+        on a successful attack: the target's <code>health</code> drops (same as before), <em>and</em>
+        a new <strong>weapon node</strong> is created, pointing at the target &mdash; a real, permanent
+        <code>Node</code> document (<code>isWeapon: true</code>), not a visual-only or computed thing.
+        It shows up in normal node listings and counts just like any node a person created.
+      </p>
+      <div class="callout">
+        <strong>Every landed attack spawns its own weapon node</strong> &mdash; attack the same target
+        three times and you get three weapon nodes accumulating around it, not one upgrading. Which
+        icon it gets is a direct 1:1 mapping from which combat weapon was used
+        (<code>nitpick&rarr;sword</code>, <code>counterpoint&rarr;axe</code>, <code>fatalFlaw&rarr;spear</code>)
+        &mdash; a different, simpler idea than <a href="#map-attack-indicators">Attack indicators</a>'
+        severity-based icon choice, and the two intentionally don't share code.
+      </div>
+
+      <figure>
+        <pre class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant Ctrl as nodeController
+  participant Abl as attackAbl
+  participant ADao as attackDao
+  participant NDao as nodeDao
+  participant DB as MongoDB
+
+  C->>Ctrl: POST /api/nodes/{nodeId}/attack {weapon}
+  Ctrl->>Abl: attackNodeAbl(nodeId, attackerId, weapon)
+  Abl->>DB: find node, check map membership
+  alt not your node, not defeated, weapon off cooldown
+    Abl->>ADao: getLastAttackDao(attackerId, weapon)
+    Abl->>ADao: applyDamageDao(node._id, newHealth, defeated)
+    Abl->>ADao: logAttackDao({mapId, targetNodeId, attackerId, weapon, damage})
+    Abl->>NDao: createWeaponNodeMutationDao(mapId, {targetNodeId, weaponIcon, ...})
+    NDao->>DB: Node.create({isWeapon: true, weaponIcon, targetNodeId, ...})
+    Abl-->>Ctrl: { node, weaponNode }
+    Ctrl-->>C: 200 {node, weaponNode}
+  else own node / already defeated / on cooldown
+    Abl-->>Ctrl: throws a typed Error (instanceof-checked)
+    Ctrl-->>C: 400 or 429
+  end
+        </pre>
+      </figure>
+
+      <div class="snippet">
+        <span class="cap">src/abl/attackAbl.ts</span>
+<pre><code>const WEAPON_TO_ICON: Record&lt;WeaponKey, WeaponIcon&gt; = {
+  nitpick: "sword",
+  counterpoint: "axe",
+  fatalFlaw: "spear",
+};
+
+// ...self-attack, defeated, cooldown checks, then damage + logging, then:
+const weaponNode = await createWeaponNodeMutationDao(node.mapId, {
+  targetNodeId: node._id,
+  weaponIcon: WEAPON_TO_ICON[weapon],
+  text: `${weaponDef.label} attack`,
+  userId: attackerId,
+});
+
+return { node: updatedNode, weaponNode };</code></pre>
+      </div>
+
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY</span>
+<pre><code>{ "weapon": "counterpoint" }</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>{
+  "success": true,
+  "node": { "nodeId": "k4Tz1PqXaB", "health": 75, "defeated": false, ... },
+  "weaponNode": {
+    "nodeId": "wF9xQ2mNpL", "text": "Counterpoint attack", "type": "unknown",
+    "isWeapon": true, "weaponIcon": "axe",
+    "targetNodeId": "665f...", "userId": "665e..."
+  }
+}</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">
+        <code>weaponNode.targetNodeId</code> is Mongo's internal <code>_id</code> of the target, not its
+        public <code>nodeId</code> &mdash; same known limitation as <code>Node.parentId</code> elsewhere
+        in this API. <code>type</code> is always <code>"unknown"</code> on a weapon node; it's not part
+        of the Problem/Option/Solution classification.
+      </p>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">RESPONSE 429 (cooldown)</span>
+<pre><code>{
+  "success": false,
+  "error": "That weapon is still on cooldown",
+  "readyAt": "2026-08-19T14:32:00.000Z"
+}</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 400 (own node / already defeated)</span>
+<pre><code>{ "success": false, "error": "You can't attack your own node" }</code></pre></div>
+      </div>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">RESPONSE 400 (discussion mode, someone else's node)</span>
+<pre><code>{ "success": false, "error": "Discussion mode: you can only attack your own nodes" }</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">404 if the node doesn't exist or you're not a member of its map (same "don't confirm what you can't see" rule as reading a node).</p>
+    </section>
+
+    <section class="uc" id="node-attack-history">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/nodes/{nodeId}/attacks</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Get a node's attack history</h3>
+      <p>Every attack ever landed on this node, newest first, with the attacker's username populated &mdash; so the discussion stays transparent about who challenged what.</p>
+      <div class="snippet">
+        <span class="cap">src/dao/attackDao.ts</span>
+<pre><code>export const getAttackHistoryDao = async (publicNodeId, userId) => {
+  const node = await findNodeByPublicIdDao(publicNodeId);
+  if (!node) return null;
+
+  const isMember = await isMapMemberDao(node.mapId, userId);
+  if (!isMember) return null;
+
+  return await Attack.find({ targetNodeId: node._id })
+    .sort({ createdAt: -1 })
+    .populate("attackerId", "username");
+};</code></pre>
+      </div>
+      <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>[
+  {
+    "weapon": "counterpoint", "damage": 25,
+    "attackerId": { "_id": "665e...", "username": "bob" },
+    "createdAt": "2026-08-19T14:02:11.000Z"
+  },
+  {
+    "weapon": "nitpick", "damage": 10,
+    "attackerId": { "_id": "665e...", "username": "bob" },
+    "createdAt": "2026-08-19T13:58:47.000Z"
+  }
+]</code></pre></div>
+    </section>
+
+    <!-- ============================================================ EDGES / INSIGHTS ============================================================ -->
+    <section class="domain-head">
+      <div class="eyebrow">Domain</div>
+      <h2>Edges &amp; graph insights</h2>
+      <p>
+        A separate concept from <code>parentId</code> (the argument tree) and from combat: an
+        <strong>Edge</strong> is an arbitrary directed link between any two nodes on the same map,
+        tagged <code>positive</code>, <code>negative</code>, or <code>neutral</code> (the default).
+        Two read-only endpoints compute insights from the edge graph &mdash; auto-detected clusters
+        and "under heavy fire" indicators &mdash; entirely on the fly. Neither is a real collection:
+        nothing about them is ever written to the database.
+      </p>
+      <div class="callout">
+        <strong>This is backend-only, by design.</strong> Rendering a cluster as a blob, choosing a
+        dashed vs. solid border, drawing a jagged red line, picking a weapon icon on screen &mdash; all
+        of that is a frontend's job. This API returns the <em>data</em> (which nodes form a cluster,
+        which node is under fire and how badly) and stops there.
+      </div>
+    </section>
+
+    <section class="uc" id="edge-create">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/edges/{mapId}</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Create an edge</h3>
+      <p>Both <code>fromNodeId</code> and <code>toNodeId</code> are public node ids, and both nodes must actually belong to <code>{mapId}</code> &mdash; nothing about two valid-looking node ids alone guarantees that, so it's checked explicitly.</p>
+      <div class="snippet">
+        <span class="cap">src/abl/edgeAbl.ts</span>
+<pre><code>export const createEdgeAbl = async (input, publicMapId, userId) => {
+  const { fromNodeId, toNodeId, sentiment } = parseOrThrow(createEdgeSchema, input);
+  if (fromNodeId === toNodeId) throw new SelfLoopError();
+
+  const map = await getMapByIdDao(publicMapId, userId); // membership check
+  if (!map) throw new MapNotFoundError();
+
+  const [fromNode, toNode] = await Promise.all([
+    findNodeByPublicIdDao(fromNodeId),
+    findNodeByPublicIdDao(toNodeId),
+  ]);
+  if (!fromNode || !toNode) throw new NodeNotFoundError();
+
+  if (fromNode.mapId.toString() !== map._id.toString()
+   || toNode.mapId.toString() !== map._id.toString()) {
+    throw new CrossMapEdgeError();
+  }
+
+  return await createEdgeMutationDao({ mapId: map._id, fromNodeId: fromNode._id, toNodeId: toNode._id, sentiment, userId });
+};</code></pre>
+      </div>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">REQUEST BODY</span>
+<pre><code>{ "fromNodeId": "k4Tz1PqXaB", "toNodeId": "9mWs2LdQoY", "sentiment": "negative" }</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 201</span>
+<pre><code>{
+  "edgeId": "qP2xN8fRkT",
+  "mapId": "665d...", "fromNodeId": "665f...", "toNodeId": "665g...",
+  "sentiment": "negative", "userId": "665e..."
+}</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)"><code>sentiment</code> is optional, defaulting to <code>"neutral"</code>. 400 for a self-loop or a missing field, 404 if either node doesn't exist, 400 if a node belongs to a different map than <code>{mapId}</code>.</p>
+    </section>
+
+    <section class="uc" id="edge-delete">
+      <div class="uc-head">
+        <span class="pill pill-delete">DEL</span><span class="path">/api/edges/{edgeId}</span>
+        <span class="tag">Edge creator</span>
+      </div>
+      <h3 class="uc-title">Delete an edge</h3>
+      <p>Same ownership pattern as nodes &mdash; only whoever created the edge can remove it. Nothing to validate here, so this skips ABL entirely: the controller calls <code>deleteEdgeDao(edgeId, userId)</code> directly.</p>
+    </section>
+
+    <section class="uc" id="edge-list">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/{mapId}/edges</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">List a map's edges</h3>
+      <p>All edges on the map, populated so <code>fromNodeId</code>/<code>toNodeId</code> come back as <code>{ nodeId, text, type }</code> instead of raw Mongo ids &mdash; same idea as <a href="#map-nodes-list">List all nodes on a map</a>.</p>
+    </section>
+
+    <section class="uc" id="circle-select">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/{mapId}/circles/select</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Select a circle</h3>
+      <p>
+        A "circle" is a node with 2+ direct <code>parentId</code>-children &mdash; the parentId "star" a
+        frontend draws as a halo/horns backdrop around a node and its branch children. Circles aren't
+        persisted; they're recomputed fresh from every node's <code>parentId</code> on every call, the same
+        way a map's other derived views are. Selecting one locks every member node
+        (<code>Node.locked = true</code>) and unlocks every other node on the map, then remembers the
+        choice &mdash; snapshotting membership at selection time &mdash; on the Map's
+        <code>selectedCircle</code>, so it survives a reload and syncs to other collaborators. A frontend's
+        layout/physics loop is expected to treat <code>locked</code> as "don't reposition me"; the intent is
+        that exactly one circle stays put while every other one is free to drift, so it stands out.
+      </p>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">BODY</span>
+<pre><code>{ "rootId": "k4Tz1PqXaB" }</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>{
+  "success": true,
+  "selectedCircle": {
+    "rootId": "k4Tz1PqXaB",
+    "nodeIds": ["k4Tz1PqXaB", "9mWs2LdQoY", "qP2xN8fRkT"]
+  }
+}</code></pre></div>
+        <div class="snippet"><span class="cap">RESPONSE 404 (stale rootId)</span>
+<pre><code>{ "success": false, "error": "Circle not found — the graph may have changed since it was computed" }</code></pre></div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">
+        <code>rootId</code> is recomputed against, not trusted verbatim &mdash; if the graph changed since
+        whatever list of circles the caller saw (a child was reparented, deleted, etc.) and that root no
+        longer has 2+ children, this 404s instead of locking a stale membership. Broadcasts
+        <code>circle:selected</code> to the map's socket room on success.
+      </p>
+    </section>
+
+    <section class="uc" id="circle-deselect">
+      <div class="uc-head">
+        <span class="pill pill-post">POST</span><span class="path">/api/{mapId}/circles/deselect</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Deselect the circle</h3>
+      <p>
+        Clears <code>selectedCircle</code> and unlocks every node on the map. Broadcasts
+        <code>circle:deselected</code> to the map's socket room on success.
+      </p>
+    </section>
+
+    <section class="uc" id="map-attack-indicators">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/{mapId}/attack-indicators?threshold=3</span>
+        <span class="tag">Map member</span>
+      </div>
+      <h3 class="uc-title">Attack indicators</h3>
+      <p>
+        Flags any node receiving at least <code>threshold</code> incoming <code>negative</code> edges, with
+        a severity-based weapon suggestion &mdash; <code>sword</code> at the threshold, escalating to
+        <code>axe</code> and then <code>spear</code> the further past it a node gets.
+      </p>
+      <div class="callout">
+        <strong>Not the same system as <a href="#node-attack">Attack a node</a>.</strong> That's an explicit
+        combat action a member takes (weapon, cooldown, health, defeat). This is a passive signal computed
+        from the edge graph &mdash; the two share vocabulary because they're both about one node being
+        "under fire," but <code>attackIndicatorAbl.ts</code> never imports from <code>attackAbl.ts</code> and
+        vice versa. Don't confuse a node with a low <code>health</code> value with one that shows up here;
+        they're unrelated.
+      </div>
+      <div class="snippet">
+        <span class="cap">src/abl/attackIndicatorAbl.ts</span>
+<pre><code>export const pickWeaponIcon = (incomingCount: number, threshold: number): WeaponIcon => {
+  if (incomingCount >= threshold + 4) return "spear";
+  if (incomingCount >= threshold + 2) return "axe";
+  return "sword";
+};</code></pre>
+      </div>
+      <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>{
+  "success": true,
+  "threshold": 3,
+  "indicators": [
+    { "nodeId": "9mWs2LdQoY", "incomingNegativeEdges": 5, "weapon": "axe" }
+  ]
+}</code></pre></div>
+      <div class="callout">
+        <strong>Spawn/despawn/duplicate-prevention, solved by not persisting anything.</strong> The spec this
+        was built from worried about spawning duplicate indicators and cleaning up stale ones. Neither problem
+        can occur here: an indicator is just one row in a freshly computed array on every call. Delete enough
+        negative edges and the node simply isn't in the array next time &mdash; there's no "despawn" step,
+        because there was never a persisted "spawn" to undo.
+      </div>
+    </section>
+
+    <hr class="rule">
+
+    <section>
+      <h2>Boot sequence</h2>
+      <p>What happens when <code>npm run dev</code> starts <code>server.ts</code>:</p>
+      <div class="pipeline">
+        <span class="node">dotenv.config()</span><span class="arrow">&rarr;</span>
+        <span class="node">check MONGO_URI</span><span class="arrow">&rarr;</span>
+        <span class="node">mongoose.connect()</span><span class="arrow">&rarr;</span>
+        <span class="node">app.listen(PORT)</span>
+      </div>
+      <p style="font-size:.9rem;color:var(--ink-soft)">
+        If <code>MONGO_URI</code> is missing, the process logs the failure and exits immediately rather than
+        starting a server with no database. There's also an unauthenticated <code>GET /__debug</code> that
+        just echoes the configured port &mdash; a manual "is this actually my server" check, dev-only.
+      </p>
+    </section>
+
+    <footer class="end">
+      Generated from the current state of <code>src/</code> &mdash; the DAO layer (<code>userDao</code>,
+      <code>mapsDao</code>, <code>nodeDao</code>, <code>attackDao</code>) is the single source of truth for every rule described above.
+      If behavior ever drifts from this page, the DAO is right and this page is stale.
+    </footer>
+
+  </div>
+</div>
