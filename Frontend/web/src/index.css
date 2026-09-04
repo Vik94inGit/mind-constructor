@@ -1,0 +1,206 @@
+@import "tailwindcss";
+
+/* Theme colors — the single source of truth stays these CSS variables
+   (unchanged from before Tailwind), so light/dark mode keeps working
+   exactly as it did with zero extra logic. @theme inline below just
+   exposes each one as a Tailwind utility (bg-surface, text-ink, ...). */
+:root {
+  --ink: #181b24;
+  --ink-soft: #565e72;
+  --paper: #f3f4f7;
+  --surface: #ffffff;
+  --surface-2: #eaecf1;
+  --line: #dce0e8;
+  --accent: #b5651d;
+  --accent-ink: #7a4413;
+  --accent-soft: #f1e1cc;
+  --danger: #a23b3f;
+  --danger-bg: #f6e1e3;
+  --success: #2e7d32;
+  --success-bg: #e3efe0;
+
+  --n-problem: #c1502e;
+  --n-poption: #b8862e;
+  --n-option: #3b5ba5;
+  --n-solution: #1f7a6c;
+  --n-success: #3f7d53;
+  --n-fail: #b23a48;
+  --n-unknown: #8a8f98;
+
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(24, 27, 36, 0.06), 0 6px 20px -8px rgba(24, 27, 36, 0.15);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #eceef3;
+    --ink-soft: #a6adbe;
+    --paper: #12141b;
+    --surface: #1a1d26;
+    --surface-2: #20242f;
+    --line: #2b303c;
+    --accent: #e08a3e;
+    --accent-ink: #f3c08c;
+    --accent-soft: #3b2a18;
+    --danger: #f19099;
+    --danger-bg: #3a1a1d;
+    --success: #7fd98a;
+    --success-bg: #16321c;
+  }
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+
+  --color-n-problem: var(--n-problem);
+  --color-n-poption: var(--n-poption);
+  --color-n-option: var(--n-option);
+  --color-n-solution: var(--n-solution);
+  --color-n-success: var(--n-success);
+  --color-n-fail: var(--n-fail);
+  --color-n-unknown: var(--n-unknown);
+
+  --radius-card: var(--radius);
+  --shadow-card: var(--shadow);
+
+  /* Every one of these still takes per-instance overrides (duration, delay,
+     custom properties like --chaos-x1/--health/--fly-x) via an inline
+     `style` prop set in the component that uses it — Tailwind's animate-*
+     utility only supplies the animation-name/timing-function/iteration
+     that's shared across every instance. See NodeCard.tsx/QuickAddGhosts.tsx. */
+  --animate-node-chaos-drift: node-chaos-drift 3s ease-in-out infinite;
+  --animate-drop-target-pulse: drop-target-pulse 0.9s ease-in-out infinite;
+  --animate-weapon-fly-in: weapon-fly-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-weapon-arrow-fly: weapon-arrow-fly 0.55s ease-in forwards;
+  --animate-quick-add-pulse: quick-add-ghost-pulse 1.8s ease-in-out infinite;
+  --animate-outcome-particle-out: outcome-particle-out 0.7s ease-out forwards;
+}
+
+/* Keyframes have no "inline in a component" form in any CSS-based styling
+   system — Tailwind's animate-* utilities (registered above) still just
+   reference a named @keyframes block. This is the one piece of visual
+   behavior in the whole app that has to live here rather than in a
+   className, structurally, not by choice. */
+@keyframes node-chaos-drift {
+  0%,
+  100% {
+    transform: translate(-50%, -50%);
+  }
+  25% {
+    transform: translate(calc(-50% + var(--chaos-x1, 0px)), calc(-50% + var(--chaos-y1, 0px)));
+  }
+  50% {
+    transform: translate(calc(-50% + var(--chaos-x2, 0px)), calc(-50% + var(--chaos-y2, 0px)));
+  }
+  75% {
+    transform: translate(calc(-50% + var(--chaos-x3, 0px)), calc(-50% + var(--chaos-y3, 0px)));
+  }
+}
+@keyframes drop-target-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--drop-glow) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--drop-glow) 20%, transparent);
+  }
+}
+@keyframes weapon-fly-in {
+  0% {
+    transform: translate(calc(-50% + var(--fly-x, 160px)), calc(-50% + var(--fly-y, -120px))) scale(0.55) rotate(-30deg);
+    opacity: 0.35;
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+/* One arrow's flight from a landed attack's bow to its target — played on
+   mount for each arrow <g> (see MapPage.tsx's weapon-mark rendering),
+   itself nested inside the bow's own translate+rotate <g>, so local +x is
+   already "toward the target" regardless of the actual on-canvas angle.
+   --arrow-dist (set inline per instance, the real on-canvas gap) is how
+   far that is; the arrow fades out right as it arrives rather than
+   lingering on the target, since — unlike the bow itself — it isn't meant
+   to persist as a permanent pointer. */
+@keyframes weapon-arrow-fly {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(var(--arrow-dist, 150px));
+    opacity: 0;
+  }
+}
+@keyframes quick-add-ghost-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+}
+@keyframes outcome-particle-out {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--px), var(--py)) scale(0);
+    opacity: 0;
+  }
+}
+
+/* Page-level element resets — not component styling, so these stay here
+   rather than repeated as utilities on every <body>/<a>/<button> there
+   isn't one of. Standard Tailwind convention (a base layer). */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code {
+    font-family: "IBM Plex Mono", "Courier New", monospace;
+  }
+  a {
+    color: var(--color-accent-ink);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--color-accent);
+  }
+  button {
+    font-family: inherit;
+  }
+}
