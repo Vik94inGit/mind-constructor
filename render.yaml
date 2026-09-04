@@ -1,0 +1,19 @@
+# Render Blueprint for the backend service. On render.com: New -> Blueprint,
+# point it at this repo, and it picks this file up automatically. MONGO_URI,
+# JWT_SECRET, and CORS_ORIGIN are marked sync:false so Render prompts for
+# them in the dashboard instead of expecting real secrets in this file.
+services:
+  - type: web
+    name: mind-constructor-backend
+    runtime: node
+    rootDir: Backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

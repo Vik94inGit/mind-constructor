@@ -15,8 +15,12 @@ let io: SocketIOServer | null = null;
 const roomFor = (publicMapId: string) => `map:${publicMapId}`;
 
 export function initRealtime(httpServer: HTTPServer): SocketIOServer {
+  // Mirrors the REST API's own cors() in server.ts: CORS_ORIGIN (comma-
+  // separated) narrows both to a specific frontend domain in production;
+  // unset, both stay wide open ("*"), which is fine for local dev.
+  const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim());
   io = new SocketIOServer(httpServer, {
-    cors: { origin: "*" }, // matches the REST API's own permissive cors()
+    cors: { origin: allowedOrigins ?? "*" },
   });
 
   // Same JWT the REST `protect` middleware checks — a socket that never

@@ -12,6 +12,7 @@
     "test:run": "vitest run",
     "dev": "nodemon --exec tsx server.ts",
     "build": "tsc",
+    "start": "tsx server.ts",
     "admin:promote": "tsx scripts/promoteAdmin.ts",
     "db:stats": "tsx scripts/dbStats.ts"
   },
@@ -32,7 +33,6 @@
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },
@@ -45,6 +45,7 @@
     "mongoose": "^9.1.4",
     "nanoid": "^5.1.16",
     "socket.io": "^4.8.3",
+    "tsx": "^4.21.0",
     "zod": "^4.4.3"
   }
 }

@@ -35,7 +35,12 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors());
+// CORS_ORIGIN restricts the API to specific frontend origin(s) in production
+// (comma-separated, e.g. "https://my-app.vercel.app"). Left unset, both this
+// and Socket.IO's own cors (src/realtime/io.ts) stay wide open, which is
+// fine for local dev but should be narrowed once a frontend domain exists.
+const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim());
+app.use(cors(allowedOrigins ? { origin: allowedOrigins } : undefined));
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
