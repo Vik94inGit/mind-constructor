@@ -34,7 +34,7 @@ const loginSchema = z.object({
 
 const generateToken = (userId: string) =>
   jwt.sign({ id: userId }, process.env.JWT_SECRET as string, {
-    expiresIn: "1minute",
+    expiresIn: "7d",
   });
 
 export const registerAbl = async (input: unknown) => {
