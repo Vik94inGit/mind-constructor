@@ -8,8 +8,19 @@ import type { WeaponIcon } from "../types";
 // that read as too sparse for a map with several attacks going at once.
 const AUTO_SHOT_INTERVAL_MS = 1500;
 
+// NodeCard's own icon is a 60px-diameter circle (see its `h-[60px] w-[60px]`
+// container) — half that, plus a small gap, is how far off the weapon
+// node's own center the bow needs to sit to read as *next to* that node
+// instead of drawn on top of/inside its icon. It's drawn on its own SVG
+// layer above every node (see MapPage) specifically to be visible at all;
+// centering it exactly on the node it belongs to just traded "hidden
+// behind the icon" for "stamped on top of it" instead of actually landing
+// beside it.
+const NODE_ICON_RADIUS = 30;
+const BOW_GAP = 8;
+
 interface Props {
-  /** The weapon node's own position — the bow sits here, always facing the target. */
+  /** The weapon node's own position — the bow is drawn just outside this, offset toward the target, always facing it. */
   x: number;
   y: number;
   targetX: number;
@@ -35,10 +46,17 @@ interface Props {
 // themselves are transient: they fly from the bow to the target and fade
 // out right as they arrive, not a permanent connecting line.
 export function WeaponMark({ x, y, targetX, targetY, weaponIcon, celebrate, replayNonce }: Props) {
-  const dx = targetX - x;
-  const dy = targetY - y;
-  const dist = Math.hypot(dx, dy) || 1;
-  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const fullDx = targetX - x;
+  const fullDy = targetY - y;
+  const fullDist = Math.hypot(fullDx, fullDy) || 1;
+  const angle = (Math.atan2(fullDy, fullDx) * 180) / Math.PI;
+  // Offset along the same line toward the target, capped so a weapon node
+  // sitting unusually close to it still leaves the bow between the two
+  // rather than overshooting past the target altogether.
+  const offset = Math.min(NODE_ICON_RADIUS + BOW_GAP, fullDist * 0.4);
+  const bowX = x + (fullDx / fullDist) * offset;
+  const bowY = y + (fullDy / fullDist) * offset;
+  const dist = fullDist - offset;
   const arrowCount = WEAPON_ARROW_COUNT[weaponIcon ?? "sword"];
 
   // One key for "the arrows are currently playing, with this identity" —
@@ -69,7 +87,7 @@ export function WeaponMark({ x, y, targetX, targetY, weaponIcon, celebrate, repl
   return (
     <g
       style={{
-        transform: `translate(${x}px, ${y}px) rotate(${angle}deg)`,
+        transform: `translate(${bowX}px, ${bowY}px) rotate(${angle}deg)`,
         transition: "transform 0.35s ease",
       }}
     >
