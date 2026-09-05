@@ -34,8 +34,17 @@ function hashOffset(seed: string, range: number) {
 
 // Node icons are 92px wide (icon + caption) — keep freshly-placed nodes at
 // least that far apart (plus a visible margin) so a new node never lands on
-// top of an existing one.
-const NODE_MIN_DIST = 92 + 50;
+// top of an existing one. The margin shrinks on a phone-width viewport: the
+// canvas is the same 2400x1600 regardless of screen size, so the same 50px
+// buffer that's comfortable on desktop just means more panning/zooming to
+// see fewer nodes at once on mobile — the 92px icon footprint itself is the
+// one part of this that can't shrink without nodes actually overlapping.
+// Read live (not memoized) since it only matters at the moment a node is
+// placed/dragged, by which point the real viewport width is already known.
+function getNodeMinDist() {
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 640;
+  return 92 + (isMobile ? 20 : 50);
+}
 
 // The rectangle (in canvas coordinates) a placement is allowed to land in —
 // defaults to the whole canvas, but every creation/drag path below is handed
@@ -65,7 +74,7 @@ function pickNonOverlappingPosition(
     const x = minX + Math.random() * (maxX - minX);
     const y = minY + Math.random() * (maxY - minY);
     if (
-      existing.every((p) => Math.hypot(p.x - x, p.y - y) >= NODE_MIN_DIST) &&
+      existing.every((p) => Math.hypot(p.x - x, p.y - y) >= getNodeMinDist()) &&
       bigObstacles.every((p) => Math.hypot(p.x - x, p.y - y) >= p.minDist)
     ) {
       return { x, y };
@@ -94,7 +103,7 @@ interface Obstacle {
   minDist: number;
 }
 
-function nodeObstacles(points: { x: number; y: number }[], minDist = NODE_MIN_DIST): Obstacle[] {
+function nodeObstacles(points: { x: number; y: number }[], minDist = getNodeMinDist()): Obstacle[] {
   return points.map((p) => ({ x: p.x, y: p.y, minDist }));
 }
 
@@ -166,8 +175,9 @@ function circleSentiment(members: NodeDoc[]): "positive" | "negative" | null {
 
 // How close a drop has to land to an existing node to read as "onto it"
 // (join its circle) instead of just "near it" (a normal reposition) — well
-// inside NODE_MIN_DIST, so a deliberate drop-to-join never gets confused
-// with two nodes that simply ended up in the same neighborhood.
+// inside getNodeMinDist()'s smallest value, so a deliberate drop-to-join
+// never gets confused with two nodes that simply ended up in the same
+// neighborhood.
 const CIRCLE_DROP_RADIUS = 70;
 // Root + up to this many children — the cap on how big a circle can grow
 // via drag-to-join.
@@ -238,6 +248,12 @@ export function MapPage() {
   } | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [showColor, setShowColor] = useState(false);
+  // The map's own toolbar (name, member count, Link/Add/Invite…) starts
+  // collapsed — the canvas is the point, and this row was permanent
+  // vertical real estate spent on it whether or not anyone needed it right
+  // then. A small arrow tab (always visible, see the JSX below) toggles it
+  // back open on demand.
+  const [toolbarOpen, setToolbarOpen] = useState(false);
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
   // Which weapon just had its arrows re-fired — set by clicking either end
   // of an attack (see handleNodeClick/triggerWeaponShot below), cleared
@@ -483,17 +499,37 @@ export function MapPage() {
       // placement regardless of what it was aimed at.
       const targetId = nodeRefId(n.targetNodeId);
       const target = targetId ? nodes.find((t) => t.nodeId === targetId) : undefined;
-      const base = (target && map.get(target.nodeId)) || { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-      // A fixed radius (not independent x/y jitter) so the gap between the
-      // two nodes stays consistent — close enough to read as "this weapon
-      // node is about that one", wide enough that the weapon mark drawn at
-      // their midpoint doesn't end up hidden under a circle, and — same
-      // NODE_MIN_DIST every other node gets — wide enough that the two
-      // nodes' captions don't run into each other either. Angle still
-      // comes from the hash, so multiple attacks on the same target fan
-      // out around it instead of stacking.
+      const targetPos = (target && map.get(target.nodeId)) || { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+      // Anchored next to the attacker's own closest node to the target, not
+      // the target itself — the bow (WeaponMark draws it at this weapon
+      // node's own position) then reads as "shot from over there" across
+      // the canvas, rather than camping right beside the node it hit. Falls
+      // back to the target's own position — the old anchor — if the
+      // attacker has no other node left on this map to anchor near (every
+      // other one of theirs got deleted since, say); a self-attack in
+      // discussion mode lands here too, since the target *is* one of the
+      // attacker's own nodes and so is trivially its own closest match.
+      const attackerId = idOf(n.userId as any);
+      let base = targetPos;
+      let closestDist = Infinity;
+      for (const own of regular) {
+        if (own.nodeId === n.nodeId || idOf(own.userId as any) !== attackerId) continue;
+        const p = map.get(own.nodeId);
+        if (!p) continue;
+        const d = Math.hypot(p.x - targetPos.x, p.y - targetPos.y);
+        if (d < closestDist) {
+          closestDist = d;
+          base = p;
+        }
+      }
+      // A fixed radius (not independent x/y jitter) so the gap between this
+      // weapon node and its anchor stays consistent — close enough to read
+      // as "this weapon node belongs over here", wide enough that its own
+      // caption doesn't run into its anchor's. Angle still comes from the
+      // hash, so multiple attacks anchored at the same node fan out around
+      // it instead of stacking.
       const angle = hashOffset(n.nodeId, 180) * (Math.PI / 180);
-      const radius = NODE_MIN_DIST;
+      const radius = getNodeMinDist();
       const desired = { x: base.x + radius * Math.cos(angle), y: base.y + radius * Math.sin(angle) };
       // Fanning by angle alone doesn't guarantee two attacks (or an attack
       // and some unrelated node) don't land on each other — nudge clear of
@@ -501,8 +537,8 @@ export function MapPage() {
       // Big-group backdrops aren't checked here: nodeGroups itself is
       // derived from these positions, so consulting it back inside this
       // same memo would be circular. Weapon nodes fan out from an explicit
-      // target and land far enough out (NODE_MIN_DIST radius) that this is
-      // a rare miss in practice, not a gap worth breaking the memo for.
+      // anchor and land far enough out (getNodeMinDist() radius) that this
+      // is a rare miss in practice, not a gap worth breaking the memo for.
       map.set(n.nodeId, avoidOverlap(desired, nodeObstacles(Array.from(map.values()))));
     });
     return map;
@@ -531,31 +567,37 @@ export function MapPage() {
     };
   }
 
-  // Pans the canvas so the given node's position is comfortably inside the
-  // current viewport — a no-op if it's already in view, so clicking a node
-  // that's already fully visible doesn't cause an unexpected jolt. Used for
-  // "move to it" navigation (a weapon node's target, a linked node) rather
-  // than every plain node click, which stays exactly where it is.
-  function revealNode(nodeId: string) {
+  // Pans the canvas so the given node's position lands in the middle of the
+  // current viewport, unconditionally — the chosen node (whatever was just
+  // clicked/selected) always ends up centered, not just nudged into view.
+  // Selecting a node always brings up NodePanel too, and that panel is now a
+  // bottom sheet *overlaying* the canvas at every screen size (see its own
+  // PANEL_CLASS) rather than a sidebar the canvas shrinks to make room for —
+  // so wrap.clientHeight's own full height is no longer what's actually
+  // visible above it. PANEL_RESERVE_FRAC below is a deliberate approximation
+  // (there's no reliable, synchronously-correct measurement of the panel's
+  // real height here — it hasn't mounted yet for a first selection, and its
+  // content, and so its height, varies by node and tab anyway), landing the
+  // node roughly centered in the space actually left on screen instead of
+  // precisely centered in the space technically covered by it.
+  function centerOnNode(nodeId: string) {
     const wrap = wrapRef.current;
     const node = nodes.find((n) => n.nodeId === nodeId);
     if (!wrap || !node) return;
     const pos = posFor(node);
-    const bounds = viewportBounds();
-    if (pos.x >= bounds.minX && pos.x <= bounds.maxX && pos.y >= bounds.minY && pos.y <= bounds.maxY) {
-      return;
-    }
+    const PANEL_RESERVE_FRAC = 0.4;
+    const visibleH = Math.max(150, wrap.clientHeight * (1 - PANEL_RESERVE_FRAC));
     const maxLeft = Math.max(0, CANVAS_W - wrap.clientWidth);
     const maxTop = Math.max(0, CANVAS_H - wrap.clientHeight);
     wrap.scrollTo({
       left: Math.min(maxLeft, Math.max(0, pos.x - wrap.clientWidth / 2)),
-      top: Math.min(maxTop, Math.max(0, pos.y - wrap.clientHeight / 2)),
+      top: Math.min(maxTop, Math.max(0, pos.y - visibleH / 2)),
       behavior: "smooth",
     });
   }
 
   // Replays a weapon's arrow flight (see WeaponMark) — alongside
-  // revealNode's camera pan, so clicking either end of an attack reads as
+  // centerOnNode's camera pan, so clicking either end of an attack reads as
   // "watch it land on that" rather than just an instant jump. The nonce
   // (not just the id) is what actually reaches WeaponMark as replayNonce,
   // so clicking the same weapon twice in a row still fires a second flight.
@@ -624,7 +666,7 @@ export function MapPage() {
   function bigNodeObstacles(excludeRootIds: Set<string> = new Set()): Obstacle[] {
     return nodeGroups
       .filter((g) => !excludeRootIds.has(g.rootId))
-      .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + NODE_MIN_DIST * 0.6 }));
+      .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + getNodeMinDist() * 0.6 }));
   }
 
   // Any closed loop in the Link graph (not branch-arrows, not weapon marks
@@ -875,8 +917,12 @@ export function MapPage() {
   // Owner-only — text/type editing isn't otherwise restricted (an earlier
   // version locked it once a node had taken any damage, but that blocked
   // ordinary corrections too aggressively; see NodePanel.tsx's own canEdit).
+  // Deliberately its own check rather than just `isOwnNode` — a weapon node
+  // is excluded there (nothing to drag/link/branch from on one), but its own
+  // attacker can still edit the objection text it carries, so that one case
+  // is allowed back in here specifically.
   function canEditNode(node: NodeDoc) {
-    return isOwnNode(node);
+    return isOwnNode(node) || (node.isWeapon && idOf(node.userId as any) === user?._id);
   }
 
   // Mirrors attackAbl.ts's own-node rule exactly (normal: someone else's
@@ -920,32 +966,36 @@ export function MapPage() {
     }
     setSelectedId(node.nodeId);
     releaseChosenCircleIfOutside(node.nodeId);
-    // Clicking either end of an attack brings the other end into view —
-    // same "move to it" navigation a click on NodePanel's own "Points at"
-    // link triggers (see onSelectNode below), just reached from the canvas
-    // instead of the panel. A weapon node has exactly one target, so that
-    // direction's unambiguous; an attacked node can carry several landed
-    // attacks, so clicking it reveals whichever landed most recently
-    // (nodes come back in creation order, so the last match is that one).
+    // Whatever was just clicked is "chosen" now — always center the camera
+    // on it, not just nudge it into view. Takes priority over panning to a
+    // *different* node (an attack's other end, below): with bows now
+    // anchored near the attacker rather than the target (see getNodeMinDist
+    // usage in the positions memo), that other end can be far enough away
+    // that panning to it would immediately un-center the node someone just
+    // chose.
+    centerOnNode(node.nodeId);
+    // Clicking either end of an attack still replays its arrow flight (see
+    // WeaponMark) — that's independent of where the camera ends up, so it
+    // stays regardless of who's centered. A weapon node has exactly one
+    // target; an attacked node can carry several landed attacks, so this
+    // replays whichever landed most recently (nodes come back in creation
+    // order, so the last match is that one).
     if (node.isWeapon) {
-      const targetId = nodeRefId(node.targetNodeId);
-      if (targetId) revealNode(targetId);
       triggerWeaponShot(node.nodeId);
     } else {
       const attackers = nodes.filter((n) => n.isWeapon && nodeRefId(n.targetNodeId) === node.nodeId);
       const latestAttacker = attackers[attackers.length - 1];
-      if (latestAttacker) {
-        revealNode(latestAttacker.nodeId);
-        triggerWeaponShot(latestAttacker.nodeId);
-      }
+      if (latestAttacker) triggerWeaponShot(latestAttacker.nodeId);
     }
   }
 
   // Double-clicking a node jumps straight into inline editing on its own
   // icon — same destination as the context menu's "Update", just one
-  // gesture instead of two.
+  // gesture instead of two. No isWeapon exclusion here any more — canEditNode
+  // itself already decides whether a weapon node's own attacker can actually
+  // edit it; this just needs to stay out of link-mode's way.
   function handleNodeDoubleClick(node: NodeDoc) {
-    if (linkMode || node.isWeapon) return;
+    if (linkMode) return;
     startInlineEdit(node);
   }
 
@@ -1189,72 +1239,87 @@ export function MapPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-wrap items-center gap-[0.6rem] border-b border-line bg-surface px-4 py-[0.7rem]">
-        <Link to="/" className={btnSmGhost}>
-          &larr;
-        </Link>
-        <h2 className="mr-2 text-[1.05rem] font-bold">{map.name}</h2>
-        <span className={chip}>{Array.isArray(map.members) ? map.members.length : 0} member(s)</span>
-        {map.discussionMode && (
-          <span
-            className="inline-flex items-center gap-1 rounded-[20px] border border-transparent bg-accent-soft px-[0.55rem] py-[0.2rem] text-[0.72rem] text-accent-ink"
-            title="Attacks only land on your own nodes here; health stays hidden until hover"
-          >
-            Discussion mode
-          </span>
-        )}
-        <div className="flex-1" />
-        <button
-          className={linkMode ? btnSmPrimary : btnSm}
-          onClick={() => {
-            setLinkMode((v) => !v);
-            setLinkSelection([]);
-            setLinkError(null);
-          }}
-        >
-          {linkMode
-            ? linkSelection.length === 0
-              ? "Pick nodes…"
-              : `${linkSelection.length} picked…`
-            : "Link nodes"}
-        </button>
-        {linkMode && linkSelection.length >= 2 && (
-          <button className={btnSmPrimary} onClick={confirmLinkSelection}>
-            Link {linkSelection.length} nodes
-          </button>
-        )}
-        {linkError && (
-          <span className="inline-flex items-center gap-1 rounded-[20px] border border-transparent bg-danger-bg px-[0.55rem] py-[0.2rem] text-[0.72rem] text-danger">
-            {linkError}
-          </span>
-        )}
-        <button
-          className={btnSmPrimary}
-          onClick={() => {
-            const pos = pickNonOverlappingPosition(Array.from(positions.values()), bigNodeObstacles(), viewportBounds());
-            setInlineEditId(null);
-            setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: null });
-          }}
-        >
-          + Add node
-        </button>
-        <button className={btnSm} onClick={() => setShowColor(true)}>
-          My color
-        </button>
-        {isOwner && (
+      {toolbarOpen && (
+        <div className="flex flex-wrap items-center gap-[0.6rem] border-b border-line bg-surface px-4 py-[0.7rem]">
+          <Link to="/" className={btnSmGhost}>
+            &larr;
+          </Link>
+          <h2 className="mr-2 text-[1.05rem] font-bold">{map.name}</h2>
+          <span className={chip}>{Array.isArray(map.members) ? map.members.length : 0} member(s)</span>
+          {map.discussionMode && (
+            <span
+              className="inline-flex items-center gap-1 rounded-[20px] border border-transparent bg-accent-soft px-[0.55rem] py-[0.2rem] text-[0.72rem] text-accent-ink"
+              title="Attacks only land on your own nodes here; health stays hidden until hover"
+            >
+              Discussion mode
+            </span>
+          )}
+          <div className="flex-1" />
           <button
-            className={map.discussionMode ? btnSmPrimary : btnSm}
-            onClick={toggleDiscussionMode}
-            title="Attacks only land on your own nodes; health stays hidden until hover"
+            className={linkMode ? btnSmPrimary : btnSm}
+            onClick={() => {
+              setLinkMode((v) => !v);
+              setLinkSelection([]);
+              setLinkError(null);
+            }}
           >
-            Discussion mode: {map.discussionMode ? "On" : "Off"}
+            {linkMode
+              ? linkSelection.length === 0
+                ? "Pick nodes…"
+                : `${linkSelection.length} picked…`
+              : "Link nodes"}
           </button>
-        )}
-        {isOwner && (
-          <button className={btnSm} onClick={() => setShowInvite(true)}>
-            Invite
+          {linkMode && linkSelection.length >= 2 && (
+            <button className={btnSmPrimary} onClick={confirmLinkSelection}>
+              Link {linkSelection.length} nodes
+            </button>
+          )}
+          {linkError && (
+            <span className="inline-flex items-center gap-1 rounded-[20px] border border-transparent bg-danger-bg px-[0.55rem] py-[0.2rem] text-[0.72rem] text-danger">
+              {linkError}
+            </span>
+          )}
+          <button
+            className={btnSmPrimary}
+            onClick={() => {
+              const pos = pickNonOverlappingPosition(Array.from(positions.values()), bigNodeObstacles(), viewportBounds());
+              setInlineEditId(null);
+              setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: null });
+            }}
+          >
+            + Add node
           </button>
-        )}
+          <button className={btnSm} onClick={() => setShowColor(true)}>
+            My color
+          </button>
+          {isOwner && (
+            <button
+              className={map.discussionMode ? btnSmPrimary : btnSm}
+              onClick={toggleDiscussionMode}
+              title="Attacks only land on your own nodes; health stays hidden until hover"
+            >
+              Discussion mode: {map.discussionMode ? "On" : "Off"}
+            </button>
+          )}
+          {isOwner && (
+            <button className={btnSm} onClick={() => setShowInvite(true)}>
+              Invite
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Always-visible handle for the toolbar above — a small arrow tab
+          rather than the toolbar's own real estate, so collapsing it back
+          down doesn't also hide the one control that reopens it. */}
+      <div className="flex justify-center border-b border-line bg-surface">
+        <button
+          className="flex h-4 w-12 cursor-pointer items-center justify-center rounded-b-lg border border-t-0 border-line bg-surface text-[0.6rem] leading-none text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink"
+          onClick={() => setToolbarOpen((v) => !v)}
+          title={toolbarOpen ? "Hide toolbar" : "Show toolbar"}
+        >
+          {toolbarOpen ? "▲" : "▼"}
+        </button>
       </div>
 
       {actionError && (
@@ -1394,34 +1459,6 @@ export function MapPage() {
                   />
                 );
               })}
-              {/*
-                Weapon marks: every attack now spawns a real node carrying the attacker's
-                objection (see attackAbl.ts) — a bow at that node, permanently facing whatever
-                it targeted, plus a volley of transient arrows (see WeaponMark) that fires once
-                when the attack lands and again on demand when either end gets clicked.
-              */}
-              {nodes
-                .filter((n) => n.isWeapon)
-                .map((weaponNode) => {
-                  const targetId = nodeRefId(weaponNode.targetNodeId);
-                  if (!targetId) return null;
-                  const targetNode = nodes.find((n) => n.nodeId === targetId);
-                  if (!targetNode) return null;
-                  const a = posFor(weaponNode);
-                  const b = posFor(targetNode);
-                  return (
-                    <WeaponMark
-                      key={`weapon-${weaponNode.nodeId}`}
-                      x={a.x}
-                      y={a.y}
-                      targetX={b.x}
-                      targetY={b.y}
-                      weaponIcon={weaponNode.weaponIcon}
-                      celebrate={celebrateIds.has(weaponNode.nodeId)}
-                      replayNonce={shotState?.id === weaponNode.nodeId ? shotState.nonce : 0}
-                    />
-                  );
-                })}
               {edges.map((edge) => {
                 // fromNodeId/toNodeId come back null (not a string, not a
                 // populated ref) when the node they pointed at was deleted
@@ -1547,6 +1584,47 @@ export function MapPage() {
               );
             })}
 
+            {/*
+              Weapon marks get their own SVG layer, painted after every NodeCard above rather
+              than inside the first (backdrop) SVG — that one sits *behind* the node icons the
+              same way the group backdrops and branch arrows need to, but a bow drawn at that
+              layer landed centered right under its own attack node's opaque circular icon, and
+              a same-stacking-context DOM sibling always paints over an earlier one regardless of
+              z-index. This one repeats that layering trick one level up: a later sibling of the
+              nodes themselves, so the bow (and its arrows) draw on top of them and are actually
+              visible. Every attack now spawns a real node carrying the attacker's objection (see
+              attackAbl.ts) — this is the permanent bow facing whatever it targeted, plus the
+              volley of transient arrows (see WeaponMark) that fires once when the attack lands
+              and again on demand when either end gets clicked.
+            */}
+            <svg
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+            >
+              {nodes
+                .filter((n) => n.isWeapon)
+                .map((weaponNode) => {
+                  const targetId = nodeRefId(weaponNode.targetNodeId);
+                  if (!targetId) return null;
+                  const targetNode = nodes.find((n) => n.nodeId === targetId);
+                  if (!targetNode) return null;
+                  const a = posFor(weaponNode);
+                  const b = posFor(targetNode);
+                  return (
+                    <WeaponMark
+                      key={`weapon-${weaponNode.nodeId}`}
+                      x={a.x}
+                      y={a.y}
+                      targetX={b.x}
+                      targetY={b.y}
+                      weaponIcon={weaponNode.weaponIcon}
+                      celebrate={celebrateIds.has(weaponNode.nodeId)}
+                      replayNonce={shotState?.id === weaponNode.nodeId ? shotState.nonce : 0}
+                    />
+                  );
+                })}
+            </svg>
+
             {quickAddActive && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
                 anchorPos={posFor(selectedNode)}
@@ -1577,41 +1655,71 @@ export function MapPage() {
         </div>
 
         {selectedNode && user && (
-          <NodePanel
-            node={selectedNode}
-            nodes={nodes}
-            edges={edges}
-            currentUserId={user._id}
-            discussionMode={!!map.discussionMode}
-            cooldowns={cooldowns}
-            onClose={() => setSelectedId(null)}
-            onSelectNode={(id) => {
-              setSelectedId(id);
-              revealNode(id);
-              // Panel's own "Points at" link is only ever shown on a
-              // weapon node's panel — same click-either-end replay the
-              // canvas gets, just reached from here instead.
-              if (selectedNode?.isWeapon) triggerWeaponShot(selectedNode.nodeId);
-            }}
-            onDeleted={applyNodeDeleted}
-            onUpdated={upsertNode}
-            onAttacked={(updatedNode, weaponNode) => {
-              upsertNode(updatedNode);
-              upsertNode(weaponNode);
-              // Weapon nodes never got the "just created" flourish other
-              // nodes get — this is what NodeCard reads to fly the weapon
-              // in at the target instead of just popping into place.
-              setCelebrateIds((prev) => new Set(prev).add(weaponNode.nodeId));
-              if (mapId) refreshInsights(mapId);
-            }}
-            onCooldown={(weapon, readyAt) => setCooldowns((prev) => ({ ...prev, [weapon]: readyAt }))}
-            onDeleteEdge={(edgeId) => {
-              setEdges((prev) => prev.filter((e) => e.edgeId !== edgeId));
-              if (mapId) refreshInsights(mapId);
-            }}
-            onStartLink={() => startLinkFrom(selectedNode.nodeId)}
-            onEdit={() => startInlineEdit(selectedNode)}
-          />
+          <>
+            {/* Backdrop for NodePanel's bottom-sheet form (see its own
+                PANEL_CLASS) — dims the canvas behind it and closes it on a
+                tap outside, same as a native sheet.
+                Selecting an *own* node (the only kind that's draggable) goes
+                through onNodePointerDown's pointer-capture path below, which
+                opens this same panel straight from pointerup and then relies
+                on suppressNextClick to swallow the browser's own trailing
+                click afterward — but only NodeCard's own onClick checks that
+                flag. If that trailing click's hit-test lands on this
+                backdrop instead of the node it capture-targeted (device/
+                browser-dependent for a touch-derived click), this closes the
+                panel it had just opened in the same interaction. Checking
+                the same flag here — not just on NodeCard — swallows that
+                stray click the same way, regardless of which element it
+                actually lands on. */}
+            <div
+              className="fixed inset-0 z-30 bg-black/30"
+              onClick={() => {
+                if (suppressNextClick.current) {
+                  suppressNextClick.current = false;
+                  return;
+                }
+                setSelectedId(null);
+              }}
+            />
+            <NodePanel
+              node={selectedNode}
+              nodes={nodes}
+              edges={edges}
+              currentUserId={user._id}
+              discussionMode={!!map.discussionMode}
+              cooldowns={cooldowns}
+              onClose={() => setSelectedId(null)}
+              onSelectNode={(id) => {
+                setSelectedId(id);
+                // Same "chosen node is always centered" rule handleNodeClick
+                // applies on the canvas — this is the panel's own path to
+                // choosing a different node (its "Points at" link).
+                centerOnNode(id);
+                // Panel's own "Points at" link is only ever shown on a
+                // weapon node's panel — same click-either-end replay the
+                // canvas gets, just reached from here instead.
+                if (selectedNode?.isWeapon) triggerWeaponShot(selectedNode.nodeId);
+              }}
+              onDeleted={applyNodeDeleted}
+              onUpdated={upsertNode}
+              onAttacked={(updatedNode, weaponNode) => {
+                upsertNode(updatedNode);
+                upsertNode(weaponNode);
+                // Weapon nodes never got the "just created" flourish other
+                // nodes get — this is what NodeCard reads to fly the weapon
+                // in at the target instead of just popping into place.
+                setCelebrateIds((prev) => new Set(prev).add(weaponNode.nodeId));
+                if (mapId) refreshInsights(mapId);
+              }}
+              onCooldown={(weapon, readyAt) => setCooldowns((prev) => ({ ...prev, [weapon]: readyAt }))}
+              onDeleteEdge={(edgeId) => {
+                setEdges((prev) => prev.filter((e) => e.edgeId !== edgeId));
+                if (mapId) refreshInsights(mapId);
+              }}
+              onStartLink={() => startLinkFrom(selectedNode.nodeId)}
+              onEdit={() => startInlineEdit(selectedNode)}
+            />
+          </>
         )}
       </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { NODE_TYPE_COLORS, cycleNodeType } from "../utils/nodeType";
+import { NODE_TYPE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
 import { NodeTypeIcon } from "./NodeTypeIcon";
@@ -407,7 +407,7 @@ export function NodeCard({
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                setDraftType(cycleNodeType);
+                setDraftType(node.isWeapon ? cycleAttackNodeType : cycleNodeType);
               }}
             >
               {isOutcome ? (
