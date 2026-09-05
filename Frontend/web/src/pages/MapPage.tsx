@@ -906,29 +906,29 @@ export function MapPage() {
     window.addEventListener("pointerup", onUp);
   }
 
-  // "Mine" gates dragging, linking, and quick-add branching alike — weapons
-  // don't count either way, there's nothing to drag/link/branch from on one.
-  // Client-side only: this can't stop a crafted request straight to the
-  // API, just the UI paths.
+  // "Mine" gates dragging, linking, quick-add branching, and editing alike —
+  // a weapon node counts here too now: it's a real node its own attacker
+  // owns like any other, just one that happened to spawn from an attack
+  // rather than the toolbar. Client-side only: this can't stop a crafted
+  // request straight to the API, just the UI paths.
   function isOwnNode(node: NodeDoc) {
-    return !node.isWeapon && idOf(node.userId as any) === user?._id;
+    return idOf(node.userId as any) === user?._id;
   }
 
   // Owner-only — text/type editing isn't otherwise restricted (an earlier
   // version locked it once a node had taken any damage, but that blocked
   // ordinary corrections too aggressively; see NodePanel.tsx's own canEdit).
-  // Deliberately its own check rather than just `isOwnNode` — a weapon node
-  // is excluded there (nothing to drag/link/branch from on one), but its own
-  // attacker can still edit the objection text it carries, so that one case
-  // is allowed back in here specifically.
   function canEditNode(node: NodeDoc) {
-    return isOwnNode(node) || (node.isWeapon && idOf(node.userId as any) === user?._id);
+    return isOwnNode(node);
   }
 
   // Mirrors attackAbl.ts's own-node rule exactly (normal: someone else's
-  // node only; Map.discussionMode: your own node only), plus the
-  // defeated/weapon exclusions that never depend on mode. Client-side
-  // only, same caveat as isOwnNode — the server enforces the real rule.
+  // node only; Map.discussionMode: your own node only), plus the defeated
+  // exclusion, which never depends on mode. A weapon node stays excluded
+  // here specifically — it's "usual" for every other purpose now (its own
+  // panel, editing, dragging, quick-add, links), but landing an attack on
+  // an attack still isn't a thing this game models. Client-side only, same
+  // caveat as isOwnNode — the server enforces the real rule.
   function canAttackNode(node: NodeDoc) {
     if (node.isWeapon || node.defeated) return false;
     return map?.discussionMode ? isOwnNode(node) : !isOwnNode(node);
@@ -1061,17 +1061,15 @@ export function MapPage() {
     setContextMenu(null);
   }
 
-  // Right-click on a node: CUD + Link always for your own nodes, plus
-  // Attack when canAttackNode agrees (normal mode: someone else's node;
-  // discussion mode: your own) — nothing opens for a weapon node, or for a
-  // node that's neither yours to edit nor yours to attack right now (an
-  // already-defeated node you don't own; anyone else's node at all while
-  // in discussion mode), since there'd be no action left to show.
+  // Right-click on a node: CUD + Link always for your own nodes (a weapon
+  // node included — it's usual for this purpose now, same as everywhere
+  // else isOwnNode gates), plus Attack when canAttackNode agrees (normal
+  // mode: someone else's node; discussion mode: your own; never a weapon
+  // node regardless — see canAttackNode). Nothing opens for a node that's
+  // neither yours to edit nor yours to attack right now (an already-
+  // defeated node you don't own; anyone else's node at all while in
+  // discussion mode), since there'd be no action left to show.
   function handleNodeContextMenu(node: NodeDoc, e: ReactMouseEvent) {
-    if (node.isWeapon) {
-      setContextMenu(null);
-      return;
-    }
     const own = isOwnNode(node);
     if (!own && !canAttackNode(node)) {
       setContextMenu(null);

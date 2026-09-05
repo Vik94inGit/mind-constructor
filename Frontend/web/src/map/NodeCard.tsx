@@ -456,7 +456,7 @@ export function NodeCard({
           {node.text}
         </div>
       )}
-      {linkModeActive && !node.isWeapon && (
+      {linkModeActive && (
         <div className="mt-[0.1rem] text-[0.65rem] font-semibold text-accent">link?</div>
       )}
     </div>

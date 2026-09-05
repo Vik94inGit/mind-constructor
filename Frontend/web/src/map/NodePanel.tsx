@@ -93,24 +93,25 @@ export function NodePanel({
   const [attackText, setAttackText] = useState("");
   const [attackType, setAttackType] = useState<AttackNodeType>("Problem");
 
-  // Mirrors attackNodeAbl.ts's own-node rule exactly: normal mode only
-  // lands on someone else's node, discussion mode only on your own.
-  const canAttack = !node.defeated && (discussionMode ? isCreator : !isCreator);
+  // A weapon node is a usual node for everything else in here (its own
+  // Info/Links/History, editing, deleting) — attacking one specifically is
+  // the one thing that stays off the table, mirroring MapPage's
+  // canAttackNode exactly (normal mode: someone else's node; discussion
+  // mode: your own; never a weapon node regardless).
+  const canAttack = !node.isWeapon && !node.defeated && (discussionMode ? isCreator : !isCreator);
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
   // symbol at all — "unknown" nodes render the plain NodeTypeIcon glyph
   // instead, nothing here to override.
   const isOutcome = !!ringKindFor(node.type);
-  // A weapon node's own attacker can edit its objection text/type (see
-  // MapPage's canEditNode) and delete it, same CRUD every other node's
-  // creator gets — but it never gets Links/Attack/History tabs of its own,
-  // so this is the one place that check needs to reach beyond isCreator.
-  const canEditWeapon = node.isWeapon && isCreator;
+  // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
+  // surfaced as a "Points at" link in the Info tab below.
+  const targetId = node.isWeapon ? nodeRefId(node.targetNodeId) : undefined;
+  const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
 
-  // Which tabs this node actually has anything behind, and which one opens
-  // by default — a weapon node only ever gets "info" (its own CRUD lives
-  // there too, see canEditWeapon above); a regular node gets Links and
-  // History always, Attack only when canAttack agrees.
-  const tabs: Tab[] = node.isWeapon ? ["info"] : ["info", "links", ...(canAttack ? (["attack"] as const) : []), "history"];
+  // Which tabs this node has anything behind, and which one opens by
+  // default — every node gets Info/Links/History; Attack only when
+  // canAttack agrees (never for a weapon node, see above).
+  const tabs: Tab[] = ["info", "links", ...(canAttack ? (["attack"] as const) : []), "history"];
   const [tab, setTab] = useState<Tab>("info");
 
   useEffect(() => {
@@ -118,14 +119,10 @@ export function NodePanel({
     setAttackText("");
     setAttackType("Problem");
     setTab("info");
-    if (!node.isWeapon) {
-      nodesApi
-        .getAttackHistory(node.nodeId)
-        .then(setHistory)
-        .catch(() => setHistory([]));
-    } else {
-      setHistory(null);
-    }
+    nodesApi
+      .getAttackHistory(node.nodeId)
+      .then(setHistory)
+      .catch(() => setHistory([]));
   }, [node.nodeId]);
 
   useEffect(() => {
@@ -201,65 +198,6 @@ export function NodePanel({
 
   const tabLabel: Record<Tab, string> = { info: "Info", links: "Links", attack: "Attack", history: "History" };
 
-  if (node.isWeapon) {
-    const targetId = nodeRefId(node.targetNodeId);
-    const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
-    return (
-      <div className={PANEL_CLASS}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="m-0 mb-[0.15rem] text-[0.78rem] font-bold tracking-[0.03em] text-ink-soft uppercase">
-              {/* One consistent bow icon regardless of which weapon landed —
-                  see WEAPON_ARROW_COUNT's own doc comment. */}
-              🏹 Attack · {node.type}
-            </h3>
-            <p className="m-0 line-clamp-2 text-[0.88rem] leading-snug text-ink" title={node.text}>
-              {node.text}
-            </p>
-          </div>
-          <button className={closeBtn} onClick={onClose}>
-            ✕
-          </button>
-        </div>
-
-        {error && (
-          <div className="mt-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-        )}
-
-        <div className="mt-4 border-t border-line pt-[1rem]">
-          {target && (
-            <p style={{ fontSize: "0.8rem" }}>
-              Points at{" "}
-              <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(target.nodeId)}>
-                {target.text.slice(0, 40)}
-              </a>
-            </p>
-          )}
-          <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-            Launched by {usernameOf(node.userId as any)}
-          </p>
-          {canEditWeapon && (
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem", alignItems: "center" }}>
-              <button
-                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={onEdit}
-              >
-                Edit
-              </button>
-              <button
-                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={handleDelete}
-                disabled={busy}
-              >
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={PANEL_CLASS}>
       <div className="flex items-start justify-between gap-2">
@@ -275,7 +213,7 @@ export function NodePanel({
               {node.text}
             </p>
             <p className="m-0 text-[0.72rem] text-ink-soft">
-              by {usernameOf(node.userId as any)}
+              {node.isWeapon ? "🏹 " : ""}by {usernameOf(node.userId as any)}
               {node.isFirstNode ? " · root" : ""}
             </p>
           </div>
@@ -313,6 +251,15 @@ export function NodePanel({
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
             {node.health}/100 health{node.defeated ? " · defeated" : ""}
           </p>
+
+          {node.isWeapon && target && (
+            <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
+              Points at{" "}
+              <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(target.nodeId)}>
+                {target.text.slice(0, 40)}
+              </a>
+            </p>
+          )}
 
           {isCreator && (
             <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", alignItems: "center" }}>
