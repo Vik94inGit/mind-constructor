@@ -35,7 +35,14 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
           <button
             key={type}
             type="button"
-            className="absolute z-[15] flex h-[34px] w-[34px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-[1.5px] border-dashed border-accent bg-surface p-0 opacity-75 shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)] transition-[opacity,transform,border-color,border-style,box-shadow] duration-[150ms] ease-[ease] animate-quick-add-pulse hover:animate-none hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.15] hover:opacity-100 hover:border-solid hover:shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_30%,transparent)] focus-visible:animate-none focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.15] focus-visible:opacity-100 focus-visible:border-solid focus-visible:shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+            // z-[33]: above MapPage's full-screen NodePanel backdrop
+            // (z-30) — that backdrop dims the canvas and closes the panel
+            // on any outside tap, and without outranking it here every tap
+            // on a ghost landed on the backdrop instead, just closing the
+            // panel (and the ghost ring with it) rather than picking a
+            // type. See NodeCard's own zIndexClass for the rest of this
+            // scheme (nodes at z-31/32, the pending-create card at z-33 too).
+            className="absolute z-[33] flex h-[34px] w-[34px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-[1.5px] border-dashed border-accent bg-surface p-0 opacity-75 shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)] transition-[opacity,transform,border-color,border-style,box-shadow] duration-[150ms] ease-[ease] animate-quick-add-pulse hover:animate-none hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.15] hover:opacity-100 hover:border-solid hover:shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_30%,transparent)] focus-visible:animate-none focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.15] focus-visible:opacity-100 focus-visible:border-solid focus-visible:shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
             style={{ left: x, top: y }}
             title={`Add ${type} node`}
             onClick={(e) => {
