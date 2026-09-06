@@ -209,9 +209,14 @@ export function NodePanel({
             <NodeTypeIcon type={node.type} />
           </div>
           <div className="min-w-0">
-            <p className="m-0 line-clamp-2 text-[0.88rem] leading-snug text-ink" title={node.text}>
-              {node.text}
-            </p>
+            {/* Used to be a 2-line clamp with the rest only reachable via a
+                hover `title` tooltip — useless on a touch screen, which has
+                no hover state, so a long node's text was simply
+                unreadable in the panel on a phone. This bottom sheet
+                already scrolls its own content (see PANEL_CLASS's
+                overflow-y-auto), so letting the text wrap to however many
+                lines it needs costs nothing but a taller header. */}
+            <p className="m-0 text-[0.88rem] leading-snug text-ink">{node.text}</p>
             <p className="m-0 text-[0.72rem] text-ink-soft">
               {node.isWeapon ? "🏹 " : ""}by {usernameOf(node.userId as any)}
               {node.isFirstNode ? " · root" : ""}

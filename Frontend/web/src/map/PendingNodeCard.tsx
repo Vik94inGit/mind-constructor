@@ -37,8 +37,13 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
   // currently animate `transform`, so it isn't actually double-offset today,
   // but staying consistent means it won't silently become double-offset the
   // moment something here ever does.
+  // z-[33]: same reasoning as QuickAddGhosts's own z-[33] — above MapPage's
+  // full-screen NodePanel backdrop (z-30), which otherwise sits on top of
+  // this input (the anchor node that opened it stays selected the whole
+  // time this is up, so the backdrop never unmounts) and swallows every
+  // tap meant for it.
   const classes =
-    "absolute flex w-[92px] [transform:translate(-50%,-50%)] flex-col items-center transition-[opacity,filter] duration-150 ease-[ease] cursor-default opacity-90";
+    "absolute z-[33] flex w-[92px] [transform:translate(-50%,-50%)] flex-col items-center transition-[opacity,filter] duration-150 ease-[ease] cursor-default opacity-90";
 
   function resolve() {
     if (cancelingRef.current) {

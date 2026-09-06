@@ -222,6 +222,19 @@ export function NodeCard({
   const transitionClass = dragging
     ? "[transition:opacity_0.15s_ease,filter_0.15s_ease]"
     : "[transition:opacity_0.15s_ease,filter_0.15s_ease,transform_0.4s_ease]";
+  // Single resolution point for this node's own stacking, same reasoning as
+  // opacityClass/cursorClass above — exactly one z-index utility ever
+  // applies, never two stacked in the same class list (whichever Tailwind
+  // happened to generate first in the stylesheet would silently win over
+  // the other otherwise). z-31 baseline keeps every node (and the
+  // quick-add ghosts/pending-create card, z-33) painting *above*
+  // MapPage's full-screen NodePanel backdrop (z-30) — added there to dim
+  // the canvas and close the panel on an outside tap, which without this
+  // otherwise also swallows every tap meant for a node, a ghost, or the
+  // pending-create input while a node is selected. z-32 while actively
+  // dragged keeps the dragged node above every other node too, same as
+  // before.
+  const zIndexClass = dragging ? "z-[32]" : "z-[31]";
   const classes = [
     // Plain `transform: translate(-50%, -50%)` via an arbitrary value, not
     // Tailwind's -translate-x-1/2 utility — Tailwind v4's translate
@@ -234,10 +247,21 @@ export function NodeCard({
     // each property), landing it visibly offset from its real x/y. Writing
     // the plain property here instead means only one thing is ever doing
     // the centering, matching what the animations' own keyframes assume.
-    "group absolute flex w-[92px] [transform:translate(-50%,-50%)] select-none flex-col items-center",
+    //
+    // touch-none (touch-action: none): without it, starting a drag with a
+    // finger on a phone is ambiguous to the browser between "the page's JS
+    // is handling this pointer sequence" and "the user is panning the
+    // scrollable canvas wrapper" — the browser is free to take over as a
+    // native scroll (canceling the drag with a pointercancel) the moment it
+    // sees touch movement, even though onPointerDown already called
+    // setPointerCapture. That's what made dragging a node on a phone just
+    // scroll the canvas out from under your finger instead. touch-none
+    // opts this element out of that native gesture so the pointermove
+    // handler in MapPage's onNodePointerDown gets every event instead.
+    "group absolute flex w-[92px] touch-none [transform:translate(-50%,-50%)] select-none flex-col items-center",
+    zIndexClass,
     transitionClass,
     cursorClass,
-    dragging && "z-20",
     opacityClass,
     filterClass,
     chaotic && "animate-node-chaos-drift",
