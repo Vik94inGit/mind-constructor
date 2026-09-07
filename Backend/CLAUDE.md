@@ -13,8 +13,10 @@ connected by **edges** with a sentiment (positive/negative/neutral). Multiple in
 the same map live over Socket.IO. Layered on top of the mapping itself is a "combat" system:
 members can attack each other's nodes with one of three weapons (nitpick/counterpoint/fatalFlaw,
 each with its own damage and cooldown) to deplete the node's health; each landed attack spawns a
-visible "weapon node" pointing at its target. The backend also derives read-only insight from the
-graph: auto-detected circles (`parentId` stars — see `circleAbl.ts`) and attack indicators.
+visible "weapon node" pointing at its target. The one node a weapon node's own target can attack
+back is that weapon node itself (retaliation — see `attackAbl.ts`), which also heals the
+retaliating node's parent. The backend also derives read-only insight from the graph: auto-detected
+circles (`parentId` stars — see `circleAbl.ts`) and attack indicators.
 
 Stack: Express 5 + TypeScript + MongoDB (Mongoose), plus a Socket.IO server (attached to the same
 HTTP server) for live map updates. Full REST endpoint reference:
@@ -96,6 +98,16 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   snapshotted onto each `Attack` document at attack time, so rebalancing a weapon later doesn't
   rewrite history. Cooldowns are per attacker+weapon (not per attacker+weapon+target) — landing a
   hit with one weapon starts a cooldown for that weapon globally, regardless of target.
+- **`src/abl/attackAbl.ts`** retaliation — a weapon node is otherwise excluded from combat
+  entirely (nothing can attack an attack), except the one node it actually targeted striking back
+  at it: `attackNodeAbl` special-cases `node.isWeapon`, requiring the caller to own the node the
+  weapon's own `targetNodeId` resolves to (`CannotRetaliateError` otherwise), bypassing the normal
+  own-node/discussion-mode rule entirely for that one case. A landed retaliation also heals the
+  *retaliating node's own parent* (`Node.parentId`, not the retaliating node itself) by a fixed
+  `RETALIATION_HEAL_AMOUNT`, via the new `healNodeDao` — capped at 100, and never clears
+  `defeated` on its own (nothing else in this app un-defeats a node either). The attack response/
+  broadcast (`node:attacked`) carries this as `healedParent` (`null` on an ordinary, non-
+  retaliation attack) alongside the existing `node`/`weaponNode`.
 - **`scripts/promoteAdmin.ts`** — the only way to grant the `admin` role; deliberately not exposed
   as an API endpoint.
 

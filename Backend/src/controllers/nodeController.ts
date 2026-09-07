@@ -17,6 +17,7 @@ import {
   getAttackHistoryAbl,
   CannotAttackOwnNodeError,
   CanOnlyAttackOwnNodeError,
+  CannotRetaliateError,
   NodeAlreadyDefeatedError,
   WeaponOnCooldownError,
 } from "../abl/attackAbl.js";
@@ -209,6 +210,12 @@ export const attackNode = async (req: Request<nodeIdParams>, res: Response) => {
       return res.status(400).json({
         success: false,
         error: "Discussion mode: you can only attack your own nodes",
+      });
+    }
+    if (error instanceof CannotRetaliateError) {
+      return res.status(403).json({
+        success: false,
+        error: "You can only retaliate against an attack that targeted your own node",
       });
     }
     if (error instanceof NodeAlreadyDefeatedError) {

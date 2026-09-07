@@ -57,7 +57,8 @@ interface Props {
   onDeleted: (nodeId: string) => void;
   /** Fired after a direct panel-side PATCH (currently just the symbol-override toggle below) with the server's response, so the canvas/other panels stay in sync — same upsert-by-id MapPage already does for every other node update. */
   onUpdated: (node: NodeDoc) => void;
-  onAttacked: (node: NodeDoc, weaponNode: NodeDoc, weapon: Weapon) => void;
+  /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. */
+  onAttacked: (node: NodeDoc, weaponNode: NodeDoc, weapon: Weapon, healedParent: NodeDoc | null) => void;
   onCooldown: (weapon: Weapon, readyAt: number) => void;
   onDeleteEdge: (edgeId: string) => void;
   onStartLink: () => void;
@@ -93,24 +94,33 @@ export function NodePanel({
   const [attackText, setAttackText] = useState("");
   const [attackType, setAttackType] = useState<AttackNodeType>("Problem");
 
+  // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
+  // surfaced as a "Points at" link in the Info tab below, and used by
+  // canAttack right below to decide whether this is a retaliation.
+  const targetId = node.isWeapon ? nodeRefId(node.targetNodeId) : undefined;
+  const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
+
   // A weapon node is a usual node for everything else in here (its own
-  // Info/Links/History, editing, deleting) — attacking one specifically is
-  // the one thing that stays off the table, mirroring MapPage's
-  // canAttackNode exactly (normal mode: someone else's node; discussion
-  // mode: your own; never a weapon node regardless).
-  const canAttack = !node.isWeapon && !node.defeated && (discussionMode ? isCreator : !isCreator);
+  // Info/Links/History, editing, deleting) — attacking one is otherwise
+  // off the table, mirroring MapPage's canAttackNode exactly (normal mode:
+  // someone else's node; discussion mode: your own), *except* retaliation:
+  // the one node this weapon actually hit striking back at it, regardless
+  // of mode — same as server-side (see Backend's attackAbl.ts,
+  // CannotRetaliateError).
+  function computeCanAttack() {
+    if (node.defeated) return false;
+    if (node.isWeapon) return !!target && idOf(target.userId as any) === currentUserId;
+    return discussionMode ? isCreator : !isCreator;
+  }
+  const canAttack = computeCanAttack();
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
   // symbol at all — "unknown" nodes render the plain NodeTypeIcon glyph
   // instead, nothing here to override.
   const isOutcome = !!ringKindFor(node.type);
-  // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
-  // surfaced as a "Points at" link in the Info tab below.
-  const targetId = node.isWeapon ? nodeRefId(node.targetNodeId) : undefined;
-  const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
 
   // Which tabs this node has anything behind, and which one opens by
   // default — every node gets Info/Links/History; Attack only when
-  // canAttack agrees (never for a weapon node, see above).
+  // canAttack agrees.
   const tabs: Tab[] = ["info", "links", ...(canAttack ? (["attack"] as const) : []), "history"];
   const [tab, setTab] = useState<Tab>("info");
 
@@ -164,7 +174,7 @@ export function NodePanel({
     setError(null);
     try {
       const res = await nodesApi.attackNode(node.nodeId, weapon, { type: attackType, text: attackText.trim() });
-      onAttacked(res.node, res.weaponNode, weapon);
+      onAttacked(res.node, res.weaponNode, weapon, res.healedParent);
       const info = WEAPON_INFO[weapon];
       if (info.cooldownMs > 0) onCooldown(weapon, Date.now() + info.cooldownMs);
       setAttackText("");
@@ -387,7 +397,9 @@ export function NodePanel({
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
             Landing an attack creates a real node with your objection, linked to this one by a
             weapon arrow.
-            {discussionMode && " Discussion mode: you can only challenge your own nodes."}
+            {node.isWeapon
+              ? " Retaliation: landing this heals your own node's parent."
+              : discussionMode && " Discussion mode: you can only challenge your own nodes."}
           </p>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="attack-text" className="text-[0.8rem] font-semibold text-ink-soft">

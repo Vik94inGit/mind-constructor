@@ -33,10 +33,16 @@ export async function attackNode(
   weapon: Weapon,
   content: { type: AttackNodeType; text: string },
 ) {
-  return apiRequest<{ success: boolean; node: NodeDoc; weaponNode: NodeDoc }>(`/api/nodes/${nodeId}/attack`, {
-    method: "POST",
-    body: { weapon, type: content.type, text: content.text },
-  });
+  // healedParent: set only when this landed as a retaliation (attacking
+  // the weapon node that hit your own node) — see Backend's attackAbl.ts.
+  // null on an ordinary attack.
+  return apiRequest<{ success: boolean; node: NodeDoc; weaponNode: NodeDoc; healedParent: NodeDoc | null }>(
+    `/api/nodes/${nodeId}/attack`,
+    {
+      method: "POST",
+      body: { weapon, type: content.type, text: content.text },
+    },
+  );
 }
 
 export async function getAttackHistory(nodeId: string): Promise<Attack[]> {

@@ -3,6 +3,8 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as Reac
 import { NODE_TYPE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
+import { NodeCrown } from "./NodeCrown";
+import { NodeWings } from "./NodeWings";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import {
   burstParticles,
@@ -42,6 +44,12 @@ function seededRandoms(seed: string, count: number): number[] {
   return out;
 }
 
+// OutcomeBadge is just a symbol now (see its own doc comment) — sized
+// close to NodeTypeIcon's own 26px so an outcome-type node and an
+// "unknown" one read as the same *kind* of glyph inside the same bordered
+// circle, just a filled bold shape instead of a thin-stroke line icon.
+const OUTCOME_BADGE_SIZE = 32;
+
 // CSS custom properties driving the .chaotic keyframes below: three small
 // waypoints plus a randomized duration/negative-delay, so several drifting
 // nodes never move in lockstep — a shared clock with the same waypoints
@@ -73,6 +81,8 @@ interface Props {
   node: NodeDoc;
   x: number;
   y: number;
+  /** MapPage's own canvas zoom (see its zoom state) — this node's own visual content (icon, health ring, caption) counter-scales by 1/zoom so it renders at a constant on-screen size regardless of zoom level; only its *position* moves with the rest of the canvas. See the inverseScaleStyle wrapper below for why that's a separate inner element rather than folded into this node's own transform. */
+  zoom: number;
   selected: boolean;
   dragging: boolean;
   canDrag: boolean;
@@ -97,7 +107,6 @@ interface Props {
   onInlineCancel?: () => void;
   onPointerDown?: (e: ReactPointerEvent) => void;
   onClick: () => void;
-  onDoubleClick?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
 }
 
@@ -105,6 +114,7 @@ export function NodeCard({
   node,
   x,
   y,
+  zoom,
   selected,
   dragging,
   canDrag,
@@ -121,7 +131,6 @@ export function NodeCard({
   onInlineCancel,
   onPointerDown,
   onClick,
-  onDoubleClick,
   onContextMenu,
 }: Props) {
   const particlesRef = useRef<HTMLDivElement | null>(null);
@@ -278,14 +287,6 @@ export function NodeCard({
     onClick();
   };
 
-  const handleDoubleClick = (e: ReactMouseEvent) => {
-    // Same stopPropagation reasoning as clicks: without it this also
-    // reaches .map-canvas's own onDoubleClick, which would pop the "create
-    // node" input on top of whatever double-clicking this node just did.
-    e.stopPropagation();
-    onDoubleClick?.();
-  };
-
   const handleContextMenu = (e: ReactMouseEvent) => {
     // Same stopPropagation reasoning as clicks: without it this also
     // reaches .map-canvas's own onContextMenu, which closes everything —
@@ -331,7 +332,8 @@ export function NodeCard({
   // node that's a circle member: the group's own halo/horns backdrop
   // already communicates its status, so each member's own ring would just
   // be visual noise sitting on top of it. Either reason hides it the same
-  // way.
+  // way. Applies uniformly to every node type — this div's own ring is
+  // health's one and only home.
   const hideHealth = discussionMode || !!groupSentiment;
 
   // Ring is a conic-gradient read off CSS custom properties, so the health
@@ -346,8 +348,15 @@ export function NodeCard({
   // it only on hover. The two custom properties stay inline either way — a
   // class-based rule can still read them via var(), cascade only decides
   // who wins for the *background* property itself.
+  // transparent, not var(--surface-2) — the "used up" portion of this ring
+  // (past the health-colored arc) used to fill gray, which on a damaged
+  // node read as a distinct gray zone sitting between the badge's own dark
+  // fill and its colored outline. Leaving it transparent instead means the
+  // ring only ever shows the *actual* health-colored arc; the "missing"
+  // health is communicated by that arc simply being shorter, not by a
+  // second, separately-colored fill for what isn't there any more.
   const healthGradient =
-    "conic-gradient(var(--ring-color, var(--success)) calc(var(--health, 100) * 3.6deg), var(--surface-2) 0deg)";
+    "conic-gradient(var(--ring-color, var(--success)) calc(var(--health, 100) * 3.6deg), transparent 0deg)";
   const ringStyle: CSSProperties = {
     "--health": Math.max(0, Math.min(100, node.health)),
     "--ring-color": node.defeated ? "var(--danger)" : "var(--success)",
@@ -361,12 +370,18 @@ export function NodeCard({
     outline: selected ? "2px solid var(--accent)" : undefined,
     outlineOffset: 2,
   } as CSSProperties;
-  // Flat and quiet at rest, the real health sweep only on hover — same
-  // `group` (the outer node div) every other hover effect here already
-  // keys off. Bracket syntax needs its spaces escaped as `_` per Tailwind's
+  // Invisible at rest, the real health sweep only on hover — same `group`
+  // (the outer node div) every other hover effect here already keys off.
+  // This used to fall back to a flat bg-surface-2 fill instead of nothing,
+  // which read as a plain gray circle sitting around every zone member's
+  // icon (hideHealth covers every one of them now — see its own comment)
+  // rather than the "nothing to see here, hover if you want it" this is
+  // actually going for; a zone's already-visible colored outline made that
+  // gray disc redundant clutter on top of it, not a second useful signal.
+  // Bracket syntax needs its spaces escaped as `_` per Tailwind's
   // arbitrary-value convention.
   const healthVisibilityClass = hideHealth
-    ? `bg-surface-2 transition-[background] duration-150 ease-[ease] group-hover:[background:conic-gradient(var(--ring-color,var(--success))_calc(var(--health,100)*3.6deg),var(--surface-2)_0deg)]`
+    ? `bg-transparent transition-[background] duration-150 ease-[ease] group-hover:[background:conic-gradient(var(--ring-color,var(--success))_calc(var(--health,100)*3.6deg),transparent_0deg)]`
     : "";
 
   const chaosCss = chaotic ? chaosStyle(node.nodeId) : undefined;
@@ -383,12 +398,37 @@ export function NodeCard({
           ? "shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_22%,transparent)]"
           : "";
 
-  // under-fire's red border only ever shows on a non-outcome ("unknown")
-  // node — an outcome type's halo/horns framing removes the plain circle
-  // border entirely regardless, same precedence the stylesheet gave them.
-  const circleBorderClass = isOutcome
-    ? "overflow-visible"
-    : `overflow-hidden border-2 shadow-card ${indicator ? "border-danger" : "border-line"}`;
+  // Every node gets the same plain circular border now, outcome types
+  // included — OutcomeBadge is just a symbol (no ring of its own any
+  // more; its own halo/horns "crown" decoration is drawn separately, see
+  // above), so there's nothing left for "outcome types skip the border
+  // entirely" to have been protecting.
+  const circleBorderClass = "overflow-hidden border-2 shadow-card";
+  // under-fire (indicator) wins over the type's own color when both could
+  // apply. This used to be a Tailwind class (border-danger) instead, which
+  // an *unconditional* inline `borderColor` a few lines down silently
+  // overrode every single time — an inline style always beats a class for
+  // the same CSS property, so that red under-fire border could never
+  // actually render, indicator or not. Deciding the color in JS instead,
+  // so whichever one applies is really what gets set.
+  const circleBorderColor = indicator ? "var(--danger)" : NODE_TYPE_COLORS[displayType];
+
+  // Counter-scales this node's own visual content against MapPage's canvas
+  // zoom, so icons/captions stay a constant size on screen while zooming —
+  // only the canvas's own spacing (everything's x/y) actually grows or
+  // shrinks. Applied on its own inner wrapper (see the JSX below) rather
+  // than folded into this element's own `classes`/`style` transform,
+  // specifically because that outer transform isn't always this element's
+  // own inline style to begin with — the chaotic-drift and weapon-fly-in
+  // *keyframe animations* (registered in index.css) each set `transform`
+  // directly while they're playing, which fully replaces the computed
+  // transform value rather than composing with it. Baking a zoom
+  // counter-scale into that same property would make it vanish for the
+  // exact duration of either animation, popping the node to the "wrong"
+  // (zoom-scaled) size and back. A separate inner element's own transform
+  // is never touched by either keyframe, so it stays in effect regardless
+  // of what the outer positioning div's transform is doing at any moment.
+  const inverseScaleStyle: CSSProperties = { transform: `scale(${1 / zoom})` };
 
   return (
     <div
@@ -396,19 +436,33 @@ export function NodeCard({
       style={{ ...style, ...flightStyle, ...chaosCss }}
       onPointerDown={onPointerDown}
       onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
       onAnimationEnd={() => {
         if (flying) burstParticles(particlesRef.current, WEAPON_PARTICLE_COLORS, 10, 40);
       }}
       title={node.text}
     >
+      {/* See inverseScaleStyle's own comment above for why this is a
+          separate element from the outer positioning div rather than
+          folded into its own transform. */}
+      <div className="flex w-full flex-col items-center" style={inverseScaleStyle}>
       <div className="relative h-[60px] w-[60px]">
         {indicator && (
           <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
             {indicator.incomingNegativeEdges}
           </div>
         )}
+        {/* Halo/horns — see NodeCrown's own doc comment; shared with
+            QuickAddGhosts so a ghost previews this too, not just the bare
+            symbol. */}
+        <NodeCrown type={displayType} />
+        {/* Wings — see NodeWings's own doc comment for why this is a
+            separate, never-resized overlay rather than living inside
+            OutcomeBadge. Placed before the bordered circle below in DOM
+            order (both z-index:auto) so the circle paints over the
+            wings' own base, same "flanking the head, not stamped on top
+            of it" look the wings always had. */}
+        <NodeWings type={displayType} show={selected} />
         {/* No more weapon-type badge here — which weapon landed used to
             show as a little corner label on the objection node itself.
             That's dropped in favor of the pointer MapPage draws between
@@ -426,7 +480,7 @@ export function NodeCard({
             <button
               type="button"
               className={`flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-surface p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${circleBorderClass}`}
-              style={{ borderColor: NODE_TYPE_COLORS[displayType] }}
+              style={{ borderColor: circleBorderColor }}
               title="Click to change type"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -435,7 +489,11 @@ export function NodeCard({
               }}
             >
               {isOutcome ? (
-                <OutcomeBadge type={displayType as OutcomeType} size={90} symbolOverride={node.symbolOverride} />
+                <OutcomeBadge
+                  type={displayType as OutcomeType}
+                  size={OUTCOME_BADGE_SIZE}
+                  symbolOverride={node.symbolOverride}
+                />
               ) : (
                 <NodeTypeIcon type={displayType} size={26} />
               )}
@@ -443,10 +501,14 @@ export function NodeCard({
           ) : (
             <div
               className={`flex h-full w-full items-center justify-center rounded-full bg-surface ${circleBorderClass}`}
-              style={{ borderColor: NODE_TYPE_COLORS[displayType] }}
+              style={{ borderColor: circleBorderColor }}
             >
               {isOutcome ? (
-                <OutcomeBadge type={displayType as OutcomeType} size={90} symbolOverride={node.symbolOverride} />
+                <OutcomeBadge
+                  type={displayType as OutcomeType}
+                  size={OUTCOME_BADGE_SIZE}
+                  symbolOverride={node.symbolOverride}
+                />
               ) : (
                 <NodeTypeIcon type={displayType} size={26} />
               )}
@@ -483,6 +545,7 @@ export function NodeCard({
       {linkModeActive && (
         <div className="mt-[0.1rem] text-[0.65rem] font-semibold text-accent">link?</div>
       )}
+      </div>
     </div>
   );
 }

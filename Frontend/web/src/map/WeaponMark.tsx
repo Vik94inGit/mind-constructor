@@ -17,7 +17,7 @@ const AUTO_SHOT_INTERVAL_MS = 1500;
 // behind the icon" for "stamped on top of it" instead of actually landing
 // beside it.
 const NODE_ICON_RADIUS = 30;
-const BOW_GAP = 8;
+const BOW_GAP = 26;
 
 interface Props {
   /** The weapon node's own position — the bow is drawn just outside this, offset toward the target, always facing it. */
@@ -26,6 +26,8 @@ interface Props {
   targetX: number;
   targetY: number;
   weaponIcon: WeaponIcon | undefined;
+  /** The bow and its arrows both draw in this color — var(--danger) (red) for an ordinary attack, but a *positive*-claim retaliation (see Backend's attackAbl.ts — a weapon node can carry any outcome type now, not just the negative-framed ones) reads oddly in red, so callers pass a blue instead when the weapon node's own type is halo-classified. See MapPage's own weapon-mark rendering for which. */
+  color: string;
   /** True once, the instant this attack lands this session — same contract
    * NodeCard's own `celebrate` prop uses: only the value at first mount
    * matters (see the useState below), so the arrows' initial flight plays
@@ -45,7 +47,7 @@ interface Props {
 // counterpoint and fatal flaw apart (see WEAPON_ARROW_COUNT). The arrows
 // themselves are transient: they fly from the bow to the target and fade
 // out right as they arrive, not a permanent connecting line.
-export function WeaponMark({ x, y, targetX, targetY, weaponIcon, celebrate, replayNonce }: Props) {
+export function WeaponMark({ x, y, targetX, targetY, weaponIcon, color, celebrate, replayNonce }: Props) {
   const fullDx = targetX - x;
   const fullDy = targetY - y;
   const fullDist = Math.hypot(fullDx, fullDy) || 1;
@@ -94,8 +96,8 @@ export function WeaponMark({ x, y, targetX, targetY, weaponIcon, celebrate, repl
       {/* The bow: static, always visible, facing the target — this attack's
           launcher. Drawn as a simple arc + string rather than any of the
           old per-weapon icons. */}
-      <path d="M -2,-11 Q 7,0 -2,11" fill="none" stroke="var(--danger)" strokeWidth={2} strokeLinecap="round" />
-      <line x1={-2} y1={-11} x2={-2} y2={11} stroke="var(--danger)" strokeWidth={1} opacity={0.6} />
+      <path d="M -2,-11 Q 7,0 -2,11" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <line x1={-2} y1={-11} x2={-2} y2={11} stroke={color} strokeWidth={1} opacity={0.6} />
       {playKey !== null &&
         Array.from({ length: arrowCount }, (_, i) => (
           <g
@@ -103,7 +105,7 @@ export function WeaponMark({ x, y, targetX, targetY, weaponIcon, celebrate, repl
             className="animate-weapon-arrow-fly"
             style={{ "--arrow-dist": `${dist}px`, animationDelay: `${i * 110}ms` } as CSSProperties}
           >
-            <path d="M -3,-3 L 6,0 L -3,3 Z" fill="var(--danger)" />
+            <path d="M -3,-3 L 6,0 L -3,3 Z" fill={color} />
           </g>
         ))}
     </g>
