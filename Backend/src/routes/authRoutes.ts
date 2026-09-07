@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, login, logout } from "../controllers/authController.js";
+import { register, login, googleAuth, logout } from "../controllers/authController.js";
 import { protect, requireAdmin } from "../middleware/auth.js";
 import {
   getAllUsers,
@@ -12,6 +12,7 @@ const router = Router();
 
 router.post("/register", register);
 router.post("/login", login);
+router.post("/google", googleAuth);
 router.post("/logout", logout);
 
 // Any signed-in user can list users — needed to look up an id to invite to

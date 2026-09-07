@@ -34,8 +34,9 @@ npx vitest run -t "test name substring"     # single test by name
 npm run admin:promote -- someone@example.com  # promote a user to admin (no in-app endpoint for this, by design)
 ```
 
-Requires a `.env` with `PORT`, `MONGO_URI`, `JWT_SECRET`. `test-db.ts` is a standalone
-connectivity check (`npx tsx test-db.ts`), not part of the test suite.
+Requires a `.env` with `PORT`, `MONGO_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID` (the OAuth client id
+"Sign in with Google" ID tokens are verified against — see `authAbl.ts`'s `googleAuthAbl`).
+`test-db.ts` is a standalone connectivity check (`npx tsx test-db.ts`), not part of the test suite.
 
 Tests mock the DAO layer with `vi.mock(...)` (see any file in `tests/`) rather than hitting a real
 MongoDB, so `npm run test:run` doesn't need `MONGO_URI` to pass.
@@ -80,6 +81,14 @@ Cross-cutting pieces:
 payload)` is the one function controllers call after a mutation commits; it's a no-op if `io`
   was never initialized (true under the test app), so it's safe to call unconditionally.
 - **`src/abl/errors.ts`** — shared `ValidationError` + `parseOrThrow`.
+- **`src/abl/authAbl.ts`** `googleAuthAbl` — "Sign in with Google" is one endpoint
+  (`POST /api/auth/google`) for both registering and logging in: the frontend hands it a Google ID
+  token (never a password), the backend verifies it against `GOOGLE_CLIENT_ID` via
+  `google-auth-library`, then resolves an account by the token's `sub` claim (`User.googleId`) —
+  falling back to matching by email (linking Google onto an existing password account) before
+  creating a brand-new one with a username derived from the email's local part. `User.passwordHash`
+  is therefore optional: a Google-only account never gets one, and `loginAbl` treats that the same
+  as a wrong password rather than a distinct error, so a probing login can't tell which case it hit.
 - **`src/abl/circleAbl.ts`** — a "circle" is a node with 2+ direct `parentId`-children (the
   parentId "star" a frontend draws as a plain translucent, sentiment-colored backdrop — positive-
   majority halo color vs. negative-majority horns color, no actual halo/horns/wings artwork).
