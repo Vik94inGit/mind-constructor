@@ -3,9 +3,10 @@ import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiRequestError } from "../api/client";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
 export function LoginPage() {
-  const { login, user } = useAuth();
+  const { login, loginWithGoogle, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -24,6 +25,19 @@ export function LoginPage() {
     setBusy(true);
     try {
       await login(email, password);
+      navigate("/", { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onGoogleCredential(idToken: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      await loginWithGoogle(idToken);
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Something went wrong");
@@ -75,6 +89,12 @@ export function LoginPage() {
             {busy ? "Logging in…" : "Log in"}
           </button>
         </form>
+        <div className="my-4 flex items-center gap-3 text-[0.75rem] text-ink-soft before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
+          or
+        </div>
+        <div className="flex justify-center">
+          <GoogleSignInButton onCredential={onGoogleCredential} />
+        </div>
         <div className="mt-4 text-center text-[0.85rem] text-ink-soft">
           No account? <Link to="/register">Register</Link>
         </div>
