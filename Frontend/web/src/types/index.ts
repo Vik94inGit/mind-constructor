@@ -32,10 +32,18 @@ export const WEAPON_INFO: Record<Weapon, { label: string; damage: number; cooldo
 };
 
 // An attack always creates a real content node alongside the damage now —
-// restricted to the three "this is an objection" types (mirrors
-// attackAbl.ts's ATTACK_NODE_TYPES on the backend, which is the one that
-// actually gets enforced).
-export const ATTACK_NODE_TYPES = ["Problem", "Problematic option", "Fail"] as const;
+// every outcome type except "unknown" (mirrors attackAbl.ts's
+// ATTACK_NODE_TYPES on the backend, which is the one that actually gets
+// enforced) — retaliation in particular is naturally a positive claim
+// ("my defense holds"), not just the negative-framed objection types.
+export const ATTACK_NODE_TYPES = [
+  "Problem",
+  "Problematic option",
+  "Solution",
+  "Option",
+  "Success",
+  "Fail",
+] as const;
 export type AttackNodeType = (typeof ATTACK_NODE_TYPES)[number];
 
 export interface User {

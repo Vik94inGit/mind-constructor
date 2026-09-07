@@ -3,10 +3,12 @@ import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import type { NodeDoc } from "../types";
 
 // Fixed corner overlay, sized to the same 3:2 ratio as the real canvas
-// (CANVAS_W:CANVAS_H = 2400:1600) so a straight linear scale-down is all the
-// coordinate math needs — no zoom level to account for, since the real
-// canvas itself is a fixed-size scrollable area, not an infinite/zoomable
-// one.
+// (CANVAS_W:CANVAS_H = 2400:1600) so a straight linear scale-down (scaleX/
+// scaleY below) is all the coordinate math needs to place a dot/zone —
+// canvas-coordinate space itself never changes shape, only how zoomed-in
+// the *real* canvas is currently rendered at (see the zoom prop below,
+// needed only for the "you are here" viewport rectangle, not for placing
+// anything drawn in canvas coordinates like these dots/zones).
 const MINIMAP_W = 180;
 const MINIMAP_H = 120;
 const DOT_R = 2.2;
@@ -22,6 +24,12 @@ interface MiniMapGroup {
   cy: number;
   r: number;
   sentiment: "positive" | "negative";
+  // Same outline polygon the real canvas draws as this group's "zone" —
+  // see MapPage's own nodeGroups. Drawn here too (scaled down) instead of
+  // falling back to the plain cx/cy/r circle, so the minimap's shape
+  // actually matches what's on the real canvas rather than just
+  // approximating its bounding circle.
+  outline: { x: number; y: number }[];
 }
 
 interface Props {
@@ -39,9 +47,16 @@ interface Props {
   groups: MiniMapGroup[];
   canvasW: number;
   canvasH: number;
+  // MapPage's own canvas zoom (see its zoom state) — wrap's scroll metrics
+  // (scrollLeft/scrollTop/scrollWidth) are in screen pixels of the
+  // *rendered* canvas once it's zoomed, not the canvasW/canvasH coordinate
+  // space nodes/positions/groups are all still expressed in, so every
+  // wrap-scroll reading below needs this to convert between the two —
+  // same reasoning as MapPage's own screenToCanvas/zoomAt.
+  zoom: number;
 }
 
-export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH }: Props) {
+export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH, zoom }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
   const [viewport, setViewport] = useState({ left: 0, top: 0, width: 0, height: 0 });
@@ -78,7 +93,10 @@ export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH }:
   // Centers the real viewport on wherever (clientX, clientY) lands in
   // minimap-space — shared by both a plain click (jump) and every
   // pointermove while dragging (pan), so a drag reads as continuously
-  // re-jumping to the point under the pointer.
+  // re-jumping to the point under the pointer. *zoom below: canvasX/canvasY
+  // land in canvas-coordinate space (0..canvasW/canvasH), but
+  // scrollLeft/scrollTop/scrollWidth are screen pixels of the rendered
+  // (zoomed) canvas — same conversion MapPage's own zoomAt does.
   function navigateTo(clientX: number, clientY: number) {
     const wrap = wrapRef.current;
     const svg = svgRef.current;
@@ -88,15 +106,30 @@ export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH }:
     const miniY = Math.min(Math.max(0, clientY - rect.top), MINIMAP_H);
     const canvasX = miniX / scaleX;
     const canvasY = miniY / scaleY;
-    const maxLeft = Math.max(0, canvasW - wrap.clientWidth);
-    const maxTop = Math.max(0, canvasH - wrap.clientHeight);
-    wrap.scrollLeft = Math.min(maxLeft, Math.max(0, canvasX - wrap.clientWidth / 2));
-    wrap.scrollTop = Math.min(maxTop, Math.max(0, canvasY - wrap.clientHeight / 2));
+    const maxLeft = Math.max(0, canvasW * zoom - wrap.clientWidth);
+    const maxTop = Math.max(0, canvasH * zoom - wrap.clientHeight);
+    wrap.scrollLeft = Math.min(maxLeft, Math.max(0, canvasX * zoom - wrap.clientWidth / 2));
+    wrap.scrollTop = Math.min(maxTop, Math.max(0, canvasY * zoom - wrap.clientHeight / 2));
   }
 
   return (
     <div
-      className="absolute top-3 right-3 z-20 overflow-hidden rounded-card border border-line bg-surface shadow-card"
+      // bottom-3 right-3: anchored to the bottom-right corner rather than
+      // top-right — out of the way of the toolbar's own top-left "back"
+      // link and the map name up there, and clear of the top-of-screen
+      // controls generally.
+      // z-[45]: above NodePanel's dimming backdrop (z-30) and the panel
+      // itself (z-40) — so the minimap stays visible and clickable while a
+      // node is selected, instead of getting buried under the panel/
+      // backdrop the moment one is (see NodeCard/QuickAddGhosts/
+      // PendingNodeCard's own z-index comments for the same problem on the
+      // canvas itself) — but still *below* a real modal dialog (Modal.tsx,
+      // z-50; Invite/Color/Create-edge/Map-summary all use it), which
+      // should stay genuinely on top of everything, minimap included, while
+      // it's open. (An earlier z-[70] here overshot past z-50 too, leaving
+      // the minimap floating on top of an open modal instead of properly
+      // covered by it.)
+      className="absolute bottom-3 right-3 z-[45] overflow-hidden rounded-card border border-line bg-surface shadow-card"
       title="Minimap — click or drag to jump around the map"
     >
       <svg
@@ -119,16 +152,15 @@ export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH }:
         }}
       >
         <rect x={0} y={0} width={MINIMAP_W} height={MINIMAP_H} fill="var(--surface-2)" />
-        {/* Circles, under the node dots — same sentiment colors the real
-            canvas backdrop uses (see MapPage's own nodeGroups rendering),
-            just scaled down and without the click-to-stabilize interaction
-            this tiny a target isn't worth wiring up for. */}
+        {/* Zones, under the node dots — the same outline polygon (and
+            sentiment colors) the real canvas draws for each group (see
+            MapPage's own nodeGroups/"Zones" rendering), just scaled down
+            and without the click-to-stabilize interaction this tiny a
+            target isn't worth wiring up for. */}
         {groups.map((g) => (
-          <circle
+          <polygon
             key={`group-${g.rootId}`}
-            cx={g.cx * scaleX}
-            cy={g.cy * scaleY}
-            r={g.r * scaleX}
+            points={g.outline.map((p) => `${p.x * scaleX},${p.y * scaleY}`).join(" ")}
             fill={g.sentiment === "positive" ? "#ffd54f" : "#ff3d00"}
             fillOpacity={0.16}
             stroke={g.sentiment === "positive" ? "#ffd54f" : "#ff3d00"}
@@ -145,11 +177,16 @@ export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH }:
               <circle key={n.nodeId} cx={p.x * scaleX} cy={p.y * scaleY} r={DOT_R} fill={NODE_TYPE_COLORS[n.type]} />
             );
           })}
+        {/* /zoom: viewport.* is wrap's own scroll/client size in screen
+            pixels of the rendered (zoomed) canvas — divide back down to
+            canvas-coordinate space before scaling to minimap size, same as
+            navigateTo above, or this rectangle would shrink to a sliver
+            the moment the real canvas zoomed in. */}
         <rect
-          x={viewport.left * scaleX}
-          y={viewport.top * scaleY}
-          width={viewport.width * scaleX}
-          height={viewport.height * scaleY}
+          x={(viewport.left / zoom) * scaleX}
+          y={(viewport.top / zoom) * scaleY}
+          width={(viewport.width / zoom) * scaleX}
+          height={(viewport.height / zoom) * scaleY}
           fill="var(--accent)"
           fillOpacity={0.12}
           stroke="var(--accent)"

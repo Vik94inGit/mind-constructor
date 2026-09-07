@@ -189,6 +189,18 @@
     color: var(--color-ink);
     font-family: "IBM Plex Sans", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    /* overscroll-behavior-x: none — a horizontal drag that starts near the
+       screen edge (dragging a node close to it, say) can otherwise get
+       read by the browser itself as "swipe to go back," which unmounts
+       this whole SPA page and silently discards whatever was in progress
+       (an open pending-create input, an unconfirmed drag) instead of the
+       deliberate "← Back to maps" link every map already has. This is the
+       one thing a web page can actually ask a browser for here — Chrome
+       (desktop and Android) honors it; iOS Safari's edge-swipe is a
+       system-level gesture this can't fully suppress, but it's still a
+       real improvement where it does apply, with no downside where it
+       doesn't. */
+    overscroll-behavior-x: none;
   }
   code {
     font-family: "IBM Plex Mono", "Courier New", monospace;

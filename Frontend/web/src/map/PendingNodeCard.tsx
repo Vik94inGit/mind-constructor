@@ -60,7 +60,17 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
   }
 
   return (
-    <div className={classes} style={{ left: x, top: y } as CSSProperties} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+    <div
+      className={classes}
+      style={{ left: x, top: y } as CSSProperties}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      // Without this, double-clicking to select a word while typing here
+      // (or double-tapping the icon by mistake) bubbles a dblclick up to
+      // the canvas, which now reads any double-click as "zoom in here" —
+      // see MapPage's onCanvasDoubleClick.
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
       <div className="relative h-[60px] w-[60px]">
         <div
           className="flex h-full w-full items-center justify-center rounded-full p-[3px] shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_22%,transparent)] transition-transform duration-150 ease-[ease]"

@@ -55,11 +55,13 @@ export function cycleNodeType(current: NodeType): NodeType {
 
 // Same idea, scoped to ATTACK_NODE_TYPES — a weapon node's own icon-click
 // cycle (now that attack nodes are editable too, see NodeCard) stays within
-// the same three types attackAbl.ts's own creation schema accepts, rather
-// than landing it on a type (Solution, say) an objection was never meant to
-// carry. `current` falls back to the first entry if it's somehow outside
-// this set (shouldn't happen — a weapon node's type is only ever set from
-// this same list — but keeps the lookup total either way).
+// whichever types attackAbl.ts's own creation schema accepts (every
+// outcome type except "unknown" — see ATTACK_NODE_TYPES's own doc comment),
+// rather than landing it on "unknown", which draws no ring/framing at all
+// and so never reads as an attack's own claim one way or the other.
+// `current` falls back to the first entry if it's somehow outside this set
+// (shouldn't happen — a weapon node's type is only ever set from this same
+// list — but keeps the lookup total either way).
 export function cycleAttackNodeType(current: NodeType): NodeType {
   const i = ATTACK_NODE_TYPES.indexOf(current as (typeof ATTACK_NODE_TYPES)[number]);
   return ATTACK_NODE_TYPES[(i + 1) % ATTACK_NODE_TYPES.length];

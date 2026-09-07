@@ -1,10 +1,25 @@
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
+import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
+import { NodeCrown } from "./NodeCrown";
 
-const RADIUS = 100;
+// Same 60px reference circle NodeCard's own icon uses (NodeCrown assumes
+// it) — a ghost is a preview of what the real node is about to look like,
+// so it borrows that circle wholesale: type-colored border, halo/horns
+// crown, the same symbol/icon size — then GHOST_SCALE shrinks the whole
+// thing back down again as one unit (a CSS transform, not smaller
+// individual numbers), so the crown/border/symbol stay in exactly the
+// proportions already tuned for the 60px version instead of needing
+// separately-tuned small-size numbers that could drift out of sync with
+// NodeCard's own version over time. Only the pulsing dashed-glow (see the
+// className below) and the reduced opacity are ghost-specific beyond
+// that, marking it as "not real yet."
+const ICON_SIZE = 60;
+const GHOST_SCALE = 0.65;
+const RADIUS = 80;
 const EDGE_MARGIN = 40;
 
 interface Props {
@@ -42,7 +57,7 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
             // panel (and the ghost ring with it) rather than picking a
             // type. See NodeCard's own zIndexClass for the rest of this
             // scheme (nodes at z-31/32, the pending-create card at z-33 too).
-            className="absolute z-[33] flex h-[34px] w-[34px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-[1.5px] border-dashed border-accent bg-surface p-0 opacity-75 shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_18%,transparent)] transition-[opacity,transform,border-color,border-style,box-shadow] duration-[150ms] ease-[ease] animate-quick-add-pulse hover:animate-none hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.15] hover:opacity-100 hover:border-solid hover:shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_30%,transparent)] focus-visible:animate-none focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.15] focus-visible:opacity-100 focus-visible:border-solid focus-visible:shadow-[0_0_0_6px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+            className="absolute z-[33] flex -translate-x-1/2 -translate-y-1/2 cursor-pointer flex-col items-center border-0 bg-transparent p-0 opacity-75 transition-[opacity,transform] duration-[150ms] ease-[ease] hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.1] hover:opacity-100 focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.1] focus-visible:opacity-100"
             style={{ left: x, top: y }}
             title={`Add ${type} node`}
             onClick={(e) => {
@@ -50,14 +65,28 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
               onPick(type, { x, y });
             }}
           >
-            {/* Same icon a node of this type will actually render with once
-                created (see OutcomeBadge/ringKindFor) — "unknown" has no
-                outcome framing, so it alone keeps the plain glyph. */}
-            {ringKindFor(type) ? (
-              <OutcomeBadge type={type as OutcomeType} size={30} />
-            ) : (
-              <NodeTypeIcon type={type} size={16} />
-            )}
+            <div
+              className="relative"
+              style={{ height: ICON_SIZE, width: ICON_SIZE, transform: `scale(${GHOST_SCALE})` }}
+            >
+              {/* Same halo/horns crown a real node of this type gets — see
+                  NodeCrown's own doc comment. */}
+              <NodeCrown type={type} />
+              <div
+                className="flex h-full w-full animate-quick-add-pulse items-center justify-center rounded-full border-2 bg-surface shadow-card"
+                style={{ borderColor: NODE_TYPE_COLORS[type] }}
+              >
+                {/* Same icon a node of this type will actually render with
+                    once created (see OutcomeBadge/ringKindFor) —
+                    "unknown" has no outcome framing, so it alone keeps
+                    the plain glyph. */}
+                {ringKindFor(type) ? (
+                  <OutcomeBadge type={type as OutcomeType} size={32} />
+                ) : (
+                  <NodeTypeIcon type={type} size={26} />
+                )}
+              </div>
+            </div>
           </button>
         );
       })}

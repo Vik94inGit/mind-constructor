@@ -9,12 +9,14 @@ import { getSocket, joinMap, leaveMap } from "../api/socket";
 import { useAuth } from "../context/AuthContext";
 import { NodeCard } from "../map/NodeCard";
 import { NodePanel } from "../map/NodePanel";
+import { LinkPickerPanel } from "../map/LinkPickerPanel";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
 import { NodeContextMenu } from "../map/NodeContextMenu";
 import { MiniMap } from "../map/MiniMap";
 import { WeaponMark } from "../map/WeaponMark";
+import { ringKindFor } from "../map/OutcomeBadge";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { Modal } from "../components/Modal";
 import { ColorPicker } from "../components/ColorPicker";
@@ -25,6 +27,14 @@ import type { AttackIndicator, EdgeDoc, MapDoc, NodeDoc, NodeType, SelectedCircl
 
 const CANVAS_W = 2400;
 const CANVAS_H = 1600;
+
+// Canvas zoom bounds/step — see the zoom state and zoomAt() below. 0.5x
+// still leaves individual node captions legible; 2.5x is plenty for
+// picking out detail in a crowded circle without the canvas's own
+// 2400x1600 bound making a fully-zoomed-out view pointless.
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.5;
+const ZOOM_STEP = 0.35;
 
 function hashOffset(seed: string, range: number) {
   let h = 0;
@@ -145,9 +155,16 @@ function avoidOverlap(
 }
 
 // Which node types read as "positive"/"negative" for group-majority
-// purposes — Option/unknown are neutral, deliberately excluded from the
-// vote rather than forced onto a side.
-const POSITIVE_TYPES = new Set<NodeType>(["Success", "Solution"]);
+// purposes — matches ringKindFor's own halo/horns split exactly (see
+// OutcomeBadge.tsx's OUTCOME_CONFIG), so whatever ring a node's own badge
+// draws is exactly what its vote counts as. Option used to be left out of
+// this (neutral, like "unknown") even though it draws the same halo ring
+// Success/Solution do — a zone full of halo Option nodes plus one horns
+// Problem/Fail then had nothing on the positive side of the vote at all,
+// so it read as negative-majority despite every visible ring in it saying
+// "positive." "unknown" alone stays genuinely neutral — it's the one type
+// with no ring to have voted with in the first place.
+const POSITIVE_TYPES = new Set<NodeType>(["Success", "Solution", "Option"]);
 const NEGATIVE_TYPES = new Set<NodeType>(["Fail", "Problem", "Problematic option"]);
 
 function sentimentOf(type: NodeType): "positive" | "negative" | null {
@@ -238,8 +255,8 @@ export function MapPage() {
   // the backend until that input confirms with real text (see
   // PendingNodeCard/confirmPendingCreate). parentId set only when reached
   // via the right-click menu's "Create branch" or a quick-add ghost; null
-  // (toolbar button, double-click empty canvas) means a regular,
-  // parent-less node.
+  // (the toolbar's own "+ Add node" button) means a regular, parent-less
+  // node.
   const [pendingCreate, setPendingCreate] = useState<{
     x: number;
     y: number;
@@ -270,6 +287,13 @@ export function MapPage() {
 
   const [cooldowns, setCooldowns] = useState<Partial<Record<Weapon, number>>>({});
 
+  // Canvas zoom level — applied to canvasRef as a CSS transform: scale(),
+  // see the JSX below. 1 = the canvas's own native 2400x1600 pixels.
+  // Changed via zoomAt() (double-click, or the zoom control buttons) rather
+  // than set directly, so every change stays clamped to [MIN_ZOOM, MAX_ZOOM]
+  // in one place.
+  const [zoom, setZoom] = useState(1);
+
   const [dragState, setDragState] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   // Live, while dragging: whichever node the pointer is currently hovering
   // close enough to read as "drop here to join its circle" — null once the
@@ -295,6 +319,35 @@ export function MapPage() {
   // 2400x1600 canvas, this is the clipped, scrolled window onto it a user
   // is actually looking at, which viewportBounds() below reads from.
   const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  // A trackpad's two-finger swipe reaching this canvas's own left/right
+  // scroll edge otherwise reads to the browser as "nothing left to scroll,
+  // treat this as swipe-to-navigate-back/forward" — unmounting the whole
+  // page and discarding whatever was in progress. index.css's own
+  // `overscroll-behavior-x: none` (both on <body> and this same wrap
+  // element) handles that for Chrome, but Safari's swipe-navigation is a
+  // native browser-chrome gesture that CSS overscroll-behavior doesn't
+  // suppress at all — the only thing that reliably stops it there is
+  // actually calling preventDefault() on the wheel event that would have
+  // driven it. React's own onWheel can't do that (it's attached passively
+  // by default since React 17, so preventDefault silently no-ops) — hence
+  // a real addEventListener with { passive: false } here instead. Only
+  // preventDefault right at the boundary (scrolled all the way left/right
+  // already, still trying to go further that way) — anywhere else, this
+  // lets the browser's own native scroll happen exactly as before, so
+  // trackpad-panning the canvas isn't affected.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    function onWheel(e: WheelEvent) {
+      if (e.deltaX === 0) return;
+      const atLeftEdge = e.deltaX < 0 && wrap!.scrollLeft <= 0;
+      const atRightEdge = e.deltaX > 0 && wrap!.scrollLeft >= wrap!.scrollWidth - wrap!.clientWidth;
+      if (atLeftEdge || atRightEdge) e.preventDefault();
+    }
+    wrap.addEventListener("wheel", onWheel, { passive: false });
+    return () => wrap.removeEventListener("wheel", onWheel);
+  }, []);
 
   // Every insertion into `nodes`/`edges` goes through these, not a blind
   // [...prev, x] append — the server broadcasts an action's own result
@@ -397,9 +450,22 @@ export function MapPage() {
         prev.filter((e) => nodeRefId(e.fromNodeId) !== deletedId && nodeRefId(e.toNodeId) !== deletedId),
       );
     };
-    const onNodeAttacked = ({ node, weaponNode }: { node: NodeDoc; weaponNode: NodeDoc }) => {
+    const onNodeAttacked = ({
+      node,
+      weaponNode,
+      healedParent,
+    }: {
+      node: NodeDoc;
+      weaponNode: NodeDoc;
+      // Set only when this attack was a retaliation that landed — see
+      // attackAbl.ts's own healedParent doc comment. null on an ordinary
+      // attack, so every other map member's canvas picks up the heal too,
+      // not just the retaliator's own tab.
+      healedParent: NodeDoc | null;
+    }) => {
       upsertNode(node);
       upsertNode(weaponNode);
+      if (healedParent) upsertNode(healedParent);
       setCelebrateIds((prev) => new Set(prev).add(weaponNode.nodeId));
       refreshInsights(mapId);
     };
@@ -549,21 +615,67 @@ export function MapPage() {
     return positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
   }
 
+  // screenToCanvas: converts a screen point (e.g. clientX/clientY) into
+  // canvas-coordinate space (the same 0..CANVAS_W/0..CANVAS_H units every
+  // node's x/y, `positions`, and dragState are already in). Needed because
+  // canvasRef is now visually zoomed via a CSS transform (see the zoom
+  // state below) — its rendered size no longer matches CANVAS_W/CANVAS_H
+  // 1:1, so any screen-pixel distance has to be divided by the current
+  // zoom before it means anything in canvas coordinates. wrap's own
+  // scroll position + bounding rect (not canvasRef's) is the anchor: the
+  // canvas's transform-origin is its own (0,0), which sits at wrap's
+  // scrolled (0,0) content position.
+  function screenToCanvas(clientX: number, clientY: number): { x: number; y: number } {
+    const wrap = wrapRef.current;
+    if (!wrap) return { x: clientX, y: clientY };
+    const rect = wrap.getBoundingClientRect();
+    return {
+      x: (wrap.scrollLeft + (clientX - rect.left)) / zoom,
+      y: (wrap.scrollTop + (clientY - rect.top)) / zoom,
+    };
+  }
+
+  // Adjusts zoom by `delta` (or snaps straight to `to` if given) while
+  // keeping the canvas point under (clientX, clientY) visually stationary —
+  // the usual "zoom toward the cursor" behavior in a map/image viewer, so
+  // zooming in on a spot doesn't also yank the view away from it.
+  function zoomAt(clientX: number, clientY: number, delta: number, to?: number) {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const nextZoom = Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, to ?? zoom + delta)) * 100) / 100;
+    if (nextZoom === zoom) return;
+    const rect = wrap.getBoundingClientRect();
+    const canvasX = (wrap.scrollLeft + (clientX - rect.left)) / zoom;
+    const canvasY = (wrap.scrollTop + (clientY - rect.top)) / zoom;
+    setZoom(nextZoom);
+    // Deferred a frame: scrollLeft/scrollTop set synchronously here would
+    // still be measured against the *old* scaled scrollWidth/scrollHeight,
+    // since canvasRef hasn't actually re-rendered at its new scale yet —
+    // the browser would clamp against stale bounds and this would land in
+    // the wrong place.
+    requestAnimationFrame(() => {
+      wrap.scrollLeft = canvasX * nextZoom - (clientX - rect.left);
+      wrap.scrollTop = canvasY * nextZoom - (clientY - rect.top);
+    });
+  }
+
   // The currently-visible rectangle of the canvas, in canvas coordinates —
   // read live off the scroll container rather than tracked in state, since
   // it's only ever needed at the instant of a create/drop action, not on
   // every render. `pad` keeps a node's full icon+caption footprint inside
   // the edge, not just its center point. Falls back to the whole canvas
-  // before the wrap has mounted.
+  // before the wrap has mounted. Divided by `zoom` throughout — wrap's own
+  // scroll metrics are in screen pixels of the *rendered* (scaled) canvas,
+  // same reasoning as screenToCanvas above.
   function viewportBounds(): ViewportBounds {
     const wrap = wrapRef.current;
     if (!wrap) return FULL_CANVAS_BOUNDS;
     const pad = 70;
     return {
-      minX: wrap.scrollLeft + pad,
-      minY: wrap.scrollTop + pad,
-      maxX: wrap.scrollLeft + wrap.clientWidth - pad,
-      maxY: wrap.scrollTop + wrap.clientHeight - pad,
+      minX: wrap.scrollLeft / zoom + pad,
+      minY: wrap.scrollTop / zoom + pad,
+      maxX: (wrap.scrollLeft + wrap.clientWidth) / zoom - pad,
+      maxY: (wrap.scrollTop + wrap.clientHeight) / zoom - pad,
     };
   }
 
@@ -587,11 +699,14 @@ export function MapPage() {
     const pos = posFor(node);
     const PANEL_RESERVE_FRAC = 0.4;
     const visibleH = Math.max(150, wrap.clientHeight * (1 - PANEL_RESERVE_FRAC));
-    const maxLeft = Math.max(0, CANVAS_W - wrap.clientWidth);
-    const maxTop = Math.max(0, CANVAS_H - wrap.clientHeight);
+    // *zoom throughout: pos.x/y are canvas-space, but scrollTo/scrollWidth
+    // deal in screen pixels of the rendered (scaled) canvas — same
+    // conversion as screenToCanvas/zoomAt above, just the other direction.
+    const maxLeft = Math.max(0, CANVAS_W * zoom - wrap.clientWidth);
+    const maxTop = Math.max(0, CANVAS_H * zoom - wrap.clientHeight);
     wrap.scrollTo({
-      left: Math.min(maxLeft, Math.max(0, pos.x - wrap.clientWidth / 2)),
-      top: Math.min(maxTop, Math.max(0, pos.y - visibleH / 2)),
+      left: Math.min(maxLeft, Math.max(0, pos.x * zoom - wrap.clientWidth / 2)),
+      top: Math.min(maxTop, Math.max(0, pos.y * zoom - visibleH / 2)),
       behavior: "smooth",
     });
   }
@@ -611,8 +726,9 @@ export function MapPage() {
   // general on purpose, same as linkCycles below: this fires whether the
   // star came from dragging one node onto another or just from branching
   // off the same node several times over. Majority of the group's own node
-  // *types* decides halo vs horns; a tie or an all-neutral group
-  // (Option/unknown) draws nothing — there's no majority to color it by.
+  // *types* decides halo vs horns; a tie, or a group made entirely of
+  // "unknown" nodes (the only type with no ring, so no vote — see
+  // sentimentOf), draws nothing — there's no majority to color it by.
   const nodeGroups = useMemo(() => {
     const childrenByParent = new Map<string, NodeDoc[]>();
     for (const n of nodes) {
@@ -628,6 +744,17 @@ export function MapPage() {
       cx: number;
       cy: number;
       r: number;
+      // The "zone" outline: every member's own current position (root
+      // included), sorted by angle around the centroid so connecting them
+      // in order traces a simple (non-self-crossing) polygon around the
+      // group instead of an old fixed circle — a triangle at the 3-member
+      // minimum (2 children + root), growing to a quad/pentagon/hexagon/…
+      // as the group grows. Recomputed from `positions` on every render
+      // (including mid-drag, via posFor/dragState), so dragging a member
+      // live-deforms its own zone the same way it already moves the
+      // member itself — nothing is a snapshot here. See MapPage's own
+      // "zone" render block and MiniMap's matching one.
+      outline: { x: number; y: number }[];
     }[] = [];
     for (const [rootId, children] of childrenByParent) {
       if (children.length < 2) continue;
@@ -640,7 +767,10 @@ export function MapPage() {
       const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
       const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
-      groups.push({ rootId, members, sentiment, cx, cy, r });
+      const outline = pts
+        .slice()
+        .sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+      groups.push({ rootId, members, sentiment, cx, cy, r, outline });
     }
     return groups;
   }, [nodes, positions]);
@@ -791,14 +921,22 @@ export function MapPage() {
     const start = posFor(node);
     setDragState({ nodeId: node.nodeId, x: start.x, y: start.y });
 
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const offsetX = e.clientX - rect.left - start.x;
-    const offsetY = e.clientY - rect.top - start.y;
+    // screenToCanvas divides by `zoom` — canvasRef is visually scaled via a
+    // CSS transform now (see the zoom controls below), so its own
+    // getBoundingClientRect() reports a *rendered* size (CANVAS_W*zoom
+    // pixels wide), not the CANVAS_W-unit coordinate space every position
+    // in this file (node.x/y, positions, dragState, viewportBounds) is
+    // expressed in. Every screen-pixel reading in this drag has to go
+    // through this same conversion, or a drag started at any zoom level
+    // other than 100% tracks the pointer at the wrong speed/direction.
+    const startPt = screenToCanvas(e.clientX, e.clientY);
+    const offsetX = startPt.x - start.x;
+    const offsetY = startPt.y - start.y;
 
     function onMove(ev: PointerEvent) {
-      const r = canvasRef.current!.getBoundingClientRect();
-      const x = ev.clientX - r.left - offsetX;
-      const y = ev.clientY - r.top - offsetY;
+      const p = screenToCanvas(ev.clientX, ev.clientY);
+      const x = p.x - offsetX;
+      const y = p.y - offsetY;
       dragMoved.current = true;
       setDragState({ nodeId: node.nodeId, x, y });
       const found = findDropTarget(node, x, y);
@@ -812,9 +950,9 @@ export function MapPage() {
       // (below) is the real one; the click still about to fire on this same
       // node is the captured-pointer artifact, not a second user action.
       suppressNextClick.current = true;
-      const r = canvasRef.current!.getBoundingClientRect();
-      const x = ev.clientX - r.left - offsetX;
-      const y = ev.clientY - r.top - offsetY;
+      const p = screenToCanvas(ev.clientX, ev.clientY);
+      const x = p.x - offsetX;
+      const y = p.y - offsetY;
       const found = dragMoved.current ? findDropTarget(node, x, y) : null;
       setDragState(null);
       setDropTarget(null);
@@ -924,13 +1062,21 @@ export function MapPage() {
 
   // Mirrors attackAbl.ts's own-node rule exactly (normal: someone else's
   // node only; Map.discussionMode: your own node only), plus the defeated
-  // exclusion, which never depends on mode. A weapon node stays excluded
-  // here specifically — it's "usual" for every other purpose now (its own
-  // panel, editing, dragging, quick-add, links), but landing an attack on
-  // an attack still isn't a thing this game models. Client-side only, same
-  // caveat as isOwnNode — the server enforces the real rule.
+  // exclusion, which never depends on mode. A weapon node is otherwise
+  // excluded here — landing an attack on an attack still isn't a thing
+  // this game models in general — except retaliation: the one node it
+  // actually hit striking back at it, mirroring attackAbl.ts's own
+  // CannotRetaliateError check (own the node this weapon's targetNodeId
+  // resolves to). That bypasses the own-node/discussion-mode rule below
+  // entirely, same as server-side. Client-side only, same caveat as
+  // isOwnNode elsewhere — the server enforces the real rule.
   function canAttackNode(node: NodeDoc) {
-    if (node.isWeapon || node.defeated) return false;
+    if (node.defeated) return false;
+    if (node.isWeapon) {
+      const targetId = nodeRefId(node.targetNodeId);
+      const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
+      return !!target && isOwnNode(target);
+    }
     return map?.discussionMode ? isOwnNode(node) : !isOwnNode(node);
   }
 
@@ -938,8 +1084,10 @@ export function MapPage() {
   // its own icon" — always selects (so the side panel shows something,
   // including the locked message when editing isn't allowed), but only
   // actually turns the inline input on when canEditNode agrees. Reached
-  // from a node double-click, the context menu's "Update", and the side
-  // panel's own Edit button.
+  // from the context menu's "Update" and the side panel's own Edit button —
+  // deliberately not a node double-click any more (see zoom controls below,
+  // which claim that gesture instead), so editing only ever starts from an
+  // explicit, hard-to-fat-finger control.
   function startInlineEdit(node: NodeDoc) {
     setContextMenu(null);
     setPendingCreate(null);
@@ -989,14 +1137,16 @@ export function MapPage() {
     }
   }
 
-  // Double-clicking a node jumps straight into inline editing on its own
-  // icon — same destination as the context menu's "Update", just one
-  // gesture instead of two. No isWeapon exclusion here any more — canEditNode
-  // itself already decides whether a weapon node's own attacker can actually
-  // edit it; this just needs to stay out of link-mode's way.
-  function handleNodeDoubleClick(node: NodeDoc) {
+  // Double-click (or double-tap) anywhere on the canvas — empty space or
+  // right on a node, doesn't matter which — zooms in one step centered on
+  // wherever was clicked, via zoomAt. This used to open inline editing/node
+  // creation instead; that's deliberately gone now (see startInlineEdit's
+  // own comment) so a stray double-tap on a phone can't silently edit or
+  // create a node any more, and the gesture is free for the much more
+  // reversible "zoom in for a closer look."
+  function onCanvasDoubleClick(e: ReactMouseEvent<HTMLDivElement>) {
     if (linkMode) return;
-    startInlineEdit(node);
+    zoomAt(e.clientX, e.clientY, ZOOM_STEP);
   }
 
   // Confirmed from NodeCard's inline input (see startInlineEdit) — resolves
@@ -1018,34 +1168,32 @@ export function MapPage() {
     setLinkSelection([nodeId]);
   }
 
+  // Backs out of link mode entirely without linking anything — shared by
+  // the toolbar's own toggle-off, LinkPickerPanel's ✕/Cancel, and anything
+  // else that needs to abandon a pick in progress, so they can't drift out
+  // of sync on which three pieces of state "not linking" actually means.
+  function exitLinkMode() {
+    setLinkMode(false);
+    setLinkSelection([]);
+    setLinkError(null);
+  }
+
+  // The current pick list resolved to real nodes (a node deleted mid-pick
+  // by someone else just quietly drops out) — read by LinkPickerPanel to
+  // render each pick's own text, and by confirmLinkSelection below to
+  // actually finish the link.
+  const linkPicks = linkSelection
+    .map((id) => nodes.find((n) => n.nodeId === id))
+    .filter((n): n is NodeDoc => !!n);
+
   // Turns the current pick list into the pending confirmation — the actual
   // edges (chain, +closing edge for 3+) get created once the sentiment
   // modal this opens is submitted.
   function confirmLinkSelection() {
-    const picked = linkSelection
-      .map((id) => nodes.find((n) => n.nodeId === id))
-      .filter((n): n is NodeDoc => !!n);
-    if (picked.length < 2) return;
-    setPendingLink(picked);
+    if (linkPicks.length < 2) return;
+    setPendingLink(linkPicks);
     setLinkMode(false);
     setLinkSelection([]);
-  }
-
-  // Double-clicking empty canvas is a shortcut for the "+ Add node" button,
-  // opening the inline pending-node input right where the user actually
-  // clicked. Guarded to the canvas div itself so double-clicking a node or
-  // an edge line doesn't also start one.
-  function onCanvasDoubleClick(e: ReactMouseEvent<HTMLDivElement>) {
-    if (linkMode || e.target !== canvasRef.current) return;
-    const rect = canvasRef.current!.getBoundingClientRect();
-    const bounds = viewportBounds();
-    setInlineEditId(null);
-    setPendingCreate({
-      x: Math.min(bounds.maxX, Math.max(bounds.minX, e.clientX - rect.left)),
-      y: Math.min(bounds.maxY, Math.max(bounds.minY, e.clientY - rect.top)),
-      type: "unknown",
-      parentId: null,
-    });
   }
 
   // Right-click on empty canvas is "close whatever's open": suppresses the
@@ -1064,11 +1212,13 @@ export function MapPage() {
   // Right-click on a node: CUD + Link always for your own nodes (a weapon
   // node included — it's usual for this purpose now, same as everywhere
   // else isOwnNode gates), plus Attack when canAttackNode agrees (normal
-  // mode: someone else's node; discussion mode: your own; never a weapon
-  // node regardless — see canAttackNode). Nothing opens for a node that's
-  // neither yours to edit nor yours to attack right now (an already-
-  // defeated node you don't own; anyone else's node at all while in
-  // discussion mode), since there'd be no action left to show.
+  // mode: someone else's node; discussion mode: your own; a weapon node
+  // only via retaliation, when it's the one that hit a node you own — see
+  // canAttackNode). Nothing opens for a node that's neither yours to edit
+  // nor yours to attack right now (an already-defeated node you don't own;
+  // anyone else's node at all while in discussion mode; someone else's
+  // weapon node that didn't target you), since there'd be no action left
+  // to show.
   function handleNodeContextMenu(node: NodeDoc, e: ReactMouseEvent) {
     const own = isOwnNode(node);
     if (!own && !canAttackNode(node)) {
@@ -1253,30 +1403,26 @@ export function MapPage() {
             </span>
           )}
           <div className="flex-1" />
+          {/* Just the on/off switch now — the pick count, confirm button,
+              and any pick error all moved to LinkPickerPanel (see its own
+              doc comment), which shows regardless of whether this toolbar
+              is even open, so starting a link from a node's own "Link from
+              this node" button doesn't require hunting this down to
+              finish it. */}
           <button
             className={linkMode ? btnSmPrimary : btnSm}
             onClick={() => {
-              setLinkMode((v) => !v);
-              setLinkSelection([]);
-              setLinkError(null);
+              if (linkMode) {
+                exitLinkMode();
+              } else {
+                setLinkMode(true);
+                setLinkSelection([]);
+                setLinkError(null);
+              }
             }}
           >
-            {linkMode
-              ? linkSelection.length === 0
-                ? "Pick nodes…"
-                : `${linkSelection.length} picked…`
-              : "Link nodes"}
+            {linkMode ? "Cancel linking" : "Link nodes"}
           </button>
-          {linkMode && linkSelection.length >= 2 && (
-            <button className={btnSmPrimary} onClick={confirmLinkSelection}>
-              Link {linkSelection.length} nodes
-            </button>
-          )}
-          {linkError && (
-            <span className="inline-flex items-center gap-1 rounded-[20px] border border-transparent bg-danger-bg px-[0.55rem] py-[0.2rem] text-[0.72rem] text-danger">
-              {linkError}
-            </span>
-          )}
           <button
             className={btnSmPrimary}
             onClick={() => {
@@ -1309,10 +1455,13 @@ export function MapPage() {
 
       {/* Always-visible handle for the toolbar above — a small arrow tab
           rather than the toolbar's own real estate, so collapsing it back
-          down doesn't also hide the one control that reopens it. */}
+          down doesn't also hide the one control that reopens it. Sized a
+          bit past the old h-4/w-12 (16x48px, uncomfortably thin to actually
+          land a tap on) — still a small tab, just one that's easier to hit
+          without being clumsy about the space it costs. */}
       <div className="flex justify-center border-b border-line bg-surface">
         <button
-          className="flex h-4 w-12 cursor-pointer items-center justify-center rounded-b-lg border border-t-0 border-line bg-surface text-[0.6rem] leading-none text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink"
+          className="flex h-6 w-16 cursor-pointer items-center justify-center rounded-b-lg border border-t-0 border-line bg-surface text-[0.7rem] leading-none text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink"
           onClick={() => setToolbarOpen((v) => !v)}
           title={toolbarOpen ? "Hide toolbar" : "Show toolbar"}
         >
@@ -1336,14 +1485,32 @@ export function MapPage() {
             positioned child of wrapRef would scroll away with the canvas
             content, same as everything else inside it. */}
         <div className="relative min-w-0 flex-1">
+          {/* [overscroll-behavior-x:none]: index.css already sets this on
+              <body>, but that only stops the *document's* own overscroll
+              from chaining into a browser back-navigation — this canvas is
+              its own independently-scrolling element (overflow-auto), so
+              a trackpad swipe that runs it into its own left scroll edge
+              (scrollLeft 0) was still handing the overscroll off to the
+              page above it, which is what a laptop's two-finger swipe
+              reads as "go back." Setting it here too stops the chain at
+              the canvas itself, before it ever reaches the document. */}
           <div
-            className="h-full w-full overflow-auto bg-[radial-gradient(circle,var(--line)_1px,transparent_1px)] [background-size:22px_22px]"
+            className="h-full w-full overflow-auto [overscroll-behavior-x:none] bg-[radial-gradient(circle,var(--line)_1px,transparent_1px)] [background-size:22px_22px]"
             ref={wrapRef}
           >
           <div
             ref={canvasRef}
             className={`relative${linkMode ? " cursor-crosshair" : ""}`}
-            style={{ width: CANVAS_W, height: CANVAS_H }}
+            // width/height stay the canvas's own native 2400x1600 — zoom is
+            // purely a paint-time transform, so every node/ghost/SVG
+            // position below (all still expressed in that native 0..2400
+            // coordinate space) scales along with it automatically, no
+            // separate math needed anywhere else in this JSX. transformOrigin
+            // "0 0" keeps that scaling anchored at the canvas's own top-left,
+            // matching what screenToCanvas/zoomAt/viewportBounds/
+            // centerOnNode above already assume when they read wrap's own
+            // scroll position directly.
+            style={{ width: CANVAS_W, height: CANVAS_H, transform: `scale(${zoom})`, transformOrigin: "0 0" }}
             onClick={() => {
               if (linkMode) return;
               setSelectedId(null);
@@ -1357,36 +1524,41 @@ export function MapPage() {
               viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
             >
               {/*
-                Groups: a big translucent circle, colored by majority sentiment (positive-majority
-                halo-gold, negative-majority horns-red — no actual halo/horns/wings artwork, just
-                the color), behind a whole parentId star — every member stays a real, individually
-                clickable node; this is purely a backdrop, the deepest layer, under even the link
-                figures.
+                Zones: the outline polygon traced through every member of a group (root + its 2+
+                direct parentId-children — see nodeGroups) — a triangle at the 3-member minimum,
+                growing to a quad/pentagon/hexagon/… as the group grows, colored by the group's
+                own majority sentiment (positive-majority halo-gold, negative-majority horns-red).
+                Deepest layer on the canvas, under even the link figures below — every member
+                stays a real, individually clickable node; this is purely a backdrop. Shape
+                actually reflects the tree's own spread now instead of one fixed bounding circle
+                either overlapping unrelated nodes or leaving a lot of empty space, and it visibly
+                deforms live as members get dragged around — nodeGroups recomputes `outline` from
+                current positions (including mid-drag) on every render, nothing here is a
+                snapshot. Same "click to stabilize" control the old plain-circle backdrop had.
               */}
               {nodeGroups.map((g) => {
-                const { cx, cy, r } = g;
                 const color = g.sentiment === "positive" ? "#ffd54f" : "#ff3d00";
-                // Clicking the backdrop itself stabilizes this circle (or,
-                // if it's already the stabilized one, releases it) — see
-                // handleCircleBackdropClick. The accent ring is the same
-                // "this is the chosen one" language NodeCard's own selected
-                // outline uses, just drawn around the whole group instead
-                // of one node.
+                // Same "chosen one stays fuller-opacity, every other zone
+                // dims" spotlight the branch-arrow lines below (and the
+                // minimap's own zones) use — one shared signal for which
+                // group, if any, is currently stabilized.
                 const isStabilized = map?.selectedCircle?.rootId === g.rootId;
-                // Any circle being chosen spotlights it — every *other*
-                // circle's backdrop dims, same treatment (and same opacity)
-                // as an unchosen node gets below, so the two stay visually
-                // consistent as one "focus on the chosen one" effect.
                 const dimmed = !!map?.selectedCircle && !isStabilized;
                 return (
-                  <g
-                    key={`group-${g.rootId}`}
+                  <polygon
+                    key={`zone-${g.rootId}`}
+                    points={g.outline.map((p) => `${p.x},${p.y}`).join(" ")}
+                    fill={color}
+                    fillOpacity={dimmed ? 0.03 : 0.08}
+                    stroke={color}
+                    strokeOpacity={dimmed ? 0.15 : 0.3}
+                    strokeWidth={2}
                     // The whole overlay SVG is pointer-events-none (so its
-                    // decorative edges/arrows never steal a drag/click from
-                    // a NodeCard div sitting underneath) — this is the one
-                    // thing in it that's actually meant to be clicked, so it
-                    // has to explicitly opt back in.
-                    style={{ cursor: "pointer", pointerEvents: "auto", opacity: dimmed ? 0.32 : 1 }}
+                    // decorative shapes never steal a drag/click from a
+                    // NodeCard div sitting underneath) — a zone is one of
+                    // the few things in it that's actually meant to be
+                    // clicked, so it has to explicitly opt back in.
+                    style={{ cursor: "pointer", pointerEvents: "auto" }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCircleBackdropClick(g.rootId);
@@ -1395,15 +1567,9 @@ export function MapPage() {
                     <title>
                       {isStabilized
                         ? "Stabilized — click it, or click anywhere outside it, to let it drift with the others"
-                        : "Click to stabilize this circle and let every other circle drift"}
+                        : "Click to stabilize this zone and let every other zone drift"}
                     </title>
-                    {/* No separate "chosen" ring drawn here any more — the
-                        dim/full-opacity split from the spotlight above is
-                        the one signal for which circle (if any) is chosen,
-                        rather than that plus a second, redundant dashed
-                        outline. */}
-                    <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.07} stroke={color} strokeOpacity={0.3} strokeWidth={2} />
-                  </g>
+                  </polygon>
                 );
               })}
               {/*
@@ -1431,9 +1597,15 @@ export function MapPage() {
               })}
               {/*
                 Branch arrows: tree lineage (node.parentId), set when a node is created via
-                the quick-add ghosts off an existing node. Dashed/muted on purpose — distinct
-                from the solid, sentiment-colored Edges below, which are explicit "Link nodes"
-                links the user chose to draw, not where a node came from.
+                the quick-add ghosts off an existing node — drawn over the zone polygon above, so
+                the direction/depth of who-branched-off-whom stays visible inside its own zone. A
+                branch that's part of a "circle" (its parent has 2+ such children — see
+                nodeGroups) is colored by the group's own majority sentiment (positive-majority
+                halo-gold, negative-majority horns-red), same as the zone it's inside, and doubles
+                as that circle's stabilize/release control too — one more place to click it,
+                alongside the zone shape itself. A lone branch (its parent has just this one
+                child, no group at all — nothing for a zone to enclose) keeps the plain,
+                unclickable accent dash.
               */}
               {nodes.map((node) => {
                 const parentId = nodeRefId(node.parentId);
@@ -1442,6 +1614,14 @@ export function MapPage() {
                 if (!parentNode) return null;
                 const a = posFor(parentNode);
                 const b = posFor(node);
+                const group = nodeGroups.find((g) => g.rootId === parentId);
+                const color = group ? (group.sentiment === "positive" ? "#ffd54f" : "#ff3d00") : "var(--accent)";
+                // Same "chosen one stays full-opacity, every other circle
+                // dims" spotlight the old backdrop drew — see its own
+                // removed comment for why. Ungrouped branches never dim;
+                // they were never part of the spotlight to begin with.
+                const isStabilized = !!group && map?.selectedCircle?.rootId === group.rootId;
+                const dimmed = !!group && !!map?.selectedCircle && !isStabilized;
                 return (
                   <line
                     key={`branch-${node.nodeId}`}
@@ -1449,14 +1629,44 @@ export function MapPage() {
                     y1={a.y}
                     x2={b.x}
                     y2={b.y}
-                    stroke="var(--accent)"
-                    strokeOpacity={0.45}
-                    strokeWidth={1.5}
-                    strokeDasharray="5 4"
+                    stroke={color}
+                    strokeOpacity={group ? (dimmed ? 0.25 : 0.85) : 0.45}
+                    strokeWidth={group ? 1.75 : 1.5}
+                    strokeDasharray={group ? undefined : "5 4"}
                     markerEnd="url(#branch-arrow)"
-                  />
+                    // The whole overlay SVG is pointer-events-none (so its
+                    // decorative edges/arrows never steal a drag/click from
+                    // a NodeCard div sitting underneath) — a grouped branch
+                    // is the one case here that's actually meant to be
+                    // clicked (see handleCircleBackdropClick, same handler
+                    // the old backdrop circle used), so it has to explicitly
+                    // opt back in; an ungrouped one stays inert.
+                    style={group ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
+                    onClick={
+                      group
+                        ? (e) => {
+                            e.stopPropagation();
+                            handleCircleBackdropClick(group.rootId);
+                          }
+                        : undefined
+                    }
+                  >
+                    {group && (
+                      <title>
+                        {isStabilized
+                          ? "Stabilized — click it, or click anywhere outside it, to let it drift with the others"
+                          : "Click to stabilize this circle and let every other circle drift"}
+                      </title>
+                    )}
+                  </line>
                 );
               })}
+              {/* Plain lines, no arrowhead — Edges are an undirected "these
+                  two are linked, and here's how they feel about each
+                  other" relationship (the sentiment color is the actual
+                  payload), not a directed one the way a branch arrow or a
+                  weapon's bow is, so an arrowhead here was implying a
+                  direction this doesn't actually have. */}
               {edges.map((edge) => {
                 // fromNodeId/toNodeId come back null (not a string, not a
                 // populated ref) when the node they pointed at was deleted
@@ -1476,18 +1686,7 @@ export function MapPage() {
                     : edge.sentiment === "positive"
                       ? "var(--success)"
                       : "var(--ink-soft)";
-                return (
-                  <line
-                    key={edge.edgeId}
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke={color}
-                    strokeWidth={2}
-                    markerEnd="url(#arrow)"
-                  />
-                );
+                return <line key={edge.edgeId} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={2} />;
               })}
               {/* Picking phase: every node picked so far stays lit while more get added. */}
               {linkSelection.map((id) => {
@@ -1514,11 +1713,13 @@ export function MapPage() {
                 );
               })}
               <defs>
-                <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-                  <path d="M0,0 L8,4 L0,8 Z" fill="var(--ink-soft)" />
-                </marker>
-                <marker id="branch-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-                  <path d="M0,0 L7,3.5 L0,7 Z" fill="var(--accent)" opacity="0.6" />
+                {/* fill="context-stroke": picks up whichever line is
+                    actually using this marker's own `stroke` (plain accent
+                    for an ungrouped branch, the group's gold/red sentiment
+                    color for a grouped one — see the branch-arrows map
+                    above) instead of one fixed color for every branch. */}
+                <marker id="branch-arrow" markerWidth="4.5" markerHeight="4.5" refX="4" refY="2.25" orient="auto">
+                  <path d="M0,0 L4.5,2.25 L0,4.5 Z" fill="context-stroke" opacity="0.75" />
                 </marker>
               </defs>
             </svg>
@@ -1550,6 +1751,7 @@ export function MapPage() {
                   node={node}
                   x={pos.x}
                   y={pos.y}
+                  zoom={zoom}
                   selected={selectedId === node.nodeId}
                   dragging={dragState?.nodeId === node.nodeId}
                   canDrag={isOwnNode(node)}
@@ -1576,7 +1778,6 @@ export function MapPage() {
                     }
                     handleNodeClick(node);
                   }}
-                  onDoubleClick={() => handleNodeDoubleClick(node)}
                   onContextMenu={(e) => handleNodeContextMenu(node, e)}
                 />
               );
@@ -1586,17 +1787,22 @@ export function MapPage() {
               Weapon marks get their own SVG layer, painted after every NodeCard above rather
               than inside the first (backdrop) SVG — that one sits *behind* the node icons the
               same way the group backdrops and branch arrows need to, but a bow drawn at that
-              layer landed centered right under its own attack node's opaque circular icon, and
-              a same-stacking-context DOM sibling always paints over an earlier one regardless of
-              z-index. This one repeats that layering trick one level up: a later sibling of the
-              nodes themselves, so the bow (and its arrows) draw on top of them and are actually
-              visible. Every attack now spawns a real node carrying the attacker's objection (see
-              attackAbl.ts) — this is the permanent bow facing whatever it targeted, plus the
-              volley of transient arrows (see WeaponMark) that fires once when the attack lands
-              and again on demand when either end gets clicked.
+              layer landed centered right under its own attack node's opaque circular icon.
+              z-[34] (not just "a later DOM sibling"): NodeCard itself carries an explicit
+              z-31/z-32 now (see its own zIndexClass, added so nodes/ghosts/the pending-create
+              input stay above MapPage's NodePanel backdrop) — a sibling with an explicit
+              positive z-index always paints over a z-index:auto one regardless of DOM order, so
+              once NodeCard stopped being auto-stacked, being "merely later in the DOM" here
+              stopped being enough to draw on top of it; this SVG rendered its bow/arrows
+              completely hidden behind every node from that point on. The explicit z-[34] is
+              what actually keeps this on top now, DOM order is incidental. Every attack now
+              spawns a real node carrying the attacker's objection (see attackAbl.ts) — this is
+              the permanent bow facing whatever it targeted, plus the volley of transient arrows
+              (see WeaponMark) that fires once when the attack lands and again on demand when
+              either end gets clicked.
             */}
             <svg
-              className="pointer-events-none absolute inset-0 h-full w-full"
+              className="pointer-events-none absolute inset-0 z-[34] h-full w-full"
               viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
             >
               {nodes
@@ -1608,6 +1814,15 @@ export function MapPage() {
                   if (!targetNode) return null;
                   const a = posFor(weaponNode);
                   const b = posFor(targetNode);
+                  // A weapon node can carry any outcome type now, not just
+                  // the negative-framed ones (see Backend's attackAbl.ts —
+                  // retaliation especially is naturally a positive claim,
+                  // "my defense holds") — var(--danger) red for every bow
+                  // read oddly on one of those, so a halo-classified
+                  // weapon (ringKindFor, same classification the badge's
+                  // own halo/horns crown uses) draws its bow in
+                  // var(--n-option) blue instead.
+                  const bowColor = ringKindFor(weaponNode.type) === "halo" ? "var(--n-option)" : "var(--danger)";
                   return (
                     <WeaponMark
                       key={`weapon-${weaponNode.nodeId}`}
@@ -1616,6 +1831,7 @@ export function MapPage() {
                       targetX={b.x}
                       targetY={b.y}
                       weaponIcon={weaponNode.weaponIcon}
+                      color={bowColor}
                       celebrate={celebrateIds.has(weaponNode.nodeId)}
                       replayNonce={shotState?.id === weaponNode.nodeId ? shotState.nonce : 0}
                     />
@@ -1649,75 +1865,141 @@ export function MapPage() {
             groups={nodeGroups}
             canvasW={CANVAS_W}
             canvasH={CANVAS_H}
+            zoom={zoom}
           />
+
+          {/* Zoom controls — stacked directly above the minimap in the same
+              bottom-right corner (used to sit bottom-left; moved to keep
+              both of the canvas's floating controls in one place instead
+              of split across the screen). bottom-[150px]: minimap's own
+              bottom-3 (12px) plus its ~122px rendered height (120px
+              MINIMAP_H + its 1px border each side) plus a small gap, so
+              this sits just above it rather than touching. Same z-[45]
+              reasoning as the minimap: above the canvas/panel, below a
+              real modal. Double-clicking the canvas (see
+              onCanvasDoubleClick) zooms in one step too, but that's
+              zoom-in-only and needs a pointer position to zoom toward;
+              these buttons are the only way to zoom back out or reset,
+              and work the same without a mouse (a tap is plenty). */}
+          <div className="absolute bottom-[150px] right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={zoom <= MIN_ZOOM}
+              title="Zoom out"
+              onClick={() => {
+                const r = wrapRef.current?.getBoundingClientRect();
+                if (!r) return;
+                zoomAt(r.left + r.width / 2, r.top + r.height / 2, -ZOOM_STEP);
+              }}
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-7 min-w-[3.2rem] cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent px-1 text-[0.72rem] font-semibold text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={zoom === 1}
+              title="Reset zoom"
+              onClick={() => {
+                const r = wrapRef.current?.getBoundingClientRect();
+                if (!r) return;
+                zoomAt(r.left + r.width / 2, r.top + r.height / 2, 0, 1);
+              }}
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={zoom >= MAX_ZOOM}
+              title="Zoom in"
+              onClick={() => {
+                const r = wrapRef.current?.getBoundingClientRect();
+                if (!r) return;
+                zoomAt(r.left + r.width / 2, r.top + r.height / 2, ZOOM_STEP);
+              }}
+            >
+              +
+            </button>
+          </div>
         </div>
 
-        {selectedNode && user && (
-          <>
-            {/* Backdrop for NodePanel's bottom-sheet form (see its own
-                PANEL_CLASS) — dims the canvas behind it and closes it on a
-                tap outside, same as a native sheet.
-                Selecting an *own* node (the only kind that's draggable) goes
-                through onNodePointerDown's pointer-capture path below, which
-                opens this same panel straight from pointerup and then relies
-                on suppressNextClick to swallow the browser's own trailing
-                click afterward — but only NodeCard's own onClick checks that
-                flag. If that trailing click's hit-test lands on this
-                backdrop instead of the node it capture-targeted (device/
-                browser-dependent for a touch-derived click), this closes the
-                panel it had just opened in the same interaction. Checking
-                the same flag here — not just on NodeCard — swallows that
-                stray click the same way, regardless of which element it
-                actually lands on. */}
-            <div
-              className="fixed inset-0 z-30 bg-black/30"
-              onClick={() => {
-                if (suppressNextClick.current) {
-                  suppressNextClick.current = false;
-                  return;
-                }
-                setSelectedId(null);
-              }}
-            />
-            <NodePanel
-              node={selectedNode}
-              nodes={nodes}
-              edges={edges}
-              currentUserId={user._id}
-              discussionMode={!!map.discussionMode}
-              cooldowns={cooldowns}
-              onClose={() => setSelectedId(null)}
-              onSelectNode={(id) => {
-                setSelectedId(id);
-                // Same "chosen node is always centered" rule handleNodeClick
-                // applies on the canvas — this is the panel's own path to
-                // choosing a different node (its "Points at" link).
-                centerOnNode(id);
-                // Panel's own "Points at" link is only ever shown on a
-                // weapon node's panel — same click-either-end replay the
-                // canvas gets, just reached from here instead.
-                if (selectedNode?.isWeapon) triggerWeaponShot(selectedNode.nodeId);
-              }}
-              onDeleted={applyNodeDeleted}
-              onUpdated={upsertNode}
-              onAttacked={(updatedNode, weaponNode) => {
-                upsertNode(updatedNode);
-                upsertNode(weaponNode);
-                // Weapon nodes never got the "just created" flourish other
-                // nodes get — this is what NodeCard reads to fly the weapon
-                // in at the target instead of just popping into place.
-                setCelebrateIds((prev) => new Set(prev).add(weaponNode.nodeId));
-                if (mapId) refreshInsights(mapId);
-              }}
-              onCooldown={(weapon, readyAt) => setCooldowns((prev) => ({ ...prev, [weapon]: readyAt }))}
-              onDeleteEdge={(edgeId) => {
-                setEdges((prev) => prev.filter((e) => e.edgeId !== edgeId));
-                if (mapId) refreshInsights(mapId);
-              }}
-              onStartLink={() => startLinkFrom(selectedNode.nodeId)}
-              onEdit={() => startInlineEdit(selectedNode)}
-            />
-          </>
+        {/* LinkPickerPanel takes over this same bottom-sheet slot while
+            link mode is active, NodePanel included — starting a link from
+            a node's own "Link from this node" button leaves that node
+            selected (startLinkFrom doesn't clear selectedId), so without
+            this the two would try to render at once. It also means the
+            dimming backdrop below never has to coexist with active
+            picking — that backdrop's job is "tap outside NodePanel closes
+            it," which isn't what a tap on empty canvas should do while
+            you're mid-pick. */}
+        {linkMode ? (
+          <LinkPickerPanel
+            picks={linkPicks}
+            error={linkError}
+            onRemove={(id) => setLinkSelection((prev) => prev.filter((x) => x !== id))}
+            onConfirm={confirmLinkSelection}
+            onCancel={exitLinkMode}
+          />
+        ) : (
+          selectedNode &&
+          user && (
+            <>
+              {/* No dimming backdrop behind this any more — it used to
+                  double as "tap anywhere outside NodePanel closes it," but
+                  the canvas's own onClick (see canvasRef below) already
+                  deselects on a tap that reaches empty canvas directly, and
+                  the backdrop's real cost outweighed that one extra bit of
+                  outside-the-canvas coverage: it sat at z-30, between the
+                  canvas content (z-31+) and the panel itself (z-40), which
+                  made it the thing every quick-add ghost, node, and the
+                  pending-create input had to specifically out-rank just to
+                  stay tappable while a node was selected (see their own
+                  z-index comments) — a whole layering workaround for a
+                  backdrop that was mostly just visual dimming to begin with. */}
+              <NodePanel
+                node={selectedNode}
+                nodes={nodes}
+                edges={edges}
+                currentUserId={user._id}
+                discussionMode={!!map.discussionMode}
+                cooldowns={cooldowns}
+                onClose={() => setSelectedId(null)}
+                onSelectNode={(id) => {
+                  setSelectedId(id);
+                  // Same "chosen node is always centered" rule handleNodeClick
+                  // applies on the canvas — this is the panel's own path to
+                  // choosing a different node (its "Points at" link).
+                  centerOnNode(id);
+                  // Panel's own "Points at" link is only ever shown on a
+                  // weapon node's panel — same click-either-end replay the
+                  // canvas gets, just reached from here instead.
+                  if (selectedNode?.isWeapon) triggerWeaponShot(selectedNode.nodeId);
+                }}
+                onDeleted={applyNodeDeleted}
+                onUpdated={upsertNode}
+                onAttacked={(updatedNode, weaponNode, _weapon, healedParent) => {
+                  upsertNode(updatedNode);
+                  upsertNode(weaponNode);
+                  // Set only on a landed retaliation — see attackAbl.ts's
+                  // own healedParent doc comment.
+                  if (healedParent) upsertNode(healedParent);
+                  // Weapon nodes never got the "just created" flourish other
+                  // nodes get — this is what NodeCard reads to fly the weapon
+                  // in at the target instead of just popping into place.
+                  setCelebrateIds((prev) => new Set(prev).add(weaponNode.nodeId));
+                  if (mapId) refreshInsights(mapId);
+                }}
+                onCooldown={(weapon, readyAt) => setCooldowns((prev) => ({ ...prev, [weapon]: readyAt }))}
+                onDeleteEdge={(edgeId) => {
+                  setEdges((prev) => prev.filter((e) => e.edgeId !== edgeId));
+                  if (mapId) refreshInsights(mapId);
+                }}
+                onStartLink={() => startLinkFrom(selectedNode.nodeId)}
+                onEdit={() => startInlineEdit(selectedNode)}
+              />
+            </>
+          )
         )}
       </div>
 
@@ -1759,23 +2041,31 @@ export function MapPage() {
         />
       )}
 
-      <div className="flex flex-wrap gap-[0.4rem] border-t border-line bg-surface px-4 py-[0.6rem]">
+      {/* whitespace-nowrap on every item: without it, a long label
+          ("Problematic option", "negative circle / under fire") had
+          nothing stopping it from wrapping *inside* its own flex item on a
+          narrow screen — text breaking mid-phrase while the icon/dot sat
+          oddly on its own line above it — instead of flex-wrap doing its
+          actual job of moving the *whole* item down to the next row.
+          Tighter gap/padding/font too, so more items fit per row before
+          any wrapping is needed at all. */}
+      <div className="flex flex-wrap gap-[0.3rem] border-t border-line bg-surface px-3 py-[0.45rem]">
         {NODE_TYPES.map((t) => (
-          <span key={t} className="flex items-center gap-[0.3rem] text-[0.72rem] text-ink-soft">
+          <span key={t} className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
             <NodeTypeIcon type={t} size={13} />
             {t}
           </span>
         ))}
-        <span className="flex items-center gap-[0.3rem] text-[0.72rem] text-ink-soft">
+        <span className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
           <span
-            className="mr-[0.35rem] inline-block h-2 w-2 flex-shrink-0 rounded-full"
+            className="mr-[0.3rem] inline-block h-2 w-2 flex-shrink-0 rounded-full"
             style={{ background: "var(--success)" }}
           />
           positive circle
         </span>
-        <span className="flex items-center gap-[0.3rem] text-[0.72rem] text-ink-soft">
+        <span className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
           <span
-            className="mr-[0.35rem] inline-block h-2 w-2 flex-shrink-0 rounded-full"
+            className="mr-[0.3rem] inline-block h-2 w-2 flex-shrink-0 rounded-full"
             style={{ background: "var(--danger)" }}
           />
           negative circle / under fire
