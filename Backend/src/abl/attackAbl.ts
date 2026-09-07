@@ -2,14 +2,16 @@
 // used to live in a DAO file (attackDao.ts) even though none of it is "how
 // do I query Mongo" — it's "is this attack allowed, and what does it do."
 import { z } from "zod";
+import type mongoose from "mongoose";
 import { WEAPONS, type WeaponKey } from "../models/Attack.js";
 import { type WeaponIcon } from "../models/Node.js";
-import { findNodeByPublicIdDao, createWeaponNodeMutationDao } from "../dao/nodeDao.js";
+import { findNodeByPublicIdDao, findNodeByInternalIdDao, createWeaponNodeMutationDao } from "../dao/nodeDao.js";
 import { getMapByInternalIdDao, isMapMemberDao } from "../dao/mapsDao.js";
 import {
   getLastAttackDao,
   applyDamageDao,
   logAttackDao,
+  healNodeDao,
   getAttackHistoryByNodeDao,
 } from "../dao/attackDao.js";
 import { parseOrThrow } from "./errors.js";
@@ -18,6 +20,14 @@ export class CannotAttackOwnNodeError extends Error {}
 // Discussion mode's inverse of the above — see Map.discussionMode. Attacking
 // itself is never disabled by discussion mode, only *who* it can land on.
 export class CanOnlyAttackOwnNodeError extends Error {}
+// A weapon node is otherwise excluded from combat entirely — "landing an
+// attack on an attack isn't a thing this game models" (see the frontend's
+// own canAttackNode) — except for the one node it actually hit striking
+// back at it. Thrown when the target *is* a weapon node but either it has
+// no resolvable target of its own, or the caller doesn't own the node it
+// targeted — i.e. "attack any weapon node you like" is still not a thing,
+// only "retaliate against the one that hit you" is.
+export class CannotRetaliateError extends Error {}
 export class NodeAlreadyDefeatedError extends Error {}
 export class WeaponOnCooldownError extends Error {
   readyAt: number;
@@ -27,12 +37,31 @@ export class WeaponOnCooldownError extends Error {
   }
 }
 
+// Reward for a successful retaliation (see the isWeapon branch in
+// attackNodeAbl below) — a fixed bump, same spirit as each weapon's own
+// fixed damage number, applied to the retaliating node's own *parent*
+// rather than the retaliating node itself.
+const RETALIATION_HEAL_AMOUNT = 10;
+
 // An attack now always creates a real content node alongside the damage —
-// restricted to the three "this is an objection" types, not the full
-// NodeType set (Success/Solution/Option/unknown don't read as an attack's
-// own claim). The weapon node this becomes carries this type + text
-// instead of the old generic "<weapon> attack" placeholder.
-export const ATTACK_NODE_TYPES = ["Problem", "Problematic option", "Fail"] as const;
+// restricted to every outcome type (see OutcomeBadge.tsx on the frontend),
+// just not "unknown" (which draws no ring/framing at all, so it doesn't
+// read as an attack's own claim one way or the other). Used to be only the
+// three negative-framed types (Problem/Problematic option/Fail) on the
+// theory that an attack is inherently an objection — but retaliation
+// (see CannotRetaliateError below) is exactly the case where the
+// attacker's own claim is naturally a positive one ("my defense holds"),
+// so the positive types (Success/Solution/Option) belong here too now.
+// The weapon node this becomes carries this type + text instead of the
+// old generic "<weapon> attack" placeholder.
+export const ATTACK_NODE_TYPES = [
+  "Problem",
+  "Problematic option",
+  "Solution",
+  "Option",
+  "Success",
+  "Fail",
+] as const;
 export type AttackNodeType = (typeof ATTACK_NODE_TYPES)[number];
 
 const attackContentSchema = z.object({
@@ -72,14 +101,29 @@ export const attackNodeAbl = async (
   const isMember = map.members.some((m) => m.toString() === attackerId.toString());
   if (!isMember) return null;
 
-  const isOwnNode = node.userId.toString() === attackerId.toString();
-  // Normal rules: attack only lands on someone else's node. Discussion
-  // mode inverts this — attacking stays enabled, it just only lands on
-  // your *own* node (self-critique instead of combat). See Map.discussionMode.
-  if (map.discussionMode) {
-    if (!isOwnNode) throw new CanOnlyAttackOwnNodeError();
-  } else if (isOwnNode) {
-    throw new CannotAttackOwnNodeError();
+  // Retaliation: the one case a weapon node can be attacked at all — see
+  // CannotRetaliateError's own doc comment. Its own, narrower check;
+  // deliberately *not* run through the own-node/discussion-mode rule below,
+  // which is about content nodes (whose owner a weapon node's `userId` is
+  // never going to match anyway, since that's always the original
+  // attacker, not the retaliator).
+  let healParentId: mongoose.Types.ObjectId | null = null;
+  if (node.isWeapon) {
+    const victim = node.targetNodeId ? await findNodeByInternalIdDao(node.targetNodeId) : null;
+    if (!victim || victim.userId.toString() !== attackerId.toString()) {
+      throw new CannotRetaliateError();
+    }
+    healParentId = victim.parentId ?? null;
+  } else {
+    const isOwnNode = node.userId.toString() === attackerId.toString();
+    // Normal rules: attack only lands on someone else's node. Discussion
+    // mode inverts this — attacking stays enabled, it just only lands on
+    // your *own* node (self-critique instead of combat). See Map.discussionMode.
+    if (map.discussionMode) {
+      if (!isOwnNode) throw new CanOnlyAttackOwnNodeError();
+    } else if (isOwnNode) {
+      throw new CannotAttackOwnNodeError();
+    }
   }
   if (node.defeated) {
     throw new NodeAlreadyDefeatedError();
@@ -121,7 +165,12 @@ export const attackNodeAbl = async (
     userId: attackerId,
   });
 
-  return { node: updatedNode, weaponNode };
+  // Only set on a landed retaliation (see healParentId above) — a node
+  // with no parent (a root) simply has nothing here to reward, same as
+  // "no circle" for a childless node elsewhere in this app.
+  const healedParent = healParentId ? await healNodeDao(healParentId, RETALIATION_HEAL_AMOUNT) : null;
+
+  return { node: updatedNode, weaponNode, healedParent };
 };
 
 // Only map members may see a node's attack history.

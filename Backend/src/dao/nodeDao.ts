@@ -10,6 +10,18 @@ export const findNodeByPublicIdDao = async (publicNodeId: string) => {
   return await Node.findOne({ nodeId: publicNodeId });
 };
 
+// Internal-id lookup, unpopulated — used specifically by attackAbl's
+// retaliation rule to resolve a weapon node's own targetNodeId (an
+// internal ObjectId ref, not a public nodeId) back to the real node it
+// hit, so it can check who owns it. Not run through NODE_POPULATE like
+// findNodeByPublicIdDao — the caller only ever reads userId/parentId off
+// this, not a client-shaped response.
+export const findNodeByInternalIdDao = async (
+  nodeInternalId: mongoose.Types.ObjectId | string,
+) => {
+  return await Node.findById(nodeInternalId);
+};
+
 // Every Node handed back to a caller should carry the same public-id shape
 // getNodesByMapDao's listing does (parentId/targetNodeId resolved to
 // { nodeId, text, type }, userId to { username }) — otherwise a node that
