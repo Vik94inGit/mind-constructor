@@ -9,6 +9,12 @@ interface CreateUserInput {
   password: string;
 }
 
+interface CreateGoogleUserInput {
+  username: string;
+  email: string;
+  googleId: string;
+}
+
 interface UpdateUserInput {
   username?: string;
   email?: string;
@@ -30,6 +36,31 @@ export const createUserDao = async (data: CreateUserInput) => {
 
 export const findUserByEmailDao = async (email: string) => {
   return User.findOne({ email });
+};
+
+export const findUserByGoogleIdDao = async (googleId: string) => {
+  return User.findOne({ googleId });
+};
+
+export const findUserByUsernameDao = async (username: string) => {
+  return User.findOne({ username });
+};
+
+// No passwordHash at all — this account only ever signs in via a verified
+// Google ID token (see authAbl.ts's googleAuthAbl), never email+password.
+export const createGoogleUserDao = async (data: CreateGoogleUserInput) => {
+  const user = await User.create({
+    username: data.username,
+    email: data.email,
+    googleId: data.googleId,
+  });
+  return user;
+};
+
+// Links a Google account onto an existing password-registered user found by
+// email — same person signing in a different way, not a second account.
+export const linkGoogleIdDao = async (id: string, googleId: string) => {
+  return User.findByIdAndUpdate(id, { googleId }, { new: true });
 };
 
 export const findUserByIdDao = async (id: string) => {

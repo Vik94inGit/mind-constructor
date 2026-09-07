@@ -327,14 +327,13 @@ export function NodeCard({
       })()
     : undefined;
 
-  // Health stays hidden-until-hover in discussion mode (nothing to do with
-  // circles — see MapPage's toolbar toggle) and, independently, for any
-  // node that's a circle member: the group's own halo/horns backdrop
-  // already communicates its status, so each member's own ring would just
-  // be visual noise sitting on top of it. Either reason hides it the same
-  // way. Applies uniformly to every node type — this div's own ring is
-  // health's one and only home.
-  const hideHealth = discussionMode || !!groupSentiment;
+  // Health only ever shows for the chosen (selected) node — every other
+  // node keeps it hidden, discussion mode/circle membership or not: a
+  // whole map's worth of health rings all visible at once read as noise,
+  // and a circle's own halo/horns backdrop already communicates its
+  // members' status anyway. Applies uniformly to every node type — this
+  // div's own ring is health's one and only home.
+  const showHealth = selected;
 
   // Ring is a conic-gradient read off CSS custom properties, so the health
   // sweep and its color are just two variables — no per-type CSS needed.
@@ -360,7 +359,7 @@ export function NodeCard({
   const ringStyle: CSSProperties = {
     "--health": Math.max(0, Math.min(100, node.health)),
     "--ring-color": node.defeated ? "var(--danger)" : "var(--success)",
-    ...(hideHealth ? {} : { background: healthGradient }),
+    ...(showHealth ? { background: healthGradient } : {}),
     // No separate dashed circle-membership outline any more — the group
     // backdrop's own color already says which circle (if any) a node
     // belongs to, and the spotlight dim/full-opacity split says whether
@@ -370,19 +369,16 @@ export function NodeCard({
     outline: selected ? "2px solid var(--accent)" : undefined,
     outlineOffset: 2,
   } as CSSProperties;
-  // Invisible at rest, the real health sweep only on hover — same `group`
-  // (the outer node div) every other hover effect here already keys off.
+  // Invisible until selected, then a plain fade-in — no more hover reveal:
+  // that let every node's health show one at a time on hover, which was
+  // still a whole map's worth of rings competing for attention as the
+  // cursor passed over them. Selecting a node is already the map's one
+  // "I'm looking at this one specifically" signal (see the outline above),
+  // so health rides along with that instead of its own separate trigger.
   // This used to fall back to a flat bg-surface-2 fill instead of nothing,
-  // which read as a plain gray circle sitting around every zone member's
-  // icon (hideHealth covers every one of them now — see its own comment)
-  // rather than the "nothing to see here, hover if you want it" this is
-  // actually going for; a zone's already-visible colored outline made that
-  // gray disc redundant clutter on top of it, not a second useful signal.
-  // Bracket syntax needs its spaces escaped as `_` per Tailwind's
-  // arbitrary-value convention.
-  const healthVisibilityClass = hideHealth
-    ? `bg-transparent transition-[background] duration-150 ease-[ease] group-hover:[background:conic-gradient(var(--ring-color,var(--success))_calc(var(--health,100)*3.6deg),transparent_0deg)]`
-    : "";
+  // which read as a plain gray circle sitting around every node's icon
+  // rather than "nothing to see here, select it if you want it".
+  const healthVisibilityClass = "bg-transparent transition-[background] duration-150 ease-[ease]";
 
   const chaosCss = chaotic ? chaosStyle(node.nodeId) : undefined;
 
@@ -474,7 +470,7 @@ export function NodeCard({
         <div
           className={`flex h-full w-full items-center justify-center rounded-full p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
           style={ringStyle}
-          title={hideHealth ? "Hover to see health" : undefined}
+          title={showHealth ? undefined : "Select to see health"}
         >
           {inlineEditing ? (
             <button

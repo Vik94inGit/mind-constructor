@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { NODE_TYPE_COLORS, cycleNodeType } from "../utils/nodeType";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
+import { NodeCrown } from "./NodeCrown";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import type { NodeType } from "../types";
 
@@ -28,10 +29,6 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
 
   const ring = ringKindFor(draftType);
   const isOutcome = !!ring;
-  // .pending: cursor default, opacity 0.9. .type-halo/.type-horns strip the
-  // icon circle's own border/shadow (OutcomeBadge draws its own), applied
-  // directly to node-icon-circle below rather than via a descendant
-  // selector off a parent modifier class.
   // Plain `transform:` arbitrary value, not Tailwind's -translate-x-1/2
   // utility — see the identical note in NodeCard.tsx. This element doesn't
   // currently animate `transform`, so it isn't actually double-offset today,
@@ -72,15 +69,21 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
       onDoubleClick={(e) => e.stopPropagation()}
     >
       <div className="relative h-[60px] w-[60px]">
+        {/* Same halo/horns crown a real node of this type gets — see
+            NodeCrown's own doc comment. Without this, a not-yet-named
+            pending node (still just a type + blank caption, before the
+            first character is typed) rendered through the old oversized-
+            badge/overflow-visible pattern instead of NodeCard's actual
+            design, which is what read as "deformed" compared to every
+            already-named node around it. */}
+        <NodeCrown type={draftType} />
         <div
           className="flex h-full w-full items-center justify-center rounded-full p-[3px] shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_22%,transparent)] transition-transform duration-150 ease-[ease]"
           style={{ background: "conic-gradient(var(--success) 360deg, var(--surface-2) 0deg)" }}
         >
           <button
             type="button"
-            className={`flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-surface p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${
-              isOutcome ? "overflow-visible" : "overflow-hidden border-2 border-line shadow-card"
-            }`}
+            className="flex h-full w-full cursor-pointer items-center justify-center rounded-full overflow-hidden border-2 bg-surface p-0 font-[inherit] shadow-card hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)]"
             style={{ borderColor: NODE_TYPE_COLORS[draftType] }}
             title="Click to change type"
             onPointerDown={(e) => e.stopPropagation()}
@@ -89,7 +92,7 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
               setDraftType(cycleNodeType);
             }}
           >
-            {isOutcome ? <OutcomeBadge type={draftType as OutcomeType} size={90} /> : <NodeTypeIcon type={draftType} size={26} />}
+            {isOutcome ? <OutcomeBadge type={draftType as OutcomeType} size={32} /> : <NodeTypeIcon type={draftType} size={26} />}
           </button>
         </div>
       </div>

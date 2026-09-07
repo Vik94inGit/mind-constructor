@@ -11,6 +11,7 @@ interface AuthContextValue {
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSelf: () => Promise<void>;
 }
@@ -52,6 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await authApi.register(username, email, password));
   }, []);
 
+  // One entry point for both "sign in with Google" and "register with
+  // Google" — same as the backend's single POST /api/auth/google (see
+  // googleAuthAbl's own doc comment), there's no separate flow here either.
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    setUser(await authApi.googleLogin(idToken));
+  }, []);
+
   const logout = useCallback(async () => {
     await authApi.logout();
     setUser(null);
@@ -74,10 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: user?.role === "admin",
       login,
       register,
+      loginWithGoogle,
       logout,
       refreshSelf,
     }),
-    [user, loading, login, register, logout, refreshSelf],
+    [user, loading, login, register, loginWithGoogle, logout, refreshSelf],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

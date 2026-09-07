@@ -47,7 +47,7 @@ export function NodeCrown({ type }: { type: NodeType }) {
       width="28"
       height="17"
       viewBox="0 0 28 17"
-      className="pointer-events-none absolute -top-[6px] left-1/2 z-[1] -translate-x-1/2"
+      className="pointer-events-none absolute -top-[11px] left-1/2 z-[1] -translate-x-1/2"
       aria-hidden="true"
     >
       <g fill={HORNS_RED} stroke={HORNS_RED} strokeWidth="2" strokeLinejoin="round">

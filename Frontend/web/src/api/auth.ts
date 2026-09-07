@@ -27,6 +27,16 @@ export async function login(email: string, password: string) {
   return res.user;
 }
 
+export async function googleLogin(idToken: string) {
+  const res = await apiRequest<AuthResponse>("/api/auth/google", {
+    method: "POST",
+    body: { idToken },
+    auth: false,
+  });
+  setToken(res.token);
+  return res.user;
+}
+
 export async function logout() {
   try {
     await apiRequest("/api/auth/logout", { method: "POST" });
