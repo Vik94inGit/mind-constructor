@@ -118,13 +118,16 @@ export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH, z
       // top-right — out of the way of the toolbar's own top-left "back"
       // link and the map name up there, and clear of the top-of-screen
       // controls generally.
-      // z-[45]: above NodePanel's dimming backdrop (z-30) and the panel
-      // itself (z-40) — so the minimap stays visible and clickable while a
-      // node is selected, instead of getting buried under the panel/
-      // backdrop the moment one is (see NodeCard/QuickAddGhosts/
-      // PendingNodeCard's own z-index comments for the same problem on the
-      // canvas itself) — but still *below* a real modal dialog (Modal.tsx,
-      // z-50; Invite/Color/Create-edge/Map-summary all use it), which
+      // z-[45]: below NodePanel/LinkPickerPanel/the multi-select pill
+      // (z-[46] — see NodePanel's own PANEL_CLASS comment) on purpose now —
+      // those are full-width bottom sheets, so once one is open it should
+      // actually cover the minimap sitting in that same bottom-right
+      // corner, not leave it floating on top with a fragment of map poking
+      // out over the panel's own content. Still above the canvas content
+      // itself (NodeCard/QuickAddGhosts/PendingNodeCard, z-31 to z-34), so
+      // the minimap stays visible/clickable whenever none of those panels
+      // happen to be open — and still *below* a real modal dialog
+      // (Modal.tsx, z-50; Invite/Create-edge/Map-summary all use it), which
       // should stay genuinely on top of everything, minimap included, while
       // it's open. (An earlier z-[70] here overshot past z-50 too, leaving
       // the minimap floating on top of an open modal instead of properly

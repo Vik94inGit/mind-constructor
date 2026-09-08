@@ -1,34 +1,20 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 import { findNodeByPublicIdDao, findNodeByInternalIdDao, createWeaponNodeMutationDao } from "../src/dao/nodeDao.js";
 import { isMapMemberDao, getMapByInternalIdDao } from "../src/dao/mapsDao.js";
-import {
-  getLastAttackDao,
-  applyDamageDao,
-  logAttackDao,
-  healNodeDao,
-  getAttackHistoryByNodeDao,
-} from "../src/dao/attackDao.js";
-import {
-  attackNodeAbl,
-  getAttackHistoryAbl,
-  CanOnlyAttackOwnNodeError,
-  CannotRetaliateError,
-  NodeAlreadyDefeatedError,
-  WeaponOnCooldownError,
-} from "../src/abl/attackAbl.js";
+import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../src/dao/attackDao.js";
+import { attackNodeAbl, getAttackHistoryAbl } from "../src/abl/attackAbl.js";
 import { ValidationError } from "../src/abl/errors.js";
 
 // An attack always carries the attacker's real objection now — every
-// call below that isn't specifically testing that validation supplies
-// this so the older "is this attack allowed" checks are still reachable.
+// call below that isn't specifically testing validation supplies this so
+// the "does this attack actually land" checks are still reachable.
 const validContent = { type: "Problem" as const, text: "This has a real issue" };
 
 // attackNodeAbl's own membership check comes off this same
-// getMapByInternalIdDao fetch — this is the "both attacker1 and victim1 are
-// members" default every test below starts from unless it's specifically
-// testing membership. discussionMode is deliberately false here to prove
-// it no longer affects the (now unconditional) own-node rule.
-const normalMap = { members: ["attacker1", "victim1"], discussionMode: false };
+// getMapByInternalIdDao fetch — this is the "both attacker1 and victim1
+// are members" default every test below starts from unless it's
+// specifically testing membership.
+const normalMap = { members: ["attacker1", "victim1"] };
 
 vi.mock("../src/dao/nodeDao.js", () => ({
   findNodeByPublicIdDao: vi.fn(),
@@ -40,7 +26,6 @@ vi.mock("../src/dao/mapsDao.js", () => ({
   getMapByInternalIdDao: vi.fn(),
 }));
 vi.mock("../src/dao/attackDao.js", () => ({
-  getLastAttackDao: vi.fn(),
   applyDamageDao: vi.fn(),
   logAttackDao: vi.fn(),
   healNodeDao: vi.fn(),
@@ -52,7 +37,7 @@ describe("attackAbl", () => {
     vi.clearAllMocks();
   });
 
-  describe("attackNodeAbl", () => {
+  describe("attackNodeAbl — combat is fully open (no own-node rule, no weapon-node exclusion, no already-defeated block, no cooldowns)", () => {
     it("returns null when the node doesn't exist", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue(null as never);
 
@@ -78,9 +63,7 @@ describe("attackAbl", () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
         _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
       } as never);
-      vi.mocked(getMapByInternalIdDao).mockResolvedValue({
-        members: ["someoneElse"], discussionMode: false,
-      } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue({ members: ["someoneElse"] } as never);
 
       const result = await attackNodeAbl("node1", "attacker1", "nitpick", validContent);
 
@@ -88,55 +71,75 @@ describe("attackAbl", () => {
       expect(applyDamageDao).not.toHaveBeenCalled();
     });
 
-    it("rejects attacking someone else's node — only your own node is a valid target", async () => {
+    it("allows attacking a node you don't own", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
         _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
       } as never);
       vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "n1", health: 90, defeated: false } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
 
-      await expect(
-        attackNodeAbl("node1", "attacker1", "nitpick", validContent),
-      ).rejects.toThrow(CanOnlyAttackOwnNodeError);
+      const result = await attackNodeAbl("node1", "attacker1", "nitpick", validContent);
+
+      expect(result).not.toBeNull();
+      expect(applyDamageDao).toHaveBeenCalledWith("n1", 90, false);
     });
 
-    // Retaliation: the one case a weapon node can be attacked at all — see
-    // CannotRetaliateError's own doc comment in attackAbl.ts.
-    it("rejects retaliating against a weapon node with no target of its own", async () => {
+    it("allows attacking your own node", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 100,
+      } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "n1", health: 90, defeated: false } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
+
+      const result = await attackNodeAbl("node1", "attacker1", "nitpick", validContent);
+
+      expect(result).not.toBeNull();
+      expect(applyDamageDao).toHaveBeenCalledWith("n1", 90, false);
+    });
+
+    it("allows attacking an already-defeated node", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: true, health: 0,
+      } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "n1", health: 0, defeated: true } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
+
+      const result = await attackNodeAbl("node1", "attacker1", "nitpick", validContent);
+
+      expect(result).not.toBeNull();
+      // Health was already 0 — clamped, not driven negative.
+      expect(applyDamageDao).toHaveBeenCalledWith("n1", 0, true);
+    });
+
+    it("allows attacking a weapon node with no target of its own — heals nothing", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
         _id: "w1", mapId: "m1", userId: "attacker1", isWeapon: true, targetNodeId: null, defeated: false, health: 100,
       } as never);
       vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "w1", health: 90, defeated: false } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w2" } as never);
 
-      await expect(
-        attackNodeAbl("weapon1", "victim1", "nitpick", validContent),
-      ).rejects.toThrow(CannotRetaliateError);
+      const result = await attackNodeAbl("weapon1", "victim1", "nitpick", validContent);
+
       expect(findNodeByInternalIdDao).not.toHaveBeenCalled();
-      expect(applyDamageDao).not.toHaveBeenCalled();
+      expect(applyDamageDao).toHaveBeenCalledWith("w1", 90, false);
+      expect(healNodeDao).not.toHaveBeenCalled();
+      expect(result!.healedParent).toBeNull();
     });
 
-    it("rejects retaliating against a weapon node that targeted someone else's node", async () => {
+    it("attacking a weapon node heals its own target's parent, for any attacker — not just the one it hit", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
         _id: "w1", mapId: "m1", userId: "attacker1", isWeapon: true, targetNodeId: "n2", defeated: false, health: 100,
       } as never);
-      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-      // n2 belongs to someone other than victim1, the one trying to retaliate.
-      vi.mocked(findNodeByInternalIdDao).mockResolvedValue({
-        _id: "n2", userId: "someoneElse", parentId: null,
+      // n2 (the node w1 actually hit) belongs to someone else entirely —
+      // this attacker ("someoneElse", a map member but neither w1's owner
+      // nor n2's owner) still lands the hit and still heals n2's parent.
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue({
+        members: ["attacker1", "victim1", "someoneElse"],
       } as never);
-
-      await expect(
-        attackNodeAbl("weapon1", "victim1", "nitpick", validContent),
-      ).rejects.toThrow(CannotRetaliateError);
-      expect(applyDamageDao).not.toHaveBeenCalled();
-    });
-
-    it("allows retaliating against the weapon node that hit your own node, and heals its parent", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "w1", mapId: "m1", userId: "attacker1", isWeapon: true, targetNodeId: "n2", defeated: false, health: 100,
-      } as never);
-      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-      // n2 (the node the weapon actually hit) belongs to victim1, the one
-      // retaliating here, and itself branches off n-parent.
       vi.mocked(findNodeByInternalIdDao).mockResolvedValue({
         _id: "n2", userId: "victim1", parentId: "n-parent",
       } as never);
@@ -144,17 +147,14 @@ describe("attackAbl", () => {
       vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w2" } as never);
       vi.mocked(healNodeDao).mockResolvedValue({ _id: "n-parent", health: 60 } as never);
 
-      const result = await attackNodeAbl("weapon1", "victim1", "nitpick", validContent);
+      const result = await attackNodeAbl("weapon1", "someoneElse", "nitpick", validContent);
 
-      // Retaliation bypasses the normal own-node rule entirely — no
-      // discussion-mode/own-node error, even though w1.userId
-      // ("attacker1") isn't victim1.
       expect(applyDamageDao).toHaveBeenCalledWith("w1", 90, false);
       expect(healNodeDao).toHaveBeenCalledWith("n-parent", 10);
       expect(result!.healedParent).toEqual({ _id: "n-parent", health: 60 });
     });
 
-    it("retaliating against a weapon that hit a root node (no parent) heals nothing", async () => {
+    it("attacking a weapon that hit a root node (no parent) heals nothing", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
         _id: "w1", mapId: "m1", userId: "attacker1", isWeapon: true, targetNodeId: "n2", defeated: false, health: 100,
       } as never);
@@ -171,49 +171,9 @@ describe("attackAbl", () => {
       expect(result!.healedParent).toBeNull();
     });
 
-    it("rejects attacking an already-defeated node", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "attacker1", defeated: true, health: 0,
-      } as never);
-      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-
-      await expect(
-        attackNodeAbl("node1", "attacker1", "nitpick", validContent),
-      ).rejects.toThrow(NodeAlreadyDefeatedError);
-    });
-
-    // The own-node rule is now the app's only combat rule, unconditionally —
-    // Map.discussionMode no longer branches this (see attackAbl.ts's own
-    // comment). `normalMap` below still carries discussionMode: false to
-    // prove the stored flag's value is irrelevant to the outcome.
-    it("rejects attacking someone else's node regardless of Map.discussionMode", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
-      } as never);
-      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-
-      await expect(
-        attackNodeAbl("node1", "attacker1", "nitpick", validContent),
-      ).rejects.toThrow(CanOnlyAttackOwnNodeError);
-    });
-
-    it("allows attacking your own node regardless of Map.discussionMode", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 100,
-      } as never);
-      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "n1", health: 90, defeated: false } as never);
-      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
-
-      const result = await attackNodeAbl("node1", "attacker1", "nitpick", validContent);
-
-      expect(result).not.toBeNull();
-      expect(applyDamageDao).toHaveBeenCalledWith("n1", 90, false);
-    });
-
     it("deals damage, logs the attack, spawns a weapon node, and returns both", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 100,
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
       } as never);
       vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
       vi.mocked(applyDamageDao).mockResolvedValue({
@@ -239,8 +199,8 @@ describe("attackAbl", () => {
       expect(result).toEqual({
         node: { _id: "n1", health: 90, defeated: false },
         weaponNode: { nodeId: "w1", isWeapon: true, weaponIcon: "sword" },
-        // Not a retaliation (the target here is an ordinary content node,
-        // not a weapon node) — nothing gets healed.
+        // The target here is an ordinary content node, not a weapon node —
+        // nothing gets healed.
         healedParent: null,
       });
       expect(healNodeDao).not.toHaveBeenCalled();
@@ -248,10 +208,9 @@ describe("attackAbl", () => {
 
     it("maps each combat weapon to its own icon", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 100,
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
       } as never);
       vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-      vi.mocked(getLastAttackDao).mockResolvedValue(null as never);
       vi.mocked(applyDamageDao).mockResolvedValue({} as never);
       vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({} as never);
 
@@ -270,10 +229,9 @@ describe("attackAbl", () => {
 
     it("health can't drop below 0, and the node becomes defeated", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 10,
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 10,
       } as never);
       vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-      vi.mocked(getLastAttackDao).mockResolvedValue(null as never); // fatalFlaw has a cooldown
       vi.mocked(applyDamageDao).mockResolvedValue({
         _id: "n1", health: 0, defeated: true,
       } as never);
@@ -283,35 +241,22 @@ describe("attackAbl", () => {
       expect(applyDamageDao).toHaveBeenCalledWith("n1", 0, true);
     });
 
-    it("blocks a weapon that's still on cooldown", async () => {
+    // No cooldown check left at all — landing the same weapon twice in a
+    // row (previously blocked, WeaponOnCooldownError) now just lands
+    // twice.
+    it("allows the same weapon to land twice in a row, with no cooldown in between", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 100,
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
       } as never);
       vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-      vi.mocked(getLastAttackDao).mockResolvedValue({ createdAt: new Date() } as never);
-
-      await expect(
-        attackNodeAbl("node1", "attacker1", "counterpoint", validContent),
-      ).rejects.toThrow(WeaponOnCooldownError);
-      expect(applyDamageDao).not.toHaveBeenCalled();
-    });
-
-    it("allows the attack once the cooldown has elapsed", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 100,
-      } as never);
-      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
-      const anHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      vi.mocked(getLastAttackDao).mockResolvedValue({ createdAt: anHourAgo } as never);
-      vi.mocked(applyDamageDao).mockResolvedValue({
-        _id: "n1", health: 75, defeated: false,
-      } as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "n1", health: 75, defeated: false } as never);
       vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w2" } as never);
 
+      await attackNodeAbl("node1", "attacker1", "counterpoint", validContent);
       const result = await attackNodeAbl("node1", "attacker1", "counterpoint", validContent);
 
+      expect(applyDamageDao).toHaveBeenCalledTimes(2);
       expect(result!.node).toEqual({ _id: "n1", health: 75, defeated: false });
-      expect(result!.weaponNode).toEqual({ nodeId: "w2" });
     });
 
     // Content is validated before anything touches the database — same

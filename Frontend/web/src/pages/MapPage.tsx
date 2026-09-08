@@ -25,7 +25,7 @@ import { Modal } from "../components/Modal";
 import { idOf, nodeRefId } from "../utils/nodeType";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
 import { NODE_TYPES } from "../types";
-import type { AttackIndicator, EdgeDoc, MapDoc, NodeDoc, NodeType, SelectedCircle, Weapon } from "../types";
+import type { AttackIndicator, EdgeDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
 
 const CANVAS_W = 2400;
 const CANVAS_H = 1600;
@@ -333,8 +333,6 @@ export function MapPage() {
   // connections not touching the selection dim (see the `muted`/edge/
   // branch-arrow computations further down).
   const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
-
-  const [cooldowns, setCooldowns] = useState<Partial<Record<Weapon, number>>>({});
 
   // Canvas zoom level — applied to canvasRef as a CSS transform: scale(),
   // see the JSX below. 1 = the canvas's own native 2400x1600 pixels.
@@ -1256,25 +1254,15 @@ export function MapPage() {
     return isOwnNode(node);
   }
 
-  // Mirrors attackAbl.ts's own-node rule exactly — an attack always lands
-  // on your *own* node (self-critique), never someone else's, regardless
-  // of Map.discussionMode (that per-map toggle is gone; every map behaves
-  // as discussion mode used to) — plus the defeated exclusion. A weapon
-  // node is otherwise excluded here — landing an attack on an attack still
-  // isn't a thing this game models in general — except retaliation: the
-  // one node it actually hit striking back at it, mirroring attackAbl.ts's
-  // own CannotRetaliateError check (own the node this weapon's
-  // targetNodeId resolves to). That bypasses the own-node rule below
-  // entirely, same as server-side. Client-side only, same caveat as
-  // isOwnNode elsewhere — the server enforces the real rule.
-  function canAttackNode(node: NodeDoc) {
-    if (node.defeated) return false;
-    if (node.isWeapon) {
-      const targetId = nodeRefId(node.targetNodeId);
-      const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
-      return !!target && isOwnNode(target);
-    }
-    return isOwnNode(node);
+  // Mirrors attackAbl.ts exactly: combat is fully open now — no own-node
+  // rule, no weapon-node exclusion, no already-defeated block. Any node
+  // (yours, someone else's, a weapon node, already at 0 health) is a valid
+  // attack target for any map member. Kept as its own function (rather than
+  // inlining `true` at each call site) purely so every place that used to
+  // ask "can this be attacked" still reads the same way and stays easy to
+  // re-tighten later if these rules ever come back.
+  function canAttackNode(_node: NodeDoc) {
+    return true;
   }
 
   // Single entry point for "start editing this node's text/type inline, on
@@ -1422,7 +1410,19 @@ export function MapPage() {
   // inside it. Mirrors onNodePointerDown's own screenToCanvas-based
   // tracking, just for a rectangle instead of a single point.
   function onCanvasPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    if (linkMode || e.button !== 0) return;
+    // pointerType "touch": a finger-drag on empty canvas is how mobile pans
+    // the map at all (the wrap div's own native touch-scroll — there's no
+    // trackpad/scrollbar to do it otherwise) — bail out before capturing
+    // the pointer so that native scroll can happen, same as this handler
+    // simply not existing. Marquee-select is a mouse-drag idea (a
+    // rubber-band rectangle) that was only ever "free" to claim on desktop
+    // because click-drag on empty canvas did nothing there before (real
+    // panning is trackpad/scrollbar-driven); on mobile that same gesture
+    // is already spoken for. Tap-to-select/center/ghosts and double-tap-
+    // to-edit are unaffected either way — those go through NodeCard's own
+    // onClick/onDoubleClick, not this handler, which only ever fires for
+    // empty canvas.
+    if (linkMode || e.button !== 0 || e.pointerType === "touch") return;
     const start = screenToCanvas(e.clientX, e.clientY);
     let moved = false;
     // Read directly off the raw pointer event in onUp, same as
@@ -1473,15 +1473,14 @@ export function MapPage() {
     window.addEventListener("pointerup", onUp);
   }
 
-  // Right-click on a node: CUD + Link always for your own nodes (a weapon
-  // node included — it's usual for this purpose now, same as everywhere
-  // else isOwnNode gates), plus Attack when canAttackNode agrees (your own
-  // node; a weapon node only via retaliation, when it's the one that hit a
-  // node you own — see canAttackNode). Nothing opens for a node that's
-  // neither yours to edit nor yours to attack right now (an already-
-  // defeated node you don't own; anyone else's node at all; someone else's
-  // weapon node that didn't target you), since there'd be no action left
-  // to show.
+  // Right-click on a node: CUD + Link for your own nodes (a weapon node
+  // included — it's usual for this purpose now, same as everywhere else
+  // isOwnNode gates), plus Attack — always, now that canAttackNode is
+  // unconditionally true (combat is fully open, see its own comment). So
+  // this menu now always has at least Attack to show, own node or not;
+  // the `!own && !canAttackNode(node)` guard below is effectively dead
+  // (kept rather than special-cased away, in case attack ever gets
+  // restricted again).
   function handleNodeContextMenu(node: NodeDoc, e: ReactMouseEvent) {
     const own = isOwnNode(node);
     if (!own && !canAttackNode(node)) {
@@ -2486,7 +2485,7 @@ export function MapPage() {
           // circle/Delete — see SelectionMenu) and Deselect; per-node
           // editing/attacking still needs dropping back to a single
           // selection first.
-          <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
+          <div className="fixed inset-x-0 bottom-0 z-[46] flex items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
             <div className="flex items-center gap-3">
               <span className="text-[0.88rem] font-semibold text-ink">
                 {multiSelectIds.size} node{multiSelectIds.size === 1 ? "" : "s"} selected
@@ -2541,7 +2540,6 @@ export function MapPage() {
                 nodes={nodes}
                 edges={edges}
                 currentUserId={user._id}
-                cooldowns={cooldowns}
                 onClose={() => setSelectedId(null)}
                 onSelectNode={(id) => {
                   setSelectedId(id);
@@ -2568,7 +2566,6 @@ export function MapPage() {
                   setCelebrateIds((prev) => new Set(prev).add(weaponNode.nodeId));
                   if (mapId) refreshInsights(mapId);
                 }}
-                onCooldown={(weapon, readyAt) => setCooldowns((prev) => ({ ...prev, [weapon]: readyAt }))}
                 onDeleteEdge={(edgeId) => {
                   setEdges((prev) => prev.filter((e) => e.edgeId !== edgeId));
                   if (mapId) refreshInsights(mapId);
