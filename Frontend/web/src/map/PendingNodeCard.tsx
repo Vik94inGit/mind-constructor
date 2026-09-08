@@ -40,7 +40,7 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
   // time this is up, so the backdrop never unmounts) and swallows every
   // tap meant for it.
   const classes =
-    "absolute z-[33] flex w-[92px] [transform:translate(-50%,-50%)] flex-col items-center transition-[opacity,filter] duration-150 ease-[ease] cursor-default opacity-90";
+    "absolute z-[33] flex w-[74px] [transform:translate(-50%,-50%)] flex-col items-center transition-[opacity,filter] duration-150 ease-[ease] cursor-default opacity-90";
 
   function resolve() {
     if (cancelingRef.current) {
@@ -64,11 +64,12 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
       onClick={(e) => e.stopPropagation()}
       // Without this, double-clicking to select a word while typing here
       // (or double-tapping the icon by mistake) bubbles a dblclick up to
-      // the canvas, which now reads any double-click as "zoom in here" —
-      // see MapPage's onCanvasDoubleClick.
+      // the canvas — harmless today (the canvas no longer does anything on
+      // double-click), but stays stopped so a stray double-click in here
+      // never risks landing on whatever's underneath.
       onDoubleClick={(e) => e.stopPropagation()}
     >
-      <div className="relative h-[60px] w-[60px]">
+      <div className="relative h-[48px] w-[48px]">
         {/* Same halo/horns crown a real node of this type gets — see
             NodeCrown's own doc comment. Without this, a not-yet-named
             pending node (still just a type + blank caption, before the
@@ -92,12 +93,12 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
               setDraftType(cycleNodeType);
             }}
           >
-            {isOutcome ? <OutcomeBadge type={draftType as OutcomeType} size={32} /> : <NodeTypeIcon type={draftType} size={26} />}
+            {isOutcome ? <OutcomeBadge type={draftType as OutcomeType} size={26} /> : <NodeTypeIcon type={draftType} size={21} />}
           </button>
         </div>
       </div>
       <input
-        className="mt-[0.35rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.72rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+        className="mt-[0.35rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
         autoFocus
         value={text}
         placeholder={draftType}

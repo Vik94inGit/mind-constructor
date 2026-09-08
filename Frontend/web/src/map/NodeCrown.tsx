@@ -10,13 +10,13 @@ import type { NodeType } from "../types";
 const HALO_GOLD = "#c9a94a";
 const HORNS_RED = "#b23a48";
 
-// A small decoration sitting just above a node's own 60px icon circle —
+// A small decoration sitting just above a node's own 48px icon circle —
 // shared by NodeCard (a real node's own icon) and QuickAddGhosts (the
 // type-preview ghosts fanned around a selected node), so a ghost actually
 // previews what the real node is about to look like instead of just its
-// bare symbol. Assumes a 60px circle directly below it (both callers use
+// bare symbol. Assumes a 48px circle directly below it (both callers use
 // that size) — independent of OutcomeBadge rather than living inside its
-// SVG, since OutcomeBadge's own canvas would have to be exactly that 60px
+// SVG, since OutcomeBadge's own canvas would have to be exactly that 48px
 // circle's size for the two to align at all, and every attempt to cram
 // the ring, wings, and health all into one shared canvas left something
 // misaligned or clipped somewhere. Halo stays hollow (fill var(--surface),
@@ -24,6 +24,12 @@ const HORNS_RED = "#b23a48";
 // with) — horns fill solid (HORNS_RED) instead; a devil's horns read as a
 // solid dark shape, not an outline. Returns null for a type with no
 // halo/horns framing ("unknown", or a type ringKindFor doesn't classify).
+//
+// Rendered width/height/offset below are 0.8x their original 34/20/13 and
+// 28/17/11 (the node icon's own -20% resize) — the viewBox and every path/
+// stroke coordinate inside it are left alone, so the whole drawing just
+// scales down uniformly rather than needing separately-tuned small-size
+// numbers that could drift out of proportion over time.
 export function NodeCrown({ type }: { type: NodeType }) {
   const kind = ringKindFor(type);
   if (!kind) return null;
@@ -31,10 +37,10 @@ export function NodeCrown({ type }: { type: NodeType }) {
   if (kind === "halo") {
     return (
       <svg
-        width="34"
-        height="20"
+        width="27.2"
+        height="16"
         viewBox="0 0 34 20"
-        className="pointer-events-none absolute -top-[13px] left-1/2 z-[1] -translate-x-1/2"
+        className="pointer-events-none absolute -top-[10.4px] left-1/2 z-[1] -translate-x-1/2"
         aria-hidden="true"
       >
         <ellipse cx="17" cy="12" rx="15" ry="6.5" fill="var(--surface)" stroke={HALO_GOLD} strokeWidth="2.5" />
@@ -44,10 +50,10 @@ export function NodeCrown({ type }: { type: NodeType }) {
 
   return (
     <svg
-      width="28"
-      height="17"
+      width="22.4"
+      height="13.6"
       viewBox="0 0 28 17"
-      className="pointer-events-none absolute -top-[11px] left-1/2 z-[1] -translate-x-1/2"
+      className="pointer-events-none absolute -top-[8.8px] left-1/2 z-[1] -translate-x-1/2"
       aria-hidden="true"
     >
       <g fill={HORNS_RED} stroke={HORNS_RED} strokeWidth="2" strokeLinejoin="round">

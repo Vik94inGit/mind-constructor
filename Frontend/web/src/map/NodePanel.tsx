@@ -50,8 +50,6 @@ interface Props {
   nodes: NodeDoc[];
   edges: EdgeDoc[];
   currentUserId: string;
-  /** Map.discussionMode — flips whose nodes the Attack section shows on (see attackNodeAbl.ts server-side); everything else here is unaffected. */
-  discussionMode: boolean;
   cooldowns: Partial<Record<Weapon, number>>;
   onClose: () => void;
   onDeleted: (nodeId: string) => void;
@@ -72,7 +70,6 @@ export function NodePanel({
   nodes,
   edges,
   currentUserId,
-  discussionMode,
   cooldowns,
   onClose,
   onDeleted,
@@ -94,6 +91,16 @@ export function NodePanel({
   const [attackText, setAttackText] = useState("");
   const [attackType, setAttackType] = useState<AttackNodeType>("Problem");
 
+  // Direct text editing, right inside the Info tab (see the textarea in the
+  // JSX below) — reset from the node's real text whenever the selected node
+  // changes, same reset-on-node-change contract attackText/attackType
+  // already follow just below. Enter submits (calls updateNode, same
+  // pattern as handleSetSymbol); Shift+Enter inserts a newline instead —
+  // this is now the panel's primary text-edit affordance, alongside the
+  // canvas's own inline editor (double-click a node, or the Edit button
+  // below, both of which still hand off to that same inline editor).
+  const [textDraft, setTextDraft] = useState(node.text);
+
   // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
   // surfaced as a "Points at" link in the Info tab below, and used by
   // canAttack right below to decide whether this is a retaliation.
@@ -102,15 +109,15 @@ export function NodePanel({
 
   // A weapon node is a usual node for everything else in here (its own
   // Info/Links/History, editing, deleting) — attacking one is otherwise
-  // off the table, mirroring MapPage's canAttackNode exactly (normal mode:
-  // someone else's node; discussion mode: your own), *except* retaliation:
-  // the one node this weapon actually hit striking back at it, regardless
-  // of mode — same as server-side (see Backend's attackAbl.ts,
-  // CannotRetaliateError).
+  // off the table, mirroring MapPage's canAttackNode exactly (an attack
+  // always lands on your own node — see attackAbl.ts's own comment),
+  // *except* retaliation: the one node this weapon actually hit striking
+  // back at it, regardless of mode — same as server-side (see Backend's
+  // attackAbl.ts, CannotRetaliateError).
   function computeCanAttack() {
     if (node.defeated) return false;
     if (node.isWeapon) return !!target && idOf(target.userId as any) === currentUserId;
-    return discussionMode ? isCreator : !isCreator;
+    return isCreator;
   }
   const canAttack = computeCanAttack();
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
@@ -128,11 +135,13 @@ export function NodePanel({
     setError(null);
     setAttackText("");
     setAttackType("Problem");
+    setTextDraft(node.text);
     setTab("info");
     nodesApi
       .getAttackHistory(node.nodeId)
       .then(setHistory)
       .catch(() => setHistory([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.nodeId]);
 
   useEffect(() => {
@@ -150,6 +159,28 @@ export function NodePanel({
       onUpdated(updated);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Failed to update symbol");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Enter (no Shift) in the textarea below — same updateNode call
+  // handleSetSymbol already uses, just for `text` instead of
+  // `symbolOverride`. A no-op (not an error) on empty/unchanged text, same
+  // as the canvas's own inline editor's resolveInlineEdit does.
+  async function handleTextSave() {
+    const trimmed = textDraft.trim();
+    if (!trimmed || trimmed === node.text) {
+      setTextDraft(node.text);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { text: trimmed });
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Failed to update text");
     } finally {
       setBusy(false);
     }
@@ -254,6 +285,31 @@ export function NodePanel({
 
       {tab === "info" && (
         <div className="mt-4">
+          {isCreator && (
+            <div className="mb-3 flex flex-col gap-[0.35rem]">
+              <label htmlFor="node-text" className="text-[0.8rem] font-semibold text-ink-soft">
+                Text
+              </label>
+              <textarea
+                id="node-text"
+                rows={2}
+                value={textDraft}
+                onChange={(e) => setTextDraft(e.target.value)}
+                disabled={busy}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleTextSave();
+                  }
+                  // Shift+Enter: no preventDefault — the textarea's own
+                  // default behavior (insert a newline) is exactly what's
+                  // wanted here.
+                }}
+                onBlur={handleTextSave}
+                className="resize-none rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
+              />
+            </div>
+          )}
           <div className="h-1 overflow-hidden rounded-[3px] bg-surface-2">
             <div
               className="h-full transition-[width] duration-200"
@@ -399,7 +455,7 @@ export function NodePanel({
             weapon arrow.
             {node.isWeapon
               ? " Retaliation: landing this heals your own node's parent."
-              : discussionMode && " Discussion mode: you can only challenge your own nodes."}
+              : " You can only challenge your own nodes."}
           </p>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="attack-text" className="text-[0.8rem] font-semibold text-ink-soft">
