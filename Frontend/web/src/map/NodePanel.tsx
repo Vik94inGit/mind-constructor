@@ -24,8 +24,16 @@ import type { Attack, AttackNodeType, EdgeDoc, NodeDoc, SymbolOverride, Weapon }
 // not exist on screen at that moment, landing partly or entirely off the
 // visible viewport instead of the bottom this is supposed to dock to.
 // `dvh` tracks the real, current visual viewport instead.
+//
+// z-[46]: above the minimap/zoom-controls cluster (z-[45]) on purpose — this
+// panel is a full-width sheet covering the bottom of the screen anyway, so
+// letting the minimap float on top of it (the old z-40, *below* z-45) just
+// left a visible fragment of map poking out over the panel's own content
+// instead of the panel's content actually covering it. Still below a real
+// modal (Modal.tsx, z-50), which should stay on top of everything,
+// this panel included.
 const PANEL_CLASS =
-  "fixed inset-x-0 bottom-0 z-40 max-h-[75dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+  "fixed inset-x-0 bottom-0 z-[46] max-h-[75dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
 // Every section below used to render stacked, all at once — text, health,
 // CRUD, links, the whole attack form, and history — which made this panel
@@ -50,14 +58,12 @@ interface Props {
   nodes: NodeDoc[];
   edges: EdgeDoc[];
   currentUserId: string;
-  cooldowns: Partial<Record<Weapon, number>>;
   onClose: () => void;
   onDeleted: (nodeId: string) => void;
   /** Fired after a direct panel-side PATCH (currently just the symbol-override toggle below) with the server's response, so the canvas/other panels stay in sync — same upsert-by-id MapPage already does for every other node update. */
   onUpdated: (node: NodeDoc) => void;
   /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. */
   onAttacked: (node: NodeDoc, weaponNode: NodeDoc, weapon: Weapon, healedParent: NodeDoc | null) => void;
-  onCooldown: (weapon: Weapon, readyAt: number) => void;
   onDeleteEdge: (edgeId: string) => void;
   onStartLink: () => void;
   onSelectNode: (nodeId: string) => void;
@@ -70,12 +76,10 @@ export function NodePanel({
   nodes,
   edges,
   currentUserId,
-  cooldowns,
   onClose,
   onDeleted,
   onUpdated,
   onAttacked,
-  onCooldown,
   onDeleteEdge,
   onStartLink,
   onSelectNode,
@@ -85,7 +89,6 @@ export function NodePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<Attack[] | null>(null);
-  const [now, setNow] = useState(Date.now());
   // An attack now creates a real node — this is that node's content, filled
   // in before any of the weapon buttons below will actually fire.
   const [attackText, setAttackText] = useState("");
@@ -107,17 +110,11 @@ export function NodePanel({
   const targetId = node.isWeapon ? nodeRefId(node.targetNodeId) : undefined;
   const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
 
-  // A weapon node is a usual node for everything else in here (its own
-  // Info/Links/History, editing, deleting) — attacking one is otherwise
-  // off the table, mirroring MapPage's canAttackNode exactly (an attack
-  // always lands on your own node — see attackAbl.ts's own comment),
-  // *except* retaliation: the one node this weapon actually hit striking
-  // back at it, regardless of mode — same as server-side (see Backend's
-  // attackAbl.ts, CannotRetaliateError).
+  // Combat is fully open now (see attackAbl.ts's own comment) — no
+  // own-node rule, no weapon-node exclusion, no already-defeated block.
+  // Mirrors MapPage's canAttackNode exactly: any node is a valid target.
   function computeCanAttack() {
-    if (node.defeated) return false;
-    if (node.isWeapon) return !!target && idOf(target.userId as any) === currentUserId;
-    return isCreator;
+    return true;
   }
   const canAttack = computeCanAttack();
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
@@ -143,11 +140,6 @@ export function NodePanel({
       .catch(() => setHistory([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.nodeId]);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   // Owner-only (same as text/type edits) — a manual annotation over the
   // badge's symbol, not a rewrite of the node's own claim.
@@ -206,17 +198,10 @@ export function NodePanel({
     try {
       const res = await nodesApi.attackNode(node.nodeId, weapon, { type: attackType, text: attackText.trim() });
       onAttacked(res.node, res.weaponNode, weapon, res.healedParent);
-      const info = WEAPON_INFO[weapon];
-      if (info.cooldownMs > 0) onCooldown(weapon, Date.now() + info.cooldownMs);
       setAttackText("");
       nodesApi.getAttackHistory(node.nodeId).then(setHistory).catch(() => {});
     } catch (err) {
-      if (err instanceof ApiRequestError && err.status === 429 && err.readyAt) {
-        onCooldown(weapon, new Date(err.readyAt).getTime());
-        setError("That weapon is still on cooldown.");
-      } else {
-        setError(err instanceof ApiRequestError ? err.message : "Attack failed");
-      }
+      setError(err instanceof ApiRequestError ? err.message : "Attack failed");
     } finally {
       setBusy(false);
     }
@@ -453,9 +438,7 @@ export function NodePanel({
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
             Landing an attack creates a real node with your objection, linked to this one by a
             weapon arrow.
-            {node.isWeapon
-              ? " Retaliation: landing this heals your own node's parent."
-              : " You can only challenge your own nodes."}
+            {node.isWeapon && " Landing this heals its own target's parent."}
           </p>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="attack-text" className="text-[0.8rem] font-semibold text-ink-soft">
@@ -495,21 +478,18 @@ export function NodePanel({
           <div className="flex flex-col gap-2">
             {WEAPONS.map((w) => {
               const info = WEAPON_INFO[w];
-              const readyAt = cooldowns[w] ?? 0;
-              const isOnCooldown = readyAt > now;
               const needsText = !attackText.trim();
               return (
                 <button
                   key={w}
                   className="inline-flex w-full cursor-pointer items-center justify-between gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={busy || isOnCooldown || needsText}
+                  disabled={busy || needsText}
                   title={needsText ? "Write your objection first" : undefined}
                   onClick={() => handleAttack(w)}
                 >
                   <span>
                     {info.label} (-{info.damage})
                   </span>
-                  <span>{isOnCooldown ? `${Math.ceil((readyAt - now) / 1000)}s` : ""}</span>
                 </button>
               );
             })}
