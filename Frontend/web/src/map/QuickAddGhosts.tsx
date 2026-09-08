@@ -17,9 +17,9 @@ import { NodeCrown } from "./NodeCrown";
 // NodeCard's own version over time. Only the pulsing dashed-glow (see the
 // className below) and the reduced opacity are ghost-specific beyond
 // that, marking it as "not real yet."
-const ICON_SIZE = 60;
+const ICON_SIZE = 48;
 const GHOST_SCALE = 0.65;
-const RADIUS = 80;
+const RADIUS = 64;
 const EDGE_MARGIN = 40;
 
 interface Props {
@@ -81,9 +81,9 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
                     "unknown" has no outcome framing, so it alone keeps
                     the plain glyph. */}
                 {ringKindFor(type) ? (
-                  <OutcomeBadge type={type as OutcomeType} size={32} />
+                  <OutcomeBadge type={type as OutcomeType} size={26} />
                 ) : (
-                  <NodeTypeIcon type={type} size={26} />
+                  <NodeTypeIcon type={type} size={21} />
                 )}
               </div>
             </div>

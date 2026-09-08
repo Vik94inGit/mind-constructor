@@ -6,10 +6,9 @@ interface Props {
   /**
    * Owner sees Create/Update/Delete/Link. canAttack already folds ownership
    * in on its own (see MapPage's canAttackNode, which mirrors attackAbl.ts's
-   * own-node rule) — normal mode: true only for someone else's node;
-   * Map.discussionMode: true only for your own — so in discussion mode both
-   * can be true together (your own node), showing Attack alongside the
-   * owner actions instead of only ever replacing them.
+   * own-node rule — an attack always lands on your own node) — so isOwner
+   * and canAttack are true together on your own node, showing Attack
+   * alongside the owner actions instead of only ever replacing them.
    */
   isOwner: boolean;
   canAttack: boolean;

@@ -16,9 +16,16 @@ import {
 } from "../dao/attackDao.js";
 import { parseOrThrow } from "./errors.js";
 
+// No longer thrown — attacking your own node is now always allowed (see
+// CanOnlyAttackOwnNodeError below). Kept exported since nodeController.ts
+// still pattern-matches on it defensively; harmless dead code, not worth
+// the churn of touching every layer to remove it.
 export class CannotAttackOwnNodeError extends Error {}
-// Discussion mode's inverse of the above — see Map.discussionMode. Attacking
-// itself is never disabled by discussion mode, only *who* it can land on.
+// The app's only combat rule now: an attack always lands on your *own*
+// node (self-critique), never someone else's. This used to be gated behind
+// Map.discussionMode (attack others normally, or attack only yourself in
+// "discussion mode") — that per-map toggle is gone; every map behaves as
+// discussion mode did. See attackNodeAbl's own-node check below.
 export class CanOnlyAttackOwnNodeError extends Error {}
 // A weapon node is otherwise excluded from combat entirely — "landing an
 // attack on an attack isn't a thing this game models" (see the frontend's
@@ -94,8 +101,10 @@ export const attackNodeAbl = async (
   const node = await findNodeByPublicIdDao(publicNodeId);
   if (!node) return null;
 
-  // Fetched (not just an isMapMemberDao existence check) because the own-
-  // node rule right below depends on this map's discussionMode too.
+  // Fetched (not just an isMapMemberDao existence check) for the membership
+  // check right below — Map.discussionMode itself no longer affects the
+  // own-node rule (see CanOnlyAttackOwnNodeError's own comment), but the
+  // map document is still needed to confirm the attacker belongs to it.
   const map = await getMapByInternalIdDao(node.mapId);
   if (!map) return null;
   const isMember = map.members.some((m) => m.toString() === attackerId.toString());
@@ -116,14 +125,11 @@ export const attackNodeAbl = async (
     healParentId = victim.parentId ?? null;
   } else {
     const isOwnNode = node.userId.toString() === attackerId.toString();
-    // Normal rules: attack only lands on someone else's node. Discussion
-    // mode inverts this — attacking stays enabled, it just only lands on
-    // your *own* node (self-critique instead of combat). See Map.discussionMode.
-    if (map.discussionMode) {
-      if (!isOwnNode) throw new CanOnlyAttackOwnNodeError();
-    } else if (isOwnNode) {
-      throw new CannotAttackOwnNodeError();
-    }
+    // Discussion mode's own-node-only rule is now the app's only combat
+    // rule — attacking is self-critique, not player-vs-player, regardless
+    // of a given map's stored Map.discussionMode value. See attackAbl.ts's
+    // top-of-file comment and CanOnlyAttackOwnNodeError's own doc comment.
+    if (!isOwnNode) throw new CanOnlyAttackOwnNodeError();
   }
   if (node.defeated) {
     throw new NodeAlreadyDefeatedError();

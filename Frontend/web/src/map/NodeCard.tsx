@@ -45,10 +45,12 @@ function seededRandoms(seed: string, count: number): number[] {
 }
 
 // OutcomeBadge is just a symbol now (see its own doc comment) — sized
-// close to NodeTypeIcon's own 26px so an outcome-type node and an
+// close to NodeTypeIcon's own 21px so an outcome-type node and an
 // "unknown" one read as the same *kind* of glyph inside the same bordered
 // circle, just a filled bold shape instead of a thin-stroke line icon.
-const OUTCOME_BADGE_SIZE = 32;
+// (Both this and NodeTypeIcon's size prop below are 0.8x their original
+// 32/26 — see MapPage's getNodeMinDist for the matching spacing shrink.)
+const OUTCOME_BADGE_SIZE = 26;
 
 // CSS custom properties driving the .chaotic keyframes below: three small
 // waypoints plus a randomized duration/negative-delay, so several drifting
@@ -84,6 +86,8 @@ interface Props {
   /** MapPage's own canvas zoom (see its zoom state) — this node's own visual content (icon, health ring, caption) counter-scales by 1/zoom so it renders at a constant on-screen size regardless of zoom level; only its *position* moves with the rest of the canvas. See the inverseScaleStyle wrapper below for why that's a separate inner element rather than folded into this node's own transform. */
   zoom: number;
   selected: boolean;
+  /** In the current group (multi-)selection — a lighter-weight, dashed version of `selected`'s ring; several nodes can carry this at once, unlike `selected`. See MapPage's multiSelectIds. */
+  multiSelected?: boolean;
   dragging: boolean;
   canDrag: boolean;
   groupSentiment?: "positive" | "negative";
@@ -106,7 +110,10 @@ interface Props {
   /** Fired on Escape, or on blur/Enter when the draft is empty or unchanged. */
   onInlineCancel?: () => void;
   onPointerDown?: (e: ReactPointerEvent) => void;
-  onClick: () => void;
+  /** Receives the raw click event (not just fired) so callers can read modifier keys — a Shift+click toggles group selection instead of the normal single-select/center behavior. See MapPage's handleNodeClick. */
+  onClick: (e: ReactMouseEvent) => void;
+  /** Double-click/double-tap — starts inline text/type editing (see MapPage's startInlineEdit). Double-click used to be a canvas-level zoom gesture instead; that's gone now, so this is the only thing double-clicking a node does. */
+  onDoubleClick?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
 }
 
@@ -116,6 +123,7 @@ export function NodeCard({
   y,
   zoom,
   selected,
+  multiSelected,
   dragging,
   canDrag,
   groupSentiment,
@@ -131,6 +139,7 @@ export function NodeCard({
   onInlineCancel,
   onPointerDown,
   onClick,
+  onDoubleClick,
   onContextMenu,
 }: Props) {
   const particlesRef = useRef<HTMLDivElement | null>(null);
@@ -198,7 +207,8 @@ export function NodeCard({
   // whole circle was already meant to avoid. Weapon nodes never carry a
   // groupSentiment (they're never anyone's parentId child), so this never
   // applies to one.
-  const chaotic = !!groupSentiment && !node.locked && !dragging && !selected && !inlineEditing;
+  const chaotic =
+    !!groupSentiment && !node.locked && !dragging && !selected && !multiSelected && !inlineEditing;
   const readonly = !canDrag;
   // Opacity/cursor each have one property multiple states could set — CSS
   // cascade resolves that per-property, not per-modifier, so it's resolved
@@ -267,7 +277,7 @@ export function NodeCard({
     // scroll the canvas out from under your finger instead. touch-none
     // opts this element out of that native gesture so the pointermove
     // handler in MapPage's onNodePointerDown gets every event instead.
-    "group absolute flex w-[92px] touch-none [transform:translate(-50%,-50%)] select-none flex-col items-center",
+    "group absolute flex w-[74px] touch-none [transform:translate(-50%,-50%)] select-none flex-col items-center",
     zIndexClass,
     transitionClass,
     cursorClass,
@@ -284,7 +294,16 @@ export function NodeCard({
     // immediately un-selecting it happened in the same tick, and clicking
     // a node looked like it did nothing at all.
     e.stopPropagation();
-    onClick();
+    onClick(e);
+  };
+
+  const handleDoubleClick = (e: ReactMouseEvent) => {
+    // Same stopPropagation reasoning as click/contextmenu — a double-click
+    // is preceded by two ordinary clicks (already handled above), so this
+    // only needs to keep the *dblclick* event itself from reaching the
+    // canvas, which no longer does anything with it but shouldn't need to.
+    e.stopPropagation();
+    onDoubleClick?.();
   };
 
   const handleContextMenu = (e: ReactMouseEvent) => {
@@ -365,8 +384,11 @@ export function NodeCard({
     // belongs to, and the spotlight dim/full-opacity split says whether
     // it's the chosen one, so a per-node ring here was a third, redundant
     // way of saying the same two things. Selection is still its own
-    // distinct signal (this is the one you clicked), so it keeps its ring.
-    outline: selected ? "2px solid var(--accent)" : undefined,
+    // distinct signal (this is the one you clicked), so it keeps its ring —
+    // multiSelected gets the same accent color but dashed, so a group
+    // selection reads as "several of these, together" rather than each
+    // member looking like the one singly-selected node.
+    outline: selected ? "2px solid var(--accent)" : multiSelected ? "2px dashed var(--accent)" : undefined,
     outlineOffset: 2,
   } as CSSProperties;
   // Invisible until selected, then a plain fade-in — no more hover reveal:
@@ -432,6 +454,7 @@ export function NodeCard({
       style={{ ...style, ...flightStyle, ...chaosCss }}
       onPointerDown={onPointerDown}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
       onAnimationEnd={() => {
         if (flying) burstParticles(particlesRef.current, WEAPON_PARTICLE_COLORS, 10, 40);
@@ -442,7 +465,7 @@ export function NodeCard({
           separate element from the outer positioning div rather than
           folded into its own transform. */}
       <div className="flex w-full flex-col items-center" style={inverseScaleStyle}>
-      <div className="relative h-[60px] w-[60px]">
+      <div className="relative h-[48px] w-[48px]">
         {indicator && (
           <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
             {indicator.incomingNegativeEdges}
@@ -491,7 +514,7 @@ export function NodeCard({
                   symbolOverride={node.symbolOverride}
                 />
               ) : (
-                <NodeTypeIcon type={displayType} size={26} />
+                <NodeTypeIcon type={displayType} size={21} />
               )}
             </button>
           ) : (
@@ -506,7 +529,7 @@ export function NodeCard({
                   symbolOverride={node.symbolOverride}
                 />
               ) : (
-                <NodeTypeIcon type={displayType} size={26} />
+                <NodeTypeIcon type={displayType} size={21} />
               )}
             </div>
           )}
@@ -514,7 +537,7 @@ export function NodeCard({
       </div>
       {inlineEditing ? (
         <input
-          className="mt-[0.35rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.72rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+          className="mt-[0.35rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
           autoFocus
           value={draftText}
           onChange={(e) => setDraftText(e.target.value)}
@@ -534,7 +557,7 @@ export function NodeCard({
           onBlur={resolveInlineEdit}
         />
       ) : (
-        <div className="mt-[0.35rem] line-clamp-2 text-center text-[0.72rem] leading-[1.25] break-words text-ink">
+        <div className="mt-[0.35rem] line-clamp-2 text-center text-[0.58rem] leading-[1.25] break-words text-ink">
           {node.text}
         </div>
       )}

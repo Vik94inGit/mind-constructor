@@ -14,12 +14,14 @@ import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
 import { NodeContextMenu } from "../map/NodeContextMenu";
+import { CanvasContextMenu } from "../map/CanvasContextMenu";
+import { AddMenu } from "../map/AddMenu";
+import { SelectionMenu } from "../map/SelectionMenu";
 import { MiniMap } from "../map/MiniMap";
 import { WeaponMark } from "../map/WeaponMark";
 import { ringKindFor } from "../map/OutcomeBadge";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { Modal } from "../components/Modal";
-import { ColorPicker } from "../components/ColorPicker";
 import { idOf, nodeRefId } from "../utils/nodeType";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
 import { NODE_TYPES } from "../types";
@@ -36,24 +38,40 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 0.35;
 
+// Node copy/paste clipboard (see copySelection/pasteClipboard below) —
+// deliberately module-level, not component state/a ref inside MapPage.
+// Navigating from one map to another is a client-side route change
+// (`/maps/:mapId`) that fully unmounts and remounts MapPage, which would
+// wipe out anything held in that component's own state/refs — copying on
+// one map and pasting on another needs this to survive exactly that.
+// Lost on a real page reload (this module gets re-evaluated then), which
+// is fine — it's a live editing convenience for the current tab session,
+// not data anything needs to persist beyond it. sourceMapId records which
+// map the copy was made on, so pasteClipboard can tell a same-map paste
+// (anchor near the originals) from a cross-map one (the originals' own
+// x/y don't mean anything on a different map — anchor in the current
+// viewport instead; see pasteClipboard's own comment).
+let nodeClipboard: { sourceMapId: string; nodes: { text: string; type: NodeType; x: number; y: number }[] } | null = null;
+
 function hashOffset(seed: string, range: number) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 10007;
   return (h % (range * 2)) - range;
 }
 
-// Node icons are 92px wide (icon + caption) — keep freshly-placed nodes at
-// least that far apart (plus a visible margin) so a new node never lands on
-// top of an existing one. The margin shrinks on a phone-width viewport: the
-// canvas is the same 2400x1600 regardless of screen size, so the same 50px
-// buffer that's comfortable on desktop just means more panning/zooming to
-// see fewer nodes at once on mobile — the 92px icon footprint itself is the
-// one part of this that can't shrink without nodes actually overlapping.
+// Node icons are 74px wide (icon + caption — 0.8x the original 92px, per
+// the node-size -20% resize) — keep freshly-placed nodes at least that far
+// apart (plus a visible margin) so a new node never lands on top of an
+// existing one. The margin shrinks on a phone-width viewport: the canvas is
+// the same 2400x1600 regardless of screen size, so the same 50px buffer
+// that's comfortable on desktop just means more panning/zooming to see
+// fewer nodes at once on mobile — the 74px icon footprint itself is the one
+// part of this that can't shrink without nodes actually overlapping.
 // Read live (not memoized) since it only matters at the moment a node is
 // placed/dragged, by which point the real viewport width is already known.
 function getNodeMinDist() {
   const isMobile = typeof window !== "undefined" && window.innerWidth <= 640;
-  return 92 + (isMobile ? 20 : 50);
+  return 74 + (isMobile ? 20 : 50);
 }
 
 // The rectangle (in canvas coordinates) a placement is allowed to land in —
@@ -264,13 +282,15 @@ export function MapPage() {
     parentId: string | null;
   } | null>(null);
   const [showInvite, setShowInvite] = useState(false);
-  const [showColor, setShowColor] = useState(false);
-  // The map's own toolbar (name, member count, Link/Add/Invite…) starts
-  // collapsed — the canvas is the point, and this row was permanent
-  // vertical real estate spent on it whether or not anyone needed it right
-  // then. A small arrow tab (always visible, see the JSX below) toggles it
-  // back open on demand.
-  const [toolbarOpen, setToolbarOpen] = useState(false);
+  // The old top toolbar (name, member count, Link/Add/Invite/color/
+  // discussion-mode…) is gone — replaced by a small floating "+" menu
+  // stacked with the minimap/zoom-controls cluster (see the JSX below).
+  // showAddMenu/showNodeTypesLegend are that menu's own open/closed state.
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showNodeTypesLegend, setShowNodeTypesLegend] = useState(false);
+  // The multi-select pill's own "Actions" dropdown (see SelectionMenu) —
+  // Copy/Group into circle/Delete for the current multiSelectIds.
+  const [showSelectionMenu, setShowSelectionMenu] = useState(false);
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
   // Which weapon just had its arrows re-fired — set by clicking either end
   // of an attack (see handleNodeClick/triggerWeaponShot below), cleared
@@ -280,10 +300,39 @@ export function MapPage() {
   // about the value would have changed the second time.
   const [shotState, setShotState] = useState<{ id: string; nonce: number } | null>(null);
   const shotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Gates the quick-add ghost ring and the radial neighbor layout (see
+  // quickAddActive/radialPositions below) — false for a beat right after
+  // centerOnNode starts a pan, true once it's had time to land. Without
+  // this, choosing a node fanned its ghosts/neighbors out immediately,
+  // which — while the camera was still smoothly panning to center that
+  // node — read as the whole ring sliding across the screen mid-pan rather
+  // than fanning out around a node that's already settled in the middle.
+  // Starts true: nothing's panning before the first selection ever happens.
+  const [selectionSettled, setSelectionSettled] = useState(true);
+  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
+  // Right-click on *empty* canvas (as opposed to a node — see contextMenu
+  // above) — opens a small type-picker for creating a new, parent-less
+  // node right where the click landed. Carries both coordinate spaces:
+  // screenX/screenY position the fixed-to-viewport menu itself (same as
+  // contextMenu's own x/y), canvasX/canvasY (run through screenToCanvas)
+  // are where the eventual node actually gets placed.
+  const [canvasContextMenu, setCanvasContextMenu] = useState<{
+    screenX: number;
+    screenY: number;
+    canvasX: number;
+    canvasY: number;
+  } | null>(null);
   // Which node currently has its caption swapped for an inline text input —
   // see startInlineEdit. Null means no node is being edited.
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
+  // Group (multi-node) selection — see the marquee/shift-click handling
+  // below. A node in here shows NodeCard's dashed multiSelected ring
+  // instead of (or alongside) the single `selectedId` ring; once this has
+  // 2+ members, NodePanel gives way to a small "N selected" pill and
+  // connections not touching the selection dim (see the `muted`/edge/
+  // branch-arrow computations further down).
+  const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
 
   const [cooldowns, setCooldowns] = useState<Partial<Record<Weapon, number>>>({});
 
@@ -295,10 +344,22 @@ export function MapPage() {
   const [zoom, setZoom] = useState(1);
 
   const [dragState, setDragState] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  // Group-drag counterpart to dragState above — set instead of (never
+  // alongside) dragState when the pointer-downed node is itself a member
+  // of multiSelectIds and there's more than one node selected; every
+  // member moves by the same pointer delta at once. posFor consults this
+  // before the single-node dragState. null outside of an active group drag.
+  const [groupDragState, setGroupDragState] = useState<Map<string, { x: number; y: number }> | null>(null);
   // Live, while dragging: whichever node the pointer is currently hovering
   // close enough to read as "drop here to join its circle" — null once the
   // pointer isn't over anything droppable. Drives NodeCard's highlight ring.
   const [dropTarget, setDropTarget] = useState<{ nodeId: string; valid: boolean } | null>(null);
+  // Rubber-band select: a plain left-button drag started on empty canvas
+  // (previously unused — panning is native scroll/trackpad, not a click-
+  // drag) sweeps this rectangle (canvas coordinates) and, on release,
+  // replaces multiSelectIds with every own node whose position falls
+  // inside it. null outside of an active marquee drag.
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const dragMoved = useRef(false);
   // onNodePointerDown calls setPointerCapture on the node's own element —
   // per the Pointer Events spec that re-targets every subsequent event for
@@ -507,8 +568,10 @@ export function MapPage() {
   // Same condition that gates the quick-add ghost ring below — reused here
   // so every other node dims while it's showing, putting the focus on the
   // selected node and its type-to-create options instead of competing with
-  // the rest of the canvas.
-  const quickAddActive = !!(selectedNode && isOwnNode(selectedNode) && !linkMode && !dragState);
+  // the rest of the canvas. selectionSettled: the ghosts (and the dimming
+  // that comes with them) wait until centerOnNode's own pan has landed —
+  // see its own doc comment.
+  const quickAddActive = !!(selectedNode && isOwnNode(selectedNode) && !linkMode && !dragState) && selectionSettled;
   // Same "focus on the one thing" treatment as quickAddActive above, keyed
   // off a *chosen circle* instead of a selected node — every node outside
   // the chosen circle (a member of some other circle, or standalone) dims,
@@ -610,8 +673,64 @@ export function MapPage() {
     return map;
   }, [nodes]);
 
+  // Radial focus layout: while exactly one node is selected (not a group
+  // selection — see multiSelectIds), its directly-connected neighbors
+  // (parentId children, its own parentId parent, and any Edge-linked nodes
+  // either direction) visually arrange in a circle around it, so the
+  // selected node's own neighborhood reads as a deliberate ring instead of
+  // wherever they happened to be scattered across the canvas. Purely a
+  // display override consulted by posFor below (never by the base
+  // `positions` memo above, or by anything — like nodeGroups' own zone
+  // outlines — that reads `positions` directly instead of going through
+  // posFor) — nothing here ever calls nodesApi.updateNode, so it reverts
+  // instantly the moment selection changes; every member's real, stored
+  // x/y is untouched. Capped at RADIAL_MAX_NEIGHBORS so a heavily-connected
+  // hub node doesn't produce an unreadable, overlapping ring — anything
+  // past the cap just keeps its stored position. Waits on selectionSettled
+  // too, same reasoning as quickAddActive — neighbors shouldn't jump into
+  // their ring while the camera's still panning toward the chosen node.
+  const RADIAL_NEIGHBOR_RADIUS = 190;
+  const RADIAL_MAX_NEIGHBORS = 10;
+  const radialPositions = useMemo(() => {
+    if (multiSelectIds.size > 1 || !selectedId || !selectionSettled) return null;
+    const center = positions.get(selectedId);
+    const selected = nodes.find((n) => n.nodeId === selectedId);
+    if (!center || !selected) return null;
+
+    const neighborIds = new Set<string>();
+    const ownParentId = nodeRefId(selected.parentId);
+    if (ownParentId) neighborIds.add(ownParentId);
+    for (const n of nodes) {
+      if (nodeRefId(n.parentId) === selectedId) neighborIds.add(n.nodeId);
+    }
+    for (const e of edges) {
+      const fromId = nodeRefId(e.fromNodeId);
+      const toId = nodeRefId(e.toNodeId);
+      if (fromId === selectedId && toId) neighborIds.add(toId);
+      if (toId === selectedId && fromId) neighborIds.add(fromId);
+    }
+    neighborIds.delete(selectedId);
+    if (neighborIds.size === 0) return null;
+
+    const neighbors = Array.from(neighborIds).slice(0, RADIAL_MAX_NEIGHBORS);
+    const map = new Map<string, { x: number; y: number }>();
+    neighbors.forEach((id, i) => {
+      const angle = (i / neighbors.length) * Math.PI * 2 - Math.PI / 2;
+      map.set(id, {
+        x: center.x + RADIAL_NEIGHBOR_RADIUS * Math.cos(angle),
+        y: center.y + RADIAL_NEIGHBOR_RADIUS * Math.sin(angle),
+      });
+    });
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, multiSelectIds, nodes, edges, positions, selectionSettled]);
+
   function posFor(node: NodeDoc) {
+    const grouped = groupDragState?.get(node.nodeId);
+    if (grouped) return grouped;
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
+    const radial = radialPositions?.get(node.nodeId);
+    if (radial) return radial;
     return positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
   }
 
@@ -709,6 +828,17 @@ export function MapPage() {
       top: Math.min(maxTop, Math.max(0, pos.y * zoom - visibleH / 2)),
       behavior: "smooth",
     });
+    // See selectionSettled's own doc comment — quick-add ghosts/radial
+    // neighbors stay hidden until this pan's had time to land. ~350ms
+    // approximates a smooth scroll's own duration for the distances
+    // involved here — not exact (a longer pan takes a bit more), same
+    // approximation shotTimeoutRef's own 700ms already makes for the
+    // weapon-arrow replay just above. Re-triggering (clicking a different
+    // node before the previous pan even settled) clears the old timer
+    // instead of letting it fire late and flip this back on prematurely.
+    setSelectionSettled(false);
+    if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+    settleTimeoutRef.current = setTimeout(() => setSelectionSettled(true), 350);
   }
 
   // Replays a weapon's arrow flight (see WeaponMark) — alongside
@@ -915,6 +1045,72 @@ export function MapPage() {
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
     if (linkMode) return;
     if (!isOwnNode(node)) return;
+
+    // Group drag: the pointer-downed node is itself a member of a 2+-node
+    // multi-selection — move every selected (own) node by the same pointer
+    // delta at once instead of the single-node path below. No circle-join
+    // drop-target check here at all (see the plan's own scope note) — a
+    // group drop is always a plain bulk reposition; each member persists
+    // with its own PATCH /api/nodes/:nodeId (no bulk endpoint exists), all
+    // in parallel.
+    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)) {
+      e.stopPropagation();
+      (e.target as Element).setPointerCapture(e.pointerId);
+      dragMoved.current = false;
+      const memberIds = Array.from(multiSelectIds).filter((id) => {
+        const n = nodes.find((nn) => nn.nodeId === id);
+        return !!n && isOwnNode(n) && !n.isWeapon;
+      });
+      const startPositions = new Map(
+        memberIds.map((id) => [id, posFor(nodes.find((n) => n.nodeId === id)!)]),
+      );
+      setGroupDragState(startPositions);
+      const startPt = screenToCanvas(e.clientX, e.clientY);
+
+      function onGroupMove(ev: PointerEvent) {
+        const p = screenToCanvas(ev.clientX, ev.clientY);
+        const dx = p.x - startPt.x;
+        const dy = p.y - startPt.y;
+        dragMoved.current = true;
+        const next = new Map<string, { x: number; y: number }>();
+        for (const [id, pos] of startPositions) next.set(id, { x: pos.x + dx, y: pos.y + dy });
+        setGroupDragState(next);
+      }
+
+      async function onGroupUp(ev: PointerEvent) {
+        window.removeEventListener("pointermove", onGroupMove);
+        window.removeEventListener("pointerup", onGroupUp);
+        suppressNextClick.current = true;
+        setGroupDragState(null);
+        if (!dragMoved.current) {
+          handleNodeClick(node, false);
+          return;
+        }
+        const p = screenToCanvas(ev.clientX, ev.clientY);
+        const dx = p.x - startPt.x;
+        const dy = p.y - startPt.y;
+        const margin = 60;
+        setActionError(null);
+        try {
+          await Promise.all(
+            memberIds.map(async (id) => {
+              const startPos = startPositions.get(id)!;
+              const nx = Math.min(CANVAS_W - margin, Math.max(margin, startPos.x + dx));
+              const ny = Math.min(CANVAS_H - margin, Math.max(margin, startPos.y + dy));
+              const updated = await nodesApi.updateNode(id, { x: nx, y: ny });
+              upsertNode(updated);
+            }),
+          );
+        } catch (err) {
+          setActionError(err instanceof ApiRequestError ? err.message : "Failed to move the selected nodes");
+        }
+      }
+
+      window.addEventListener("pointermove", onGroupMove);
+      window.addEventListener("pointerup", onGroupUp);
+      return;
+    }
+
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
     dragMoved.current = false;
@@ -1060,14 +1256,15 @@ export function MapPage() {
     return isOwnNode(node);
   }
 
-  // Mirrors attackAbl.ts's own-node rule exactly (normal: someone else's
-  // node only; Map.discussionMode: your own node only), plus the defeated
-  // exclusion, which never depends on mode. A weapon node is otherwise
-  // excluded here — landing an attack on an attack still isn't a thing
-  // this game models in general — except retaliation: the one node it
-  // actually hit striking back at it, mirroring attackAbl.ts's own
-  // CannotRetaliateError check (own the node this weapon's targetNodeId
-  // resolves to). That bypasses the own-node/discussion-mode rule below
+  // Mirrors attackAbl.ts's own-node rule exactly — an attack always lands
+  // on your *own* node (self-critique), never someone else's, regardless
+  // of Map.discussionMode (that per-map toggle is gone; every map behaves
+  // as discussion mode used to) — plus the defeated exclusion. A weapon
+  // node is otherwise excluded here — landing an attack on an attack still
+  // isn't a thing this game models in general — except retaliation: the
+  // one node it actually hit striking back at it, mirroring attackAbl.ts's
+  // own CannotRetaliateError check (own the node this weapon's
+  // targetNodeId resolves to). That bypasses the own-node rule below
   // entirely, same as server-side. Client-side only, same caveat as
   // isOwnNode elsewhere — the server enforces the real rule.
   function canAttackNode(node: NodeDoc) {
@@ -1077,7 +1274,7 @@ export function MapPage() {
       const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
       return !!target && isOwnNode(target);
     }
-    return map?.discussionMode ? isOwnNode(node) : !isOwnNode(node);
+    return isOwnNode(node);
   }
 
   // Single entry point for "start editing this node's text/type inline, on
@@ -1095,7 +1292,7 @@ export function MapPage() {
     if (canEditNode(node)) setInlineEditId(node.nodeId);
   }
 
-  function handleNodeClick(node: NodeDoc) {
+  function handleNodeClick(node: NodeDoc, shiftKey = false) {
     setContextMenu(null);
     if (linkMode) {
       // Clicking an already-picked node deselects just that one — free to
@@ -1112,6 +1309,23 @@ export function MapPage() {
       setLinkSelection((prev) => [...prev, node.nodeId]);
       return;
     }
+    // Shift+click toggles group (multi-)selection instead of the normal
+    // single-select/center flow below — only own nodes can join it, same
+    // gate as dragging a node at all (see onNodePointerDown/isOwnNode).
+    // Doesn't touch `selectedId`/centering/weapon-replay at all; a group
+    // selection has its own small "N selected" pill instead of NodePanel
+    // (see the JSX below).
+    if (shiftKey) {
+      if (!isOwnNode(node)) return;
+      setMultiSelectIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(node.nodeId)) next.delete(node.nodeId);
+        else next.add(node.nodeId);
+        return next;
+      });
+      return;
+    }
+    if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
     setSelectedId(node.nodeId);
     releaseChosenCircleIfOutside(node.nodeId);
     // Whatever was just clicked is "chosen" now — always center the camera
@@ -1135,18 +1349,6 @@ export function MapPage() {
       const latestAttacker = attackers[attackers.length - 1];
       if (latestAttacker) triggerWeaponShot(latestAttacker.nodeId);
     }
-  }
-
-  // Double-click (or double-tap) anywhere on the canvas — empty space or
-  // right on a node, doesn't matter which — zooms in one step centered on
-  // wherever was clicked, via zoomAt. This used to open inline editing/node
-  // creation instead; that's deliberately gone now (see startInlineEdit's
-  // own comment) so a stray double-tap on a phone can't silently edit or
-  // create a node any more, and the gesture is free for the much more
-  // reversible "zoom in for a closer look."
-  function onCanvasDoubleClick(e: ReactMouseEvent<HTMLDivElement>) {
-    if (linkMode) return;
-    zoomAt(e.clientX, e.clientY, ZOOM_STEP);
   }
 
   // Confirmed from NodeCard's inline input (see startInlineEdit) — resolves
@@ -1196,27 +1398,88 @@ export function MapPage() {
     setLinkSelection([]);
   }
 
-  // Right-click on empty canvas is "close whatever's open": suppresses the
-  // browser's native context menu and dismisses the classical side panel
-  // (which also tears down its quick-add ghost ring, since that's derived
-  // from selectedId) plus any node context menu — a quick way out that
-  // doesn't need the panel's ✕ or a click on empty canvas. Right-click *on*
-  // a node instead opens that node's own menu — see handleNodeContextMenu,
-  // which stops the event before it ever reaches this handler.
+  // Right-click on empty canvas opens a small type-picker for creating a
+  // new, parent-less node right where the click landed (see
+  // CanvasContextMenu/confirmPendingCreate) — also dismisses the side panel
+  // (which tears down its own quick-add ghost ring, derived from
+  // selectedId) and any node context menu, same "close whatever's open
+  // first" as before. Right-click *on* a node instead opens that node's own
+  // menu — see handleNodeContextMenu, which stops the event before it ever
+  // reaches this handler.
   function onCanvasContextMenu(e: ReactMouseEvent<HTMLDivElement>) {
     e.preventDefault();
     setSelectedId(null);
     setContextMenu(null);
+    setMultiSelectIds(new Set());
+    const canvasPos = screenToCanvas(e.clientX, e.clientY);
+    setCanvasContextMenu({ screenX: e.clientX, screenY: e.clientY, canvasX: canvasPos.x, canvasY: canvasPos.y });
+  }
+
+  // Rubber-band (marquee) select: a plain left-button drag started on empty
+  // canvas — previously unused (panning is native scroll/trackpad, not a
+  // click-drag) — sweeps a rectangle and, on release, replaces
+  // multiSelectIds with every own, non-weapon node whose position falls
+  // inside it. Mirrors onNodePointerDown's own screenToCanvas-based
+  // tracking, just for a rectangle instead of a single point.
+  function onCanvasPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (linkMode || e.button !== 0) return;
+    const start = screenToCanvas(e.clientX, e.clientY);
+    let moved = false;
+    // Read directly off the raw pointer event in onUp, same as
+    // onNodePointerDown's own onMove/onUp — React state from onMove's
+    // setMarquee calls isn't guaranteed to have flushed by the time onUp
+    // runs, so onUp recomputes the final point itself rather than trusting
+    // `marquee` state.
+    let last = start;
+    (e.target as Element).setPointerCapture(e.pointerId);
+    setMarquee({ x0: start.x, y0: start.y, x1: start.x, y1: start.y });
+
+    function onMove(ev: PointerEvent) {
+      const p = screenToCanvas(ev.clientX, ev.clientY);
+      last = p;
+      if (Math.hypot(p.x - start.x, p.y - start.y) > 4) moved = true;
+      setMarquee({ x0: start.x, y0: start.y, x1: p.x, y1: p.y });
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setMarquee(null);
+      if (!moved) return;
+      // Same captured-pointer artifact onNodePointerDown's own onUp already
+      // documents: a pointerdown+pointerup on the same element (this canvas
+      // div, via setPointerCapture above) still synthesizes a trailing
+      // native `click` on it once released. Without suppressing that here
+      // too, the canvas's own onClick (a plain click always deselects/
+      // clears multiSelectIds — see its JSX below) fired immediately after
+      // this and wiped out the selection this same drag had just computed,
+      // so a marquee looked like it "began" (the rectangle drew) but never
+      // actually selected anything.
+      suppressNextClick.current = true;
+      const minX = Math.min(start.x, last.x);
+      const maxX = Math.max(start.x, last.x);
+      const minY = Math.min(start.y, last.y);
+      const maxY = Math.max(start.y, last.y);
+      const picked = nodes.filter((n) => {
+        if (n.isWeapon || !isOwnNode(n)) return false;
+        const p = positions.get(n.nodeId);
+        return !!p && p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
+      });
+      setMultiSelectIds(new Set(picked.map((n) => n.nodeId)));
+      setSelectedId(null);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   }
 
   // Right-click on a node: CUD + Link always for your own nodes (a weapon
   // node included — it's usual for this purpose now, same as everywhere
-  // else isOwnNode gates), plus Attack when canAttackNode agrees (normal
-  // mode: someone else's node; discussion mode: your own; a weapon node
-  // only via retaliation, when it's the one that hit a node you own — see
-  // canAttackNode). Nothing opens for a node that's neither yours to edit
-  // nor yours to attack right now (an already-defeated node you don't own;
-  // anyone else's node at all while in discussion mode; someone else's
+  // else isOwnNode gates), plus Attack when canAttackNode agrees (your own
+  // node; a weapon node only via retaliation, when it's the one that hit a
+  // node you own — see canAttackNode). Nothing opens for a node that's
+  // neither yours to edit nor yours to attack right now (an already-
+  // defeated node you don't own; anyone else's node at all; someone else's
   // weapon node that didn't target you), since there'd be no action left
   // to show.
   function handleNodeContextMenu(node: NodeDoc, e: ReactMouseEvent) {
@@ -1297,21 +1560,6 @@ export function MapPage() {
     }
   }
 
-  // Owner-only toggle (updateMap itself already restricts the PATCH to the
-  // owner server-side, same as name/color) — flips Map.discussionMode,
-  // which NodeCard/NodePanel/NodeContextMenu below all read straight off
-  // `map` to decide health visibility and who an attack can land on.
-  async function toggleDiscussionMode() {
-    if (!mapId || !map) return;
-    setActionError(null);
-    try {
-      const updated = await mapsApi.updateMap(mapId, { discussionMode: !map.discussionMode });
-      setMap(updated);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to update discussion mode");
-    }
-  }
-
   // Quick-add: clicking one of the half-visible type ghosts fanned around
   // the selected node opens the inline pending-node input at the ghost's
   // spot, pre-set to that type and already branching off the anchor via
@@ -1359,6 +1607,259 @@ export function MapPage() {
     }
   }
 
+  // Ctrl/Cmd+C / Ctrl/Cmd+V — see the keydown effect below and
+  // nodeClipboard's own module-level doc comment. Copies the currently
+  // selected node(s) (multiSelectIds if any are picked, else the single
+  // selectedId) as plain text+type+position snapshots — nothing structural
+  // (parentId, Edges, health, attacks) carries over, so a paste is always a
+  // set of brand-new, unlinked nodes, never a re-parented copy of the
+  // originals.
+  //
+  // Fixed offset (not random/growing) so a repeated copy-paste-paste-paste
+  // on the *same* map fans pasted copies out along one consistent diagonal
+  // instead of clustering — avoidOverlap (used when actually placing each
+  // one, below) still nudges clear of whatever's already there regardless.
+  const PASTE_OFFSET = 40;
+
+  function copySelection() {
+    if (!mapId) return;
+    const ids = multiSelectIds.size > 0 ? Array.from(multiSelectIds) : selectedId ? [selectedId] : [];
+    if (ids.length === 0) return;
+    const copied = ids
+      .map((id) => nodes.find((n) => n.nodeId === id))
+      .filter((n): n is NodeDoc => !!n && !n.isWeapon)
+      .map((n) => {
+        const pos = positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+        return { text: n.text, type: n.type, x: pos.x, y: pos.y };
+      });
+    if (copied.length > 0) nodeClipboard = { sourceMapId: mapId, nodes: copied };
+  }
+
+  async function pasteClipboard() {
+    const clipboard = nodeClipboard;
+    if (!clipboard || !mapId) return;
+    setActionError(null);
+    // Pasting back into the map it was copied from: keep the originals'
+    // own positions as the anchor (PASTE_OFFSET nudges just clear of them).
+    // Pasting into a *different* map: those raw x/y are meaningless here —
+    // that map's own layout has nothing to do with this one's — so anchor
+    // the whole copied group at a fresh spot inside the *current* viewport
+    // instead (same call "+ Add node" already uses), preserving the
+    // copied nodes' own relative arrangement around that new anchor rather
+    // than each one's original absolute position.
+    const sameMap = clipboard.sourceMapId === mapId;
+    let anchorDx = 0;
+    let anchorDy = 0;
+    if (!sameMap) {
+      const cx = clipboard.nodes.reduce((s, n) => s + n.x, 0) / clipboard.nodes.length;
+      const cy = clipboard.nodes.reduce((s, n) => s + n.y, 0) / clipboard.nodes.length;
+      const anchor = pickNonOverlappingPosition(Array.from(positions.values()), bigNodeObstacles(), viewportBounds());
+      anchorDx = anchor.x - cx;
+      anchorDy = anchor.y - cy;
+    }
+    try {
+      const created = await Promise.all(
+        clipboard.nodes.map(async ({ text, type, x, y }) => {
+          const desired = sameMap
+            ? { x: x + PASTE_OFFSET, y: y + PASTE_OFFSET }
+            : { x: x + anchorDx, y: y + anchorDy };
+          const placed = avoidOverlap(
+            desired,
+            [...nodeObstacles(Array.from(positions.values())), ...bigNodeObstacles()],
+            viewportBounds(),
+          );
+          return nodesApi.createNode(mapId, { text, type, x: placed.x, y: placed.y, parentId: null });
+        }),
+      );
+      created.forEach((n) => {
+        upsertNode(n);
+        setCelebrateIds((prev) => new Set(prev).add(n.nodeId));
+      });
+      // The pasted copies become the new selection — same "what you just
+      // did is now selected" convention confirmPendingCreate/group-drag
+      // already follow, so it's immediately obvious what paste produced
+      // and a follow-up paste (offset again from *these*, not the
+      // originals) reads as "keep fanning out from here."
+      if (created.length > 1) {
+        setSelectedId(null);
+        setMultiSelectIds(new Set(created.map((n) => n.nodeId)));
+      } else if (created.length === 1) {
+        setMultiSelectIds(new Set());
+        setSelectedId(created[0].nodeId);
+      }
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : "Failed to paste");
+    }
+  }
+
+  // SelectionMenu's "Delete N nodes" — one DELETE per selected node, in
+  // parallel, same shape as pasteClipboard's own Promise.all(createNode).
+  // Confirms once for the whole batch rather than once per node (the
+  // single-node handleDeleteNode's own confirm() would be absurd N times
+  // in a row here).
+  async function deleteSelection() {
+    const ids = Array.from(multiSelectIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} node${ids.length === 1 ? "" : "s"}?`)) return;
+    setActionError(null);
+    try {
+      await Promise.all(ids.map((id) => nodesApi.deleteNode(id)));
+      setNodes((prev) => prev.filter((n) => !ids.includes(n.nodeId)));
+      setEdges((prev) =>
+        prev.filter((e) => !ids.includes(nodeRefId(e.fromNodeId) ?? "") && !ids.includes(nodeRefId(e.toNodeId) ?? "")),
+      );
+      setMultiSelectIds(new Set());
+      if (mapId) refreshInsights(mapId);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : "Failed to delete the selected nodes");
+    }
+  }
+
+  // SelectionMenu's "Group into circle" — turns the current multi-selection
+  // into a circle (see circleAbl.ts / the app's own parentId-star mechanism,
+  // same as dragging one node onto another to join its circle): every
+  // selected node except one gets its parentId set to that one, so with
+  // 3+ selected the result is immediately a real circle (nodeGroups needs
+  // 2+ direct children); with exactly 2, it's just a plain branch link
+  // until a third node joins later. The root is picked automatically —
+  // whichever selected node sits closest to the group's own centroid —
+  // since there's no per-node "make this the root" control on this pill.
+  // isDescendant guards each reparent the same way findDropTarget's own
+  // drag-to-join path already does: skip (don't create) a link that would
+  // close the parentId chain into a loop, rather than silently corrupting
+  // the tree.
+  async function groupSelectionIntoCircle() {
+    const selectedNodes = Array.from(multiSelectIds)
+      .map((id) => nodes.find((n) => n.nodeId === id))
+      .filter((n): n is NodeDoc => !!n);
+    if (selectedNodes.length < 2) return;
+    const pts = selectedNodes.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    let rootIndex = 0;
+    let bestDist = Infinity;
+    pts.forEach((p, i) => {
+      const d = Math.hypot(p.x - cx, p.y - cy);
+      if (d < bestDist) {
+        bestDist = d;
+        rootIndex = i;
+      }
+    });
+    const root = selectedNodes[rootIndex];
+    const others = selectedNodes.filter((n) => n.nodeId !== root.nodeId);
+    setActionError(null);
+    try {
+      const results = await Promise.all(
+        others.map(async (n) => {
+          if (isDescendant(root.nodeId, n.nodeId, nodes)) return null;
+          return nodesApi.updateNode(n.nodeId, { parentId: root.nodeId });
+        }),
+      );
+      results.forEach((n) => {
+        if (n) upsertNode(n);
+      });
+      const skipped = results.filter((r) => r === null).length;
+      if (skipped > 0) {
+        setActionError(
+          `Grouped ${results.length - skipped} of ${others.length} node${others.length === 1 ? "" : "s"} — ${skipped} would have closed a loop and ${skipped === 1 ? "was" : "were"} left alone.`,
+        );
+      }
+      setMultiSelectIds(new Set());
+      setSelectedId(root.nodeId);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : "Failed to group into a circle");
+    }
+  }
+
+  // AddMenu's "Create circle" — a root plus 2 children, parented to it, so
+  // the result is an instant, already-formed circle (nodeGroups needs 2+
+  // direct children) rather than needing to branch twice by hand.
+  // Sequential, not Promise.all: the children's own create calls need the
+  // root's real (server-assigned) nodeId as their parentId, so the root
+  // has to actually finish first.
+  async function createCircle() {
+    if (!mapId) return;
+    setActionError(null);
+    try {
+      const rootPos = pickNonOverlappingPosition(Array.from(positions.values()), bigNodeObstacles(), viewportBounds());
+      const root = await nodesApi.createNode(mapId, {
+        text: "New circle",
+        type: "unknown",
+        x: rootPos.x,
+        y: rootPos.y,
+        parentId: null,
+      });
+      upsertNode(root);
+      setCelebrateIds((prev) => new Set(prev).add(root.nodeId));
+
+      // Two children fanned either side of straight up from the root —
+      // same angle-from-vertical idea QuickAddGhosts' own ring uses, just
+      // two fixed slots instead of one per node type.
+      const radius = getNodeMinDist() + 40;
+      const children = await Promise.all(
+        [-50, 50].map(async (deg) => {
+          const angle = (-90 + deg) * (Math.PI / 180);
+          const desired = { x: rootPos.x + radius * Math.cos(angle), y: rootPos.y + radius * Math.sin(angle) };
+          const placed = avoidOverlap(
+            desired,
+            [...nodeObstacles([...Array.from(positions.values()), rootPos]), ...bigNodeObstacles()],
+            viewportBounds(),
+          );
+          return nodesApi.createNode(mapId, {
+            // "Option" (not "unknown", like the root) — circleSentiment
+            // needs at least one non-"unknown" member to draw a backdrop
+            // at all (a majority-vote of ties/no-votes draws nothing —
+            // see nodeGroups' own doc comment), so an all-"unknown" trio
+            // would create a real parentId circle that never actually
+            // *looks* like one until someone manually retypes a member.
+            // Giving both children a real (positive) type up front means
+            // "Create circle" shows an actual circle immediately.
+            text: "New node",
+            type: "Option",
+            x: placed.x,
+            y: placed.y,
+            parentId: root.nodeId,
+          });
+        }),
+      );
+      children.forEach((c) => {
+        upsertNode(c);
+        setCelebrateIds((prev) => new Set(prev).add(c.nodeId));
+      });
+
+      setMultiSelectIds(new Set());
+      setSelectedId(root.nodeId);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : "Failed to create a circle");
+    }
+  }
+
+  // Global Ctrl/Cmd+C / Ctrl/Cmd+V for the current node selection — ignored
+  // whenever focus is inside a real text field (NodePanel's textarea, the
+  // inline node-caption editor, PendingNodeCard's input, an attack
+  // objection box, …), so normal copy/paste of *text* inside those keeps
+  // working exactly as the browser already handles it; this only ever
+  // fires for the "nothing text-editable is focused" case, i.e. the
+  // canvas/selection itself has the user's attention.
+  useEffect(() => {
+    function isEditableTarget(el: EventTarget | null): boolean {
+      if (!(el instanceof HTMLElement)) return false;
+      return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable;
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || isEditableTarget(e.target)) return;
+      if (e.key === "c" || e.key === "C") {
+        copySelection();
+      } else if (e.key === "v" || e.key === "V") {
+        e.preventDefault();
+        pasteClipboard();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+
   if (loading) return <div className="p-12 text-center text-ink-soft">Loading map…</div>;
   if (error || !map) {
     return (
@@ -1382,93 +1883,9 @@ export function MapPage() {
     "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-white transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
   const btnSmGhost =
     "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50";
-  const chip =
-    "inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {toolbarOpen && (
-        <div className="flex flex-wrap items-center gap-[0.6rem] border-b border-line bg-surface px-4 py-[0.7rem]">
-          <Link to="/" className={btnSmGhost}>
-            &larr;
-          </Link>
-          <h2 className="mr-2 text-[1.05rem] font-bold">{map.name}</h2>
-          <span className={chip}>{Array.isArray(map.members) ? map.members.length : 0} member(s)</span>
-          {map.discussionMode && (
-            <span
-              className="inline-flex items-center gap-1 rounded-[20px] border border-transparent bg-accent-soft px-[0.55rem] py-[0.2rem] text-[0.72rem] text-accent-ink"
-              title="Attacks only land on your own nodes here; health stays hidden until hover"
-            >
-              Discussion mode
-            </span>
-          )}
-          <div className="flex-1" />
-          {/* Just the on/off switch now — the pick count, confirm button,
-              and any pick error all moved to LinkPickerPanel (see its own
-              doc comment), which shows regardless of whether this toolbar
-              is even open, so starting a link from a node's own "Link from
-              this node" button doesn't require hunting this down to
-              finish it. */}
-          <button
-            className={linkMode ? btnSmPrimary : btnSm}
-            onClick={() => {
-              if (linkMode) {
-                exitLinkMode();
-              } else {
-                setLinkMode(true);
-                setLinkSelection([]);
-                setLinkError(null);
-              }
-            }}
-          >
-            {linkMode ? "Cancel linking" : "Link nodes"}
-          </button>
-          <button
-            className={btnSmPrimary}
-            onClick={() => {
-              const pos = pickNonOverlappingPosition(Array.from(positions.values()), bigNodeObstacles(), viewportBounds());
-              setInlineEditId(null);
-              setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: null });
-            }}
-          >
-            + Add node
-          </button>
-          <button className={btnSm} onClick={() => setShowColor(true)}>
-            My color
-          </button>
-          {isOwner && (
-            <button
-              className={map.discussionMode ? btnSmPrimary : btnSm}
-              onClick={toggleDiscussionMode}
-              title="Attacks only land on your own nodes; health stays hidden until hover"
-            >
-              Discussion mode: {map.discussionMode ? "On" : "Off"}
-            </button>
-          )}
-          {isOwner && (
-            <button className={btnSm} onClick={() => setShowInvite(true)}>
-              Invite
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Always-visible handle for the toolbar above — a small arrow tab
-          rather than the toolbar's own real estate, so collapsing it back
-          down doesn't also hide the one control that reopens it. Sized a
-          bit past the old h-4/w-12 (16x48px, uncomfortably thin to actually
-          land a tap on) — still a small tab, just one that's easier to hit
-          without being clumsy about the space it costs. */}
-      <div className="flex justify-center border-b border-line bg-surface">
-        <button
-          className="flex h-6 w-16 cursor-pointer items-center justify-center rounded-b-lg border border-t-0 border-line bg-surface text-[0.7rem] leading-none text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink"
-          onClick={() => setToolbarOpen((v) => !v)}
-          title={toolbarOpen ? "Hide toolbar" : "Show toolbar"}
-        >
-          {toolbarOpen ? "▲" : "▼"}
-        </button>
-      </div>
-
       {actionError && (
         <div className="mx-4 mt-[0.6rem] flex items-center justify-between gap-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">
           {actionError}
@@ -1500,7 +1917,19 @@ export function MapPage() {
           >
           <div
             ref={canvasRef}
-            className={`relative${linkMode ? " cursor-crosshair" : ""}`}
+            // select-none: without it, a left-drag on empty canvas (the
+            // marquee/rubber-band gesture — see onCanvasPointerDown) also
+            // triggers the browser's own native text-selection drag (there's
+            // plenty of selectable text — every node caption — sitting right
+            // there), painting its own blue highlight over whatever the drag
+            // passed across. The two aren't mutually exclusive — pointer
+            // events still fire either way — but the native highlight reads
+            // as "nothing is happening" (or actively wrong) over the actual
+            // accent-colored marquee rectangle, and in some browsers a
+            // native selection drag can itself swallow/alter the pointer
+            // event stream. NodeCard's own outer div already opts out the
+            // same way for the same reason (see its own select-none).
+            className={`relative select-none${linkMode ? " cursor-crosshair" : ""}`}
             // width/height stay the canvas's own native 2400x1600 — zoom is
             // purely a paint-time transform, so every node/ghost/SVG
             // position below (all still expressed in that native 0..2400
@@ -1512,11 +1941,20 @@ export function MapPage() {
             // scroll position directly.
             style={{ width: CANVAS_W, height: CANVAS_H, transform: `scale(${zoom})`, transformOrigin: "0 0" }}
             onClick={() => {
+              // See onCanvasPointerDown's own onUp comment — the trailing
+              // native click a completed marquee drag leaves behind on this
+              // same element would otherwise immediately clear the
+              // selection that drag just computed.
+              if (suppressNextClick.current) {
+                suppressNextClick.current = false;
+                return;
+              }
               if (linkMode) return;
               setSelectedId(null);
+              setMultiSelectIds(new Set());
               releaseChosenCircleIfOutside();
             }}
-            onDoubleClick={onCanvasDoubleClick}
+            onPointerDown={onCanvasPointerDown}
             onContextMenu={onCanvasContextMenu}
           >
             <svg
@@ -1618,10 +2056,18 @@ export function MapPage() {
                 const color = group ? (group.sentiment === "positive" ? "#ffd54f" : "#ff3d00") : "var(--accent)";
                 // Same "chosen one stays full-opacity, every other circle
                 // dims" spotlight the old backdrop drew — see its own
-                // removed comment for why. Ungrouped branches never dim;
-                // they were never part of the spotlight to begin with.
+                // removed comment for why. Ungrouped branches never dim for
+                // *that* reason; they were never part of the spotlight to
+                // begin with. A 2+-node group selection dims independently
+                // of all that — any branch with neither end selected fades,
+                // grouped or not, so the selection's own neighborhood reads
+                // clearly against everything else (see NodeCard's matching
+                // `muted` computation and the plain-Edge dimming just below).
                 const isStabilized = !!group && map?.selectedCircle?.rootId === group.rootId;
-                const dimmed = !!group && !!map?.selectedCircle && !isStabilized;
+                const circleDimmed = !!group && !!map?.selectedCircle && !isStabilized;
+                const multiSelectDimmed =
+                  multiSelectIds.size > 0 && !multiSelectIds.has(parentId) && !multiSelectIds.has(node.nodeId);
+                const dimmed = circleDimmed || multiSelectDimmed;
                 return (
                   <line
                     key={`branch-${node.nodeId}`}
@@ -1630,7 +2076,7 @@ export function MapPage() {
                     x2={b.x}
                     y2={b.y}
                     stroke={color}
-                    strokeOpacity={group ? (dimmed ? 0.25 : 0.85) : 0.45}
+                    strokeOpacity={dimmed ? 0.2 : group ? 0.85 : 0.45}
                     strokeWidth={group ? 1.75 : 1.5}
                     strokeDasharray={group ? undefined : "5 4"}
                     markerEnd="url(#branch-arrow)"
@@ -1686,7 +2132,23 @@ export function MapPage() {
                     : edge.sentiment === "positive"
                       ? "var(--success)"
                       : "var(--ink-soft)";
-                return <line key={edge.edgeId} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={2} />;
+                // Same multi-select dimming the branch arrows above and
+                // NodeCard's own `muted` prop apply — an edge with neither
+                // end in the group selection fades, so the selected nodes'
+                // own connections read clearly against the rest.
+                const dimmed = multiSelectIds.size > 0 && !multiSelectIds.has(fromId) && !multiSelectIds.has(toId);
+                return (
+                  <line
+                    key={edge.edgeId}
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke={color}
+                    strokeWidth={2}
+                    strokeOpacity={dimmed ? 0.15 : 1}
+                  />
+                );
               })}
               {/* Picking phase: every node picked so far stays lit while more get added. */}
               {linkSelection.map((id) => {
@@ -1753,7 +2215,8 @@ export function MapPage() {
                   y={pos.y}
                   zoom={zoom}
                   selected={selectedId === node.nodeId}
-                  dragging={dragState?.nodeId === node.nodeId}
+                  multiSelected={multiSelectIds.has(node.nodeId)}
+                  dragging={dragState?.nodeId === node.nodeId || groupDragState?.has(node.nodeId) === true}
                   canDrag={isOwnNode(node)}
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
                   indicator={indicatorByNode.get(node.nodeId)}
@@ -1763,7 +2226,8 @@ export function MapPage() {
                   flightVector={flightVector}
                   muted={
                     ((quickAddActive && node.nodeId !== selectedId) ||
-                      (!!spotlightedNodeIds && !spotlightedNodeIds.includes(node.nodeId))) &&
+                      (!!spotlightedNodeIds && !spotlightedNodeIds.includes(node.nodeId)) ||
+                      (multiSelectIds.size > 0 && !multiSelectIds.has(node.nodeId))) &&
                     !unmutedAttackNodeIds?.has(node.nodeId)
                   }
                   dropHighlight={dropTarget?.nodeId === node.nodeId ? (dropTarget.valid ? "valid" : "invalid") : undefined}
@@ -1771,13 +2235,14 @@ export function MapPage() {
                   onInlineConfirm={(text, type) => confirmInlineEdit(node, text, type)}
                   onInlineCancel={() => setInlineEditId(null)}
                   onPointerDown={editingThis ? undefined : (e) => onNodePointerDown(node, e)}
-                  onClick={() => {
+                  onClick={(e) => {
                     if (suppressNextClick.current) {
                       suppressNextClick.current = false;
                       return;
                     }
-                    handleNodeClick(node);
+                    handleNodeClick(node, e.shiftKey);
                   }}
+                  onDoubleClick={() => startInlineEdit(node)}
                   onContextMenu={(e) => handleNodeContextMenu(node, e)}
                 />
               );
@@ -1856,6 +2321,25 @@ export function MapPage() {
                 onCancel={() => setPendingCreate(null)}
               />
             )}
+
+            {/* Rubber-band select rectangle — see onCanvasPointerDown. A
+                plain absolutely-positioned div (not another SVG layer) in
+                the same raw canvas coordinates every NodeCard already uses,
+                so it scales/pans along with the rest of the canvas via the
+                canvas div's own transform, no separate math needed. */}
+            {marquee && (
+              <div
+                className="pointer-events-none absolute z-[20]"
+                style={{
+                  left: Math.min(marquee.x0, marquee.x1),
+                  top: Math.min(marquee.y0, marquee.y1),
+                  width: Math.abs(marquee.x1 - marquee.x0),
+                  height: Math.abs(marquee.y1 - marquee.y0),
+                  border: "1.5px solid var(--accent)",
+                  background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+                }}
+              />
+            )}
           </div>
           </div>
           <MiniMap
@@ -1868,6 +2352,60 @@ export function MapPage() {
             zoom={zoom}
           />
 
+          {/* The whole top toolbar collapses to this one compact floating
+              cluster — Back + a single "+" menu (Invite/Create/Node types)
+              — pinned top-left instead of a separate full-width bar. Same
+              z-[45] reasoning as the minimap/zoom-controls cluster below
+              (which stays put, bottom-right, on its own): above
+              canvas/panel, below a real modal. */}
+          <div className="absolute top-3 left-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
+            <Link
+              to="/"
+              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
+              title="Back to maps"
+            >
+              &larr;
+            </Link>
+            <div className="relative">
+              <button
+                type="button"
+                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[1.05rem] font-semibold text-ink hover:bg-surface-2"
+                title="Add"
+                onClick={() => setShowAddMenu((v) => !v)}
+              >
+                +
+              </button>
+              {showAddMenu && (
+                <AddMenu
+                  isOwner={isOwner}
+                  onClose={() => setShowAddMenu(false)}
+                  onInvite={() => {
+                    setShowAddMenu(false);
+                    setShowInvite(true);
+                  }}
+                  onCreateNode={() => {
+                    setShowAddMenu(false);
+                    const pos = pickNonOverlappingPosition(
+                      Array.from(positions.values()),
+                      bigNodeObstacles(),
+                      viewportBounds(),
+                    );
+                    setInlineEditId(null);
+                    setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: null });
+                  }}
+                  onCreateCircle={() => {
+                    setShowAddMenu(false);
+                    createCircle();
+                  }}
+                  onNodeTypes={() => {
+                    setShowAddMenu(false);
+                    setShowNodeTypesLegend(true);
+                  }}
+                />
+              )}
+            </div>
+          </div>
+
           {/* Zoom controls — stacked directly above the minimap in the same
               bottom-right corner (used to sit bottom-left; moved to keep
               both of the canvas's floating controls in one place instead
@@ -1876,11 +2414,7 @@ export function MapPage() {
               MINIMAP_H + its 1px border each side) plus a small gap, so
               this sits just above it rather than touching. Same z-[45]
               reasoning as the minimap: above the canvas/panel, below a
-              real modal. Double-clicking the canvas (see
-              onCanvasDoubleClick) zooms in one step too, but that's
-              zoom-in-only and needs a pointer position to zoom toward;
-              these buttons are the only way to zoom back out or reset,
-              and work the same without a mouse (a tap is plenty). */}
+              real modal. */}
           <div className="absolute bottom-[150px] right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
             <button
               type="button"
@@ -1941,6 +2475,51 @@ export function MapPage() {
             onConfirm={confirmLinkSelection}
             onCancel={exitLinkMode}
           />
+        ) : multiSelectIds.size > 0 ? (
+          // Group selection takes over this same bottom-sheet slot instead
+          // of NodePanel — a single node's panel doesn't make sense once
+          // this mode is active (even with just one node caught by a small
+          // marquee — see onCanvasPointerDown's onUp, which always clears
+          // `selectedId` once a marquee resolves, size 1 or more, so
+          // NodePanel would never mount for it either way). Move (drag any
+          // selected node) plus the Actions dropdown (Copy/Group into
+          // circle/Delete — see SelectionMenu) and Deselect; per-node
+          // editing/attacking still needs dropping back to a single
+          // selection first.
+          <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
+            <div className="flex items-center gap-3">
+              <span className="text-[0.88rem] font-semibold text-ink">
+                {multiSelectIds.size} node{multiSelectIds.size === 1 ? "" : "s"} selected
+              </span>
+              <div className="relative">
+                <button className={btnSm} onClick={() => setShowSelectionMenu((v) => !v)}>
+                  Actions
+                </button>
+                {showSelectionMenu && (
+                  <SelectionMenu
+                    count={multiSelectIds.size}
+                    canGroupCircle={multiSelectIds.size >= 2}
+                    onClose={() => setShowSelectionMenu(false)}
+                    onCopy={() => {
+                      setShowSelectionMenu(false);
+                      copySelection();
+                    }}
+                    onGroupCircle={() => {
+                      setShowSelectionMenu(false);
+                      groupSelectionIntoCircle();
+                    }}
+                    onDelete={() => {
+                      setShowSelectionMenu(false);
+                      deleteSelection();
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+            <button className={btnSm} onClick={() => setMultiSelectIds(new Set())}>
+              Deselect
+            </button>
+          </div>
         ) : (
           selectedNode &&
           user && (
@@ -1962,7 +2541,6 @@ export function MapPage() {
                 nodes={nodes}
                 edges={edges}
                 currentUserId={user._id}
-                discussionMode={!!map.discussionMode}
                 cooldowns={cooldowns}
                 onClose={() => setSelectedId(null)}
                 onSelectNode={(id) => {
@@ -2041,6 +2619,24 @@ export function MapPage() {
         />
       )}
 
+      {canvasContextMenu && (
+        <CanvasContextMenu
+          x={canvasContextMenu.screenX}
+          y={canvasContextMenu.screenY}
+          onClose={() => setCanvasContextMenu(null)}
+          onPick={(type) => {
+            const pos = avoidOverlap(
+              { x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY },
+              [...nodeObstacles(Array.from(positions.values())), ...bigNodeObstacles()],
+              viewportBounds(),
+            );
+            setCanvasContextMenu(null);
+            setInlineEditId(null);
+            setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null });
+          }}
+        />
+      )}
+
       {/* whitespace-nowrap on every item: without it, a long label
           ("Problematic option", "negative circle / under fire") had
           nothing stopping it from wrapping *inside* its own flex item on a
@@ -2089,69 +2685,18 @@ export function MapPage() {
         <InviteMemberModal map={map} onClose={() => setShowInvite(false)} onInvited={setMap} />
       )}
 
-      {showColor && map && (
-        <SetColorModal
-          map={map}
-          onClose={() => setShowColor(false)}
-          onSaved={(updated) => {
-            setMap(updated);
-            setShowColor(false);
-          }}
-        />
+      {showNodeTypesLegend && (
+        <Modal title="Node types" onClose={() => setShowNodeTypesLegend(false)}>
+          <div className="flex flex-col gap-[0.6rem]">
+            {NODE_TYPES.map((t) => (
+              <div key={t} className="flex items-center gap-[0.6rem] text-[0.88rem] text-ink">
+                <NodeTypeIcon type={t} size={20} />
+                {t}
+              </div>
+            ))}
+          </div>
+        </Modal>
       )}
     </div>
-  );
-}
-
-function SetColorModal({
-  map,
-  onClose,
-  onSaved,
-}: {
-  map: MapDoc;
-  onClose: () => void;
-  onSaved: (map: MapDoc) => void;
-}) {
-  const { user } = useAuth();
-  const existing = map.memberColors.find((mc) => mc.userId === user?._id)?.color ?? "#22c55e";
-  const [color, setColor] = useState(existing);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await mapsApi.setMyColor(map.mapId, color);
-      onSaved(updated);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to set color");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal title="My color on this map" onClose={onClose}>
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
-      <ColorPicker value={color} onChange={setColor} />
-      <div className="mt-[1.2rem] flex justify-end gap-[0.6rem]">
-        <button
-          className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={onClose}
-        >
-          Cancel
-        </button>
-        <button
-          className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-4 py-[0.55rem] text-[0.88rem] font-semibold text-white transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={save}
-          disabled={busy}
-        >
-          {busy ? "Saving…" : "Save"}
-        </button>
-      </div>
-    </Modal>
   );
 }
