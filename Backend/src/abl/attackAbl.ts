@@ -7,33 +7,17 @@ import { WEAPONS, type WeaponKey } from "../models/Attack.js";
 import { type WeaponIcon } from "../models/Node.js";
 import { findNodeByPublicIdDao, findNodeByInternalIdDao, createWeaponNodeMutationDao } from "../dao/nodeDao.js";
 import { getMapByInternalIdDao, isMapMemberDao } from "../dao/mapsDao.js";
-import {
-  getLastAttackDao,
-  applyDamageDao,
-  logAttackDao,
-  healNodeDao,
-  getAttackHistoryByNodeDao,
-} from "../dao/attackDao.js";
+import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../dao/attackDao.js";
 import { parseOrThrow } from "./errors.js";
 
-// No longer thrown — attacking your own node is now always allowed (see
-// CanOnlyAttackOwnNodeError below). Kept exported since nodeController.ts
-// still pattern-matches on it defensively; harmless dead code, not worth
-// the churn of touching every layer to remove it.
+// Combat is fully open now — attackNodeAbl below no longer throws any of
+// these; every restriction on *who* can attack, *what* can be attacked,
+// and *how often* has been removed. All five classes are kept exported and
+// unused (rather than torn out of every layer that still references them —
+// nodeController.ts's own error handling, mainly) purely so nothing else
+// has to change just to keep compiling; none of them can fire any more.
 export class CannotAttackOwnNodeError extends Error {}
-// The app's only combat rule now: an attack always lands on your *own*
-// node (self-critique), never someone else's. This used to be gated behind
-// Map.discussionMode (attack others normally, or attack only yourself in
-// "discussion mode") — that per-map toggle is gone; every map behaves as
-// discussion mode did. See attackNodeAbl's own-node check below.
 export class CanOnlyAttackOwnNodeError extends Error {}
-// A weapon node is otherwise excluded from combat entirely — "landing an
-// attack on an attack isn't a thing this game models" (see the frontend's
-// own canAttackNode) — except for the one node it actually hit striking
-// back at it. Thrown when the target *is* a weapon node but either it has
-// no resolvable target of its own, or the caller doesn't own the node it
-// targeted — i.e. "attack any weapon node you like" is still not a thing,
-// only "retaliate against the one that hit you" is.
 export class CannotRetaliateError extends Error {}
 export class NodeAlreadyDefeatedError extends Error {}
 export class WeaponOnCooldownError extends Error {
@@ -101,52 +85,33 @@ export const attackNodeAbl = async (
   const node = await findNodeByPublicIdDao(publicNodeId);
   if (!node) return null;
 
-  // Fetched (not just an isMapMemberDao existence check) for the membership
-  // check right below — Map.discussionMode itself no longer affects the
-  // own-node rule (see CanOnlyAttackOwnNodeError's own comment), but the
-  // map document is still needed to confirm the attacker belongs to it.
+  // Still fetched for the membership check right below — an attacker has
+  // to actually belong to the map, full stop; that's the one thing left
+  // that isn't a "combat rule" so much as basic access control.
   const map = await getMapByInternalIdDao(node.mapId);
   if (!map) return null;
   const isMember = map.members.some((m) => m.toString() === attackerId.toString());
   if (!isMember) return null;
 
-  // Retaliation: the one case a weapon node can be attacked at all — see
-  // CannotRetaliateError's own doc comment. Its own, narrower check;
-  // deliberately *not* run through the own-node/discussion-mode rule below,
-  // which is about content nodes (whose owner a weapon node's `userId` is
-  // never going to match anyway, since that's always the original
-  // attacker, not the retaliator).
+  // Fully open combat: no own-node rule, no restriction on attacking a
+  // weapon node (used to require being the one it actually hit —
+  // "retaliation," see the removed CannotRetaliateError), no
+  // already-defeated block, no cooldowns. Every check that used to gate
+  // *who* could land a hit, *what* it could land on, and *how often* is
+  // gone — any map member can attack any node, any number of times, with
+  // any weapon, regardless of its current health.
+  //
+  // The one thing that survives from the old retaliation mechanic is the
+  // reward itself, now unconditional: landing a hit on a weapon node still
+  // heals whatever that weapon node's own target's parent is, for whoever
+  // lands it — not just the original victim striking back any more.
   let healParentId: mongoose.Types.ObjectId | null = null;
   if (node.isWeapon) {
     const victim = node.targetNodeId ? await findNodeByInternalIdDao(node.targetNodeId) : null;
-    if (!victim || victim.userId.toString() !== attackerId.toString()) {
-      throw new CannotRetaliateError();
-    }
-    healParentId = victim.parentId ?? null;
-  } else {
-    const isOwnNode = node.userId.toString() === attackerId.toString();
-    // Discussion mode's own-node-only rule is now the app's only combat
-    // rule — attacking is self-critique, not player-vs-player, regardless
-    // of a given map's stored Map.discussionMode value. See attackAbl.ts's
-    // top-of-file comment and CanOnlyAttackOwnNodeError's own doc comment.
-    if (!isOwnNode) throw new CanOnlyAttackOwnNodeError();
-  }
-  if (node.defeated) {
-    throw new NodeAlreadyDefeatedError();
+    healParentId = victim?.parentId ?? null;
   }
 
   const weaponDef = WEAPONS[weapon];
-
-  if (weaponDef.cooldownMs > 0) {
-    const lastUse = await getLastAttackDao(attackerId, weapon);
-    if (lastUse) {
-      const readyAt = new Date(lastUse.createdAt as Date).getTime() + weaponDef.cooldownMs;
-      if (Date.now() < readyAt) {
-        throw new WeaponOnCooldownError(readyAt);
-      }
-    }
-  }
-
   const newHealth = Math.max(0, (node.health ?? 100) - weaponDef.damage);
 
   const updatedNode = await applyDamageDao(node._id, newHealth, newHealth <= 0);
