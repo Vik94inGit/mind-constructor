@@ -5,7 +5,14 @@ import { z } from "zod";
 import type mongoose from "mongoose";
 import { WEAPONS, type WeaponKey } from "../models/Attack.js";
 import { type WeaponIcon } from "../models/Node.js";
-import { findNodeByPublicIdDao, findNodeByInternalIdDao, createWeaponNodeMutationDao } from "../dao/nodeDao.js";
+import {
+  findNodeByPublicIdDao,
+  findNodeByInternalIdDao,
+  createWeaponNodeMutationDao,
+  createProtectionNodeMutationDao,
+  findActiveProtectorDao,
+  NODE_POPULATE,
+} from "../dao/nodeDao.js";
 import { getMapByInternalIdDao, isMapMemberDao } from "../dao/mapsDao.js";
 import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../dao/attackDao.js";
 import { parseOrThrow } from "./errors.js";
@@ -111,23 +118,43 @@ export const attackNodeAbl = async (
     healParentId = victim?.parentId ?? null;
   }
 
+  // Protection: the one thing that still stops an attack outright. Any
+  // undefeated protection node linked to this target (see protectNodeAbl
+  // below) blocks every hit unconditionally — full block while alive, no
+  // stacking, no limited uses, no cooldown — so this is a plain existence
+  // check, not a count. Everything else about landing an attack still
+  // happens even when blocked (the attacker's objection is still a real
+  // recorded node/history entry, see below); only the health/defeated
+  // change is skipped.
+  const protector = await findActiveProtectorDao(node._id);
+  const blocked = !!protector;
+
   const weaponDef = WEAPONS[weapon];
   const newHealth = Math.max(0, (node.health ?? 100) - weaponDef.damage);
 
-  const updatedNode = await applyDamageDao(node._id, newHealth, newHealth <= 0);
+  // findNodeByPublicIdDao (used to fetch `node` above) deliberately doesn't
+  // populate — most of its callers only ever read internal fields off it.
+  // applyDamageDao's own query does populate (see attackDao.ts), so the
+  // non-blocked path already returns a client-shaped node; the blocked path
+  // has to explicitly populate the same way here, or the response goes out
+  // with a raw userId ObjectId instead of { _id, username } — a frontend's
+  // usernameOf() then has nothing to do but print the raw id string.
+  const updatedNode = blocked ? await node.populate(NODE_POPULATE) : await applyDamageDao(node._id, newHealth, newHealth <= 0);
 
   await logAttackDao({
     mapId: node.mapId,
     targetNodeId: node._id,
     attackerId,
     weapon,
-    damage: weaponDef.damage,
+    damage: blocked ? 0 : weaponDef.damage,
   });
 
   // Every landed attack spawns its own weapon node pointing at the target
   // — repeated attacks accumulate weapon nodes rather than upgrading one.
   // It's a real content node now (the attacker's actual objection), not a
   // generic "<weapon> attack" placeholder — type/text come from the caller.
+  // Still created even when blocked: the objection itself is a real
+  // recorded node regardless of whether the shield stopped the damage.
   const weaponNode = await createWeaponNodeMutationDao(node.mapId, {
     targetNodeId: node._id,
     weaponIcon: WEAPON_TO_ICON[weapon],
@@ -138,10 +165,49 @@ export const attackNodeAbl = async (
 
   // Only set on a landed retaliation (see healParentId above) — a node
   // with no parent (a root) simply has nothing here to reward, same as
-  // "no circle" for a childless node elsewhere in this app.
+  // "no circle" for a childless node elsewhere in this app. Independent of
+  // `blocked` — this is about the weapon node's own target's parent, not
+  // about whether the current attack's own damage landed.
   const healedParent = healParentId ? await healNodeDao(healParentId, RETALIATION_HEAL_AMOUNT) : null;
 
-  return { node: updatedNode, weaponNode, healedParent };
+  return { node: updatedNode, weaponNode, healedParent, blocked };
+};
+
+// Which node types a protection node's own linked "why" can carry — reused
+// from ATTACK_NODE_TYPES rather than duplicated: a protection node is the
+// same kind of real, typed content node a weapon node is, just framed as a
+// defense instead of an objection.
+export const PROTECT_NODE_TYPES = ATTACK_NODE_TYPES;
+
+const protectContentSchema = attackContentSchema;
+
+// Creates a protection node aimed at publicNodeId. Owner-of-target-only —
+// deliberately *not* open like attackNodeAbl above: a shield has a
+// map-wide, no-cost, no-cooldown effect (it blocks *everyone's* future
+// attacks on that node, not just the protector's own), so only the target's
+// own owner may add one, same gating as editing that node's own text/type.
+export class NotNodeOwnerError extends Error {}
+
+export const protectNodeAbl = async (
+  publicNodeId: string,
+  protectorId: string,
+  content: unknown,
+) => {
+  const { type, text } = parseOrThrow(protectContentSchema, content);
+
+  const node = await findNodeByPublicIdDao(publicNodeId);
+  if (!node) return null;
+
+  if (node.userId.toString() !== protectorId.toString()) throw new NotNodeOwnerError();
+
+  const protectionNode = await createProtectionNodeMutationDao(node.mapId, {
+    protectsNodeId: node._id,
+    type,
+    text,
+    userId: protectorId,
+  });
+
+  return { protectionNode };
 };
 
 // Only map members may see a node's attack history.

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type mongoose from "mongoose";
-import { NODE_TYPES, SYMBOL_OVERRIDES } from "../models/Node.js";
+import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS } from "../models/Node.js";
 import { getMapByIdDao } from "../dao/mapsDao.js";
 import {
   createNodeMutationDao,
@@ -9,6 +9,12 @@ import {
   findNodeByPublicIdDao,
 } from "../dao/nodeDao.js";
 import { parseOrThrow } from "./errors.js";
+
+// z.enum only accepts strings (or a TS enum object) in the zod version this
+// repo pins — SIZE_TIERS is a numeric tuple, so this needs a union of
+// literals instead. Shared between create/update below so the two schemas
+// can't drift out of sync with SIZE_TIERS or each other.
+const sizeTierSchema = z.union([z.literal(SIZE_TIERS[0]), z.literal(SIZE_TIERS[1]), z.literal(SIZE_TIERS[2])]);
 
 export class MapNotFoundError extends Error {}
 export class ParentNotFoundError extends Error {}
@@ -28,6 +34,10 @@ const createNodeSchema = z.object({
   // See Node.symbolOverride — rarely set at creation, but no reason to
   // forbid it (e.g. cloning a decided outcome via a template later).
   symbolOverride: z.enum(SYMBOL_OVERRIDES).nullish(),
+  // See Node.SIZE_TIERS — rarely set at creation (packAbl.ts's auto-bump is
+  // the common path), but nothing stops a caller from picking a size up
+  // front.
+  sizeTier: sizeTierSchema.nullish(),
 });
 
 // The clearest example of "why ABL": creating a node is two DAO calls
@@ -79,6 +89,12 @@ const updateNodeSchema = z
     // null explicitly clears back to "use the type's own default symbol" —
     // same nullish-vs-absent convention parentId already uses below.
     symbolOverride: z.enum(SYMBOL_OVERRIDES).nullish(),
+    // Manual size override (NodePanel's 100/115/130% buttons) — "Reset"
+    // sends an explicit 1, not null, so it doesn't re-arm packAbl.ts's
+    // auto-bump. null is still accepted here (schema-wise) since nullish
+    // updates are a general PATCH convention, but no current UI path sends
+    // it for this field.
+    sizeTier: sizeTierSchema.nullish(),
   })
   .refine((fields) => Object.values(fields).some((v) => v !== undefined), {
     error: "No fields to update",

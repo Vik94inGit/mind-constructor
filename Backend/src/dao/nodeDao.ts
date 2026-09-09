@@ -31,6 +31,8 @@ export const NODE_POPULATE = [
   { path: "userId", select: "username" },
   { path: "parentId", select: "nodeId text type" },
   { path: "targetNodeId", select: "nodeId text type" },
+  { path: "protectsNodeId", select: "nodeId text type" },
+  { path: "packedIntoNodeId", select: "nodeId text type" },
 ];
 
 // Pure mutation — the membership check and the isFirstNode calculation both
@@ -94,6 +96,99 @@ export const createWeaponNodeMutationDao = async (
   return weaponNode.populate(NODE_POPULATE);
 };
 
+// Spawns a protection node — exact mirror of createWeaponNodeMutationDao,
+// isProtection/protectsNodeId in place of isWeapon/weaponIcon/targetNodeId.
+// Called once per POST /:nodeId/protect; multiple protection nodes can
+// point at the same target (each renders its own shield arc — see
+// ShieldMark.tsx — none of them "use up" or replace an existing one).
+export const createProtectionNodeMutationDao = async (
+  mapInternalId: MapInternalId,
+  data: {
+    protectsNodeId: MapInternalId;
+    type: NodeType;
+    text: string;
+    userId: string;
+  },
+) => {
+  const protectionNode = await Node.create({
+    nodeId: nanoid(10),
+    mapId: mapInternalId,
+    userId: data.userId,
+    text: data.text,
+    type: data.type,
+    isFirstNode: false,
+    isProtection: true,
+    protectsNodeId: data.protectsNodeId,
+  });
+  return protectionNode.populate(NODE_POPULATE);
+};
+
+// A boolean gate, not a list — attackNodeAbl only ever needs "does at least
+// one undefeated protection node currently guard this node," per the
+// full-block-while-alive mechanic (no stacking, no partial absorption).
+export const findActiveProtectorDao = async (protectedNodeInternalId: MapInternalId) => {
+  return await Node.findOne({
+    isProtection: true,
+    protectsNodeId: protectedNodeInternalId,
+    defeated: false,
+  });
+};
+
+// How many nodes are currently packed into this container — read *before*
+// packNodesMutationDao runs, so packAbl.ts's auto-bump can tell "was this
+// the container's first-ever pack" from "it already had members."
+export const countPackedMembersDao = async (containerInternalId: MapInternalId) => {
+  return await Node.countDocuments({ packedIntoNodeId: containerInternalId });
+};
+
+// Folds the given members into containerInternalId — packAbl.ts has
+// already validated eligibility/ownership by this point, so this is a
+// plain bulk mutation, same division of labor as every other *MutationDao
+// in this file. Returns the freshly-populated container + members so the
+// caller can broadcast/respond with up-to-date shapes rather than the
+// pre-mutation documents it started with.
+export const packNodesMutationDao = async (
+  containerInternalId: mongoose.Types.ObjectId,
+  memberInternalIds: mongoose.Types.ObjectId[],
+) => {
+  await Node.updateMany(
+    { _id: { $in: memberInternalIds } },
+    { $set: { packedIntoNodeId: containerInternalId } },
+  );
+  const [container, members] = await Promise.all([
+    Node.findById(containerInternalId).populate(NODE_POPULATE),
+    Node.find({ _id: { $in: memberInternalIds } }).populate(NODE_POPULATE),
+  ]);
+  return { container, members };
+};
+
+// Unpacks one member — owner-of-the-member-itself scoped, same convention
+// updateNodeDao already uses (any other node edit is gated by "you own the
+// node being changed," not by who owns whatever it's connected to).
+export const unpackNodeMutationDao = async (publicNodeId: string, userId: string) => {
+  return await Node.findOneAndUpdate(
+    { nodeId: publicNodeId, userId },
+    { $set: { packedIntoNodeId: null } },
+    { new: true },
+  ).populate(NODE_POPULATE);
+};
+
+// Atomic guard for packAbl.ts's auto-bump: only ever succeeds while
+// sizeTier is still null (never touched, manually or automatically) — a
+// concurrent manual PATCH landing between packAbl's own "check" and this
+// write loses the race cleanly instead of clobbering the user's explicit
+// choice.
+export const bumpSizeTierIfDefaultDao = async (
+  nodeInternalId: mongoose.Types.ObjectId,
+  tier: number,
+) => {
+  return await Node.findOneAndUpdate(
+    { _id: nodeInternalId, sizeTier: null },
+    { $set: { sizeTier: tier } },
+    { new: true },
+  ).populate(NODE_POPULATE);
+};
+
 // Only members of the node's map may view it.
 export const findNodeDao = async (publicNodeId: string, userId: string) => {
   const node = await findNodeByPublicIdDao(publicNodeId);
@@ -131,6 +226,15 @@ export const deleteNodeDao = async (publicNodeId: string, userId: string) => {
     Edge.deleteMany({ $or: [{ fromNodeId: node._id }, { toNodeId: node._id }] }),
     Node.updateMany({ parentId: node._id }, { $set: { parentId: null } }),
     Node.deleteMany({ isWeapon: true, targetNodeId: node._id }),
+    // Deleting a protected node takes its shields down with it — same
+    // "the thing it points at is gone, so it goes too" reasoning as the
+    // weapon-node line above.
+    Node.deleteMany({ isProtection: true, protectsNodeId: node._id }),
+    // Deleting a container unpacks its members instead of leaving them
+    // forever hidden with a dangling packedIntoNodeId — mirrors the
+    // parentId line above (deleting a parent doesn't delete its children,
+    // it just clears the link).
+    Node.updateMany({ packedIntoNodeId: node._id }, { $set: { packedIntoNodeId: null } }),
   ]);
 
   return node;

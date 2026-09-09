@@ -1,8 +1,14 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
-import { findNodeByPublicIdDao, findNodeByInternalIdDao, createWeaponNodeMutationDao } from "../src/dao/nodeDao.js";
+import {
+  findNodeByPublicIdDao,
+  findNodeByInternalIdDao,
+  createWeaponNodeMutationDao,
+  createProtectionNodeMutationDao,
+  findActiveProtectorDao,
+} from "../src/dao/nodeDao.js";
 import { isMapMemberDao, getMapByInternalIdDao } from "../src/dao/mapsDao.js";
 import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../src/dao/attackDao.js";
-import { attackNodeAbl, getAttackHistoryAbl } from "../src/abl/attackAbl.js";
+import { attackNodeAbl, getAttackHistoryAbl, protectNodeAbl, NotNodeOwnerError } from "../src/abl/attackAbl.js";
 import { ValidationError } from "../src/abl/errors.js";
 
 // An attack always carries the attacker's real objection now — every
@@ -20,6 +26,9 @@ vi.mock("../src/dao/nodeDao.js", () => ({
   findNodeByPublicIdDao: vi.fn(),
   findNodeByInternalIdDao: vi.fn(),
   createWeaponNodeMutationDao: vi.fn(),
+  createProtectionNodeMutationDao: vi.fn(),
+  findActiveProtectorDao: vi.fn(),
+  NODE_POPULATE: [],
 }));
 vi.mock("../src/dao/mapsDao.js", () => ({
   isMapMemberDao: vi.fn(),
@@ -202,6 +211,9 @@ describe("attackAbl", () => {
         // The target here is an ordinary content node, not a weapon node —
         // nothing gets healed.
         healedParent: null,
+        // No protection node guards this target (findActiveProtectorDao's
+        // default unconfigured mock resolves undefined) — the attack lands.
+        blocked: false,
       });
       expect(healNodeDao).not.toHaveBeenCalled();
     });
@@ -298,6 +310,97 @@ describe("attackAbl", () => {
         expect.objectContaining({ type: "Solution" }),
       );
       expect(result).not.toBeNull();
+    });
+  });
+
+  describe("attackNodeAbl — protection blocks damage", () => {
+    it("does 0 damage and skips applyDamageDao when an undefeated protection node guards the target", async () => {
+      // populate: a real Mongoose document's own instance method — the
+      // blocked path calls `node.populate(NODE_POPULATE)` directly (see
+      // attackAbl.ts's own comment) since findNodeByPublicIdDao's query
+      // doesn't populate, unlike applyDamageDao's. Mocked here to resolve a
+      // *populated*-shaped node, same client-facing shape applyDamageDao's
+      // own query would have produced on the non-blocked path.
+      const populatedNode = {
+        _id: "n1", mapId: "m1", userId: { _id: "victim1", username: "victim" }, defeated: false, health: 100,
+      };
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
+        populate: vi.fn().mockResolvedValue(populatedNode),
+      } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
+      vi.mocked(findActiveProtectorDao).mockResolvedValue({ _id: "shield1" } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
+
+      const result = await attackNodeAbl("node1", "attacker1", "fatalFlaw", validContent);
+
+      expect(findActiveProtectorDao).toHaveBeenCalledWith("n1");
+      expect(applyDamageDao).not.toHaveBeenCalled();
+      expect(logAttackDao).toHaveBeenCalledWith(
+        expect.objectContaining({ damage: 0 }),
+      );
+      // Still a real, recorded objection node even though it didn't land.
+      expect(createWeaponNodeMutationDao).toHaveBeenCalled();
+      expect(result).toEqual({
+        node: populatedNode,
+        weaponNode: { nodeId: "w1" },
+        healedParent: null,
+        blocked: true,
+      });
+    });
+
+    it("lands normally once findActiveProtectorDao reports no protector", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
+      } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
+      vi.mocked(findActiveProtectorDao).mockResolvedValue(null as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "n1", health: 90, defeated: false } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
+
+      const result = await attackNodeAbl("node1", "attacker1", "nitpick", validContent);
+
+      expect(applyDamageDao).toHaveBeenCalledWith("n1", 90, false);
+      expect(result!.blocked).toBe(false);
+    });
+  });
+
+  describe("protectNodeAbl", () => {
+    it("returns null when the target node doesn't exist", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(null as never);
+
+      const result = await protectNodeAbl("node1", "owner1", validContent);
+
+      expect(result).toBeNull();
+      expect(createProtectionNodeMutationDao).not.toHaveBeenCalled();
+    });
+
+    it("throws NotNodeOwnerError when the caller doesn't own the target", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "owner1",
+      } as never);
+
+      await expect(
+        protectNodeAbl("node1", "someoneElse", validContent),
+      ).rejects.toThrow(NotNodeOwnerError);
+      expect(createProtectionNodeMutationDao).not.toHaveBeenCalled();
+    });
+
+    it("creates a protection node aimed at the target when the caller owns it", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "owner1",
+      } as never);
+      vi.mocked(createProtectionNodeMutationDao).mockResolvedValue({ nodeId: "p1" } as never);
+
+      const result = await protectNodeAbl("node1", "owner1", validContent);
+
+      expect(createProtectionNodeMutationDao).toHaveBeenCalledWith("m1", {
+        protectsNodeId: "n1",
+        type: "Problem",
+        text: "This has a real issue",
+        userId: "owner1",
+      });
+      expect(result).toEqual({ protectionNode: { nodeId: "p1" } });
     });
   });
 
