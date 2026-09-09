@@ -35,16 +35,52 @@ export async function attackNode(
 ) {
   // healedParent: set only when this landed as a retaliation (attacking
   // the weapon node that hit your own node) — see Backend's attackAbl.ts.
-  // null on an ordinary attack.
-  return apiRequest<{ success: boolean; node: NodeDoc; weaponNode: NodeDoc; healedParent: NodeDoc | null }>(
-    `/api/nodes/${nodeId}/attack`,
-    {
-      method: "POST",
-      body: { weapon, type: content.type, text: content.text },
-    },
-  );
+  // null on an ordinary attack. blocked: true when a linked, undefeated
+  // protection node stopped this attack outright (0 damage) — see
+  // attackAbl.ts's own findActiveProtectorDao check.
+  return apiRequest<{
+    success: boolean;
+    node: NodeDoc;
+    weaponNode: NodeDoc;
+    healedParent: NodeDoc | null;
+    blocked: boolean;
+  }>(`/api/nodes/${nodeId}/attack`, {
+    method: "POST",
+    body: { weapon, type: content.type, text: content.text },
+  });
 }
 
 export async function getAttackHistory(nodeId: string): Promise<Attack[]> {
   return apiRequest<Attack[]>(`/api/nodes/${nodeId}/attacks`);
+}
+
+// Creates a protection node aimed at nodeId — owner-of-nodeId only (see
+// attackAbl.ts's protectNodeAbl). Same content shape as an attack (a real
+// typed claim, just framed as a defense).
+export async function protectNode(
+  nodeId: string,
+  content: { type: AttackNodeType; text: string },
+) {
+  return apiRequest<{ success: boolean; protectionNode: NodeDoc }>(`/api/nodes/${nodeId}/protect`, {
+    method: "POST",
+    body: { type: content.type, text: content.text },
+  });
+}
+
+// Folds nodeIds into containerId — container-owner-only, server-revalidates
+// eligibility regardless of what the picker already filtered client-side
+// (see packAbl.ts's packNodesAbl).
+export async function packNodes(containerId: string, nodeIds: string[]) {
+  return apiRequest<{ success: boolean; container: NodeDoc; members: NodeDoc[] }>(
+    `/api/nodes/${containerId}/pack`,
+    { method: "POST", body: { nodeIds } },
+  );
+}
+
+// Unpacks one member back into a normal, visible node — scoped to the
+// member's own owner (not the container's).
+export async function unpackNode(nodeId: string) {
+  return apiRequest<{ success: boolean; node: NodeDoc }>(`/api/nodes/${nodeId}/unpack`, {
+    method: "POST",
+  });
 }

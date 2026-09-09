@@ -1,19 +1,39 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { idOf, nodeRefId, usernameOf } from "../utils/nodeType";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
-import { ATTACK_NODE_TYPES, WEAPONS, WEAPON_INFO } from "../types";
-import type { Attack, AttackNodeType, EdgeDoc, NodeDoc, SymbolOverride, Weapon } from "../types";
+import { ATTACK_NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
+import type { Attack, AttackNodeType, EdgeDoc, NodeDoc, SizeTier, SymbolOverride, Weapon } from "../types";
+
+// Same 100%/115%/130% scale NodeCard's own SIZE_MULTIPLIERS uses, just for
+// the button labels here — kept as a separate literal rather than imported
+// from NodeCard (a map component importing from another map component's
+// internals isn't a pattern this codebase otherwise uses; this pairing is
+// simple enough not to be worth a shared constants file).
+const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "130%" };
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
-// this panel's own ✕, MapPage's dimming backdrop (see the JSX that renders
-// this) closes it too, same as a native sheet dismisses on a tap outside it.
-// Used to switch to an inline right-hand sidebar at `sm` and up; moved off
-// that in favor of always keeping the canvas full-width and the node's text
+// this panel's own ✕, tapping empty canvas closes it too (MapPage's own
+// onClick), same as a native sheet dismisses on a tap outside it. Used to
+// switch to an inline right-hand sidebar at `sm` and up; moved off that in
+// favor of always keeping the canvas full-width and the node's text
 // anchored to the bottom of the view, on any device.
+//
+// max-h caps this at roughly a third of the viewport (not the 75dvh this
+// started at) — on a phone-height screen a sheet that tall left almost
+// nothing for the canvas above it: the just-selected node (and its
+// quick-add ghosts) routinely landed *behind* the sheet, and every other
+// node in that bottom stretch became physically untappable, since the
+// sheet is opaque and always paints above the canvas. This 1/3 figure is
+// shared with MapPage — see its own PANEL_RESERVE_FRAC doc comment for why
+// it has to match: MapPage's centerOnNode reserves exactly this much room
+// when parking the chosen node above the sheet, and viewportBounds
+// reserves it too when clamping where a new node/ghost is allowed to land,
+// so a mismatch here would put either of those back to guessing at how
+// tall this sheet actually gets.
 //
 // max-h uses `dvh` (dynamic viewport height), not the plain `vh` this
 // started with — on a real phone browser (address bar sliding in/out as the
@@ -33,7 +53,7 @@ import type { Attack, AttackNodeType, EdgeDoc, NodeDoc, SymbolOverride, Weapon }
 // modal (Modal.tsx, z-50), which should stay on top of everything,
 // this panel included.
 const PANEL_CLASS =
-  "fixed inset-x-0 bottom-0 z-[46] max-h-[75dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+  "fixed inset-x-0 bottom-0 z-[46] max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
 // Every section below used to render stacked, all at once — text, health,
 // CRUD, links, the whole attack form, and history — which made this panel
@@ -42,7 +62,7 @@ const PANEL_CLASS =
 // text (see the header markup below); everything else lives behind one of
 // these tabs, one screenful at a time. Which tabs actually show up (and
 // which one opens by default) still depends on the node — see tabsFor below.
-type Tab = "info" | "links" | "attack" | "history";
+type Tab = "info" | "links" | "attack" | "protect" | "pack" | "history";
 
 const closeBtn =
   "inline-flex flex-shrink-0 cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.5rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50";
@@ -62,13 +82,25 @@ interface Props {
   onDeleted: (nodeId: string) => void;
   /** Fired after a direct panel-side PATCH (currently just the symbol-override toggle below) with the server's response, so the canvas/other panels stay in sync — same upsert-by-id MapPage already does for every other node update. */
   onUpdated: (node: NodeDoc) => void;
-  /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. */
-  onAttacked: (node: NodeDoc, weaponNode: NodeDoc, weapon: Weapon, healedParent: NodeDoc | null) => void;
+  /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. blocked: true when a linked, undefeated protection node stopped this attack outright. */
+  onAttacked: (
+    node: NodeDoc,
+    weaponNode: NodeDoc,
+    weapon: Weapon,
+    healedParent: NodeDoc | null,
+    blocked: boolean,
+  ) => void;
   onDeleteEdge: (edgeId: string) => void;
   onStartLink: () => void;
   onSelectNode: (nodeId: string) => void;
   /** Text/type editing now happens inline on the node's own icon on the canvas — this just asks the canvas to turn it on. No-ops there if editing isn't currently allowed. */
   onEdit: () => void;
+  /** A new protection node landed, aimed at this node — MapPage upserts it same as any other node. */
+  onProtected: (protectionNode: NodeDoc) => void;
+  /** Asks MapPage to open the pack picker for this node (owner-only — see the Info tab's Pack button). */
+  onStartPack: () => void;
+  /** One packed member got unpacked back to a normal, visible node. */
+  onUnpacked: (node: NodeDoc) => void;
 }
 
 export function NodePanel({
@@ -84,6 +116,9 @@ export function NodePanel({
   onStartLink,
   onSelectNode,
   onEdit,
+  onProtected,
+  onStartPack,
+  onUnpacked,
 }: Props) {
   const isCreator = idOf(node.userId) === currentUserId;
   const [busy, setBusy] = useState(false);
@@ -93,6 +128,17 @@ export function NodePanel({
   // in before any of the weapon buttons below will actually fire.
   const [attackText, setAttackText] = useState("");
   const [attackType, setAttackType] = useState<AttackNodeType>("Problem");
+  // Same shape as the attack draft, for the Protect tab.
+  const [protectText, setProtectText] = useState("");
+  const [protectType, setProtectType] = useState<AttackNodeType>("Solution");
+  // Transient "Blocked!" feedback when handleAttack's response comes back
+  // with blocked:true — not the `error` banner below, since a blocked
+  // attack isn't an error, just a shield doing its job. Cleared by its own
+  // timeout, tracked in a ref so a second blocked attack in a row restarts
+  // the timer instead of the first one's timeout clearing the second's
+  // still-fresh flash out from under it.
+  const [blockedFlash, setBlockedFlash] = useState(false);
+  const blockedFlashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Direct text editing, right inside the Info tab (see the textarea in the
   // JSX below) — reset from the node's real text whenever the selected node
@@ -110,6 +156,22 @@ export function NodePanel({
   const targetId = node.isWeapon ? nodeRefId(node.targetNodeId) : undefined;
   const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
 
+  // Same idea, for a protection node's own protectsNodeId — surfaced as a
+  // "Protects" line in the Info tab, exact mirror of "Points at" above.
+  const protectedId = node.isProtection ? nodeRefId(node.protectsNodeId) : undefined;
+  const protectedTarget = protectedId ? nodes.find((n) => n.nodeId === protectedId) : undefined;
+
+  // The reverse direction: every protection node currently guarding *this*
+  // node (there can be more than one — see ShieldMark, one arc per
+  // protector) — surfaced as a "Protected by" list.
+  const protectors = nodes.filter((n) => n.isProtection && nodeRefId(n.protectsNodeId) === node.nodeId);
+
+  // Every node currently packed into this one — the Pack tab's own list.
+  // Only ever non-empty for a container; a packed member's own panel would
+  // never show this (a packed node is hidden from the canvas entirely, so
+  // its panel can't be open in the first place).
+  const packedMembers = nodes.filter((n) => nodeRefId(n.packedIntoNodeId) === node.nodeId);
+
   // Combat is fully open now (see attackAbl.ts's own comment) — no
   // own-node rule, no weapon-node exclusion, no already-defeated block.
   // Mirrors MapPage's canAttackNode exactly: any node is a valid target.
@@ -123,17 +185,31 @@ export function NodePanel({
   const isOutcome = !!ringKindFor(node.type);
 
   // Which tabs this node has anything behind, and which one opens by
-  // default — every node gets Info/Links/History; Attack only when
-  // canAttack agrees.
-  const tabs: Tab[] = ["info", "links", ...(canAttack ? (["attack"] as const) : []), "history"];
+  // default — every node gets Info/Links/Attack/Protect/History; Pack only
+  // once the node actually has something packed into it (nothing to show
+  // otherwise — the Pack *action* itself lives as a button in Info, not
+  // behind its own tab, since starting a pack hands off to MapPage's own
+  // picker sheet rather than rendering anything further in here).
+  const tabs: Tab[] = [
+    "info",
+    "links",
+    ...(canAttack ? (["attack"] as const) : []),
+    "protect",
+    ...(packedMembers.length > 0 ? (["pack"] as const) : []),
+    "history",
+  ];
   const [tab, setTab] = useState<Tab>("info");
 
   useEffect(() => {
     setError(null);
     setAttackText("");
     setAttackType("Problem");
+    setProtectText("");
+    setProtectType("Solution");
     setTextDraft(node.text);
     setTab("info");
+    if (blockedFlashTimeout.current) clearTimeout(blockedFlashTimeout.current);
+    setBlockedFlash(false);
     nodesApi
       .getAttackHistory(node.nodeId)
       .then(setHistory)
@@ -197,11 +273,67 @@ export function NodePanel({
     setError(null);
     try {
       const res = await nodesApi.attackNode(node.nodeId, weapon, { type: attackType, text: attackText.trim() });
-      onAttacked(res.node, res.weaponNode, weapon, res.healedParent);
+      onAttacked(res.node, res.weaponNode, weapon, res.healedParent, res.blocked);
       setAttackText("");
       nodesApi.getAttackHistory(node.nodeId).then(setHistory).catch(() => {});
+      if (res.blocked) {
+        if (blockedFlashTimeout.current) clearTimeout(blockedFlashTimeout.current);
+        setBlockedFlash(true);
+        blockedFlashTimeout.current = setTimeout(() => setBlockedFlash(false), 3000);
+      }
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Attack failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Owner-of-the-*target*-only (protectNodeAbl enforces this server-side
+  // too) — creates a protection node aimed at this node.
+  async function handleProtect() {
+    if (!protectText.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await nodesApi.protectNode(node.nodeId, { type: protectType, text: protectText.trim() });
+      onProtected(res.protectionNode);
+      setProtectText("");
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Protect failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Owner-of-the-*member*-only (unpackNodeAbl enforces this server-side
+  // too) — a member unpacking itself back out doesn't require the
+  // container's own owner at all, same as any other single-node edit.
+  async function handleUnpack(memberId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await nodesApi.unpackNode(memberId);
+      onUnpacked(res.node);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Unpack failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Owner-only (same as text/type edits) — packAbl.ts's own auto-bump is
+  // the common path to a non-1 size; this is the manual override. Reset
+  // pins at tier 1 explicitly rather than clearing back to "untouched," so
+  // it can never silently re-bump on a later pack — see Node.sizeTier's own
+  // doc comment.
+  async function handleSetSize(tier: SizeTier) {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { sizeTier: tier });
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Failed to update size");
     } finally {
       setBusy(false);
     }
@@ -222,7 +354,14 @@ export function NodePanel({
 
   const nodeById = (id: string) => nodes.find((n) => n.nodeId === id);
 
-  const tabLabel: Record<Tab, string> = { info: "Info", links: "Links", attack: "Attack", history: "History" };
+  const tabLabel: Record<Tab, string> = {
+    info: "Info",
+    links: "Links",
+    attack: "Attack",
+    protect: "Protect",
+    pack: `Packed (${packedMembers.length})`,
+    history: "History",
+  };
 
   return (
     <div className={PANEL_CLASS}>
@@ -317,13 +456,43 @@ export function NodePanel({
             </p>
           )}
 
+          {node.isProtection && protectedTarget && (
+            <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
+              🛡️ Protects{" "}
+              <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(protectedTarget.nodeId)}>
+                {protectedTarget.text.slice(0, 40)}
+              </a>
+            </p>
+          )}
+
+          {protectors.length > 0 && (
+            <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
+              🛡️ Protected by{" "}
+              {protectors.map((p, i) => (
+                <span key={p.nodeId}>
+                  {i > 0 && ", "}
+                  <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(p.nodeId)}>
+                    {p.text.slice(0, 24)}
+                  </a>
+                </span>
+              ))}
+            </p>
+          )}
+
           {isCreator && (
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
               <button
                 className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onEdit}
               >
                 Edit
+              </button>
+              <button
+                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={onStartPack}
+                title="Fold other linked/branched nodes into this one"
+              >
+                Pack…
               </button>
               <button
                 className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -332,6 +501,26 @@ export function NodePanel({
               >
                 Delete
               </button>
+            </div>
+          )}
+
+          {isCreator && (
+            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Size:</span>
+              {SIZE_TIERS.map((tier) => (
+                <button
+                  key={tier}
+                  className={`inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.8rem] font-semibold transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 ${
+                    (node.sizeTier ?? 1) === tier
+                      ? "border-accent bg-accent-soft text-accent-ink"
+                      : "border-line bg-surface text-ink enabled:hover:bg-surface-2"
+                  }`}
+                  onClick={() => handleSetSize(tier)}
+                  disabled={busy}
+                >
+                  {SIZE_TIER_LABEL[tier]}
+                </button>
+              ))}
             </div>
           )}
 
@@ -435,10 +624,16 @@ export function NodePanel({
 
       {tab === "attack" && canAttack && (
         <div className="mt-4">
+          {blockedFlash && (
+            <div className="mb-3 rounded-lg border border-accent bg-accent-soft px-[0.9rem] py-[0.7rem] text-[0.85rem] font-semibold text-accent-ink">
+              🛡️ Blocked! A protection node stopped that attack outright.
+            </div>
+          )}
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
             Landing an attack creates a real node with your objection, linked to this one by a
             weapon arrow.
             {node.isWeapon && " Landing this heals its own target's parent."}
+            {protectors.length > 0 && " This node is currently shielded — attacks will be blocked."}
           </p>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="attack-text" className="text-[0.8rem] font-semibold text-ink-soft">
@@ -494,6 +689,84 @@ export function NodePanel({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {tab === "protect" && (
+        <div className="mt-4">
+          {isCreator ? (
+            <>
+              <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                A protection node fully blocks every future attack on this node while it stays
+                undefeated — no limit, no cooldown.
+              </p>
+              <div className="mb-4 flex flex-col gap-[0.35rem]">
+                <label htmlFor="protect-text" className="text-[0.8rem] font-semibold text-ink-soft">
+                  Why it's defended
+                </label>
+                <textarea
+                  id="protect-text"
+                  rows={2}
+                  value={protectText}
+                  onChange={(e) => setProtectText(e.target.value)}
+                  placeholder="Why does this hold up?"
+                  className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
+                />
+              </div>
+              <div className="mb-4 flex flex-col gap-[0.35rem]">
+                <label htmlFor="protect-type" className="text-[0.8rem] font-semibold text-ink-soft">
+                  As a
+                </label>
+                <select
+                  id="protect-type"
+                  value={protectType}
+                  onChange={(e) => setProtectType(e.target.value as AttackNodeType)}
+                  className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
+                >
+                  {PROTECT_NODE_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-[0.65rem] py-[0.55rem] text-[0.88rem] font-semibold text-white transition-opacity duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={busy || !protectText.trim()}
+                title={!protectText.trim() ? "Write why it's defended first" : undefined}
+                onClick={handleProtect}
+              >
+                🛡️ Add protection
+              </button>
+            </>
+          ) : (
+            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+              Only {usernameOf(node.userId as any)} can add a protection node to this one.
+            </p>
+          )}
+        </div>
+      )}
+
+      {tab === "pack" && (
+        <div className="mt-4">
+          {packedMembers.length === 0 ? (
+            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>Nothing packed in here.</p>
+          ) : (
+            <div style={{ marginTop: "0.5rem" }}>
+              {packedMembers.map((m) => (
+                <div className="flex items-center justify-between py-[0.35rem] text-[0.8rem]" key={m.nodeId}>
+                  <span className="min-w-0 truncate">{m.text.slice(0, 40)}</span>
+                  <button
+                    className="inline-flex flex-shrink-0 cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.55rem] py-[0.25rem] text-[0.76rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => handleUnpack(m.nodeId)}
+                    disabled={busy}
+                  >
+                    Unpack
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
