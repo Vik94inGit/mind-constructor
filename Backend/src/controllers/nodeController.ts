@@ -15,12 +15,22 @@ import {
 import {
   attackNodeAbl,
   getAttackHistoryAbl,
+  protectNodeAbl,
   CannotAttackOwnNodeError,
   CanOnlyAttackOwnNodeError,
   CannotRetaliateError,
   NodeAlreadyDefeatedError,
   WeaponOnCooldownError,
+  NotNodeOwnerError,
 } from "../abl/attackAbl.js";
+import {
+  packNodesAbl,
+  unpackNodeAbl,
+  PackContainerNotFoundError,
+  PackNotOwnedError,
+  PackMemberNotFoundError,
+  PackMemberNotEligibleError,
+} from "../abl/packAbl.js";
 import { ValidationError } from "../abl/errors.js";
 import { WEAPONS, type WeaponKey } from "../models/Attack.js";
 
@@ -233,6 +243,110 @@ export const attackNode = async (req: Request<nodeIdParams>, res: Response) => {
     }
     console.error("attackNode error:", error);
     return res.status(500).json({ success: false, error: "Attack failed" });
+  }
+};
+
+// ========== PROTECT A NODE ==========
+export const protectNode = async (req: Request<nodeIdParams>, res: Response) => {
+  try {
+    const { nodeId } = req.params;
+    const userId = req.user?._id;
+    const { type, text } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Not authenticated" });
+    }
+
+    const result = await protectNodeAbl(nodeId, userId, { type, text });
+
+    if (!result) {
+      return res.status(404).json({ success: false, error: "Node not found" });
+    }
+
+    const publicMapId = await findPublicMapIdDao(result.protectionNode.mapId);
+    if (publicMapId) broadcastToMap(publicMapId, "node:protected", result);
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    if (error instanceof NotNodeOwnerError) {
+      return res.status(403).json({
+        success: false,
+        error: "Only this node's own owner can add a protection node to it",
+      });
+    }
+    console.error("protectNode error:", error);
+    return res.status(500).json({ success: false, error: "Protect failed" });
+  }
+};
+
+// ========== PACK / UNPACK NODES ==========
+export const packNode = async (req: Request<nodeIdParams>, res: Response) => {
+  try {
+    const { nodeId } = req.params;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Not authenticated" });
+    }
+
+    const result = await packNodesAbl(nodeId, userId, req.body);
+
+    const publicMapId = result.container ? await findPublicMapIdDao(result.container.mapId) : null;
+    if (publicMapId) broadcastToMap(publicMapId, "node:packed", result);
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    if (error instanceof PackContainerNotFoundError) {
+      return res.status(404).json({ success: false, error: "Container node not found" });
+    }
+    if (error instanceof PackNotOwnedError) {
+      return res.status(403).json({
+        success: false,
+        error: "You can only pack nodes into a container you created",
+      });
+    }
+    if (error instanceof PackMemberNotFoundError) {
+      return res.status(404).json({ success: false, error: "One of the picked nodes was not found" });
+    }
+    if (error instanceof PackMemberNotEligibleError) {
+      return res.status(400).json({
+        success: false,
+        error: "A picked node isn't linked (by branch or Link) to the container",
+      });
+    }
+    console.error("packNode error:", error);
+    return res.status(500).json({ success: false, error: "Pack failed" });
+  }
+};
+
+export const unpackNode = async (req: Request<nodeIdParams>, res: Response) => {
+  try {
+    const { nodeId } = req.params;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Not authenticated" });
+    }
+
+    const node = await unpackNodeAbl(nodeId, userId);
+
+    if (!node) {
+      return res.status(404).json({ success: false, error: "Node not found" });
+    }
+
+    const publicMapId = await findPublicMapIdDao(node.mapId);
+    if (publicMapId) broadcastToMap(publicMapId, "node:unpacked", { node });
+
+    return res.status(200).json({ success: true, node });
+  } catch (error) {
+    console.error("unpackNode error:", error);
+    return res.status(500).json({ success: false, error: "Unpack failed" });
   }
 };
 

@@ -53,6 +53,20 @@ export const getEdgesByMapDao = async (publicMapId: string, userId: string) => {
     .populate("userId", "username");
 };
 
+// Every edge touching this node, either direction — used by packAbl.ts to
+// compute pack-eligibility (a node counts as "linked" if it's on either end
+// of an Edge with the anchor, same either-direction reasoning
+// countIncomingEdgesByTargetDao's own sentiment-only aggregate doesn't need
+// but this does). Lean + minimal projection, same spirit as
+// listNodesByMapInternalIdDao's own "just the ids, the caller does the
+// graph-shape reasoning" split.
+export const findEdgesByNodeInternalIdDao = async (nodeInternalId: InternalId) => {
+  return await Edge.find(
+    { $or: [{ fromNodeId: nodeInternalId }, { toNodeId: nodeInternalId }] },
+    "fromNodeId toNodeId",
+  ).lean();
+};
+
 // One row per node that receives at least one edge of the given sentiment,
 // with how many it received. Used for the attack-indicator threshold check
 // — grouping/counting is still "just a query", so it stays in the DAO; what

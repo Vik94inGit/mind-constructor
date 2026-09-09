@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { NODE_TYPE_COLORS } from "../utils/nodeType";
-import type { NodeDoc } from "../types";
+import { ZONE_COLORS } from "../utils/nodeType";
 
 // Fixed corner overlay, sized to the same 3:2 ratio as the real canvas
 // (CANVAS_W:CANVAS_H = 2400:1600) so a straight linear scale-down (scaleX/
@@ -11,7 +10,6 @@ import type { NodeDoc } from "../types";
 // anything drawn in canvas coordinates like these dots/zones).
 const MINIMAP_W = 180;
 const MINIMAP_H = 120;
-const DOT_R = 2.2;
 
 // Just the fields the minimap actually draws — MapPage's own nodeGroups
 // carries more (the member list) that this has no use for. rootId is kept
@@ -39,8 +37,6 @@ interface Props {
   // scroll tick only ever re-renders this small component, not the whole
   // map.
   wrapRef: React.RefObject<HTMLDivElement | null>;
-  nodes: NodeDoc[];
-  positions: Map<string, { x: number; y: number }>;
   // Same circles the main canvas draws a backdrop for (see MapPage's own
   // nodeGroups) — drawn here too, scaled down, so a circle is findable from
   // the minimap instead of only showing up once you've already scrolled to it.
@@ -50,13 +46,13 @@ interface Props {
   // MapPage's own canvas zoom (see its zoom state) — wrap's scroll metrics
   // (scrollLeft/scrollTop/scrollWidth) are in screen pixels of the
   // *rendered* canvas once it's zoomed, not the canvasW/canvasH coordinate
-  // space nodes/positions/groups are all still expressed in, so every
+  // space groups is still expressed in, so every
   // wrap-scroll reading below needs this to convert between the two —
   // same reasoning as MapPage's own screenToCanvas/zoomAt.
   zoom: number;
 }
 
-export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH, zoom }: Props) {
+export function MiniMap({ wrapRef, groups, canvasW, canvasH, zoom }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
   const [viewport, setViewport] = useState({ left: 0, top: 0, width: 0, height: 0 });
@@ -155,31 +151,25 @@ export function MiniMap({ wrapRef, nodes, positions, groups, canvasW, canvasH, z
         }}
       >
         <rect x={0} y={0} width={MINIMAP_W} height={MINIMAP_H} fill="var(--surface-2)" />
-        {/* Zones, under the node dots — the same outline polygon (and
-            sentiment colors) the real canvas draws for each group (see
-            MapPage's own nodeGroups/"Zones" rendering), just scaled down
-            and without the click-to-stabilize interaction this tiny a
-            target isn't worth wiring up for. */}
+        {/* Zones — the same outline polygon (and sentiment colors) the real
+            canvas draws for each group (see MapPage's own nodeGroups/
+            "Zones" rendering), just scaled down and without the
+            click-to-stabilize interaction this tiny a target isn't worth
+            wiring up for. No per-node dots any more (removed along with
+            this component's own nodes/positions props) — a whole map's
+            worth of 2px dots read as noise at this scale; the zone shapes
+            and the viewport rectangle below are enough to navigate by. */}
         {groups.map((g) => (
           <polygon
             key={`group-${g.rootId}`}
             points={g.outline.map((p) => `${p.x * scaleX},${p.y * scaleY}`).join(" ")}
-            fill={g.sentiment === "positive" ? "#ffd54f" : "#ff3d00"}
-            fillOpacity={0.16}
-            stroke={g.sentiment === "positive" ? "#ffd54f" : "#ff3d00"}
-            strokeOpacity={0.4}
+            fill={g.sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative}
+            fillOpacity={0.26}
+            stroke={g.sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative}
+            strokeOpacity={0.6}
             strokeWidth={0.75}
           />
         ))}
-        {nodes
-          .filter((n) => !n.isWeapon)
-          .map((n) => {
-            const p = positions.get(n.nodeId);
-            if (!p) return null;
-            return (
-              <circle key={n.nodeId} cx={p.x * scaleX} cy={p.y * scaleY} r={DOT_R} fill={NODE_TYPE_COLORS[n.type]} />
-            );
-          })}
         {/* /zoom: viewport.* is wrap's own scroll/client size in screen
             pixels of the rendered (zoomed) canvas — divide back down to
             canvas-coordinate space before scaling to minimap size, same as

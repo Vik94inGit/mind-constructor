@@ -19,9 +19,14 @@ attacking a weapon node, no already-defeated block, no cooldown enforcement; thi
 more restricted (an evolving history of an own-node-only rule, a `Map.discussionMode` per-map
 toggle between that and normal player-vs-player, then a "retaliation"-only exception for weapon
 nodes — all now removed). The one surviving piece of that history: landing a hit on a weapon node
-still heals whatever that weapon node's own target's parent is, for whoever lands it. The backend
-also derives read-only insight from the graph: auto-detected circles (`parentId` stars — see
-`circleAbl.ts`) and attack indicators.
+still heals whatever that weapon node's own target's parent is, for whoever lands it. The one
+remaining way to actually stop an attack: a **protection node**, created by a node's own owner
+(`POST /api/nodes/:nodeId/protect`), fully blocks every attack on its linked target for as long as
+it stays undefeated (see `attackAbl.ts`'s `protectNodeAbl`/`findActiveProtectorDao`). Nodes can also
+be **packed** into a chosen container node (`packAbl.ts`) — folded off the canvas, reversible via
+unpack — and given one of three visual size tiers, which a container auto-bumps out of once
+something is first packed into it. The backend also derives read-only insight from the graph:
+auto-detected circles (`parentId` stars — see `circleAbl.ts`) and attack indicators.
 
 Stack: Express 5 + TypeScript + MongoDB (Mongoose), plus a Socket.IO server (attached to the same
 HTTP server) for live map updates. Full REST endpoint reference:
@@ -67,7 +72,7 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`).
   calls. Each module defines its own domain-specific error classes (e.g. `MapNotFoundError`,
   `ParentNotOwnedError`, `WeaponOnCooldownError`) that the matching controller knows how to map to
   a status code. Modules: `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `attackAbl`,
-  `attackIndicatorAbl`, `circleAbl`.
+  `attackIndicatorAbl`, `circleAbl`, `packAbl`.
 - **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `attackDao`) — the only layer
   that touches Mongoose models directly.
 - **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Attack`) — schemas. Each one strips
@@ -125,7 +130,36 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   own (nothing else in this app un-defeats a node either) — now unconditional, for whoever lands the
   hit, not just the original victim. The attack response/broadcast (`node:attacked`) carries this as
   `healedParent` (`null` when the target wasn't a weapon node, or was one with nothing to heal)
-  alongside the existing `node`/`weaponNode`.
+  alongside the existing `node`/`weaponNode`. `attackNodeAbl` also checks
+  `findActiveProtectorDao(node._id)` right before computing damage — if any undefeated protection
+  node points at the target (`Node.isProtection` + `protectsNodeId`), the hit is blocked entirely
+  (0 damage, `applyDamageDao` never called) and the response/broadcast carries `blocked: true`; the
+  attacker's objection is still recorded as a real weapon node and in `logAttackDao`'s history either
+  way. Protection nodes themselves are created by `protectNodeAbl` (`POST /:nodeId/protect`,
+  `attackAbl.ts`) — same "real, typed content Node" shape as a weapon node
+  (`createProtectionNodeMutationDao` mirrors `createWeaponNodeMutationDao`), but owner-of-the-target
+  only (`NotNodeOwnerError`), not open like combat — a shield has a map-wide, no-cost, no-cooldown
+  effect on everyone else's future attacks, so it's gated like editing the node's own text/type
+  rather than left open.
+- **`src/abl/packAbl.ts`** — folds one or more nodes into a chosen container node
+  (`POST /:nodeId/pack`, body `{ nodeIds }`) so they stop rendering on the canvas
+  (`Node.packedIntoNodeId`), reversible per member (`POST /:memberId/unpack`). A different
+  relationship from a circle on purpose: eligible pack candidates are the union of the container's
+  branch neighbors (`parentId` children + its own parent) *and* every node on either end of an
+  `Edge` touching it — recomputed server-side on every call rather than trusting the client's picks,
+  same "don't trust a stale snapshot" principle `selectCircleAbl` already applies to circle
+  membership. Container-owner-only (`PackNotOwnedError`), same reasoning as protection's
+  owner-gating above. The first time a container is ever packed, and only while its `Node.sizeTier`
+  has never been touched (`null` — see below), `packNodesAbl` bumps it to tier 2 via the atomic
+  `bumpSizeTierIfDefaultDao` (guarded by a `sizeTier: null` filter so a concurrent manual PATCH can't
+  be clobbered). Deleting a container unpacks its members (`deleteNodeDao`'s cascade) rather than
+  leaving them permanently hidden.
+- **`Node.sizeTier`** (`1 | 2 | 3`, `models/Node.ts`) — three visual size tiers a frontend renders
+  at 100%/115%/130%. `null` (not `1`) means "never touched, by anyone or anything" — that's the one
+  state `packAbl.ts`'s auto-bump above will ever act on; once set, by the auto-bump or a plain
+  `PATCH /api/nodes/:nodeId`, packing never silently changes it again. A frontend's "reset to 100%"
+  control is expected to PATCH an explicit `1`, not `null`, so resetting doesn't quietly re-arm the
+  auto-bump.
 - **`scripts/promoteAdmin.ts`** — the only way to grant the `admin` role; deliberately not exposed
   as an API endpoint.
 

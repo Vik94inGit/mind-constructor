@@ -13,7 +13,7 @@ import {
   DEFAULT_PARTICLE_COLORS,
   WEAPON_PARTICLE_COLORS,
 } from "../utils/particles";
-import type { AttackIndicator, NodeDoc, NodeType } from "../types";
+import type { AttackIndicator, NodeDoc, NodeType, SizeTier } from "../types";
 
 // A stable "which direction did this weapon fly in from" per node, derived
 // from its id so it doesn't change across re-renders without needing to be
@@ -51,6 +51,12 @@ function seededRandoms(seed: string, count: number): number[] {
 // (Both this and NodeTypeIcon's size prop below are 0.8x their original
 // 32/26 — see MapPage's getNodeMinDist for the matching spacing shrink.)
 const OUTCOME_BADGE_SIZE = 26;
+
+// See Node.sizeTier's own doc comment (backend + types/index.ts) for the
+// null-vs-1 "never touched" contract — this is just the *visual* scale each
+// tier renders at. `node.sizeTier ?? 1` (never a bare `node.sizeTier`) is
+// the one correct way to read this anywhere in this component.
+const SIZE_MULTIPLIERS: Record<SizeTier, number> = { 1: 1, 2: 1.15, 3: 1.3 };
 
 // CSS custom properties driving the .chaotic keyframes below: three small
 // waypoints plus a randomized duration/negative-delay, so several drifting
@@ -99,6 +105,8 @@ interface Props {
   celebrate?: boolean;
   /** Dimmed because some other node's quick-add ghosts are active — still clickable. */
   muted?: boolean;
+  /** How many nodes are currently packed into this one (MapPage's packedCountByContainer) — undefined/0 renders no badge. See the corner-badge markup below. */
+  packedCount?: number;
   /** Someone is currently dragging another node close enough to this one to drop-and-join its circle — "valid" (would succeed) or "invalid" (blocked, e.g. sentiment mismatch). */
   dropHighlight?: "valid" | "invalid";
   /** Swaps the caption for an autofocused text input and makes the icon clickable to cycle type — set by double-click/"Update"/the side panel's Edit button. */
@@ -132,6 +140,7 @@ export function NodeCard({
   discussionMode,
   celebrate,
   muted,
+  packedCount,
   dropHighlight,
   inlineEditing,
   flightVector,
@@ -181,7 +190,13 @@ export function NodeCard({
     }
   }, [inlineEditing, node.text, node.type]);
 
-  const style: CSSProperties = { left: x, top: y };
+  // The outer positioning div's own footprint needs to grow with the
+  // node's size tier too, not just its visual content (see
+  // inverseScaleStyle below) — otherwise a 130% node's wider icon/caption
+  // would visually spill out of a hit-target box that never actually grew,
+  // leaving the extra 30% unclickable/unhoverable.
+  const sizeMultiplier = SIZE_MULTIPLIERS[node.sizeTier ?? 1];
+  const style: CSSProperties = { left: x, top: y, width: 74 * sizeMultiplier };
 
   // A weapon/attack node carries a real type now (Problem/Problematic
   // option/Fail — the attacker's actual objection), so it renders through
@@ -446,7 +461,13 @@ export function NodeCard({
   // (zoom-scaled) size and back. A separate inner element's own transform
   // is never touched by either keyframe, so it stays in effect regardless
   // of what the outer positioning div's transform is doing at any moment.
-  const inverseScaleStyle: CSSProperties = { transform: `scale(${1 / zoom})` };
+  // sizeMultiplier folded in here (not into the outer div's own transform,
+  // for the same reason 1/zoom already lives here and not there — see this
+  // comment block above) — this is the one wrapper NodeCrown/NodeWings/the
+  // ring/OutcomeBadge all already scale through together, so composing the
+  // size tier's multiplier into the same scale() keeps everything
+  // proportional automatically instead of needing separately-tuned numbers.
+  const inverseScaleStyle: CSSProperties = { transform: `scale(${sizeMultiplier / zoom})` };
 
   return (
     <div
@@ -469,6 +490,15 @@ export function NodeCard({
         {indicator && (
           <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
             {indicator.incomingNegativeEdges}
+          </div>
+        )}
+        {/* Packed-member count — bottom-right corner (the indicator badge
+            above already claims top-right) so both can show at once
+            without overlapping. bg-accent, not bg-danger: this isn't a
+            combat signal, just "N nodes folded in here." */}
+        {!!packedCount && (
+          <div className="absolute -right-2 -bottom-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-accent text-[0.65rem] font-bold text-white">
+            {packedCount}
           </div>
         )}
         {/* Halo/horns — see NodeCrown's own doc comment; shared with

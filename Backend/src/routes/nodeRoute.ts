@@ -7,6 +7,9 @@ import {
   deleteNode,
   attackNode,
   getNodeAttackHistory,
+  protectNode,
+  packNode,
+  unpackNode,
 } from "../controllers/nodeController.js";
 import { protect } from "#src/middleware/auth.js";
 
@@ -19,5 +22,8 @@ router.delete<{ nodeId: string }>("/:nodeId", protect, deleteNode);
 
 router.post<{ nodeId: string }>("/:nodeId/attack", protect, attackNode);
 router.get<{ nodeId: string }>("/:nodeId/attacks", protect, getNodeAttackHistory);
+router.post<{ nodeId: string }>("/:nodeId/protect", protect, protectNode);
+router.post<{ nodeId: string }>("/:nodeId/pack", protect, packNode);
+router.post<{ nodeId: string }>("/:nodeId/unpack", protect, unpackNode);
 
 export default router;

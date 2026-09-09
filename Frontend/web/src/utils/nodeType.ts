@@ -24,6 +24,15 @@ export const WEAPON_ARROW_COUNT: Record<WeaponIcon, number> = {
   spear: 3,
 };
 
+// The one positive/negative color pair every "zone" backdrop uses (a
+// circle's own halo/horns-colored polygon — MapPage's Zones SVG block and
+// MiniMap's own scaled-down copy — plus grouped branch-arrow lines). Used
+// to be duplicated as a bare hex literal at each of those three sites with
+// no shared constant; pulled out here so a future re-tune only ever
+// touches one place. Slightly deeper/less pastel than the original
+// #ffd54f/#ff3d00 pair for more contrast against the surface background.
+export const ZONE_COLORS = { positive: "#f2c744", negative: "#e8320a" } as const;
+
 export function idOf(ref: string | { _id: string } | undefined | null): string | undefined {
   if (!ref) return undefined;
   return typeof ref === "string" ? ref : ref._id;

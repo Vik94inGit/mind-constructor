@@ -29,6 +29,18 @@ export type WeaponIcon = (typeof WEAPON_ICONS)[number];
 export const SYMBOL_OVERRIDES = ["check", "cross"] as const;
 export type SymbolOverride = (typeof SYMBOL_OVERRIDES)[number];
 
+// Three discrete visual scales (100%/115%/130%, applied client-side — this
+// model just stores which one). `null` is a distinct state from `1`: it
+// means "never touched, by anyone or anything" — packAbl.ts's auto-bump
+// (a container gets bumped to 2 the first time something is ever packed
+// into it) only ever fires while this is still null, and never fires again
+// once it's been set to *any* tier, manually or automatically. Resetting a
+// node's size via NodePanel explicitly writes `1`, not `null` — back to
+// "untouched" would silently re-arm the auto-bump on the next pack, which
+// isn't what "reset to 100%" should mean.
+export const SIZE_TIERS = [1, 2, 3] as const;
+export type SizeTier = (typeof SIZE_TIERS)[number];
+
 export const NodeSchema = new mongoose.Schema(
   {
     nodeId: { type: String, required: true, unique: true }, // public id, safe to expose in URLs/JSON
@@ -59,6 +71,26 @@ export const NodeSchema = new mongoose.Schema(
     isWeapon: { type: Boolean, default: false },
     weaponIcon: { type: String, enum: WEAPON_ICONS }, // only set when isWeapon is true
     targetNodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", default: null }, // which node this weapon points at
+
+    // Protection nodes: created via POST /:nodeId/protect (abl/attackAbl.ts),
+    // same "real Node, tagged so a frontend can tell it apart" shape as a
+    // weapon node. While any protection node with isProtection:true and
+    // defeated:false points at a given node (protectsNodeId), every attack
+    // on that node does 0 damage — see attackNodeAbl's own `blocked` check.
+    isProtection: { type: Boolean, default: false },
+    protectsNodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", default: null }, // which node this shield defends
+
+    // Packing: folds this node off the canvas, nested inside another node
+    // (abl/packAbl.ts). Set only via POST /:nodeId/pack (on the *container*,
+    // for one or more member ids at once) and cleared via POST
+    // /:memberId/unpack — not a plain PATCH field like symbolOverride, since
+    // packing has its own eligibility rule (the member must already be
+    // Edge-linked or branch-linked to the container) that a bare PATCH
+    // can't enforce. null means "not packed into anything."
+    packedIntoNodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", default: null },
+
+    // See SIZE_TIERS above for the null-vs-1 contract.
+    sizeTier: { type: Number, enum: SIZE_TIERS, default: null },
 
     // Set only via a map's circle-selection endpoints (abl/circleAbl.ts),
     // never directly through PATCH /api/nodes/:nodeId — it's derived from
