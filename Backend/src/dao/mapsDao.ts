@@ -66,13 +66,26 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   const map = await Map.findOne({ mapId: publicMapId, members: userId });
   if (!map) return null;
 
-  // parentId/targetNodeId are internal ObjectId refs — populated with the
-  // same public-id projection Edge uses for fromNodeId/toNodeId, so a
-  // caller never has to resolve Mongo's internal ids itself.
+  // parentId/targetNodeId/protectsNodeId/packedIntoNodeId are all internal
+  // ObjectId refs — populated with the same public-id projection Edge uses
+  // for fromNodeId/toNodeId, so a caller never has to resolve Mongo's
+  // internal ids itself. This list used to fall behind nodeDao.ts's own
+  // NODE_POPULATE (the create/update/attack/protect/pack responses' shared
+  // populate list) whenever a new ref field was added there — protectsNodeId
+  // and packedIntoNodeId both came back missing from a fresh page load
+  // (present on a freshly-created node's own response, since that goes
+  // through NODE_POPULATE, but silently absent again the moment the page
+  // reloaded and refetched through this query instead) — breaking
+  // protection's shield rendering/positioning and packing's own hidden-node
+  // filter for anyone who wasn't looking at a still-live tab. Keep this in
+  // sync with NODE_POPULATE by hand; the two aren't shared code since this
+  // one is scoped to a whole map's nodes rather than one at a time.
   return await Node.find({ mapId: map._id })
     .populate("userId", "username")
     .populate("parentId", "nodeId text type")
-    .populate("targetNodeId", "nodeId text type");
+    .populate("targetNodeId", "nodeId text type")
+    .populate("protectsNodeId", "nodeId text type")
+    .populate("packedIntoNodeId", "nodeId text type");
 };
 
 export const createMapDao = async (mapData: {

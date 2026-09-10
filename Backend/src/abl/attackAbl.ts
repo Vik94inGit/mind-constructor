@@ -11,6 +11,7 @@ import {
   createWeaponNodeMutationDao,
   createProtectionNodeMutationDao,
   findActiveProtectorDao,
+  incrementBlockedDamageDao,
   NODE_POPULATE,
 } from "../dao/nodeDao.js";
 import { getMapByInternalIdDao, isMapMemberDao } from "../dao/mapsDao.js";
@@ -40,6 +41,12 @@ export class WeaponOnCooldownError extends Error {
 // fixed damage number, applied to the retaliating node's own *parent*
 // rather than the retaliating node itself.
 const RETALIATION_HEAL_AMOUNT = 10;
+
+// Adding a shield doesn't just set up future defense, it's an immediate
+// show of support for the node it defends — a fixed bump applied once, at
+// creation (see protectNodeAbl below), on top of (not instead of) the
+// shield's own ongoing block-and-bank-damage behavior in attackNodeAbl.
+const PROTECT_CREATE_HEAL_AMOUNT = 15;
 
 // An attack now always creates a real content node alongside the damage —
 // restricted to every outcome type (see OutcomeBadge.tsx on the frontend),
@@ -132,13 +139,16 @@ export const attackNodeAbl = async (
   const weaponDef = WEAPONS[weapon];
   const newHealth = Math.max(0, (node.health ?? 100) - weaponDef.damage);
 
-  // findNodeByPublicIdDao (used to fetch `node` above) deliberately doesn't
-  // populate — most of its callers only ever read internal fields off it.
-  // applyDamageDao's own query does populate (see attackDao.ts), so the
-  // non-blocked path already returns a client-shaped node; the blocked path
-  // has to explicitly populate the same way here, or the response goes out
-  // with a raw userId ObjectId instead of { _id, username } — a frontend's
-  // usernameOf() then has nothing to do but print the raw id string.
+  // Blocked: 0 damage to the target — but the damage isn't erased, it's
+  // banked on the protector instead (Node.blockedDamage), released back
+  // onto the target all at once if/when this protector is ever deleted
+  // (see deleteNodeDao). A shield defers the hit, it doesn't cancel it.
+  // `node` itself is unchanged either way here, but findNodeByPublicIdDao's
+  // own query doesn't populate (see its own doc comment) — applyDamageDao's
+  // query does, so the non-blocked branch already comes back client-shaped;
+  // the blocked branch has to populate explicitly or the response goes out
+  // with a raw userId ObjectId instead of { _id, username }.
+  const updatedProtector = blocked ? await incrementBlockedDamageDao(protector._id, weaponDef.damage) : null;
   const updatedNode = blocked ? await node.populate(NODE_POPULATE) : await applyDamageDao(node._id, newHealth, newHealth <= 0);
 
   await logAttackDao({
@@ -170,7 +180,7 @@ export const attackNodeAbl = async (
   // about whether the current attack's own damage landed.
   const healedParent = healParentId ? await healNodeDao(healParentId, RETALIATION_HEAL_AMOUNT) : null;
 
-  return { node: updatedNode, weaponNode, healedParent, blocked };
+  return { node: updatedNode, weaponNode, healedParent, blocked, protector: updatedProtector };
 };
 
 // Which node types a protection node's own linked "why" can carry — reused
@@ -207,7 +217,11 @@ export const protectNodeAbl = async (
     userId: protectorId,
   });
 
-  return { protectionNode };
+  // Immediate, one-time reward for adding a shield — capped at 100, same
+  // healNodeDao every other heal in this app already uses.
+  const healedNode = await healNodeDao(node._id, PROTECT_CREATE_HEAL_AMOUNT);
+
+  return { protectionNode, healedNode };
 };
 
 // Only map members may see a node's attack history.

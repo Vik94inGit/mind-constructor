@@ -125,13 +125,30 @@ export const createProtectionNodeMutationDao = async (
 
 // A boolean gate, not a list — attackNodeAbl only ever needs "does at least
 // one undefeated protection node currently guard this node," per the
-// full-block-while-alive mechanic (no stacking, no partial absorption).
+// full-block-while-alive mechanic (no stacking, no partial absorption). The
+// actual document (not just a boolean) is returned since attackNodeAbl also
+// needs its _id to bank the blocked damage onto (see
+// incrementBlockedDamageDao below).
 export const findActiveProtectorDao = async (protectedNodeInternalId: MapInternalId) => {
   return await Node.findOne({
     isProtection: true,
     protectsNodeId: protectedNodeInternalId,
     defeated: false,
   });
+};
+
+// Banks a blocked hit's damage onto the protector instead of applying it to
+// the node it defends — see Node.blockedDamage's own doc comment for why:
+// a shield defers damage, it doesn't erase it. Returns the updated
+// protector so the caller can hand it back to the client (its running
+// total is worth surfacing — see NodePanel's own "this shield has
+// absorbed N damage" line).
+export const incrementBlockedDamageDao = async (protectorInternalId: MapInternalId, amount: number) => {
+  return await Node.findByIdAndUpdate(
+    protectorInternalId,
+    { $inc: { blockedDamage: amount } },
+    { new: true },
+  ).populate(NODE_POPULATE);
 };
 
 // How many nodes are currently packed into this container — read *before*
@@ -218,9 +235,31 @@ export const updateNodeDao = async (
 // instead of ever being cleaned up) — this now takes the rest of the graph
 // down with it: edges touching the node, branch-children's parentId, and
 // weapon nodes that were aimed at it.
+//
+// Returns { node, damagedProtectedNode } instead of just `node` now —
+// deleting a protection node with a nonzero blockedDamage releases that
+// whole running total onto whatever it was defending in the same breath
+// (see Node.blockedDamage's own doc comment), and the caller needs that
+// second, separately-updated node to broadcast so every open tab picks up
+// the health change live rather than only on next reload (unlike the other
+// cascades below, which stay silent — a health change is worth more than
+// those).
 export const deleteNodeDao = async (publicNodeId: string, userId: string) => {
   const node = await Node.findOneAndDelete({ nodeId: publicNodeId, userId });
   if (!node) return null;
+
+  let damagedProtectedNode = null;
+  if (node.isProtection && node.protectsNodeId && node.blockedDamage > 0) {
+    const protectedNode = await Node.findById(node.protectsNodeId);
+    if (protectedNode) {
+      const newHealth = Math.max(0, (protectedNode.health ?? 100) - node.blockedDamage);
+      damagedProtectedNode = await Node.findByIdAndUpdate(
+        protectedNode._id,
+        { $set: { health: newHealth, defeated: newHealth <= 0 } },
+        { new: true },
+      ).populate(NODE_POPULATE);
+    }
+  }
 
   await Promise.all([
     Edge.deleteMany({ $or: [{ fromNodeId: node._id }, { toNodeId: node._id }] }),
@@ -228,7 +267,10 @@ export const deleteNodeDao = async (publicNodeId: string, userId: string) => {
     Node.deleteMany({ isWeapon: true, targetNodeId: node._id }),
     // Deleting a protected node takes its shields down with it — same
     // "the thing it points at is gone, so it goes too" reasoning as the
-    // weapon-node line above.
+    // weapon-node line above. Any *other* protector's own blockedDamage
+    // (a second shield also guarding this same node) is simply lost along
+    // with it here, same as any other in-progress state a deleted node's
+    // relations carry — there's no third node left to release it onto.
     Node.deleteMany({ isProtection: true, protectsNodeId: node._id }),
     // Deleting a container unpacks its members instead of leaving them
     // forever hidden with a dangling packedIntoNodeId — mirrors the
@@ -237,7 +279,7 @@ export const deleteNodeDao = async (publicNodeId: string, userId: string) => {
     Node.updateMany({ packedIntoNodeId: node._id }, { $set: { packedIntoNodeId: null } }),
   ]);
 
-  return node;
+  return { node, damagedProtectedNode };
 };
 
 // Locks exactly the given nodes and unlocks everything else on the map —

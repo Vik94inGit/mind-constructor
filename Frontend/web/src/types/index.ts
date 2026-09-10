@@ -58,6 +58,12 @@ export const PROTECT_NODE_TYPES = ATTACK_NODE_TYPES;
 export const SIZE_TIERS = [1, 2, 3] as const;
 export type SizeTier = (typeof SIZE_TIERS)[number];
 
+// A manually-placed zone ring around exactly one node — independent of the
+// automatic circle detection (nodeGroups, computed from parentId). Mirrors
+// Node.MANUAL_ZONE_COLORS on the backend. null means no manual zone.
+export const MANUAL_ZONE_COLORS = ["positive", "negative"] as const;
+export type ManualZoneColor = (typeof MANUAL_ZONE_COLORS)[number];
+
 export interface User {
   _id: string;
   username: string;
@@ -151,6 +157,11 @@ export interface NodeDoc {
   // every attack on that node does 0 damage (see attackNode's own
   // `blocked` field below).
   protectsNodeId?: string | EdgeNodeRef | null;
+  // Only meaningful when isProtection is true — the running total of
+  // damage this shield has blocked *instead of* applying it to protectsNodeId
+  // (see attackNode's own `protector` field below). Not erased: deleting
+  // this node releases the whole total onto protectsNodeId at once.
+  blockedDamage?: number;
   // Set once this node has been packed into a container (see
   // PackPickerPanel/packNodes) — null when not packed. A packed node is
   // filtered out of MapPage's own canvas rendering (visibleNodes) but still
@@ -167,6 +178,11 @@ export interface NodeDoc {
   // Manual override of this node's OutcomeBadge inner symbol — see
   // SYMBOL_OVERRIDES above. Owner-editable via PATCH, same as text/type.
   symbolOverride?: SymbolOverride | null;
+  // A manually-placed zone ring around just this node — see
+  // MANUAL_ZONE_COLORS above. Owner-editable via PATCH, same as
+  // symbolOverride; independent of (and drawn alongside, if both apply)
+  // MapPage's own automatic nodeGroups zones.
+  manualZone?: ManualZoneColor | null;
   createdAt?: string;
   updatedAt?: string;
 }

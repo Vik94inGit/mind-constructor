@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { idOf, nodeRefId, usernameOf } from "../utils/nodeType";
+import { idOf, nodeRefId, usernameOf, ZONE_COLORS } from "../utils/nodeType";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
-import { ATTACK_NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
-import type { Attack, AttackNodeType, EdgeDoc, NodeDoc, SizeTier, SymbolOverride, Weapon } from "../types";
+import { ATTACK_NODE_TYPES, MANUAL_ZONE_COLORS, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
+import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, SizeTier, SymbolOverride, Weapon } from "../types";
 
 // Same 100%/115%/130% scale NodeCard's own SIZE_MULTIPLIERS uses, just for
 // the button labels here — kept as a separate literal rather than imported
@@ -15,6 +15,15 @@ import type { Attack, AttackNodeType, EdgeDoc, NodeDoc, SizeTier, SymbolOverride
 // simple enough not to be worth a shared constants file).
 const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "130%" };
 
+// Same 640px threshold MapPage's own isMobileViewport uses (not shared as
+// an import — this file has no existing dependency on that one, and the
+// two only need to ever agree on the cutoff, not on being the same
+// function). Read live, not memoized, for the same reason: it only matters
+// at the moment a key is actually pressed.
+function isMobileViewport() {
+  return typeof window !== "undefined" && window.innerWidth <= 640;
+}
+
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own
 // onClick), same as a native sheet dismisses on a tap outside it. Used to
@@ -22,18 +31,22 @@ const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "13
 // favor of always keeping the canvas full-width and the node's text
 // anchored to the bottom of the view, on any device.
 //
-// max-h caps this at roughly a third of the viewport (not the 75dvh this
-// started at) — on a phone-height screen a sheet that tall left almost
-// nothing for the canvas above it: the just-selected node (and its
+// max-h caps this at roughly a third of the viewport on desktop (not the
+// 75dvh this started at) — on a phone-height screen a sheet that tall left
+// almost nothing for the canvas above it: the just-selected node (and its
 // quick-add ghosts) routinely landed *behind* the sheet, and every other
 // node in that bottom stretch became physically untappable, since the
-// sheet is opaque and always paints above the canvas. This 1/3 figure is
-// shared with MapPage — see its own PANEL_RESERVE_FRAC doc comment for why
-// it has to match: MapPage's centerOnNode reserves exactly this much room
-// when parking the chosen node above the sheet, and viewportBounds
-// reserves it too when clamping where a new node/ghost is allowed to land,
-// so a mismatch here would put either of those back to guessing at how
-// tall this sheet actually gets.
+// sheet is opaque and always paints above the canvas. Two thirds on mobile
+// instead (below Tailwind's `sm` = MapPage's own 640px isMobileViewport
+// cutoff) — a phone's shorter screen needs more of it for a sheet worth
+// reading, and centerOnNode still parks the chosen node in the third left
+// above it. These 1/3 and 2/3 figures are shared with MapPage — see its
+// own panelReserveFrac() doc comment for why they have to match:
+// MapPage's centerOnNode reserves exactly this much room when parking the
+// chosen node above the sheet, and viewportBounds reserves it too when
+// clamping where a new node/ghost is allowed to land, so a mismatch here
+// would put either of those back to guessing at how tall this sheet
+// actually gets.
 //
 // max-h uses `dvh` (dynamic viewport height), not the plain `vh` this
 // started with — on a real phone browser (address bar sliding in/out as the
@@ -53,7 +66,7 @@ const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "13
 // modal (Modal.tsx, z-50), which should stay on top of everything,
 // this panel included.
 const PANEL_CLASS =
-  "fixed inset-x-0 bottom-0 z-[46] max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+  "fixed inset-x-0 bottom-0 z-[46] max-h-[67dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
 // Every section below used to render stacked, all at once — text, health,
 // CRUD, links, the whole attack form, and history — which made this panel
@@ -82,21 +95,22 @@ interface Props {
   onDeleted: (nodeId: string) => void;
   /** Fired after a direct panel-side PATCH (currently just the symbol-override toggle below) with the server's response, so the canvas/other panels stay in sync — same upsert-by-id MapPage already does for every other node update. */
   onUpdated: (node: NodeDoc) => void;
-  /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. blocked: true when a linked, undefeated protection node stopped this attack outright. */
+  /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. blocked: true when a linked, undefeated protection node stopped this attack outright. protector: that protection node's own updated document (its blockedDamage bumped) when blocked, else null. */
   onAttacked: (
     node: NodeDoc,
     weaponNode: NodeDoc,
     weapon: Weapon,
     healedParent: NodeDoc | null,
     blocked: boolean,
+    protector: NodeDoc | null,
   ) => void;
   onDeleteEdge: (edgeId: string) => void;
   onStartLink: () => void;
   onSelectNode: (nodeId: string) => void;
   /** Text/type editing now happens inline on the node's own icon on the canvas — this just asks the canvas to turn it on. No-ops there if editing isn't currently allowed. */
   onEdit: () => void;
-  /** A new protection node landed, aimed at this node — MapPage upserts it same as any other node. */
-  onProtected: (protectionNode: NodeDoc) => void;
+  /** A new protection node landed, aimed at this node — MapPage upserts it same as any other node. healedNode: this node's own updated document, immediately healed once by the new shield. */
+  onProtected: (protectionNode: NodeDoc, healedNode: NodeDoc) => void;
   /** Asks MapPage to open the pack picker for this node (owner-only — see the Info tab's Pack button). */
   onStartPack: () => void;
   /** One packed member got unpacked back to a normal, visible node. */
@@ -131,14 +145,6 @@ export function NodePanel({
   // Same shape as the attack draft, for the Protect tab.
   const [protectText, setProtectText] = useState("");
   const [protectType, setProtectType] = useState<AttackNodeType>("Solution");
-  // Transient "Blocked!" feedback when handleAttack's response comes back
-  // with blocked:true — not the `error` banner below, since a blocked
-  // attack isn't an error, just a shield doing its job. Cleared by its own
-  // timeout, tracked in a ref so a second blocked attack in a row restarts
-  // the timer instead of the first one's timeout clearing the second's
-  // still-fresh flash out from under it.
-  const [blockedFlash, setBlockedFlash] = useState(false);
-  const blockedFlashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Direct text editing, right inside the Info tab (see the textarea in the
   // JSX below) — reset from the node's real text whenever the selected node
@@ -162,8 +168,7 @@ export function NodePanel({
   const protectedTarget = protectedId ? nodes.find((n) => n.nodeId === protectedId) : undefined;
 
   // The reverse direction: every protection node currently guarding *this*
-  // node (there can be more than one — see ShieldMark, one arc per
-  // protector) — surfaced as a "Protected by" list.
+  // node (there can be more than one) — surfaced as a "Protected by" list.
   const protectors = nodes.filter((n) => n.isProtection && nodeRefId(n.protectsNodeId) === node.nodeId);
 
   // Every node currently packed into this one — the Pack tab's own list.
@@ -208,8 +213,6 @@ export function NodePanel({
     setProtectType("Solution");
     setTextDraft(node.text);
     setTab("info");
-    if (blockedFlashTimeout.current) clearTimeout(blockedFlashTimeout.current);
-    setBlockedFlash(false);
     nodesApi
       .getAttackHistory(node.nodeId)
       .then(setHistory)
@@ -258,8 +261,13 @@ export function NodePanel({
     if (!confirm("Delete this node?")) return;
     setBusy(true);
     try {
-      await nodesApi.deleteNode(node.nodeId);
+      const res = await nodesApi.deleteNode(node.nodeId);
       onDeleted(node.nodeId);
+      // Deleting a protection node with banked damage releases the whole
+      // total onto whatever it was defending in the same breath — see
+      // Backend's deleteNodeDao. Surface that update the same way any
+      // other panel-triggered change does.
+      if (res.damagedProtectedNode) onUpdated(res.damagedProtectedNode);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Delete failed");
     } finally {
@@ -273,14 +281,13 @@ export function NodePanel({
     setError(null);
     try {
       const res = await nodesApi.attackNode(node.nodeId, weapon, { type: attackType, text: attackText.trim() });
-      onAttacked(res.node, res.weaponNode, weapon, res.healedParent, res.blocked);
-      setAttackText("");
-      nodesApi.getAttackHistory(node.nodeId).then(setHistory).catch(() => {});
-      if (res.blocked) {
-        if (blockedFlashTimeout.current) clearTimeout(blockedFlashTimeout.current);
-        setBlockedFlash(true);
-        blockedFlashTimeout.current = setTimeout(() => setBlockedFlash(false), 3000);
-      }
+      onAttacked(res.node, res.weaponNode, weapon, res.healedParent, res.blocked, res.protector);
+      // Landing an attack — blocked or not — creates a real node (the
+      // weapon node carrying the attacker's own objection); closing here
+      // matches every other node-creating action in this panel (Protect
+      // below, Pack's own confirm in MapPage) instead of leaving the panel
+      // sitting open on whatever was just acted on.
+      onClose();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Attack failed");
     } finally {
@@ -296,8 +303,9 @@ export function NodePanel({
     setError(null);
     try {
       const res = await nodesApi.protectNode(node.nodeId, { type: protectType, text: protectText.trim() });
-      onProtected(res.protectionNode);
-      setProtectText("");
+      onProtected(res.protectionNode, res.healedNode);
+      // Same "close after creating a node" reasoning as handleAttack above.
+      onClose();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Protect failed");
     } finally {
@@ -334,6 +342,23 @@ export function NodePanel({
       onUpdated(updated);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Failed to update size");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Owner-only (same as text/type edits) — a manually-chosen zone ring
+  // around just this node, independent of the automatic circle/nodeGroups
+  // detection. null explicitly removes it, same nullish contract
+  // symbolOverride already uses.
+  async function handleSetZone(manualZone: ManualZoneColor | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { manualZone });
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Failed to update zone");
     } finally {
       setBusy(false);
     }
@@ -421,13 +446,21 @@ export function NodePanel({
                 onChange={(e) => setTextDraft(e.target.value)}
                 disabled={busy}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  // Mobile has no Shift key to reach alongside a virtual
+                  // keyboard's Enter/return, so plain Enter has to behave
+                  // like a normal textarea there too (insert a newline,
+                  // "another row," same as Shift+Enter below) — saving is
+                  // onBlur's job only (tapping the visible strip of canvas
+                  // outside the panel already does this). Desktop keeps its
+                  // existing plain-Enter-saves shortcut, Shift+Enter still
+                  // its own newline escape hatch.
+                  if (e.key === "Enter" && !e.shiftKey && !isMobileViewport()) {
                     e.preventDefault();
                     handleTextSave();
                   }
-                  // Shift+Enter: no preventDefault — the textarea's own
-                  // default behavior (insert a newline) is exactly what's
-                  // wanted here.
+                  // Shift+Enter (desktop), or plain Enter on mobile: no
+                  // preventDefault — the textarea's own default behavior
+                  // (insert a newline) is exactly what's wanted here.
                 }}
                 onBlur={handleTextSave}
                 className="resize-none rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
@@ -462,6 +495,13 @@ export function NodePanel({
               <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(protectedTarget.nodeId)}>
                 {protectedTarget.text.slice(0, 40)}
               </a>
+            </p>
+          )}
+
+          {node.isProtection && !!node.blockedDamage && (
+            <p style={{ fontSize: "0.78rem", marginTop: "0.3rem", color: "var(--ink-soft)" }}>
+              Blocked {node.blockedDamage} damage so far — deleting this shield returns all of it to{" "}
+              {protectedTarget ? protectedTarget.text.slice(0, 30) : "the node it defends"} at once.
             </p>
           )}
 
@@ -521,6 +561,38 @@ export function NodePanel({
                   {SIZE_TIER_LABEL[tier]}
                 </button>
               ))}
+            </div>
+          )}
+
+          {isCreator && (
+            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Zone:</span>
+              {MANUAL_ZONE_COLORS.map((z) => (
+                <button
+                  key={z}
+                  className="inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.8rem] font-semibold capitalize transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50"
+                  style={
+                    node.manualZone === z
+                      ? { borderColor: ZONE_COLORS[z], background: `${ZONE_COLORS[z]}26`, color: ZONE_COLORS[z] }
+                      : { borderColor: "var(--line)", background: "var(--surface)", color: "var(--ink)" }
+                  }
+                  onClick={() => handleSetZone(z)}
+                  disabled={busy}
+                  title={`Draw a ${z} zone ring around just this node`}
+                >
+                  {z}
+                </button>
+              ))}
+              {node.manualZone && (
+                <button
+                  className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent px-[0.55rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink-soft transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => handleSetZone(null)}
+                  disabled={busy}
+                  title="Remove this manual zone ring"
+                >
+                  Reset
+                </button>
+              )}
             </div>
           )}
 
@@ -624,11 +696,6 @@ export function NodePanel({
 
       {tab === "attack" && canAttack && (
         <div className="mt-4">
-          {blockedFlash && (
-            <div className="mb-3 rounded-lg border border-accent bg-accent-soft px-[0.9rem] py-[0.7rem] text-[0.85rem] font-semibold text-accent-ink">
-              🛡️ Blocked! A protection node stopped that attack outright.
-            </div>
-          )}
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
             Landing an attack creates a real node with your objection, linked to this one by a
             weapon arrow.

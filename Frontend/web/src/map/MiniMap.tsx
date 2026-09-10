@@ -1,5 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { ZONE_COLORS } from "../utils/nodeType";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
+import type { EdgeDoc, NodeDoc } from "../types";
+
+// Smaller than the original per-node dots (which were 2.2px and colored one
+// per NodeType) — this brings dots back per the user's own ask, but paired
+// down to just "which side is this on," matching the zones' own green/red
+// split instead of a whole palette of per-type colors that read as noise at
+// this scale. A dot with no sentiment (sentimentOf returns null — only
+// "unknown"-typed nodes; weapon and protection nodes both carry a real
+// outcome type of their own and vote same as any other node) is skipped
+// entirely rather than drawn in some third neutral color.
+const DOT_R = 1.5;
 
 // Fixed corner overlay, sized to the same 3:2 ratio as the real canvas
 // (CANVAS_W:CANVAS_H = 2400:1600) so a straight linear scale-down (scaleX/
@@ -37,6 +48,12 @@ interface Props {
   // scroll tick only ever re-renders this small component, not the whole
   // map.
   wrapRef: React.RefObject<HTMLDivElement | null>;
+  nodes: NodeDoc[];
+  // The explicit "Link nodes" relationship (as opposed to branch/parentId
+  // lineage, which this doesn't draw) — same sentiment-colored lines the
+  // real canvas draws for these, scaled down.
+  edges: EdgeDoc[];
+  positions: Map<string, { x: number; y: number }>;
   // Same circles the main canvas draws a backdrop for (see MapPage's own
   // nodeGroups) — drawn here too, scaled down, so a circle is findable from
   // the minimap instead of only showing up once you've already scrolled to it.
@@ -52,7 +69,7 @@ interface Props {
   zoom: number;
 }
 
-export function MiniMap({ wrapRef, groups, canvasW, canvasH, zoom }: Props) {
+export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, canvasH, zoom }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
   const [viewport, setViewport] = useState({ left: 0, top: 0, width: 0, height: 0 });
@@ -85,6 +102,12 @@ export function MiniMap({ wrapRef, groups, canvasW, canvasH, zoom }: Props) {
 
   const scaleX = MINIMAP_W / canvasW;
   const scaleY = MINIMAP_H / canvasH;
+
+  // `nodes` here is already MapPage's own visibleNodes (packed-away members
+  // filtered out) — but `positions` still carries an entry for every node,
+  // packed or not, so the Links loop below can't just trust positions.get
+  // to tell it a node is actually visible. This id set is that check.
+  const visibleIds = useMemo(() => new Set(nodes.map((n) => n.nodeId)), [nodes]);
 
   // Centers the real viewport on wherever (clientX, clientY) lands in
   // minimap-space — shared by both a plain click (jump) and every
@@ -155,10 +178,7 @@ export function MiniMap({ wrapRef, groups, canvasW, canvasH, zoom }: Props) {
             canvas draws for each group (see MapPage's own nodeGroups/
             "Zones" rendering), just scaled down and without the
             click-to-stabilize interaction this tiny a target isn't worth
-            wiring up for. No per-node dots any more (removed along with
-            this component's own nodes/positions props) — a whole map's
-            worth of 2px dots read as noise at this scale; the zone shapes
-            and the viewport rectangle below are enough to navigate by. */}
+            wiring up for. */}
         {groups.map((g) => (
           <polygon
             key={`group-${g.rootId}`}
@@ -170,6 +190,91 @@ export function MiniMap({ wrapRef, groups, canvasW, canvasH, zoom }: Props) {
             strokeWidth={0.75}
           />
         ))}
+        {/* Manual zones — a single node's own owner-chosen zone ring (see
+            MapPage's own manual-zone circle rendering and NodePanel's Info
+            tab), scaled-down as a small circle instead of the fixed 55px
+            canvas radius (this small a target isn't worth an exact-radius
+            scale, just readable as "this node has a ring"). */}
+        {nodes
+          .filter((n) => n.manualZone)
+          .map((n) => {
+            const p = positions.get(n.nodeId);
+            if (!p) return null;
+            const color = n.manualZone === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative;
+            return (
+              <circle
+                key={`manual-zone-${n.nodeId}`}
+                cx={p.x * scaleX}
+                cy={p.y * scaleY}
+                r={4}
+                fill="none"
+                stroke={color}
+                strokeOpacity={0.75}
+                strokeWidth={0.9}
+              />
+            );
+          })}
+        {/* Links — the explicit "Link nodes" relationship (Edge documents),
+            not the branch/parentId tree (that one's implicit in a node's
+            own placement, not something drawn on the minimap). Same
+            sentiment coloring the real canvas's own Edge lines use, scaled
+            down; a stale edge whose node was deleted out from under it
+            (fromNodeId/toNodeId come back null, not a string/ref) is
+            skipped rather than crashing on `.nodeId` of null, same guard
+            the main canvas's own Edge-rendering loop already has. */}
+        {edges.map((edge) => {
+          const fromId = nodeRefId(edge.fromNodeId);
+          const toId = nodeRefId(edge.toNodeId);
+          if (!fromId || !toId) return null;
+          // Either end packed away — hide the line along with it, same as
+          // the real canvas's own Edge lines (see MapPage's matching guard).
+          if (!visibleIds.has(fromId) || !visibleIds.has(toId)) return null;
+          const a = positions.get(fromId);
+          const b = positions.get(toId);
+          if (!a || !b) return null;
+          const color =
+            edge.sentiment === "negative"
+              ? ZONE_COLORS.negative
+              : edge.sentiment === "positive"
+                ? ZONE_COLORS.positive
+                : "var(--ink-soft)";
+          return (
+            <line
+              key={edge.edgeId}
+              x1={a.x * scaleX}
+              y1={a.y * scaleY}
+              x2={b.x * scaleX}
+              y2={b.y * scaleY}
+              stroke={color}
+              strokeWidth={0.75}
+              strokeOpacity={0.8}
+            />
+          );
+        })}
+        {/* Per-node dots — colored only by which side of the positive/
+            negative split a node's type falls on (same ZONE_COLORS pair the
+            zones above use), not a whole palette of per-type colors.
+            "unknown"-typed nodes have no sentiment to vote with (see
+            sentimentOf) and are skipped rather than drawn in a third,
+            meaningless color. Weapon (attacking) nodes carry a real outcome
+            type of their own (the attacker's actual objection — see
+            attackAbl.ts) and get a dot the same as any other node now, per
+            the user's own "attacking node show" ask. */}
+        {nodes.map((n) => {
+          const sentiment = sentimentOf(n.type);
+          if (!sentiment) return null;
+          const p = positions.get(n.nodeId);
+          if (!p) return null;
+          return (
+            <circle
+              key={n.nodeId}
+              cx={p.x * scaleX}
+              cy={p.y * scaleY}
+              r={DOT_R}
+              fill={sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative}
+            />
+          );
+        })}
         {/* /zoom: viewport.* is wrap's own scroll/client size in screen
             pixels of the rendered (zoomed) canvas — divide back down to
             canvas-coordinate space before scaling to minimap size, same as

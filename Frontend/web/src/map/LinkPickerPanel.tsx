@@ -2,14 +2,14 @@ import type { NodeDoc } from "../types";
 
 // Same bottom-sheet look NodePanel uses (see its own PANEL_CLASS, including
 // the same z-[46] reasoning — above the minimap/zoom-controls cluster,
-// below a real modal — and the same 1/3-of-viewport cap, kept in sync with
-// MapPage's PANEL_RESERVE_FRAC for the same reason NodePanel's own comment
-// explains) — this takes over that exact slot while link mode is active
-// (see MapPage's own mutual exclusivity between the two), so picking nodes
-// to link and viewing a node's own details never compete for the same
-// screen space.
+// below a real modal — and the same 1/3-desktop/2/3-mobile viewport cap,
+// kept in sync with MapPage's panelReserveFrac() for the same reason
+// NodePanel's own comment explains) — this takes over that exact slot
+// while link mode is active (see MapPage's own mutual exclusivity between
+// the two), so picking nodes to link and viewing a node's own details
+// never compete for the same screen space.
 const PANEL_CLASS =
-  "fixed inset-x-0 bottom-0 z-[46] max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+  "fixed inset-x-0 bottom-0 z-[46] max-h-[67dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
 interface Props {
   picks: NodeDoc[];
