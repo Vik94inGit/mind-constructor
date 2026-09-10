@@ -501,6 +501,20 @@ export function NodeCard({
             {packedCount}
           </div>
         )}
+        {/* Protection nodes always carry this badge, active attacker or
+            not — the user's own "if attacking node absent, protect is just
+            a usual node but with shield" case. Bottom-left corner: the
+            indicator badge claims top-right, the pack-count badge claims
+            bottom-right. The only shield decoration now — a separate
+            bow-and-emblem overlay used to draw on top of an actively
+            defending protection node too, but that read as redundant
+            clutter once the node itself already sits right on the attack's
+            own arrow path (see MapPage's positions memo) — removed. */}
+        {node.isProtection && (
+          <div className="absolute -bottom-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-surface text-[0.7rem]">
+            🛡️
+          </div>
+        )}
         {/* Halo/horns — see NodeCrown's own doc comment; shared with
             QuickAddGhosts so a ghost previews this too, not just the bare
             symbol. */}

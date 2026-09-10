@@ -41,6 +41,15 @@ export type SymbolOverride = (typeof SYMBOL_OVERRIDES)[number];
 export const SIZE_TIERS = [1, 2, 3] as const;
 export type SizeTier = (typeof SIZE_TIERS)[number];
 
+// A manually-placed zone ring around exactly this one node — independent of
+// (and drawn alongside, if both happen to apply) the automatic circle
+// detection in circleAbl.ts, which only ever fires for a node with 2+
+// direct parentId-children and picks its own color by majority vote. This
+// is the opposite: any single node, color chosen outright rather than
+// computed. null means no manual zone.
+export const MANUAL_ZONE_COLORS = ["positive", "negative"] as const;
+export type ManualZoneColor = (typeof MANUAL_ZONE_COLORS)[number];
+
 export const NodeSchema = new mongoose.Schema(
   {
     nodeId: { type: String, required: true, unique: true }, // public id, safe to expose in URLs/JSON
@@ -80,6 +89,15 @@ export const NodeSchema = new mongoose.Schema(
     isProtection: { type: Boolean, default: false },
     protectsNodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", default: null }, // which node this shield defends
 
+    // A shield doesn't erase the damage it blocks, it defers it: every hit
+    // attackNodeAbl blocks for this protector adds that weapon's damage
+    // here instead of applying it to protectsNodeId. Deleting this node
+    // releases the whole running total onto protectsNodeId at once (see
+    // deleteNodeDao) — "the protected node has its own damage back," per
+    // the feature's own ask. Only ever meaningful while isProtection is
+    // true; a plain node has no use for it.
+    blockedDamage: { type: Number, default: 0 },
+
     // Packing: folds this node off the canvas, nested inside another node
     // (abl/packAbl.ts). Set only via POST /:nodeId/pack (on the *container*,
     // for one or more member ids at once) and cleared via POST
@@ -103,6 +121,10 @@ export const NodeSchema = new mongoose.Schema(
     // SYMBOL_OVERRIDES above. Unlike `locked`, this one IS settable through
     // PATCH /api/nodes/:nodeId (by the node's owner, same as text/type).
     symbolOverride: { type: String, enum: SYMBOL_OVERRIDES, default: null },
+
+    // See MANUAL_ZONE_COLORS above — also settable through plain
+    // PATCH /api/nodes/:nodeId, same owner-only gating as symbolOverride.
+    manualZone: { type: String, enum: MANUAL_ZONE_COLORS, default: null },
   },
   {
     timestamps: true,

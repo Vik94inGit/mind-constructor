@@ -26,12 +26,30 @@ export const WEAPON_ARROW_COUNT: Record<WeaponIcon, number> = {
 
 // The one positive/negative color pair every "zone" backdrop uses (a
 // circle's own halo/horns-colored polygon — MapPage's Zones SVG block and
-// MiniMap's own scaled-down copy — plus grouped branch-arrow lines). Used
-// to be duplicated as a bare hex literal at each of those three sites with
-// no shared constant; pulled out here so a future re-tune only ever
-// touches one place. Slightly deeper/less pastel than the original
-// #ffd54f/#ff3d00 pair for more contrast against the surface background.
-export const ZONE_COLORS = { positive: "#f2c744", negative: "#e8320a" } as const;
+// MiniMap's own scaled-down copy — plus grouped branch-arrow lines and the
+// minimap's own per-node dots). Used to be duplicated as a bare hex literal
+// at each site with no shared constant; pulled out here so a future re-tune
+// only ever touches one place. Plain green/red now — reads unambiguously as
+// "positive side" / "negative side" at the small sizes both the minimap
+// dots and its zone polygons render at, more so than the earlier gold/
+// deep-orange pair.
+export const ZONE_COLORS = { positive: "#22c55e", negative: "#ef4444" } as const;
+
+// A node type's own positive/negative lean — the same halo/horns split
+// OutcomeBadge.tsx's ringKindFor already classifies by (halo=positive,
+// horns=negative), just named for what a group/dot *color* decision needs
+// rather than what symbol a single node draws. "unknown" alone has neither
+// — nothing to vote with, nothing to color a dot by. Shared by MapPage's
+// own circleSentiment (majority vote across a group) and MiniMap's per-node
+// dot coloring, so the two can never disagree about which side a type is on.
+const POSITIVE_TYPES = new Set<NodeType>(["Success", "Solution", "Option"]);
+const NEGATIVE_TYPES = new Set<NodeType>(["Fail", "Problem", "Problematic option"]);
+
+export function sentimentOf(type: NodeType): "positive" | "negative" | null {
+  if (POSITIVE_TYPES.has(type)) return "positive";
+  if (NEGATIVE_TYPES.has(type)) return "negative";
+  return null;
+}
 
 export function idOf(ref: string | { _id: string } | undefined | null): string | undefined {
   if (!ref) return undefined;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type mongoose from "mongoose";
-import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS } from "../models/Node.js";
+import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS } from "../models/Node.js";
 import { getMapByIdDao } from "../dao/mapsDao.js";
 import {
   createNodeMutationDao,
@@ -38,6 +38,9 @@ const createNodeSchema = z.object({
   // the common path), but nothing stops a caller from picking a size up
   // front.
   sizeTier: sizeTierSchema.nullish(),
+  // See Node.MANUAL_ZONE_COLORS — a manually-placed zone ring, independent
+  // of the automatic circle detection.
+  manualZone: z.enum(MANUAL_ZONE_COLORS).nullish(),
 });
 
 // The clearest example of "why ABL": creating a node is two DAO calls
@@ -95,6 +98,9 @@ const updateNodeSchema = z
     // updates are a general PATCH convention, but no current UI path sends
     // it for this field.
     sizeTier: sizeTierSchema.nullish(),
+    // null explicitly removes a manual zone ring — same nullish-vs-absent
+    // convention symbolOverride already uses.
+    manualZone: z.enum(MANUAL_ZONE_COLORS).nullish(),
   })
   .refine((fields) => Object.values(fields).some((v) => v !== undefined), {
     error: "No fields to update",
