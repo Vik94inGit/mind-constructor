@@ -396,22 +396,29 @@ export const deleteNode = async (
         .json({ success: false, error: "Unauthorized User missing" });
     }
 
-    const node = await deleteNodeDao(nodeId, userId);
+    const result = await deleteNodeDao(nodeId, userId);
 
-    if (!node) {
+    if (!result) {
       return res
         .status(404)
         .json({ success: false, error: "Node not found" });
     }
+    const { node, damagedProtectedNode } = result;
 
     // Deleting a node also cascades to edges touching it, children's
     // parentId, and weapon nodes aimed at it (see deleteNodeDao) — those
     // side effects aren't individually broadcast, so other open tabs only
-    // pick them up on next reload. The node itself goes out live.
+    // pick them up on next reload. The node itself goes out live, and so
+    // does damagedProtectedNode when this was a protection node with a
+    // nonzero blockedDamage — a live health change (possibly a defeat) is
+    // worth more than the other, silent cascade effects.
     const publicMapId = await findPublicMapIdDao(node.mapId);
-    if (publicMapId) broadcastToMap(publicMapId, "node:deleted", { nodeId });
+    if (publicMapId) {
+      broadcastToMap(publicMapId, "node:deleted", { nodeId });
+      if (damagedProtectedNode) broadcastToMap(publicMapId, "node:updated", damagedProtectedNode);
+    }
 
-    return res.status(200).json({ success: true, deletedId: nodeId });
+    return res.status(200).json({ success: true, deletedId: nodeId, damagedProtectedNode });
   } catch (error) {
     console.error("deleteNode error:", error);
     return res.status(500).json({ success: false, error: "Server error" });

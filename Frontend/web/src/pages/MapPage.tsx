@@ -20,11 +20,10 @@ import { AddMenu } from "../map/AddMenu";
 import { SelectionMenu } from "../map/SelectionMenu";
 import { MiniMap } from "../map/MiniMap";
 import { WeaponMark } from "../map/WeaponMark";
-import { ShieldMark } from "../map/ShieldMark";
 import { ringKindFor } from "../map/OutcomeBadge";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { Modal } from "../components/Modal";
-import { idOf, nodeRefId, ZONE_COLORS } from "../utils/nodeType";
+import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
 import { NODE_TYPES } from "../types";
 import type { AttackIndicator, EdgeDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
@@ -225,25 +224,15 @@ function avoidOverlap(
   };
 }
 
-// Which node types read as "positive"/"negative" for group-majority
-// purposes — matches ringKindFor's own halo/horns split exactly (see
-// OutcomeBadge.tsx's OUTCOME_CONFIG), so whatever ring a node's own badge
-// draws is exactly what its vote counts as. Option used to be left out of
-// this (neutral, like "unknown") even though it draws the same halo ring
-// Success/Solution do — a zone full of halo Option nodes plus one horns
-// Problem/Fail then had nothing on the positive side of the vote at all,
-// so it read as negative-majority despite every visible ring in it saying
-// "positive." "unknown" alone stays genuinely neutral — it's the one type
-// with no ring to have voted with in the first place.
-const POSITIVE_TYPES = new Set<NodeType>(["Success", "Solution", "Option"]);
-const NEGATIVE_TYPES = new Set<NodeType>(["Fail", "Problem", "Problematic option"]);
-
-function sentimentOf(type: NodeType): "positive" | "negative" | null {
-  if (POSITIVE_TYPES.has(type)) return "positive";
-  if (NEGATIVE_TYPES.has(type)) return "negative";
-  return null;
-}
-
+// sentimentOf (imported from utils/nodeType.ts) — matches ringKindFor's own
+// halo/horns split exactly (see OutcomeBadge.tsx's OUTCOME_CONFIG), so
+// whatever ring a node's own badge draws is exactly what its vote counts
+// as. Option counts as positive (same halo ring Success/Solution draw), not
+// neutral — a zone full of halo Option nodes plus one horns Problem/Fail
+// would otherwise have nothing on the positive side of the vote despite
+// every visible ring in it saying "positive." "unknown" alone stays
+// genuinely neutral — it's the one type with no ring to have voted with.
+//
 // A circle's own filter, and the same majority vote the big backdrop's
 // halo/horns color already uses — root counts as a member like any other.
 // A lone non-neutral root already leans a side from the start (majority of
@@ -267,9 +256,6 @@ function circleSentiment(members: NodeDoc[]): "positive" | "negative" | null {
 // never gets confused with two nodes that simply ended up in the same
 // neighborhood.
 const CIRCLE_DROP_RADIUS = 70;
-// Root + up to this many children — the cap on how big a circle can grow
-// via drag-to-join.
-const CIRCLE_MAX_CHILDREN = 6;
 
 // Would setting candidateId's parentId to ancestorId close a loop? Walks up
 // from candidateId's *current* parent chain — if ancestorId is already up
@@ -613,6 +599,7 @@ export function MapPage() {
       node,
       weaponNode,
       healedParent,
+      protector,
     }: {
       node: NodeDoc;
       weaponNode: NodeDoc;
@@ -621,10 +608,18 @@ export function MapPage() {
       // attack, so every other map member's canvas picks up the heal too,
       // not just the retaliator's own tab.
       healedParent: NodeDoc | null;
+      // Set only when this attack was blocked — the protection node that
+      // blocked it, with its own blockedDamage bumped (see attackAbl.ts's
+      // own comment). Every other tab needs this too, not just the
+      // attacker's own, so NodePanel's own "blocked N damage so far" line
+      // and the weapon-mark loop's own "redirect arrows to the shield"
+      // lookup both stay in sync everywhere.
+      protector: NodeDoc | null;
     }) => {
       upsertNode(node);
       upsertNode(weaponNode);
       if (healedParent) upsertNode(healedParent);
+      if (protector) upsertNode(protector);
       setCelebrateIds((prev) => new Set(prev).add(weaponNode.nodeId));
       refreshInsights(mapId);
     };
@@ -639,7 +634,10 @@ export function MapPage() {
     const onCircleSelected = ({ selectedCircle }: { selectedCircle: SelectedCircle | null }) =>
       applyCircleSelection(selectedCircle);
     const onCircleDeselected = () => applyCircleSelection(null);
-    const onNodeProtected = ({ protectionNode }: { protectionNode: NodeDoc }) => upsertNode(protectionNode);
+    const onNodeProtected = ({ protectionNode, healedNode }: { protectionNode: NodeDoc; healedNode: NodeDoc }) => {
+      upsertNode(protectionNode);
+      upsertNode(healedNode);
+    };
     const onNodePacked = ({ container, members }: { container: NodeDoc; members: NodeDoc[] }) => {
       upsertNode(container);
       members.forEach(upsertNode);
@@ -802,15 +800,40 @@ export function MapPage() {
         map.set(n.nodeId, { x: n.x, y: n.y });
         return;
       }
-      // Exact mirror of the weapon-node placement just above — anchored
-      // near the protector's own closest node to the node it's guarding,
-      // not the guarded node itself, so the shield (ShieldMark, drawn on
-      // the *guarded* node oriented toward this position) reads as "coming
-      // from over there" the same way a weapon's bow does.
       const protectedId = nodeRefId(n.protectsNodeId);
       const protectedNode = protectedId ? nodes.find((t) => t.nodeId === protectedId) : undefined;
       const protectedPos = (protectedNode && map.get(protectedNode.nodeId)) || { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-      map.set(n.nodeId, placeCompanionNode(n, protectedPos));
+
+      // Whoever most recently attacked the node this shield defends (same
+      // "nodes come back in creation order, last match is most recent"
+      // convention handleNodeClick's own weapon-replay already relies on) —
+      // when one exists, the shield belongs literally between the two:
+      // positioned at their midpoint, reading as "standing in the way"
+      // rather than floating near its own creator's other nodes (also what
+      // the weapon-mark loop's own arrow-redirect lookup uses to find where
+      // to stop). No active attacker at all: this is just an ordinary
+      // companion node (placeCompanionNode, same as a weapon node with
+      // nothing target-specific to react to) — a shield badge on the node
+      // itself (NodeCard) is all that marks it as one.
+      const attackers = weapons.filter((w) => nodeRefId(w.targetNodeId) === protectedId);
+      const latestAttackerId = attackers[attackers.length - 1]?.nodeId;
+      const attackerPos = latestAttackerId ? map.get(latestAttackerId) : undefined;
+
+      if (attackerPos) {
+        // Deliberately *not* run through avoidOverlap here, unlike every
+        // other placement in this memo — a weapon node is anchored only
+        // getNodeMinDist() away from its own target (close enough that the
+        // bow reads as "right next to the attacker"), which puts their own
+        // midpoint well inside *both* nodes' minDist zones every time.
+        // avoidOverlap's own job is exactly to push out of a zone like
+        // that, which here would walk the shield away from the midpoint by
+        // more than the attacker-target distance itself — the opposite of
+        // "on the arrows path." A literal on-the-line position, slightly
+        // overlapping either endpoint's own footprint, is the actual ask.
+        map.set(n.nodeId, { x: (attackerPos.x + protectedPos.x) / 2, y: (attackerPos.y + protectedPos.y) / 2 });
+      } else {
+        map.set(n.nodeId, placeCompanionNode(n, protectedPos));
+      }
     });
     return map;
   }, [nodes]);
@@ -831,7 +854,17 @@ export function MapPage() {
   // past the cap just keeps its stored position. Waits on selectionSettled
   // too, same reasoning as quickAddActive — neighbors shouldn't jump into
   // their ring while the camera's still panning toward the chosen node.
-  const RADIAL_NEIGHBOR_RADIUS = 190;
+  // Shrunk on a phone-width viewport, same isMobile threshold
+  // getNodeMinDist() already uses — the fixed 190px radius left several of
+  // a 10-neighbor ring's members past the horizontal edges of a ~375px-wide
+  // screen (center ± 190 overshoots a 375px width on either side once the
+  // node's own ~37px half-width is added in), physically unreachable to
+  // tap. This is exactly what made picking pack-eligible neighbors "not
+  // work" on mobile — the picker opened, but some of the very nodes it
+  // needed you to tap were off-screen. 110px keeps a full-diameter ring
+  // (220px) comfortably inside even a narrow phone width.
+  const isMobileViewport = typeof window !== "undefined" && window.innerWidth <= 640;
+  const RADIAL_NEIGHBOR_RADIUS = isMobileViewport ? 110 : 190;
   const RADIAL_MAX_NEIGHBORS = 10;
   const radialPositions = useMemo(() => {
     if (multiSelectIds.size > 1 || !selectedId || !selectionSettled) return null;
@@ -1019,15 +1052,16 @@ export function MapPage() {
     shotTimeoutRef.current = setTimeout(() => setShotState(null), 700);
   }
 
-  // Every packed-away node filtered out — this is what every canvas
-  // rendering loop (NodeCard itself, branch-arrow lines, circle/zone
-  // detection) should iterate instead of raw `nodes`, so a packed member
-  // actually disappears from the canvas instead of just growing a
-  // packedIntoNodeId nobody reads. Plain `nodes` stays correct (and is
-  // still used) for lookups that need to resolve a packed node's own text —
-  // e.g. NodePanel's own "Packed (N)" list — since a packed node is still a
-  // completely real node server-side, just hidden here.
-  const visibleNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
+  // Used to filter packed-away members out of every canvas rendering loop.
+  // Packing (packAbl.ts) still exists as a relationship — a container's own
+  // count badge, and its "Packed (N)" unpack list in NodePanel, both still
+  // work off Node.packedIntoNodeId exactly as before — but per the user's
+  // own "no packed are hidden," a packed member itself no longer disappears
+  // from the canvas; it renders as a completely normal node, same as
+  // anything else. Kept as its own alias (rather than replacing every call
+  // site back with plain `nodes`) so reintroducing a filter here later is a
+  // one-line change again if that ever comes back.
+  const visibleNodes = nodes;
 
   // How many nodes are currently packed into each container — NodeCard's
   // own corner badge reads this by nodeId.
@@ -1182,11 +1216,17 @@ export function MapPage() {
   // ----- dragging -----
 
   // What dragging `dragged` to (x,y) would land it on, if anything — the
-  // nearest other node within CIRCLE_DROP_RADIUS, plus whether dropping
-  // there is actually allowed to become/join a circle (own node, no
-  // cycle, room under the 7-node cap, and a sentiment that doesn't
-  // conflict with the target's own). null means the pointer isn't over
-  // anything droppable, so the drag ends as a plain reposition instead.
+  // nearest other node within CIRCLE_DROP_RADIUS. Every restriction on
+  // *joining* a circle this way (own-node-only, the 7-node cap, matching
+  // sentiment) has been removed — any node can be dropped onto any other to
+  // join its circle, any number of nodes, any mix of sentiment, same
+  // "fully open" spirit combat and pack/protect creation already follow.
+  // The one thing still checked is cycle-safety, not a restriction so much
+  // as a correctness guard: dropping a node onto its own descendant would
+  // close the parentId chain into a loop, which every bit of code that
+  // walks that chain (nodeGroups, radialPositions, isDescendant itself)
+  // assumes can never happen. null means the pointer isn't over anything
+  // droppable at all, so the drag ends as a plain reposition instead.
   function findDropTarget(
     dragged: NodeDoc,
     x: number,
@@ -1206,29 +1246,8 @@ export function MapPage() {
     }
     if (!closest) return null;
     const target = closest;
-    if (!isOwnNode(target)) {
-      return { target, valid: false, reason: "Only your own nodes can anchor a circle." };
-    }
     if (isDescendant(target.nodeId, dragged.nodeId, nodes)) {
       return { target, valid: false, reason: "Can't drop a node onto its own branch." };
-    }
-    // Exclude the dragged node itself from the target's current children —
-    // otherwise re-dropping it back onto its existing parent would double-
-    // count it against both the cap and the sentiment vote.
-    const currentChildren = nodes.filter(
-      (n) => n.nodeId !== dragged.nodeId && nodeRefId(n.parentId) === target.nodeId,
-    );
-    if (currentChildren.length >= CIRCLE_MAX_CHILDREN) {
-      return { target, valid: false, reason: "That circle already has the maximum of 7 nodes." };
-    }
-    const targetSentiment = circleSentiment([target, ...currentChildren]);
-    const draggedSentiment = sentimentOf(dragged.type);
-    if (targetSentiment && draggedSentiment && targetSentiment !== draggedSentiment) {
-      return {
-        target,
-        valid: false,
-        reason: `That circle is ${targetSentiment} — only ${targetSentiment} nodes can join it.`,
-      };
     }
     return { target, valid: true };
   }
@@ -1320,7 +1339,49 @@ export function MapPage() {
     const offsetX = startPt.x - start.x;
     const offsetY = startPt.y - start.y;
 
+    // Long-press to multi-select, touch only — there's no keyboard on a
+    // phone to reach shift+click's own toggle any other way, and
+    // marquee-drag is already claimed by native canvas panning on touch
+    // (see onCanvasPointerDown's own comment), so touch had no path into
+    // multi-select at all. Holding still for LONG_PRESS_MS toggles this
+    // node into/out of the multi-selection, same common "long-press to
+    // start picking" gesture photo/file picker apps already use; moving
+    // more than a few px (real drag, not a held finger's own jitter) or
+    // releasing early cancels it and falls through to the ordinary
+    // tap-to-select/drag paths below, untouched.
+    const LONG_PRESS_MS = 500;
+    const LONG_PRESS_MOVE_TOLERANCE = 10;
+    let longPressTimer: ReturnType<typeof setTimeout> | undefined;
+    // Reused below by onMove's own cancellation check — stays undefined
+    // (a no-op) for a mouse pointerdown, only ever assigned for touch.
+    let cancelLongPressIfMoved: ((ev: PointerEvent) => void) | undefined;
+    if (e.pointerType === "touch") {
+      const touchStartX = e.clientX;
+      const touchStartY = e.clientY;
+      longPressTimer = setTimeout(() => {
+        longPressTimer = undefined;
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        setDragState(null);
+        setDropTarget(null);
+        navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        setMultiSelectIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(node.nodeId)) next.delete(node.nodeId);
+          else next.add(node.nodeId);
+          return next;
+        });
+      }, LONG_PRESS_MS);
+      cancelLongPressIfMoved = (ev: PointerEvent) => {
+        if (longPressTimer && Math.hypot(ev.clientX - touchStartX, ev.clientY - touchStartY) > LONG_PRESS_MOVE_TOLERANCE) {
+          clearTimeout(longPressTimer);
+          longPressTimer = undefined;
+        }
+      };
+    }
+
     function onMove(ev: PointerEvent) {
+      cancelLongPressIfMoved?.(ev);
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
@@ -1331,6 +1392,10 @@ export function MapPage() {
     }
 
     async function onUp(ev: PointerEvent) {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = undefined;
+      }
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       // See suppressNextClick's own comment — this interaction's outcome
@@ -1765,8 +1830,11 @@ export function MapPage() {
   async function handleDeleteNode(node: NodeDoc) {
     if (!confirm("Delete this node?")) return;
     try {
-      await nodesApi.deleteNode(node.nodeId);
+      const res = await nodesApi.deleteNode(node.nodeId);
       applyNodeDeleted(node.nodeId);
+      // Deleting a protection node with banked damage releases the whole
+      // total onto whatever it was defending — see Backend's deleteNodeDao.
+      if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : "Delete failed");
     }
@@ -1868,7 +1936,14 @@ export function MapPage() {
       const node = await nodesApi.createNode(mapId, { text, type, x, y, parentId });
       upsertNode(node);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-      setSelectedId(node.nodeId);
+      // Deselect rather than select the freshly-created node — same "close
+      // the panel after creating a node" behavior NodePanel's own
+      // handleAttack/handleProtect follow, applied to every other
+      // node-creation path (toolbar, double-click, quick-add) that ends up
+      // here too. Used to select it instead, opening its panel right away;
+      // this leaves the canvas clear so the create-flow itself reads as
+      // finished rather than immediately handing you another panel.
+      setSelectedId(null);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : "Failed to create node");
     } finally {
@@ -1972,7 +2047,12 @@ export function MapPage() {
     if (!confirm(`Delete ${ids.length} node${ids.length === 1 ? "" : "s"}?`)) return;
     setActionError(null);
     try {
-      await Promise.all(ids.map((id) => nodesApi.deleteNode(id)));
+      const results = await Promise.all(ids.map((id) => nodesApi.deleteNode(id)));
+      // Any protection node in the batch releases its own banked damage
+      // onto whatever it was defending — see Backend's deleteNodeDao.
+      results.forEach((res) => {
+        if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
+      });
       setNodes((prev) => prev.filter((n) => !ids.includes(n.nodeId)));
       setEdges((prev) =>
         prev.filter((e) => !ids.includes(nodeRefId(e.fromNodeId) ?? "") && !ids.includes(nodeRefId(e.toNodeId) ?? "")),
@@ -2304,6 +2384,34 @@ export function MapPage() {
                 );
               })}
               {/*
+                Manual zones: a single node's own owner-chosen zone ring (node.manualZone —
+                see NodePanel's Info tab), independent of the automatic parentId-group zones
+                above — no 2+-children requirement, color picked outright rather than voted.
+                Fixed-radius circle (there's no multi-member outline to trace, unlike the
+                polygon zones) around just that one node's own position. Drawn alongside an
+                automatic zone if a node happens to be in both at once — these are separate
+                layers, not mutually exclusive.
+              */}
+              {visibleNodes
+                .filter((n) => n.manualZone)
+                .map((n) => {
+                  const p = posFor(n);
+                  const color = n.manualZone === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative;
+                  return (
+                    <circle
+                      key={`manual-zone-${n.nodeId}`}
+                      cx={p.x}
+                      cy={p.y}
+                      r={55}
+                      fill={color}
+                      fillOpacity={0.14}
+                      stroke={color}
+                      strokeOpacity={0.5}
+                      strokeWidth={2.5}
+                    />
+                  );
+                })}
+              {/*
                 Figures: any closed loop in the Link graph — colored fill as a backdrop, under
                 everything else. A plain two-node link is a line and can never close, so it never
                 shows up here; this is what "except line" means in practice, not a special case.
@@ -2572,7 +2680,17 @@ export function MapPage() {
                   const targetNode = visibleNodes.find((n) => n.nodeId === targetId);
                   if (!targetNode) return null;
                   const a = posFor(weaponNode);
-                  const b = posFor(targetNode);
+                  // An active shield on the target intercepts the arrows —
+                  // they fly to (and stop at) the shield's own position
+                  // instead of reaching the target, reading as "blocked
+                  // here," not "landed." Any one active protector is enough
+                  // to redirect every one of the target's own attackers,
+                  // same "just needs to exist" gate attackAbl.ts's own
+                  // findActiveProtectorDao check already uses server-side.
+                  const activeProtector = visibleNodes.find(
+                    (n) => n.isProtection && !n.defeated && nodeRefId(n.protectsNodeId) === targetId,
+                  );
+                  const b = posFor(activeProtector ?? targetNode);
                   // A weapon node can carry any outcome type now, not just
                   // the negative-framed ones (see Backend's attackAbl.ts —
                   // retaliation especially is naturally a positive claim,
@@ -2598,35 +2716,14 @@ export function MapPage() {
                 })}
             </svg>
 
-            {/* Shields — one per active protection node, drawn on the node
-                it protects (not the protection node's own spot), oriented
-                toward whichever protector it came from. Same dedicated
-                overlay-layer treatment as the weapon marks above, for the
-                same reason (has to paint above every NodeCard, z-31/32). */}
-            <svg
-              className="pointer-events-none absolute inset-0 z-[34] h-full w-full"
-              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-            >
-              {visibleNodes
-                .filter((n) => n.isProtection && !n.defeated)
-                .map((protectionNode) => {
-                  const protectedId = nodeRefId(protectionNode.protectsNodeId);
-                  if (!protectedId) return null;
-                  const protectedNode = visibleNodes.find((n) => n.nodeId === protectedId);
-                  if (!protectedNode) return null;
-                  const a = posFor(protectedNode);
-                  const b = posFor(protectionNode);
-                  return (
-                    <ShieldMark
-                      key={`shield-${protectionNode.nodeId}`}
-                      x={a.x}
-                      y={a.y}
-                      protectorX={b.x}
-                      protectorY={b.y}
-                    />
-                  );
-                })}
-            </svg>
+            {/* No separate ShieldMark overlay any more — a protection node
+                already sits exactly on the arrows path between attacker and
+                defended node (see the positions memo) and the arrows
+                targeting it stop right there (see the weapon-mark loop
+                above), which is signal enough on its own; the extra
+                bow-and-emblem drawing on top of it read as redundant
+                clutter. NodeCard's own small 🛡️ badge is still the one
+                thing marking a node as a protector, active attacker or not. */}
 
             {quickAddActive && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
@@ -2668,6 +2765,9 @@ export function MapPage() {
           </div>
           <MiniMap
             wrapRef={wrapRef}
+            nodes={visibleNodes}
+            edges={edges}
+            positions={positions}
             groups={nodeGroups}
             canvasW={CANVAS_W}
             canvasH={CANVAS_H}
@@ -2892,12 +2992,15 @@ export function MapPage() {
                 }}
                 onDeleted={applyNodeDeleted}
                 onUpdated={upsertNode}
-                onAttacked={(updatedNode, weaponNode, _weapon, healedParent) => {
+                onAttacked={(updatedNode, weaponNode, _weapon, healedParent, _blocked, protector) => {
                   upsertNode(updatedNode);
                   upsertNode(weaponNode);
                   // Set only on a landed retaliation — see attackAbl.ts's
                   // own healedParent doc comment.
                   if (healedParent) upsertNode(healedParent);
+                  // Set only when blocked — the protector's own updated
+                  // blockedDamage (see attackAbl.ts's own comment).
+                  if (protector) upsertNode(protector);
                   // Weapon nodes never got the "just created" flourish other
                   // nodes get — this is what NodeCard reads to fly the weapon
                   // in at the target instead of just popping into place.
@@ -2910,7 +3013,10 @@ export function MapPage() {
                 }}
                 onStartLink={() => startLinkFrom(selectedNode.nodeId)}
                 onEdit={() => startInlineEdit(selectedNode)}
-                onProtected={(protectionNode) => upsertNode(protectionNode)}
+                onProtected={(protectionNode, healedNode) => {
+                  upsertNode(protectionNode);
+                  upsertNode(healedNode);
+                }}
                 onStartPack={() => startPackFrom(selectedNode.nodeId)}
                 onUnpacked={(unpacked) => upsertNode(unpacked)}
               />

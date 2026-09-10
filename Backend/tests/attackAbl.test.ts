@@ -5,6 +5,7 @@ import {
   createWeaponNodeMutationDao,
   createProtectionNodeMutationDao,
   findActiveProtectorDao,
+  incrementBlockedDamageDao,
 } from "../src/dao/nodeDao.js";
 import { isMapMemberDao, getMapByInternalIdDao } from "../src/dao/mapsDao.js";
 import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../src/dao/attackDao.js";
@@ -28,6 +29,7 @@ vi.mock("../src/dao/nodeDao.js", () => ({
   createWeaponNodeMutationDao: vi.fn(),
   createProtectionNodeMutationDao: vi.fn(),
   findActiveProtectorDao: vi.fn(),
+  incrementBlockedDamageDao: vi.fn(),
   NODE_POPULATE: [],
 }));
 vi.mock("../src/dao/mapsDao.js", () => ({
@@ -214,6 +216,7 @@ describe("attackAbl", () => {
         // No protection node guards this target (findActiveProtectorDao's
         // default unconfigured mock resolves undefined) — the attack lands.
         blocked: false,
+        protector: null,
       });
       expect(healNodeDao).not.toHaveBeenCalled();
     });
@@ -314,28 +317,27 @@ describe("attackAbl", () => {
   });
 
   describe("attackNodeAbl — protection blocks damage", () => {
-    it("does 0 damage and skips applyDamageDao when an undefeated protection node guards the target", async () => {
-      // populate: a real Mongoose document's own instance method — the
-      // blocked path calls `node.populate(NODE_POPULATE)` directly (see
-      // attackAbl.ts's own comment) since findNodeByPublicIdDao's query
-      // doesn't populate, unlike applyDamageDao's. Mocked here to resolve a
-      // *populated*-shaped node, same client-facing shape applyDamageDao's
-      // own query would have produced on the non-blocked path.
+    it("does 0 damage, banks it on the protector, and skips applyDamageDao when an undefeated protection node guards the target", async () => {
       const populatedNode = {
-        _id: "n1", mapId: "m1", userId: { _id: "victim1", username: "victim" }, defeated: false, health: 100,
+        _id: "n1", mapId: "m1", userId: { _id: "victim1", username: "victim" }, defeated: false, health: 70,
       };
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
-        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 70,
         populate: vi.fn().mockResolvedValue(populatedNode),
       } as never);
       vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
       vi.mocked(findActiveProtectorDao).mockResolvedValue({ _id: "shield1" } as never);
+      vi.mocked(incrementBlockedDamageDao).mockResolvedValue({ _id: "shield1", blockedDamage: 50 } as never);
       vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
 
       const result = await attackNodeAbl("node1", "attacker1", "fatalFlaw", validContent);
 
       expect(findActiveProtectorDao).toHaveBeenCalledWith("n1");
       expect(applyDamageDao).not.toHaveBeenCalled();
+      // Banked on the protector, not applied to (or healed on) the target —
+      // a shield defers the hit, it doesn't erase or reward it.
+      expect(incrementBlockedDamageDao).toHaveBeenCalledWith("shield1", 50);
+      expect(healNodeDao).not.toHaveBeenCalled();
       expect(logAttackDao).toHaveBeenCalledWith(
         expect.objectContaining({ damage: 0 }),
       );
@@ -346,6 +348,7 @@ describe("attackAbl", () => {
         weaponNode: { nodeId: "w1" },
         healedParent: null,
         blocked: true,
+        protector: { _id: "shield1", blockedDamage: 50 },
       });
     });
 
@@ -386,11 +389,12 @@ describe("attackAbl", () => {
       expect(createProtectionNodeMutationDao).not.toHaveBeenCalled();
     });
 
-    it("creates a protection node aimed at the target when the caller owns it", async () => {
+    it("creates a protection node aimed at the target and immediately heals it, when the caller owns it", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
         _id: "n1", mapId: "m1", userId: "owner1",
       } as never);
       vi.mocked(createProtectionNodeMutationDao).mockResolvedValue({ nodeId: "p1" } as never);
+      vi.mocked(healNodeDao).mockResolvedValue({ _id: "n1", health: 100 } as never);
 
       const result = await protectNodeAbl("node1", "owner1", validContent);
 
@@ -400,7 +404,10 @@ describe("attackAbl", () => {
         text: "This has a real issue",
         userId: "owner1",
       });
-      expect(result).toEqual({ protectionNode: { nodeId: "p1" } });
+      // The immediate, one-time heal-on-create — on top of, not instead of,
+      // the ongoing block-and-bank-damage behavior tested above.
+      expect(healNodeDao).toHaveBeenCalledWith("n1", 15);
+      expect(result).toEqual({ protectionNode: { nodeId: "p1" }, healedNode: { _id: "n1", health: 100 } });
     });
   });
 

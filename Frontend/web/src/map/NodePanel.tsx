@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { idOf, nodeRefId, usernameOf } from "../utils/nodeType";
+import { idOf, nodeRefId, usernameOf, ZONE_COLORS } from "../utils/nodeType";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
-import { ATTACK_NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
-import type { Attack, AttackNodeType, EdgeDoc, NodeDoc, SizeTier, SymbolOverride, Weapon } from "../types";
+import { ATTACK_NODE_TYPES, MANUAL_ZONE_COLORS, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
+import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, SizeTier, SymbolOverride, Weapon } from "../types";
 
 // Same 100%/115%/130% scale NodeCard's own SIZE_MULTIPLIERS uses, just for
 // the button labels here — kept as a separate literal rather than imported
@@ -82,21 +82,22 @@ interface Props {
   onDeleted: (nodeId: string) => void;
   /** Fired after a direct panel-side PATCH (currently just the symbol-override toggle below) with the server's response, so the canvas/other panels stay in sync — same upsert-by-id MapPage already does for every other node update. */
   onUpdated: (node: NodeDoc) => void;
-  /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. blocked: true when a linked, undefeated protection node stopped this attack outright. */
+  /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. blocked: true when a linked, undefeated protection node stopped this attack outright. protector: that protection node's own updated document (its blockedDamage bumped) when blocked, else null. */
   onAttacked: (
     node: NodeDoc,
     weaponNode: NodeDoc,
     weapon: Weapon,
     healedParent: NodeDoc | null,
     blocked: boolean,
+    protector: NodeDoc | null,
   ) => void;
   onDeleteEdge: (edgeId: string) => void;
   onStartLink: () => void;
   onSelectNode: (nodeId: string) => void;
   /** Text/type editing now happens inline on the node's own icon on the canvas — this just asks the canvas to turn it on. No-ops there if editing isn't currently allowed. */
   onEdit: () => void;
-  /** A new protection node landed, aimed at this node — MapPage upserts it same as any other node. */
-  onProtected: (protectionNode: NodeDoc) => void;
+  /** A new protection node landed, aimed at this node — MapPage upserts it same as any other node. healedNode: this node's own updated document, immediately healed once by the new shield. */
+  onProtected: (protectionNode: NodeDoc, healedNode: NodeDoc) => void;
   /** Asks MapPage to open the pack picker for this node (owner-only — see the Info tab's Pack button). */
   onStartPack: () => void;
   /** One packed member got unpacked back to a normal, visible node. */
@@ -131,14 +132,6 @@ export function NodePanel({
   // Same shape as the attack draft, for the Protect tab.
   const [protectText, setProtectText] = useState("");
   const [protectType, setProtectType] = useState<AttackNodeType>("Solution");
-  // Transient "Blocked!" feedback when handleAttack's response comes back
-  // with blocked:true — not the `error` banner below, since a blocked
-  // attack isn't an error, just a shield doing its job. Cleared by its own
-  // timeout, tracked in a ref so a second blocked attack in a row restarts
-  // the timer instead of the first one's timeout clearing the second's
-  // still-fresh flash out from under it.
-  const [blockedFlash, setBlockedFlash] = useState(false);
-  const blockedFlashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Direct text editing, right inside the Info tab (see the textarea in the
   // JSX below) — reset from the node's real text whenever the selected node
@@ -162,8 +155,7 @@ export function NodePanel({
   const protectedTarget = protectedId ? nodes.find((n) => n.nodeId === protectedId) : undefined;
 
   // The reverse direction: every protection node currently guarding *this*
-  // node (there can be more than one — see ShieldMark, one arc per
-  // protector) — surfaced as a "Protected by" list.
+  // node (there can be more than one) — surfaced as a "Protected by" list.
   const protectors = nodes.filter((n) => n.isProtection && nodeRefId(n.protectsNodeId) === node.nodeId);
 
   // Every node currently packed into this one — the Pack tab's own list.
@@ -208,8 +200,6 @@ export function NodePanel({
     setProtectType("Solution");
     setTextDraft(node.text);
     setTab("info");
-    if (blockedFlashTimeout.current) clearTimeout(blockedFlashTimeout.current);
-    setBlockedFlash(false);
     nodesApi
       .getAttackHistory(node.nodeId)
       .then(setHistory)
@@ -258,8 +248,13 @@ export function NodePanel({
     if (!confirm("Delete this node?")) return;
     setBusy(true);
     try {
-      await nodesApi.deleteNode(node.nodeId);
+      const res = await nodesApi.deleteNode(node.nodeId);
       onDeleted(node.nodeId);
+      // Deleting a protection node with banked damage releases the whole
+      // total onto whatever it was defending in the same breath — see
+      // Backend's deleteNodeDao. Surface that update the same way any
+      // other panel-triggered change does.
+      if (res.damagedProtectedNode) onUpdated(res.damagedProtectedNode);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Delete failed");
     } finally {
@@ -273,14 +268,13 @@ export function NodePanel({
     setError(null);
     try {
       const res = await nodesApi.attackNode(node.nodeId, weapon, { type: attackType, text: attackText.trim() });
-      onAttacked(res.node, res.weaponNode, weapon, res.healedParent, res.blocked);
-      setAttackText("");
-      nodesApi.getAttackHistory(node.nodeId).then(setHistory).catch(() => {});
-      if (res.blocked) {
-        if (blockedFlashTimeout.current) clearTimeout(blockedFlashTimeout.current);
-        setBlockedFlash(true);
-        blockedFlashTimeout.current = setTimeout(() => setBlockedFlash(false), 3000);
-      }
+      onAttacked(res.node, res.weaponNode, weapon, res.healedParent, res.blocked, res.protector);
+      // Landing an attack — blocked or not — creates a real node (the
+      // weapon node carrying the attacker's own objection); closing here
+      // matches every other node-creating action in this panel (Protect
+      // below, Pack's own confirm in MapPage) instead of leaving the panel
+      // sitting open on whatever was just acted on.
+      onClose();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Attack failed");
     } finally {
@@ -296,8 +290,9 @@ export function NodePanel({
     setError(null);
     try {
       const res = await nodesApi.protectNode(node.nodeId, { type: protectType, text: protectText.trim() });
-      onProtected(res.protectionNode);
-      setProtectText("");
+      onProtected(res.protectionNode, res.healedNode);
+      // Same "close after creating a node" reasoning as handleAttack above.
+      onClose();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Protect failed");
     } finally {
@@ -334,6 +329,23 @@ export function NodePanel({
       onUpdated(updated);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Failed to update size");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Owner-only (same as text/type edits) — a manually-chosen zone ring
+  // around just this node, independent of the automatic circle/nodeGroups
+  // detection. null explicitly removes it, same nullish contract
+  // symbolOverride already uses.
+  async function handleSetZone(manualZone: ManualZoneColor | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { manualZone });
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Failed to update zone");
     } finally {
       setBusy(false);
     }
@@ -465,6 +477,13 @@ export function NodePanel({
             </p>
           )}
 
+          {node.isProtection && !!node.blockedDamage && (
+            <p style={{ fontSize: "0.78rem", marginTop: "0.3rem", color: "var(--ink-soft)" }}>
+              Blocked {node.blockedDamage} damage so far — deleting this shield returns all of it to{" "}
+              {protectedTarget ? protectedTarget.text.slice(0, 30) : "the node it defends"} at once.
+            </p>
+          )}
+
           {protectors.length > 0 && (
             <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
               🛡️ Protected by{" "}
@@ -521,6 +540,38 @@ export function NodePanel({
                   {SIZE_TIER_LABEL[tier]}
                 </button>
               ))}
+            </div>
+          )}
+
+          {isCreator && (
+            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Zone:</span>
+              {MANUAL_ZONE_COLORS.map((z) => (
+                <button
+                  key={z}
+                  className="inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.8rem] font-semibold capitalize transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50"
+                  style={
+                    node.manualZone === z
+                      ? { borderColor: ZONE_COLORS[z], background: `${ZONE_COLORS[z]}26`, color: ZONE_COLORS[z] }
+                      : { borderColor: "var(--line)", background: "var(--surface)", color: "var(--ink)" }
+                  }
+                  onClick={() => handleSetZone(z)}
+                  disabled={busy}
+                  title={`Draw a ${z} zone ring around just this node`}
+                >
+                  {z}
+                </button>
+              ))}
+              {node.manualZone && (
+                <button
+                  className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent px-[0.55rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink-soft transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => handleSetZone(null)}
+                  disabled={busy}
+                  title="Remove this manual zone ring"
+                >
+                  Reset
+                </button>
+              )}
             </div>
           )}
 
@@ -624,11 +675,6 @@ export function NodePanel({
 
       {tab === "attack" && canAttack && (
         <div className="mt-4">
-          {blockedFlash && (
-            <div className="mb-3 rounded-lg border border-accent bg-accent-soft px-[0.9rem] py-[0.7rem] text-[0.85rem] font-semibold text-accent-ink">
-              🛡️ Blocked! A protection node stopped that attack outright.
-            </div>
-          )}
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
             Landing an attack creates a real node with your objection, linked to this one by a
             weapon arrow.

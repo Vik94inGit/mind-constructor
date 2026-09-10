@@ -113,6 +113,12 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   "cluster" detector: this app's maps are normally trees radiating from a Problem/Option node, and
   a tree's k-core for any `minDegree >= 2` is always empty (a forest has no cycles), so that
   approach could never actually fire on a real map.
+- **`Node.manualZone`** — a manually-placed zone ring around exactly one node, independent of
+  `circleAbl.ts`'s automatic detection above (no 2+-children requirement, and the color — positive/
+  negative, `MANUAL_ZONE_COLORS` — is chosen outright rather than computed by majority vote). Plain
+  `PATCH /api/nodes/:nodeId`, owner-only, same gating as `symbolOverride`; `null` removes it. If a
+  node happens to have both an automatic circle *and* a manual zone at once, a frontend draws both —
+  they're independent layers, not mutually exclusive.
 - **`src/models/Attack.ts`** (`WEAPONS`) — the weapon catalog (damage, cooldown). Damage is
   snapshotted onto each `Attack` document at attack time, so rebalancing a weapon later doesn't
   rewrite history. Cooldowns are per attacker+weapon (not per attacker+weapon+target) — landing a
@@ -132,15 +138,37 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `healedParent` (`null` when the target wasn't a weapon node, or was one with nothing to heal)
   alongside the existing `node`/`weaponNode`. `attackNodeAbl` also checks
   `findActiveProtectorDao(node._id)` right before computing damage — if any undefeated protection
-  node points at the target (`Node.isProtection` + `protectsNodeId`), the hit is blocked entirely
-  (0 damage, `applyDamageDao` never called) and the response/broadcast carries `blocked: true`; the
-  attacker's objection is still recorded as a real weapon node and in `logAttackDao`'s history either
-  way. Protection nodes themselves are created by `protectNodeAbl` (`POST /:nodeId/protect`,
-  `attackAbl.ts`) — same "real, typed content Node" shape as a weapon node
+  node points at the target (`Node.isProtection` + `protectsNodeId`), the hit is blocked entirely:
+  0 damage to the target, but the damage isn't erased — it's banked on the protector itself
+  (`Node.blockedDamage`, via `incrementBlockedDamageDao`) instead. A shield defers a hit, it doesn't
+  cancel it: deleting a protection node releases its whole running `blockedDamage` total onto
+  whatever it was defending in one lump sum (`deleteNodeDao`'s own extra step, returning
+  `{ node, damagedProtectedNode }` instead of just `node` — `damagedProtectedNode` is `null` unless
+  that release actually happened) — "the protected node has its own damage back," per the feature's
+  own ask. `deleteNode`'s controller broadcasts a `node:updated` for `damagedProtectedNode` alongside
+  the usual `node:deleted`, unlike this same cascade's other, silent side effects (edge/parentId/
+  weapon cleanup), specifically because a live health change is worth surfacing immediately rather
+  than waiting for next reload. The attack response/broadcast (`node:attacked`) carries `blocked:
+  true` and the protector's own updated document (as `protector`, its `blockedDamage` bumped) when
+  blocked; the attacker's objection is still recorded as a real weapon node and in `logAttackDao`'s
+  history either way. Protection nodes themselves are created by `protectNodeAbl`
+  (`POST /:nodeId/protect`, `attackAbl.ts`) — same "real, typed content Node" shape as a weapon node
   (`createProtectionNodeMutationDao` mirrors `createWeaponNodeMutationDao`), but owner-of-the-target
   only (`NotNodeOwnerError`), not open like combat — a shield has a map-wide, no-cost, no-cooldown
   effect on everyone else's future attacks, so it's gated like editing the node's own text/type
-  rather than left open.
+  rather than left open. Creating one also immediately heals the node it defends by a fixed
+  `PROTECT_CREATE_HEAL_AMOUNT` (via `healNodeDao`, capped at 100, returned/broadcast as
+  `healedNode`) — on top of, not instead of, the ongoing block-and-bank-damage behavior above; adding
+  a shield is both an immediate show of support and a standing defense. A frontend positions a protection node differently depending on whether the
+  target currently has an active attacker (the most recent weapon node aimed at it): with one, the
+  shield sits literally on that attack's own flight path, at the attacker-target midpoint (not nudged
+  clear of either, unlike every other placement in `MapPage.tsx`'s `positions` memo — that midpoint
+  is always within both nodes' own minimum-spacing zone, so the usual overlap-avoidance would just
+  walk it back off the path), and that attack's arrows stop there instead of reaching the target; with
+  none, it's placed like any other companion node. Either way it's rendered through the same `NodeCard`
+  every node uses, distinguished only by its own small 🛡️ badge — no separate directional
+  bow-and-emblem overlay any more, that read as redundant clutter once the node itself already sits on
+  the arrow path.
 - **`src/abl/packAbl.ts`** — folds one or more nodes into a chosen container node
   (`POST /:nodeId/pack`, body `{ nodeIds }`) so they stop rendering on the canvas
   (`Node.packedIntoNodeId`), reversible per member (`POST /:memberId/unpack`). A different
