@@ -22,6 +22,7 @@ import { MiniMap } from "../map/MiniMap";
 import { WeaponMark } from "../map/WeaponMark";
 import { ringKindFor } from "../map/OutcomeBadge";
 import { InviteMemberModal } from "../components/InviteMemberModal";
+import { ExportTextModal } from "../components/ExportTextModal";
 import { Modal } from "../components/Modal";
 import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
@@ -40,20 +41,27 @@ const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 0.35;
 
 // How much of the screen's height NodePanel/LinkPickerPanel's bottom sheet
-// is allowed to cover, on any device — kept in one place so centerOnNode
-// (which reserves this much space when parking the chosen node) and
+// is allowed to cover — kept in one function so centerOnNode (which
+// reserves this much space when parking the chosen node) and
 // viewportBounds (which reserves the same strip when clamping where a new
 // node/ghost is allowed to land) can never drift out of sync with each
-// other, or with the sheet's own max-height (see NodePanel's PANEL_CLASS).
-// A phone's short viewport is what actually makes a mismatch here bite: on
-// desktop there's plenty of headroom above even a generous sheet, but on a
-// phone the old 75dvh sheet against a 40%-reserve camera left the just-
-// selected node (and its quick-add ghosts) parked behind the sheet more
-// often than not, and made every *other* node in that bottom third
-// physically untappable — the sheet is opaque and sits above every node in
-// z-index, so a tap there never reaches the canvas at all. 1/3 leaves two
-// full thirds of the screen clear for the canvas.
-const PANEL_RESERVE_FRAC = 1 / 3;
+// other, or with the sheet's own max-height (see NodePanel's PANEL_CLASS,
+// whose own max-h-[..dvh] pair has to keep matching these two numbers).
+// Different per device on purpose now: on desktop there's plenty of
+// headroom above even a generous sheet, but a phone's short viewport is
+// what actually makes a mismatch here bite — the old 75dvh sheet against a
+// 40%-reserve camera left the just-selected node (and its quick-add
+// ghosts) parked behind the sheet more often than not, and made every
+// *other* node in that bottom stretch physically untappable (the sheet is
+// opaque and sits above every node in z-index, so a tap there never
+// reaches the canvas at all). 1/3 on desktop leaves two full thirds of the
+// screen clear for the canvas; mobile's own screen is short enough that a
+// sheet worth reading needs more of it, so it gets 2/3 instead, leaving
+// exactly the top third clear (still enough room for the chosen node and
+// its ghosts to land somewhere reachable above the sheet).
+function panelReserveFrac(isMobile: boolean) {
+  return isMobile ? 2 / 3 : 1 / 3;
+}
 
 // Node copy/paste clipboard (see copySelection/pasteClipboard below) —
 // deliberately module-level, not component state/a ref inside MapPage.
@@ -289,6 +297,18 @@ export function MapPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Off by default: a bare tap/click on a node only ever selects it while
+  // this is false — onNodePointerDown's own single-node drag setup is
+  // gated behind it (see its own comment). Root cause this fixes: dragging
+  // used to arm from the very first pointerdown on any node, so lightly
+  // grazing one while trying to tap it (a phone's own touch imprecision,
+  // mainly) read as "drag this node," relocating or even re-parenting it
+  // by accident. Turning it on is a deliberate, explicit act (the
+  // toolbar's own Move toggle) instead of the app's default stance.
+  // Doesn't touch double-click-to-edit (startInlineEdit) or an
+  // already-multi-selected group's own drag — both stay available
+  // regardless, since neither one is the "accidental" case this addresses.
+  const [moveMode, setMoveMode] = useState(false);
   const [linkMode, setLinkMode] = useState(false);
   // Ordered picks for the link-mode multi-select — 2 nodes finishes as a
   // single edge (a line); 3+ finishes as a closed loop (every consecutive
@@ -336,6 +356,7 @@ export function MapPage() {
   // showAddMenu/showNodeTypesLegend are that menu's own open/closed state.
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showNodeTypesLegend, setShowNodeTypesLegend] = useState(false);
+  const [showExportText, setShowExportText] = useState(false);
   // The multi-select pill's own "Actions" dropdown (see SelectionMenu) —
   // Copy/Group into circle/Delete for the current multiSelectIds.
   const [showSelectionMenu, setShowSelectionMenu] = useState(false);
@@ -433,9 +454,11 @@ export function MapPage() {
   // out of screen pixels into canvas units, same *zoom reasoning every
   // other screen<->canvas conversion here uses) is generous on purpose:
   // centerOnNode only ever needs up to ~2/3 of that (see its own
-  // PANEL_RESERVE_FRAC-derived visibleH/2), so this comfortably covers it
-  // with room to spare rather than being tuned to the exact minimum and
-  // risking falling short after some future tweak to that fraction.
+  // panelReserveFrac()-derived visibleH/2 — mobile's bigger reserve leaves
+  // *less* headroom to need here, not more, so this stays generous either
+  // way), so this comfortably covers it with room to spare rather than
+  // being tuned to the exact minimum and risking falling short after some
+  // future tweak to that fraction.
   // Recomputed on resize (ResizeObserver, same pattern MiniMap's own
   // viewport tracking already uses) and whenever zoom changes, since both
   // change how many canvas units one screen pixel is worth.
@@ -953,15 +976,15 @@ export function MapPage() {
     const wrap = wrapRef.current;
     if (!wrap) return FULL_CANVAS_BOUNDS;
     const pad = 70;
-    // NodePanel/LinkPickerPanel's bottom sheet (see PANEL_RESERVE_FRAC's own
-    // doc comment) physically covers the bottom third of the screen while
-    // it's open — shrink the placeable rectangle by the same amount so a
-    // freshly-created node (or a quick-add ghost, which reads this via
-    // MapPage's own bounds prop) never lands underneath it. Skipped for the
-    // group-selection footer (multiSelectIds), which is a slim bar, not a
-    // tall sheet.
+    // NodePanel/LinkPickerPanel's bottom sheet (see panelReserveFrac's own
+    // doc comment) physically covers the bottom third (two thirds on
+    // mobile) of the screen while it's open — shrink the placeable
+    // rectangle by the same amount so a freshly-created node (or a
+    // quick-add ghost, which reads this via MapPage's own bounds prop)
+    // never lands underneath it. Skipped for the group-selection footer
+    // (multiSelectIds), which is a slim bar, not a tall sheet.
     const sheetOpen = linkMode || packMode || (!!selectedNode && multiSelectIds.size === 0);
-    const reserve = sheetOpen ? wrap.clientHeight * PANEL_RESERVE_FRAC : 0;
+    const reserve = sheetOpen ? wrap.clientHeight * panelReserveFrac(isMobileViewport) : 0;
     return {
       minX: wrap.scrollLeft / zoom + pad,
       minY: wrap.scrollTop / zoom + pad,
@@ -977,16 +1000,16 @@ export function MapPage() {
   // bottom sheet *overlaying* the canvas at every screen size (see its own
   // PANEL_CLASS) rather than a sidebar the canvas shrinks to make room for —
   // so wrap.clientHeight's own full height is no longer what's actually
-  // visible above it. The module-level PANEL_RESERVE_FRAC (see its own doc
-  // comment) is a deliberate approximation (there's no reliable,
-  // synchronously-correct measurement of the panel's real height here — it
-  // hasn't mounted yet for a first selection, and its content, and so its
-  // height, varies by node and tab anyway) — but it's the *same* fraction
-  // viewportBounds() reserves and PANEL_CLASS caps the sheet at, so the
-  // chosen node (and the quick-add ghosts fanned around it, clamped to that
-  // same viewportBounds) land in the space actually left on screen rather
-  // than drifting out of sync with how tall the sheet is actually allowed
-  // to grow.
+  // visible above it. panelReserveFrac() (see its own doc comment) is a
+  // deliberate approximation (there's no reliable, synchronously-correct
+  // measurement of the panel's real height here — it hasn't mounted yet for
+  // a first selection, and its content, and so its height, varies by node
+  // and tab anyway) — but it's the *same* fraction viewportBounds()
+  // reserves and PANEL_CLASS caps the sheet at, so the chosen node (and the
+  // quick-add ghosts fanned around it, clamped to that same
+  // viewportBounds) land in the space actually left on screen rather than
+  // drifting out of sync with how tall the sheet is actually allowed to
+  // grow.
   function centerOnNode(nodeId: string) {
     const wrap = wrapRef.current;
     const node = nodes.find((n) => n.nodeId === nodeId);
@@ -1010,7 +1033,7 @@ export function MapPage() {
     // so it's always that node's own real, settled spot regardless of
     // what was selected a moment ago.
     const pos = positions.get(nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const visibleH = Math.max(150, wrap.clientHeight * (1 - PANEL_RESERVE_FRAC));
+    const visibleH = Math.max(150, wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport)));
     // *zoom throughout: pos.x/y are canvas-space, but scrollTo/scrollWidth
     // deal in screen pixels of the rendered (scaled) canvas — same
     // conversion as screenToCanvas/zoomAt above, just the other direction.
@@ -1052,16 +1075,16 @@ export function MapPage() {
     shotTimeoutRef.current = setTimeout(() => setShotState(null), 700);
   }
 
-  // Used to filter packed-away members out of every canvas rendering loop.
-  // Packing (packAbl.ts) still exists as a relationship — a container's own
-  // count badge, and its "Packed (N)" unpack list in NodePanel, both still
-  // work off Node.packedIntoNodeId exactly as before — but per the user's
-  // own "no packed are hidden," a packed member itself no longer disappears
-  // from the canvas; it renders as a completely normal node, same as
-  // anything else. Kept as its own alias (rather than replacing every call
-  // site back with plain `nodes`) so reintroducing a filter here later is a
-  // one-line change again if that ever comes back.
-  const visibleNodes = nodes;
+  // Filters packed-away members out of every canvas rendering loop. Packing
+  // (packAbl.ts) still exists as a relationship regardless — a container's
+  // own count badge, and its "Packed (N)" unpack list in NodePanel, both
+  // still work off Node.packedIntoNodeId either way — but a packed member
+  // itself is hidden from the canvas again (this filter briefly went away
+  // per an earlier "no packed are hidden" ask; reinstated per a later,
+  // final call reverting that). NodePanel still receives plain `nodes`
+  // (not this), since it has to show a packed member in its container's own
+  // unpack list even though the canvas itself no longer renders it.
+  const visibleNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
 
   // How many nodes are currently packed into each container — NodeCard's
   // own corner badge reads this by nodeId.
@@ -1321,6 +1344,54 @@ export function MapPage() {
       return;
     }
 
+    // Outside explicit move mode, a bare pointer-down on a single node
+    // never arms a reposition/reparent drag — only touch's own
+    // long-press-to-multiselect gesture still lives here (a deliberate,
+    // held gesture, not the accidental case this addresses); a plain tap
+    // or click falls straight through to NodeCard's own onClick, untouched.
+    // This is what actually fixes "uncomfortable to accidentally drag and
+    // drop nodes": dragging has to be turned on first (the toolbar's own
+    // Move toggle) instead of arming from the very first pointerdown on
+    // any node, so a phone's own touch imprecision while just trying to
+    // tap a node can no longer relocate — or even re-parent — it by
+    // accident.
+    if (!moveMode) {
+      if (e.pointerType !== "touch") return;
+      const touchStartX = e.clientX;
+      const touchStartY = e.clientY;
+      const LONG_PRESS_MS = 500;
+      const LONG_PRESS_MOVE_TOLERANCE = 10;
+      let longPressTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => {
+        longPressTimer = undefined;
+        window.removeEventListener("pointermove", onIdleMove);
+        window.removeEventListener("pointerup", onIdleUp);
+        navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        setMultiSelectIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(node.nodeId)) next.delete(node.nodeId);
+          else next.add(node.nodeId);
+          return next;
+        });
+      }, LONG_PRESS_MS);
+      function onIdleMove(ev: PointerEvent) {
+        if (longPressTimer && Math.hypot(ev.clientX - touchStartX, ev.clientY - touchStartY) > LONG_PRESS_MOVE_TOLERANCE) {
+          clearTimeout(longPressTimer);
+          longPressTimer = undefined;
+        }
+      }
+      function onIdleUp() {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = undefined;
+        }
+        window.removeEventListener("pointermove", onIdleMove);
+        window.removeEventListener("pointerup", onIdleUp);
+      }
+      window.addEventListener("pointermove", onIdleMove);
+      window.addEventListener("pointerup", onIdleUp);
+      return;
+    }
+
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
     dragMoved.current = false;
@@ -1410,7 +1481,14 @@ export function MapPage() {
       setDropTarget(null);
       if (dragMoved.current) {
         if (found && !found.valid) {
+          // Invalid drop (own descendant, per findDropTarget's own
+          // isDescendant check) — cancel the whole move instead of falling
+          // through to a plain reposition below. node.x/y were never
+          // touched during the drag (only dragState was, and that's already
+          // cleared above), so simply not persisting anything here is
+          // enough to snap it back to where it started.
           setActionError(found.reason ?? "Can't join that circle.");
+          return;
         }
         if (found && found.valid) {
           // Dropped onto an eligible node — join its circle instead of a
@@ -2417,8 +2495,12 @@ export function MapPage() {
                 shows up here; this is what "except line" means in practice, not a special case.
               */}
               {linkCycles.map((cycle) => {
+                // visibleNodes, not nodes — a member folded into a pack
+                // drops out of the shape entirely (same as the plain Edge
+                // lines below), rather than a figure still tracing a vertex
+                // at a node nobody can see any more.
                 const pts = cycle
-                  .map((id) => nodes.find((n) => n.nodeId === id))
+                  .map((id) => visibleNodes.find((n) => n.nodeId === id))
                   .filter((n): n is NodeDoc => !!n)
                   .map((n) => posFor(n));
                 if (pts.length < 3) return null;
@@ -2522,8 +2604,13 @@ export function MapPage() {
                 const fromId = nodeRefId(edge.fromNodeId);
                 const toId = nodeRefId(edge.toNodeId);
                 if (!fromId || !toId) return null;
-                const fromNode = nodes.find((n) => n.nodeId === fromId);
-                const toNode = nodes.find((n) => n.nodeId === toId);
+                // visibleNodes, not nodes — a packed-away endpoint hides
+                // this edge along with it (same relationship as a branch
+                // arrow into a packed node, which already goes through
+                // visibleNodes below); unpacking either end brings the edge
+                // right back since this re-resolves on every render.
+                const fromNode = visibleNodes.find((n) => n.nodeId === fromId);
+                const toNode = visibleNodes.find((n) => n.nodeId === toId);
                 if (!fromNode || !toNode) return null;
                 const a = posFor(fromNode);
                 const b = posFor(toNode);
@@ -2618,7 +2705,13 @@ export function MapPage() {
                   selected={selectedId === node.nodeId}
                   multiSelected={multiSelectIds.has(node.nodeId)}
                   dragging={dragState?.nodeId === node.nodeId || groupDragState?.has(node.nodeId) === true}
-                  canDrag={isOwnNode(node)}
+                  // Drags off a bare pointer-down only actually happen when
+                  // moveMode is on, or the node is already part of an
+                  // active 2+-node multi-selection (that path stays live
+                  // regardless — see onNodePointerDown's own group-drag
+                  // branch) — this just keeps NodeCard's own grab/grabbing
+                  // cursor honest about which nodes will really respond.
+                  canDrag={isOwnNode(node) && (moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))}
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
@@ -2823,9 +2916,29 @@ export function MapPage() {
                     setShowAddMenu(false);
                     setShowNodeTypesLegend(true);
                   }}
+                  onExportText={() => {
+                    setShowAddMenu(false);
+                    setShowExportText(true);
+                  }}
                 />
               )}
             </div>
+            {/* Off by default — see moveMode's own doc comment for why
+                (dragging used to arm from a bare pointerdown, which read
+                as accidental relocation on any touch imprecision). Pressed
+                state mirrors tabBtn's own active look elsewhere in the
+                app, just inline here since this cluster has no shared
+                button style of its own to draw from. */}
+            <button
+              type="button"
+              className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border text-[0.95rem] font-semibold hover:bg-surface-2 ${
+                moveMode ? "border-accent bg-accent-soft text-accent-ink" : "border-transparent bg-transparent text-ink"
+              }`}
+              title={moveMode ? "Move nodes: on — tap Done to go back to just selecting" : "Move nodes: off — turn on to drag nodes around"}
+              onClick={() => setMoveMode((v) => !v)}
+            >
+              ✥
+            </button>
           </div>
 
           {/* Zoom controls — stacked directly above the minimap in the same
@@ -3140,6 +3253,15 @@ export function MapPage() {
             ))}
           </div>
         </Modal>
+      )}
+
+      {showExportText && map && (
+        <ExportTextModal
+          mapName={map.name}
+          nodes={nodes}
+          positions={positions}
+          onClose={() => setShowExportText(false)}
+        />
       )}
     </div>
   );

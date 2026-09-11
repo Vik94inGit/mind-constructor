@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import type { EdgeDoc, NodeDoc } from "../types";
 
@@ -102,6 +102,12 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
 
   const scaleX = MINIMAP_W / canvasW;
   const scaleY = MINIMAP_H / canvasH;
+
+  // `nodes` here is already MapPage's own visibleNodes (packed-away members
+  // filtered out) — but `positions` still carries an entry for every node,
+  // packed or not, so the Links loop below can't just trust positions.get
+  // to tell it a node is actually visible. This id set is that check.
+  const visibleIds = useMemo(() => new Set(nodes.map((n) => n.nodeId)), [nodes]);
 
   // Centers the real viewport on wherever (clientX, clientY) lands in
   // minimap-space — shared by both a plain click (jump) and every
@@ -220,6 +226,9 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
           const fromId = nodeRefId(edge.fromNodeId);
           const toId = nodeRefId(edge.toNodeId);
           if (!fromId || !toId) return null;
+          // Either end packed away — hide the line along with it, same as
+          // the real canvas's own Edge lines (see MapPage's matching guard).
+          if (!visibleIds.has(fromId) || !visibleIds.has(toId)) return null;
           const a = positions.get(fromId);
           const b = positions.get(toId);
           if (!a || !b) return null;

@@ -21,15 +21,39 @@ export function InviteMemberModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // The `map` prop comes straight from the dashboard's own card list now,
+  // which no longer carries real member ids (see MapDoc's own doc comment
+  // and mapsDao.ts's getMapsDao) — just a memberCount. Fetching the map's
+  // full detail here, once, whenever this modal actually opens, is exactly
+  // the "on demand" this was traded for: nobody pays for the real member
+  // list until they specifically open Invite. `null` means "not loaded
+  // yet" (still fetching, or it failed) — candidates stays empty rather
+  // than briefly showing already-invited users as available.
+  const [fullMap, setFullMap] = useState<MapDoc | null>(null);
+  const [membersError, setMembersError] = useState<string | null>(null);
+
   const memberIds = new Set(
-    Array.isArray(map.members) ? map.members.map((m) => (typeof m === "string" ? m : m._id)) : [],
+    Array.isArray(fullMap?.members) ? fullMap.members.map((m) => (typeof m === "string" ? m : m._id)) : [],
   );
 
   useEffect(() => {
     authApi.listUsers().then(setUsers).catch(() => setUsers([]));
   }, []);
 
-  const candidates = users.filter((u) => !memberIds.has(u._id));
+  useEffect(() => {
+    let cancelled = false;
+    setFullMap(null);
+    setMembersError(null);
+    mapsApi
+      .getMap(map.mapId)
+      .then((m) => !cancelled && setFullMap(m))
+      .catch((err) => !cancelled && setMembersError(err instanceof ApiRequestError ? err.message : "Failed to load current members"));
+    return () => {
+      cancelled = true;
+    };
+  }, [map.mapId]);
+
+  const candidates = fullMap ? users.filter((u) => !memberIds.has(u._id)) : [];
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -55,7 +79,11 @@ export function InviteMemberModal({
       {success && (
         <div className="mb-4 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">{success}</div>
       )}
-      {candidates.length === 0 ? (
+      {membersError ? (
+        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{membersError}</div>
+      ) : !fullMap ? (
+        <p className="text-[0.85rem] text-ink-soft">Loading current members…</p>
+      ) : candidates.length === 0 ? (
         <p className="text-[0.85rem] text-ink-soft">Everyone is already a member.</p>
       ) : (
         <form onSubmit={onSubmit}>

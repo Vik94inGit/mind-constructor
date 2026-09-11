@@ -1,0 +1,8 @@
+# Stray local artifacts that live at the repo root, sibling to Backend/ and
+# Frontend/ — none of these belong in the tracked tree, but a broad `git add`
+# run from here has swept them into a commit before. Backend/ and
+# Frontend/web/ keep their own .gitignore for what's local to each.
+Backend-accidental-empty-git/
+Backend-old-git-backup/
+Frontend/my-awesome-app/
+Frontend/package-lock.json

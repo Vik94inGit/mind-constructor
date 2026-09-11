@@ -15,6 +15,34 @@ import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, SizeTie
 // simple enough not to be worth a shared constants file).
 const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "130%" };
 
+// Same 640px threshold MapPage's own isMobileViewport uses (not shared as
+// an import — this file has no existing dependency on that one, and the
+// two only need to ever agree on the cutoff, not on being the same
+// function). Read live, not memoized, for the same reason: it only matters
+// at the moment a key is actually pressed.
+function isMobileViewport() {
+  return typeof window !== "undefined" && window.innerWidth <= 640;
+}
+
+// The panel's own persistent header (shown above every tab, not just Info)
+// used to just print the node's full text, wrapping to however many lines
+// it needed — fine for a short claim, but a long one pushed the tabs
+// themselves (and the close button) further down, or off the always-visible
+// area on a short mobile sheet. Derives a short label instead: first line
+// only (a node's text is conceptually one claim, not a paragraph — a
+// second line, if the author added one, reads as elaboration, not
+// headline), truncated at a word boundary if even that first line runs
+// long. The full text is never lost to this — it's exactly what the Info
+// tab's own scrollable body below shows in full.
+const HEADER_MAX_CHARS = 48;
+function stripHeader(text: string): string {
+  const firstLine = text.split("\n")[0].trim();
+  if (firstLine.length <= HEADER_MAX_CHARS) return firstLine;
+  const cut = firstLine.slice(0, HEADER_MAX_CHARS);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
+
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own
 // onClick), same as a native sheet dismisses on a tap outside it. Used to
@@ -22,18 +50,22 @@ const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "13
 // favor of always keeping the canvas full-width and the node's text
 // anchored to the bottom of the view, on any device.
 //
-// max-h caps this at roughly a third of the viewport (not the 75dvh this
-// started at) — on a phone-height screen a sheet that tall left almost
-// nothing for the canvas above it: the just-selected node (and its
+// max-h caps this at roughly a third of the viewport on desktop (not the
+// 75dvh this started at) — on a phone-height screen a sheet that tall left
+// almost nothing for the canvas above it: the just-selected node (and its
 // quick-add ghosts) routinely landed *behind* the sheet, and every other
 // node in that bottom stretch became physically untappable, since the
-// sheet is opaque and always paints above the canvas. This 1/3 figure is
-// shared with MapPage — see its own PANEL_RESERVE_FRAC doc comment for why
-// it has to match: MapPage's centerOnNode reserves exactly this much room
-// when parking the chosen node above the sheet, and viewportBounds
-// reserves it too when clamping where a new node/ghost is allowed to land,
-// so a mismatch here would put either of those back to guessing at how
-// tall this sheet actually gets.
+// sheet is opaque and always paints above the canvas. Two thirds on mobile
+// instead (below Tailwind's `sm` = MapPage's own 640px isMobileViewport
+// cutoff) — a phone's shorter screen needs more of it for a sheet worth
+// reading, and centerOnNode still parks the chosen node in the third left
+// above it. These 1/3 and 2/3 figures are shared with MapPage — see its
+// own panelReserveFrac() doc comment for why they have to match:
+// MapPage's centerOnNode reserves exactly this much room when parking the
+// chosen node above the sheet, and viewportBounds reserves it too when
+// clamping where a new node/ghost is allowed to land, so a mismatch here
+// would put either of those back to guessing at how tall this sheet
+// actually gets.
 //
 // max-h uses `dvh` (dynamic viewport height), not the plain `vh` this
 // started with — on a real phone browser (address bar sliding in/out as the
@@ -53,7 +85,7 @@ const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "13
 // modal (Modal.tsx, z-50), which should stay on top of everything,
 // this panel included.
 const PANEL_CLASS =
-  "fixed inset-x-0 bottom-0 z-[46] max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+  "fixed inset-x-0 bottom-0 z-[46] max-h-[67dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
 // Every section below used to render stacked, all at once — text, health,
 // CRUD, links, the whole attack form, and history — which made this panel
@@ -142,6 +174,11 @@ export function NodePanel({
   // canvas's own inline editor (double-click a node, or the Edit button
   // below, both of which still hand off to that same inline editor).
   const [textDraft, setTextDraft] = useState(node.text);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Transient "Copied!" confirmation on the Info tab's own Copy button —
+  // auto-clears, same pattern the mobile-focused parts of this file already
+  // favor over a persistent status line for a one-off confirmation.
+  const [copied, setCopied] = useState(false);
 
   // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
   // surfaced as a "Points at" link in the Info tab below, and used by
@@ -241,6 +278,20 @@ export function NodePanel({
       setError(err instanceof ApiRequestError ? err.message : "Failed to update text");
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Copies the node's own real text (not textDraft — this should work
+  // identically for a non-owner, who has no draft at all) to the clipboard.
+  // Everyone can do this, not just the owner — reading/reusing a node's
+  // text isn't an edit.
+  async function handleCopyText() {
+    try {
+      await navigator.clipboard.writeText(node.text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError("Copy failed — this browser blocked clipboard access.");
     }
   }
 
@@ -368,7 +419,11 @@ export function NodePanel({
 
   const tabLabel: Record<Tab, string> = {
     info: "Info",
-    links: "Links",
+    // Everything that used to live in the Info tab (Edit/Pack/Delete, Size,
+    // Zone, Symbol, health, and the weapon/protection relationship lines)
+    // moved onto this same "links" tab, on top of what it already had —
+    // "Modify" is the label for all of that combined now, not just linking.
+    links: "Modify",
     attack: "Attack",
     protect: "Protect",
     pack: `Packed (${packedMembers.length})`,
@@ -386,14 +441,14 @@ export function NodePanel({
             <NodeTypeIcon type={node.type} />
           </div>
           <div className="min-w-0">
-            {/* Used to be a 2-line clamp with the rest only reachable via a
-                hover `title` tooltip — useless on a touch screen, which has
-                no hover state, so a long node's text was simply
-                unreadable in the panel on a phone. This bottom sheet
-                already scrolls its own content (see PANEL_CLASS's
-                overflow-y-auto), so letting the text wrap to however many
-                lines it needs costs nothing but a taller header. */}
-            <p className="m-0 text-[0.88rem] leading-snug text-ink">{node.text}</p>
+            {/* stripHeader — a short, single-line label, not the full text
+                (see its own doc comment); the Info tab below is where the
+                complete text actually lives, scrollable. `title` puts the
+                full text back one hover away on desktop, same fallback a
+                truncated label anywhere else in this app would use. */}
+            <p className="m-0 truncate text-[0.88rem] leading-snug text-ink" title={node.text}>
+              {stripHeader(node.text)}
+            </p>
             <p className="m-0 text-[0.72rem] text-ink-soft">
               {node.isWeapon ? "🏹 " : ""}by {usernameOf(node.userId as any)}
               {node.isFirstNode ? " · root" : ""}
@@ -421,31 +476,69 @@ export function NodePanel({
 
       {tab === "info" && (
         <div className="mt-4">
-          {isCreator && (
-            <div className="mb-3 flex flex-col gap-[0.35rem]">
-              <label htmlFor="node-text" className="text-[0.8rem] font-semibold text-ink-soft">
-                Text
-              </label>
-              <textarea
-                id="node-text"
-                rows={2}
-                value={textDraft}
-                onChange={(e) => setTextDraft(e.target.value)}
-                disabled={busy}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleTextSave();
-                  }
-                  // Shift+Enter: no preventDefault — the textarea's own
-                  // default behavior (insert a newline) is exactly what's
-                  // wanted here.
-                }}
-                onBlur={handleTextSave}
-                className="resize-none rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
-              />
+          {/* Just the text — extendable (a generous min-height so even a
+              short claim doesn't look cramped) and scrollable (capped at
+              max-h so a long one scrolls in place instead of pushing the
+              rest of the sheet, and this whole panel, off-screen). Owner
+              gets the same editable textarea NodePanel has always used here
+              (Enter/blur-to-save, mobile's own Enter-inserts-a-newline
+              handling below, unchanged); anyone else gets a plain
+              read-only, same-sized block — reading a node's full text
+              shouldn't require owning it. */}
+          {isCreator ? (
+            <textarea
+              id="node-text"
+              ref={textareaRef}
+              rows={6}
+              value={textDraft}
+              onChange={(e) => setTextDraft(e.target.value)}
+              disabled={busy}
+              onKeyDown={(e) => {
+                // Mobile has no Shift key to reach alongside a virtual
+                // keyboard's Enter/return, so plain Enter has to behave
+                // like a normal textarea there too (insert a newline,
+                // "another row," same as Shift+Enter below) — saving is
+                // onBlur's job only (tapping the visible strip of canvas
+                // outside the panel already does this). Desktop keeps its
+                // existing plain-Enter-saves shortcut, Shift+Enter still
+                // its own newline escape hatch.
+                if (e.key === "Enter" && !e.shiftKey && !isMobileViewport()) {
+                  e.preventDefault();
+                  handleTextSave();
+                }
+                // Shift+Enter (desktop), or plain Enter on mobile: no
+                // preventDefault — the textarea's own default behavior
+                // (insert a newline) is exactly what's wanted here.
+              }}
+              onBlur={handleTextSave}
+              className="max-h-[40vh] min-h-[8rem] w-full resize-y rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
+            />
+          ) : (
+            <div className="max-h-[40vh] min-h-[8rem] w-full overflow-y-auto rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink">
+              {node.text}
             </div>
           )}
+          <div className="mt-2 flex items-center gap-[0.5rem]">
+            {isCreator && (
+              <button
+                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => textareaRef.current?.focus()}
+              >
+                Edit
+              </button>
+            )}
+            <button
+              className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleCopyText}
+            >
+              {copied ? "Copied ✓" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === "links" && (
+        <div className="mt-4">
           <div className="h-1 overflow-hidden rounded-[3px] bg-surface-2">
             <div
               className="h-full transition-[width] duration-200"
@@ -499,10 +592,11 @@ export function NodePanel({
           )}
 
           {isCreator && (
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
               <button
                 className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onEdit}
+                title="Open the canvas's own inline editor (text + type)"
               >
                 Edit
               </button>
@@ -614,23 +708,21 @@ export function NodePanel({
               )}
             </div>
           )}
-        </div>
-      )}
 
-      {tab === "links" && (
-        <div className="mt-4">
-          {isCreator ? (
-            <button
-              className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={onStartLink}
-            >
-              Link from this node
-            </button>
-          ) : (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-              Only {usernameOf(node.userId as any)} can link from this node.
-            </p>
-          )}
+          <div className="mt-4 border-t border-line pt-4">
+            {isCreator ? (
+              <button
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={onStartLink}
+              >
+                Link from this node
+              </button>
+            ) : (
+              <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                Only {usernameOf(node.userId as any)} can link from this node.
+              </p>
+            )}
+          </div>
           {connectedEdges.length === 0 ? (
             <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.5rem" }}>No links yet.</p>
           ) : (
