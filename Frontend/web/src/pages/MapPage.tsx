@@ -379,12 +379,12 @@ export function MapPage() {
   // Starts true: nothing's panning before the first selection ever happens.
   const [selectionSettled, setSelectionSettled] = useState(true);
   const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // True from the moment centerOnNode kicks off a pan until either the
-  // wrap's own `scrollend` fires or the fallback timeout below gives up
-  // waiting for it — see the scrollend effect right after wrapRef's own
-  // declaration. Guards against a *stale* scrollend (one left over from a
-  // pan nobody's waiting on any more, e.g. a plain manual scroll) flipping
-  // selectionSettled back on when nothing asked it to.
+  // True from the moment centerOnNode kicks off a pan until its own
+  // scroll-position poll (see centerOnNode) notices the camera has
+  // actually stopped moving. Guards against a *stale* poll (one left over
+  // from a pan nobody's waiting on any more, e.g. it got superseded by
+  // picking a different node) flipping selectionSettled back on when
+  // nothing asked it to.
   const panInFlightRef = useRef(false);
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
   // Right-click on *empty* canvas (as opposed to a node — see contextMenu
@@ -455,34 +455,12 @@ export function MapPage() {
   // is actually looking at, which viewportBounds() below reads from.
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  // Fires the instant a smooth scroll actually finishes landing — the real
-  // signal centerOnNode's own selectionSettled fallback timeout below used
-  // to have to guess at with one fixed duration (350ms) regardless of how
-  // far the pan actually had to travel. A short hop (the newly-selected
-  // node was already near the middle of the screen) settled well within
-  // that; a long one — picking a node clear across the canvas from
-  // wherever the camera happened to be, worst case one all the way out
-  // near an edge — routinely didn't, so quick-add ghosts/the radial ring
-  // fanned out mid-pan, computed against wherever the viewport happened to
-  // be at the 350ms mark rather than where the node actually ends up
-  // centered. Reads as "ghosts show up squashed to one side" specifically
-  // for a node near the end of the canvas, and worse on a phone's already
-  //-narrow viewport. `scrollend` (broadly supported on modern mobile/
-  // desktop browsers alike) reports the real completion regardless of
-  // distance; the fallback timeout below still exists for the rare browser
-  // that never fires it, just no longer trying to be clever about timing.
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    function onScrollEnd() {
-      if (!panInFlightRef.current) return; // a plain manual scroll, not a pan we're waiting on
-      panInFlightRef.current = false;
-      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
-      setSelectionSettled(true);
-    }
-    wrap.addEventListener("scrollend", onScrollEnd);
-    return () => wrap.removeEventListener("scrollend", onScrollEnd);
-  }, []);
+  // centerOnNode's own settle-detection (see its doc comment) polls via
+  // this instead of a fixed guessed duration — the id of the in-flight
+  // requestAnimationFrame loop, so a newer pan (picking a different node
+  // before the previous one even finished) can cancel the stale one
+  // instead of two polls racing to declare "settled" for the wrong node.
+  const settlePollRef = useRef<number | null>(null);
 
   // How far (in canvas units) centerOnNode is allowed to scroll past the
   // canvas's own bottom edge — see the bottom-scroll-margin spacer below
@@ -1108,11 +1086,16 @@ export function MapPage() {
     const targetLeft = Math.min(maxLeft, Math.max(0, pos.x * zoom - wrap.clientWidth / 2));
     const targetTop = Math.min(maxTop, Math.max(0, pos.y * zoom - visibleH / 2));
 
+    // Cancel whatever a previous call left running — a newer pan (picking
+    // a different node before the last one even settled) fully supersedes
+    // it, and letting the old poll/timeout keep going could flip
+    // selectionSettled back on for the wrong node's ghosts.
+    if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+    if (settlePollRef.current) cancelAnimationFrame(settlePollRef.current);
+
     // Already there (the just-selected node was already sitting dead
     // center, or re-clicking the same one) — scrollTo wouldn't actually
-    // move anything, so there's no pan for the scrollend effect below to
-    // ever hear about, and nothing here to wait on either.
-    if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+    // move anything, so there's no pan to wait on at all.
     if (Math.hypot(targetLeft - wrap.scrollLeft, targetTop - wrap.scrollTop) < 1) {
       panInFlightRef.current = false;
       setSelectionSettled(true);
@@ -1120,21 +1103,58 @@ export function MapPage() {
     }
 
     wrap.scrollTo({ left: targetLeft, top: targetTop, behavior: "smooth" });
-    // See selectionSettled's own doc comment — quick-add ghosts/the radial
-    // ring stay hidden until this pan actually lands, which the scrollend
-    // effect right after wrapRef's own declaration is the real signal for.
-    // This timeout is only the fallback for a browser that never fires
-    // scrollend at all: generous (900ms, not tuned to any particular pan
-    // distance) since it's meant to be a rare safety net, not the normal
-    // path. Re-triggering (clicking a different node before the previous
-    // pan even settled) clears the old timer/flight flag instead of
-    // letting either fire late and flip this back on for the wrong node.
     setSelectionSettled(false);
     panInFlightRef.current = true;
-    settleTimeoutRef.current = setTimeout(() => {
+
+    // See selectionSettled's own doc comment — quick-add ghosts/the radial
+    // ring stay hidden until this pan actually lands. Used to guess *when*
+    // that was with one fixed duration (350ms, then a scrollend listener
+    // with a 900ms fallback) — both still amount to a guess: a `scrollend`
+    // that never fires on some real browser/device, or a real pan that
+    // (a big canvas, a slower phone actually rendering the animation
+    // rather than this environment's own sandboxed panes, which don't
+    // always tick it forward at all) genuinely takes longer than any fixed
+    // number picked here, leaves ghosts fanning out against whatever the
+    // viewport still was at that guessed moment — not where the node
+    // actually ends up — which is exactly what read as "ghosts floating in
+    // a curvy row, disconnected from the node" on a real phone. Polling
+    // the actual scroll position every frame until it stops moving is
+    // correct regardless of distance, device speed, or scrollend support:
+    // however long the real pan takes, this notices the moment it's
+    // actually done. 3 consecutive unchanged frames (not just one, which
+    // could land between two ticks that happened to round to the same
+    // pixel) before declaring it settled; an outer 3s timeout is a last-
+    // resort safety net for the pathological case where scrolling somehow
+    // never stabilizes at all, so ghosts can never end up permanently
+    // stuck hidden.
+    let lastLeft = wrap.scrollLeft;
+    let lastTop = wrap.scrollTop;
+    let stableFrames = 0;
+    const finish = () => {
       panInFlightRef.current = false;
+      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+      if (settlePollRef.current) cancelAnimationFrame(settlePollRef.current);
       setSelectionSettled(true);
-    }, 900);
+    };
+    const poll = () => {
+      if (!panInFlightRef.current) return; // superseded by a newer pan, or already finished
+      const nowLeft = wrap.scrollLeft;
+      const nowTop = wrap.scrollTop;
+      if (Math.abs(nowLeft - lastLeft) < 0.5 && Math.abs(nowTop - lastTop) < 0.5) {
+        stableFrames++;
+      } else {
+        stableFrames = 0;
+        lastLeft = nowLeft;
+        lastTop = nowTop;
+      }
+      if (stableFrames >= 3) {
+        finish();
+        return;
+      }
+      settlePollRef.current = requestAnimationFrame(poll);
+    };
+    settlePollRef.current = requestAnimationFrame(poll);
+    settleTimeoutRef.current = setTimeout(finish, 3000);
   }
 
   // Replays a weapon's arrow flight (see WeaponMark) — alongside
@@ -3205,6 +3225,7 @@ export function MapPage() {
                 }}
                 onStartPack={() => startPackFrom(selectedNode.nodeId)}
                 onUnpacked={(unpacked) => upsertNode(unpacked)}
+                onExportText={() => setShowExportText(true)}
               />
             </>
           )

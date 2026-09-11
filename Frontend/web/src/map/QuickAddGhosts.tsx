@@ -19,8 +19,23 @@ import { NodeCrown } from "./NodeCrown";
 // that, marking it as "not real yet."
 const ICON_SIZE = 48;
 const GHOST_SCALE = 0.65;
-const RADIUS = 64;
-const EDGE_MARGIN = 40;
+// Smaller on mobile — not just a nicety, a real geometry fix. The ring's
+// own safe-zone recentering below can always keep every ghost on-screen
+// and non-overlapping, but *how far* it has to nudge the ring away from
+// the node scales with RADIUS+EDGE_MARGIN, and mobile's visible strip
+// above the bottom sheet is short (only ~1/3 of the screen — see
+// panelReserveFrac in MapPage.tsx). At the old, flat 64+40, a node
+// anywhere in the lower half of that already-short strip forced the ring
+// so far upward to fit that all 7 ghosts ended up bunched into an arc
+// above the node instead of surrounding it — exactly the "curvy row"
+// this was reported as. Shrinking the ring itself for mobile means it
+// usually fits right where the node already is, needing little or no
+// recentering at all; icon size is left alone (unlike RADIUS) so the
+// actual tap targets don't shrink, just how far apart their centers sit —
+// still comfortably clear of each other at this radius.
+const isMobileViewport = typeof window !== "undefined" && window.innerWidth <= 640;
+const RADIUS = isMobileViewport ? 48 : 64;
+const EDGE_MARGIN = isMobileViewport ? 24 : 40;
 
 interface Props {
   anchorPos: { x: number; y: number };

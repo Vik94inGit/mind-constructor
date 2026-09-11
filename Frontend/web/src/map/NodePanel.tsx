@@ -5,8 +5,8 @@ import { ApiRequestError } from "../api/client";
 import { idOf, nodeRefId, usernameOf, ZONE_COLORS } from "../utils/nodeType";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
-import { ATTACK_NODE_TYPES, MANUAL_ZONE_COLORS, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
-import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, SizeTier, SymbolOverride, Weapon } from "../types";
+import { ATTACK_NODE_TYPES, MANUAL_ZONE_COLORS, NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
+import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 
 // Same 100%/115%/130% scale NodeCard's own SIZE_MULTIPLIERS uses, just for
 // the button labels here — kept as a separate literal rather than imported
@@ -134,6 +134,8 @@ interface Props {
   onStartPack: () => void;
   /** One packed member got unpacked back to a normal, visible node. */
   onUnpacked: (node: NodeDoc) => void;
+  /** Asks MapPage to open the whole-map text export modal (see textExport.ts/ExportTextModal) — a map-wide action, reachable from any node's own Modify tab rather than only the "+" toolbar menu. */
+  onExportText: () => void;
 }
 
 export function NodePanel({
@@ -152,6 +154,7 @@ export function NodePanel({
   onProtected,
   onStartPack,
   onUnpacked,
+  onExportText,
 }: Props) {
   const isCreator = idOf(node.userId) === currentUserId;
   const [busy, setBusy] = useState(false);
@@ -179,6 +182,41 @@ export function NodePanel({
   // auto-clears, same pattern the mobile-focused parts of this file already
   // favor over a persistent status line for a one-off confirmation.
   const [copied, setCopied] = useState(false);
+  // The Info tab's own text box's only "increasing fold" used to be the
+  // textarea's native CSS resize handle (a small drag grip in its own
+  // bottom-right corner) — easy to miss (no visible affordance beyond that
+  // grip), doesn't work at all via touch on most mobile browsers, and
+  // never existed in the first place for a non-owner (their read-only view
+  // is a plain div, which CSS resize doesn't apply to at all). This is an
+  // explicit, always-visible, works-everywhere substitute: expanded drops
+  // the box's own height cap entirely (letting it grow to fit the whole
+  // text) instead of scrolling internally within a fixed 40vh — the panel
+  // itself already scrolls (see PANEL_CLASS), so a long text just makes
+  // the sheet itself taller/scrollable rather than needing its own nested
+  // scrollbar.
+  const [expanded, setExpanded] = useState(false);
+
+  // A <textarea>'s own rendered height is CSS/rows-driven, not content-
+  // driven — removing max-height above (the `expanded` class swap) doesn't
+  // by itself make the box taller, it only lifts the *cap*, same way
+  // dropping a `max-width` doesn't widen an element that was never asked
+  // to grow in the first place. This is the actual growing: set to its own
+  // scrollHeight (the height its content would need with no scrollbar) the
+  // moment expanded turns on, and again on every keystroke while it stays
+  // on, so typing more keeps growing the box instead of re-introducing an
+  // inner scrollbar. Collapsing clears the inline height back off entirely
+  // so the CSS class's own rows/min-height takes back over, same as if
+  // this effect had never touched it.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    if (expanded) {
+      ta.style.height = "auto";
+      ta.style.height = `${ta.scrollHeight}px`;
+    } else {
+      ta.style.height = "";
+    }
+  }, [expanded, textDraft]);
 
   // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
   // surfaced as a "Points at" link in the Info tab below, and used by
@@ -236,6 +274,7 @@ export function NodePanel({
     setProtectText("");
     setProtectType("Solution");
     setTextDraft(node.text);
+    setExpanded(false);
     setTab("info");
     nodesApi
       .getAttackHistory(node.nodeId)
@@ -385,6 +424,27 @@ export function NodePanel({
     }
   }
 
+  // Owner-only — the type itself, not to be confused with symbolOverride
+  // (which only ever tweaks an outcome node's inner check/cross, never its
+  // actual claimed type). The canvas's own inline editor (double-click, or
+  // the Edit button below) already lets you cycle through types by
+  // clicking the node's icon — this is a second, more discoverable path to
+  // the exact same field, same reasoning Size/Zone/Symbol already got
+  // their own explicit controls here instead of staying inline-editor-only.
+  async function handleSetType(type: NodeType) {
+    if (type === node.type) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { type });
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Failed to update type");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Owner-only (same as text/type edits) — a manually-chosen zone ring
   // around just this node, independent of the automatic circle/nodeGroups
   // detection. null explicitly removes it, same nullish contract
@@ -479,12 +539,15 @@ export function NodePanel({
           {/* Just the text — extendable (a generous min-height so even a
               short claim doesn't look cramped) and scrollable (capped at
               max-h so a long one scrolls in place instead of pushing the
-              rest of the sheet, and this whole panel, off-screen). Owner
-              gets the same editable textarea NodePanel has always used here
-              (Enter/blur-to-save, mobile's own Enter-inserts-a-newline
-              handling below, unchanged); anyone else gets a plain
-              read-only, same-sized block — reading a node's full text
-              shouldn't require owning it. */}
+              rest of the sheet, and this whole panel, off-screen, unless
+              expanded — see the Expand/Collapse button below, and its own
+              doc comment on the `expanded` state above for why that's a
+              real button now rather than just this box's native CSS
+              resize handle). Owner gets the same editable textarea
+              NodePanel has always used here (Enter/blur-to-save, mobile's
+              own Enter-inserts-a-newline handling below, unchanged);
+              anyone else gets a plain read-only, same-sized block —
+              reading a node's full text shouldn't require owning it. */}
           {isCreator ? (
             <textarea
               id="node-text"
@@ -511,14 +574,23 @@ export function NodePanel({
                 // (insert a newline) is exactly what's wanted here.
               }}
               onBlur={handleTextSave}
-              className="max-h-[40vh] min-h-[8rem] w-full resize-y rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
+              className={`min-h-[8rem] w-full resize-y rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent ${expanded ? "max-h-none" : "max-h-[40vh]"}`}
             />
           ) : (
-            <div className="max-h-[40vh] min-h-[8rem] w-full overflow-y-auto rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink">
+            <div
+              className={`min-h-[8rem] w-full overflow-y-auto rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded ? "max-h-none" : "max-h-[40vh]"}`}
+            >
               {node.text}
             </div>
           )}
           <div className="mt-2 flex items-center gap-[0.5rem]">
+            <button
+              className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setExpanded((v) => !v)}
+              title={expanded ? "Collapse back to a scrollable box" : "Expand to show the whole text, no inner scrollbar"}
+            >
+              {expanded ? "Collapse" : "Expand"}
+            </button>
             {isCreator && (
               <button
                 className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -589,6 +661,24 @@ export function NodePanel({
                 </span>
               ))}
             </p>
+          )}
+
+          {isCreator && (
+            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Type:</span>
+              <select
+                value={node.type}
+                onChange={(e) => handleSetType(e.target.value as NodeType)}
+                disabled={busy}
+                className="rounded-lg border border-line bg-surface px-[0.55rem] py-[0.3rem] text-[0.8rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {NODE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
 
           {isCreator && (
@@ -762,6 +852,16 @@ export function NodePanel({
               })}
             </div>
           )}
+
+          <div className="mt-4 border-t border-line pt-4">
+            <button
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={onExportText}
+              title="Export every node's text on this whole map, not just this one — same as the toolbar's own Export text"
+            >
+              Export map text…
+            </button>
+          </div>
         </div>
       )}
 
