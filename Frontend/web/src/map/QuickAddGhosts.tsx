@@ -34,18 +34,42 @@ interface Props {
 // spot and auto-links it to the anchor — branching an argument tree becomes a
 // single click instead of toolbar button -> modal -> manual placement.
 export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
+  // The anchor itself used to be the ring's center, with each of the 7
+  // points *independently* clamped into bounds afterward — fine when the
+  // anchor sits well clear of every edge, but a node close enough to one
+  // (a phone's own narrow/short visible strip makes "close enough" the
+  // common case, not a rare one, and centerOnNode can only scroll a node
+  // so close to the actual edge of the whole 2400x1600 canvas to begin
+  // with — there's nothing further to scroll into) clamped every point
+  // that would've landed past that edge to the *same* boundary value,
+  // collapsing several ghosts on top of each other into a squashed line
+  // instead of a ring. Centering the ring itself on a point nudged just
+  // far enough inside `bounds` to fit the whole undistorted circle (rather
+  // than clamping each point after the fact) keeps every ghost evenly
+  // spaced and fully clickable regardless of where the node landed — it
+  // just may not sit perfectly centered on the node itself in that case,
+  // which is the unavoidable tradeoff once the node is right at the edge
+  // of the map with nothing beyond it to make room from.
+  const halfSpan = RADIUS + EDGE_MARGIN;
+  const spanX = bounds.maxX - bounds.minX;
+  const spanY = bounds.maxY - bounds.minY;
+  // A viewport narrower/shorter than the ring itself (a tiny window, or a
+  // zoomed-way-out canvas) has no safe zone to clamp into at all — center
+  // the ring on bounds' own midpoint rather than letting min > max invert
+  // the clamp below.
+  const ringCenter =
+    spanX >= halfSpan * 2 && spanY >= halfSpan * 2
+      ? {
+          x: Math.min(bounds.maxX - halfSpan, Math.max(bounds.minX + halfSpan, anchorPos.x)),
+          y: Math.min(bounds.maxY - halfSpan, Math.max(bounds.minY + halfSpan, anchorPos.y)),
+        }
+      : { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
   return (
     <>
       {NODE_TYPES.map((type, i) => {
         const angle = (i / NODE_TYPES.length) * Math.PI * 2 - Math.PI / 2;
-        const x = Math.min(
-          bounds.maxX - EDGE_MARGIN,
-          Math.max(bounds.minX + EDGE_MARGIN, anchorPos.x + RADIUS * Math.cos(angle)),
-        );
-        const y = Math.min(
-          bounds.maxY - EDGE_MARGIN,
-          Math.max(bounds.minY + EDGE_MARGIN, anchorPos.y + RADIUS * Math.sin(angle)),
-        );
+        const x = ringCenter.x + RADIUS * Math.cos(angle);
+        const y = ringCenter.y + RADIUS * Math.sin(angle);
         return (
           <button
             key={type}

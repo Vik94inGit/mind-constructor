@@ -371,7 +371,7 @@ export function MapPage() {
   const shotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Gates the quick-add ghost ring and the radial neighbor layout (see
   // quickAddActive/radialPositions below) — false for a beat right after
-  // centerOnNode starts a pan, true once it's had time to land. Without
+  // centerOnNode starts a pan, true once it's actually landed. Without
   // this, choosing a node fanned its ghosts/neighbors out immediately,
   // which — while the camera was still smoothly panning to center that
   // node — read as the whole ring sliding across the screen mid-pan rather
@@ -379,6 +379,13 @@ export function MapPage() {
   // Starts true: nothing's panning before the first selection ever happens.
   const [selectionSettled, setSelectionSettled] = useState(true);
   const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True from the moment centerOnNode kicks off a pan until either the
+  // wrap's own `scrollend` fires or the fallback timeout below gives up
+  // waiting for it — see the scrollend effect right after wrapRef's own
+  // declaration. Guards against a *stale* scrollend (one left over from a
+  // pan nobody's waiting on any more, e.g. a plain manual scroll) flipping
+  // selectionSettled back on when nothing asked it to.
+  const panInFlightRef = useRef(false);
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
   // Right-click on *empty* canvas (as opposed to a node — see contextMenu
   // above) — opens a small type-picker for creating a new, parent-less
@@ -447,6 +454,35 @@ export function MapPage() {
   // 2400x1600 canvas, this is the clipped, scrolled window onto it a user
   // is actually looking at, which viewportBounds() below reads from.
   const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  // Fires the instant a smooth scroll actually finishes landing — the real
+  // signal centerOnNode's own selectionSettled fallback timeout below used
+  // to have to guess at with one fixed duration (350ms) regardless of how
+  // far the pan actually had to travel. A short hop (the newly-selected
+  // node was already near the middle of the screen) settled well within
+  // that; a long one — picking a node clear across the canvas from
+  // wherever the camera happened to be, worst case one all the way out
+  // near an edge — routinely didn't, so quick-add ghosts/the radial ring
+  // fanned out mid-pan, computed against wherever the viewport happened to
+  // be at the 350ms mark rather than where the node actually ends up
+  // centered. Reads as "ghosts show up squashed to one side" specifically
+  // for a node near the end of the canvas, and worse on a phone's already
+  //-narrow viewport. `scrollend` (broadly supported on modern mobile/
+  // desktop browsers alike) reports the real completion regardless of
+  // distance; the fallback timeout below still exists for the rare browser
+  // that never fires it, just no longer trying to be clever about timing.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    function onScrollEnd() {
+      if (!panInFlightRef.current) return; // a plain manual scroll, not a pan we're waiting on
+      panInFlightRef.current = false;
+      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+      setSelectionSettled(true);
+    }
+    wrap.addEventListener("scrollend", onScrollEnd);
+    return () => wrap.removeEventListener("scrollend", onScrollEnd);
+  }, []);
 
   // How far (in canvas units) centerOnNode is allowed to scroll past the
   // canvas's own bottom edge — see the bottom-scroll-margin spacer below
@@ -899,12 +935,35 @@ export function MapPage() {
     if (neighborIds.size === 0) return null;
 
     const neighbors = Array.from(neighborIds).slice(0, RADIAL_MAX_NEIGHBORS);
+    // Same fix as QuickAddGhosts' own ring-centering (see its doc comment)
+    // — this ring used to have no bounds awareness at all, just `center +
+    // radius`, trusting centerOnNode to have already put `center` in the
+    // middle of the screen. A node close enough to the actual edge of the
+    // whole 2400x1600 canvas (nothing left to scroll into) never gets
+    // truly centered, and on a narrow phone viewport that's routine, not
+    // rare — so members on the far side of the ring rendered clear off the
+    // visible screen, unreachable to tap (the exact "picking pack-eligible
+    // neighbors doesn't work" symptom this radius was already shrunk for
+    // once before). Nudging the ring's own center into a safe zone inside
+    // the current viewport keeps the whole ring on-screen and evenly
+    // spaced regardless of where the selected node itself landed.
+    const bounds = viewportBounds();
+    const halfSpan = RADIAL_NEIGHBOR_RADIUS + 40;
+    const spanX = bounds.maxX - bounds.minX;
+    const spanY = bounds.maxY - bounds.minY;
+    const ringCenter =
+      spanX >= halfSpan * 2 && spanY >= halfSpan * 2
+        ? {
+            x: Math.min(bounds.maxX - halfSpan, Math.max(bounds.minX + halfSpan, center.x)),
+            y: Math.min(bounds.maxY - halfSpan, Math.max(bounds.minY + halfSpan, center.y)),
+          }
+        : { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
     const map = new Map<string, { x: number; y: number }>();
     neighbors.forEach((id, i) => {
       const angle = (i / neighbors.length) * Math.PI * 2 - Math.PI / 2;
       map.set(id, {
-        x: center.x + RADIAL_NEIGHBOR_RADIUS * Math.cos(angle),
-        y: center.y + RADIAL_NEIGHBOR_RADIUS * Math.sin(angle),
+        x: ringCenter.x + RADIAL_NEIGHBOR_RADIUS * Math.cos(angle),
+        y: ringCenter.y + RADIAL_NEIGHBOR_RADIUS * Math.sin(angle),
       });
     });
     return map;
@@ -1046,22 +1105,36 @@ export function MapPage() {
     // scroll further. *zoom to convert bottomScrollMargin (canvas units)
     // back to screen pixels, same as every other term here.
     const maxTop = Math.max(0, CANVAS_H * zoom - wrap.clientHeight) + bottomScrollMargin * zoom;
-    wrap.scrollTo({
-      left: Math.min(maxLeft, Math.max(0, pos.x * zoom - wrap.clientWidth / 2)),
-      top: Math.min(maxTop, Math.max(0, pos.y * zoom - visibleH / 2)),
-      behavior: "smooth",
-    });
-    // See selectionSettled's own doc comment — quick-add ghosts/radial
-    // neighbors stay hidden until this pan's had time to land. ~350ms
-    // approximates a smooth scroll's own duration for the distances
-    // involved here — not exact (a longer pan takes a bit more), same
-    // approximation shotTimeoutRef's own 700ms already makes for the
-    // weapon-arrow replay just above. Re-triggering (clicking a different
-    // node before the previous pan even settled) clears the old timer
-    // instead of letting it fire late and flip this back on prematurely.
-    setSelectionSettled(false);
+    const targetLeft = Math.min(maxLeft, Math.max(0, pos.x * zoom - wrap.clientWidth / 2));
+    const targetTop = Math.min(maxTop, Math.max(0, pos.y * zoom - visibleH / 2));
+
+    // Already there (the just-selected node was already sitting dead
+    // center, or re-clicking the same one) — scrollTo wouldn't actually
+    // move anything, so there's no pan for the scrollend effect below to
+    // ever hear about, and nothing here to wait on either.
     if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
-    settleTimeoutRef.current = setTimeout(() => setSelectionSettled(true), 350);
+    if (Math.hypot(targetLeft - wrap.scrollLeft, targetTop - wrap.scrollTop) < 1) {
+      panInFlightRef.current = false;
+      setSelectionSettled(true);
+      return;
+    }
+
+    wrap.scrollTo({ left: targetLeft, top: targetTop, behavior: "smooth" });
+    // See selectionSettled's own doc comment — quick-add ghosts/the radial
+    // ring stay hidden until this pan actually lands, which the scrollend
+    // effect right after wrapRef's own declaration is the real signal for.
+    // This timeout is only the fallback for a browser that never fires
+    // scrollend at all: generous (900ms, not tuned to any particular pan
+    // distance) since it's meant to be a rare safety net, not the normal
+    // path. Re-triggering (clicking a different node before the previous
+    // pan even settled) clears the old timer/flight flag instead of
+    // letting either fire late and flip this back on for the wrong node.
+    setSelectionSettled(false);
+    panInFlightRef.current = true;
+    settleTimeoutRef.current = setTimeout(() => {
+      panInFlightRef.current = false;
+      setSelectionSettled(true);
+    }, 900);
   }
 
   // Replays a weapon's arrow flight (see WeaponMark) — alongside

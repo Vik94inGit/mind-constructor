@@ -69,10 +69,24 @@ interface Props {
   zoom: number;
 }
 
-export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, canvasH, zoom }: Props) {
+export function MiniMap({
+  wrapRef,
+  nodes,
+  edges,
+  positions,
+  groups,
+  canvasW,
+  canvasH,
+  zoom,
+}: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
-  const [viewport, setViewport] = useState({ left: 0, top: 0, width: 0, height: 0 });
+  const [viewport, setViewport] = useState({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+  });
 
   // Keeps the little "you are here" rectangle in sync with the real
   // viewport — both when the user scrolls the canvas directly and when a
@@ -107,7 +121,10 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
   // filtered out) — but `positions` still carries an entry for every node,
   // packed or not, so the Links loop below can't just trust positions.get
   // to tell it a node is actually visible. This id set is that check.
-  const visibleIds = useMemo(() => new Set(nodes.map((n) => n.nodeId)), [nodes]);
+  const visibleIds = useMemo(
+    () => new Set(nodes.map((n) => n.nodeId)),
+    [nodes],
+  );
 
   // Centers the real viewport on wherever (clientX, clientY) lands in
   // minimap-space — shared by both a plain click (jump) and every
@@ -127,8 +144,14 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
     const canvasY = miniY / scaleY;
     const maxLeft = Math.max(0, canvasW * zoom - wrap.clientWidth);
     const maxTop = Math.max(0, canvasH * zoom - wrap.clientHeight);
-    wrap.scrollLeft = Math.min(maxLeft, Math.max(0, canvasX * zoom - wrap.clientWidth / 2));
-    wrap.scrollTop = Math.min(maxTop, Math.max(0, canvasY * zoom - wrap.clientHeight / 2));
+    wrap.scrollLeft = Math.min(
+      maxLeft,
+      Math.max(0, canvasX * zoom - wrap.clientWidth / 2),
+    );
+    wrap.scrollTop = Math.min(
+      maxTop,
+      Math.max(0, canvasY * zoom - wrap.clientHeight / 2),
+    );
   }
 
   return (
@@ -151,7 +174,7 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
       // it's open. (An earlier z-[70] here overshot past z-50 too, leaving
       // the minimap floating on top of an open modal instead of properly
       // covered by it.)
-      className="absolute bottom-3 right-3 z-[45] overflow-hidden rounded-card border border-line bg-surface shadow-card"
+      className="absolute bottom-3 right-3 z-45 overflow-hidden rounded-card border border-line bg-surface shadow-card"
       title="Minimap — click or drag to jump around the map"
     >
       <svg
@@ -173,7 +196,13 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
           draggingRef.current = false;
         }}
       >
-        <rect x={0} y={0} width={MINIMAP_W} height={MINIMAP_H} fill="var(--surface-2)" />
+        <rect
+          x={0}
+          y={0}
+          width={MINIMAP_W}
+          height={MINIMAP_H}
+          fill="var(--surface-2)"
+        />
         {/* Zones — the same outline polygon (and sentiment colors) the real
             canvas draws for each group (see MapPage's own nodeGroups/
             "Zones" rendering), just scaled down and without the
@@ -182,10 +211,20 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
         {groups.map((g) => (
           <polygon
             key={`group-${g.rootId}`}
-            points={g.outline.map((p) => `${p.x * scaleX},${p.y * scaleY}`).join(" ")}
-            fill={g.sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative}
+            points={g.outline
+              .map((p) => `${p.x * scaleX},${p.y * scaleY}`)
+              .join(" ")}
+            fill={
+              g.sentiment === "positive"
+                ? ZONE_COLORS.positive
+                : ZONE_COLORS.negative
+            }
             fillOpacity={0.26}
-            stroke={g.sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative}
+            stroke={
+              g.sentiment === "positive"
+                ? ZONE_COLORS.positive
+                : ZONE_COLORS.negative
+            }
             strokeOpacity={0.6}
             strokeWidth={0.75}
           />
@@ -200,7 +239,10 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
           .map((n) => {
             const p = positions.get(n.nodeId);
             if (!p) return null;
-            const color = n.manualZone === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative;
+            const color =
+              n.manualZone === "positive"
+                ? ZONE_COLORS.positive
+                : ZONE_COLORS.negative;
             return (
               <circle
                 key={`manual-zone-${n.nodeId}`}
@@ -271,7 +313,11 @@ export function MiniMap({ wrapRef, nodes, edges, positions, groups, canvasW, can
               cx={p.x * scaleX}
               cy={p.y * scaleY}
               r={DOT_R}
-              fill={sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative}
+              fill={
+                sentiment === "positive"
+                  ? ZONE_COLORS.positive
+                  : ZONE_COLORS.negative
+              }
             />
           );
         })}
