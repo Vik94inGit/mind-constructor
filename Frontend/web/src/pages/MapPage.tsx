@@ -22,6 +22,7 @@ import { MiniMap } from "../map/MiniMap";
 import { WeaponMark } from "../map/WeaponMark";
 import { ringKindFor } from "../map/OutcomeBadge";
 import { InviteMemberModal } from "../components/InviteMemberModal";
+import { ExportTextModal } from "../components/ExportTextModal";
 import { Modal } from "../components/Modal";
 import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
@@ -355,6 +356,7 @@ export function MapPage() {
   // showAddMenu/showNodeTypesLegend are that menu's own open/closed state.
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showNodeTypesLegend, setShowNodeTypesLegend] = useState(false);
+  const [showExportText, setShowExportText] = useState(false);
   // The multi-select pill's own "Actions" dropdown (see SelectionMenu) —
   // Copy/Group into circle/Delete for the current multiSelectIds.
   const [showSelectionMenu, setShowSelectionMenu] = useState(false);
@@ -2914,6 +2916,10 @@ export function MapPage() {
                     setShowAddMenu(false);
                     setShowNodeTypesLegend(true);
                   }}
+                  onExportText={() => {
+                    setShowAddMenu(false);
+                    setShowExportText(true);
+                  }}
                 />
               )}
             </div>
@@ -3247,6 +3253,15 @@ export function MapPage() {
             ))}
           </div>
         </Modal>
+      )}
+
+      {showExportText && map && (
+        <ExportTextModal
+          mapName={map.name}
+          nodes={nodes}
+          positions={positions}
+          onClose={() => setShowExportText(false)}
+        />
       )}
     </div>
   );

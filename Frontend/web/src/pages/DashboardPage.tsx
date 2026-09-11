@@ -149,7 +149,7 @@ export function DashboardPage() {
                 <h3 className="m-0 pr-[1.9rem] text-[1.05rem] font-bold">{map.name}</h3>
                 <div className="flex flex-wrap gap-[0.6rem] text-[0.78rem] text-ink-soft">
                   <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
-                    {Array.isArray(map.members) ? map.members.length : 0} member(s)
+                    {map.memberCount ?? 0} member(s)
                   </span>
                   {map.mapId in nodeCounts && (
                     <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
@@ -196,7 +196,21 @@ export function DashboardPage() {
         <InviteMemberModal
           map={inviteMap}
           onClose={() => setInviteMap(null)}
-          onInvited={(updated) => setMaps((prev) => prev.map((m) => (m.mapId === updated.mapId ? updated : m)))}
+          onInvited={(updated) =>
+            setMaps((prev) =>
+              prev.map((m) =>
+                m.mapId === updated.mapId
+                  ? // `updated` is a full-detail MapDoc (real `members`, no
+                    // memberCount — see inviteUserToMapDao's own populate),
+                    // but this list otherwise only ever holds the lighter
+                    // list shape (see MapDoc's own doc comment) — derive
+                    // memberCount here so the card's own badge doesn't
+                    // read back as 0 until the next reload.
+                    { ...updated, memberCount: Array.isArray(updated.members) ? updated.members.length : m.memberCount }
+                  : m,
+              ),
+            )
+          }
         />
       )}
 

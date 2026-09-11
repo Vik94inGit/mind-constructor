@@ -97,8 +97,17 @@ export interface MapDoc {
   mapId: string;
   name: string;
   ownerId: string;
-  members: string[] | { _id: string; username: string }[];
-  memberColors: MemberColor[];
+  // Both optional now: GET /api (listMaps, the dashboard's own card list)
+  // omits the real member list entirely — see mapsDao.ts's own comment —
+  // and sends memberCount instead. A single map's full detail (getMap,
+  // used once you're actually on that map, or by InviteMemberModal's own
+  // on-demand fetch) still carries the real `members`/`memberColors`; a
+  // list card never has memberCount undefined, and a full detail response
+  // never has members undefined, but nothing here can statically tell the
+  // two shapes apart, so both fields stay optional for either caller.
+  members?: string[] | { _id: string; username: string }[];
+  memberCount?: number;
+  memberColors?: MemberColor[];
   color?: string;
   selectedCircle?: SelectedCircle | null;
   // Inverts combat's own-node rule map-wide: normally you can only attack
