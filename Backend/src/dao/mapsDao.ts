@@ -11,22 +11,26 @@ export const getMapsDao = async (
   currentUserId: string,
   filterType: "all" | "owned" | "shared" = "all",
 ) => {
-  switch (filterType) {
-    case "owned":
-      return await Map.find({ ownerId: currentUserId });
-
-    case "shared":
-      return await Map.find({
-        members: currentUserId,
-        ownerId: { $ne: currentUserId },
-      });
-
-    case "all":
-    default:
-      return await Map.find({
-        $or: [{ members: currentUserId }],
-      });
-  }
+  const query =
+    filterType === "owned"
+      ? { ownerId: currentUserId }
+      : filterType === "shared"
+        ? { members: currentUserId, ownerId: { $ne: currentUserId } }
+        : { $or: [{ members: currentUserId }] };
+  const maps = await Map.find(query);
+  // A dashboard card only ever needs enough to render itself
+  // (name/color/ownerId) plus how many members there are — memberColors/
+  // pendingInvites/selectedCircle used to ride along on every card in this
+  // list for no reason: nothing in the frontend's own list view reads any
+  // of them (a map's full detail, real member ids included, is only ever
+  // fetched once you're actually on that map, or opening Invite — see
+  // getMapByIdDao/InviteMemberModal's own on-demand fetch). `members`
+  // itself is dropped the same way here, replaced by its own length —
+  // never sent as the raw id array on this list endpoint.
+  return maps.map((m) => {
+    const { memberColors, pendingInvites, selectedCircle, members, ...rest } = m.toJSON();
+    return { ...rest, memberCount: Array.isArray(members) ? members.length : 0 };
+  });
 };
 
 export const getMapByIdDao = async (publicMapId: string, userId: string) => {
