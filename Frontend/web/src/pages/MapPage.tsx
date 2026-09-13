@@ -386,6 +386,26 @@ export function MapPage() {
   // picking a different node) flipping selectionSettled back on when
   // nothing asked it to.
   const panInFlightRef = useRef(false);
+  // The exact scroll position centerOnNode's most recent pan is (or was)
+  // headed for — set the instant that pan is kicked off, not once it
+  // lands. Waiting for a real device to actually *finish* an animated
+  // smooth-scroll turned out to be the wrong thing to build correctness
+  // on at all: whether that's signaled by `scrollend` or by polling
+  // scrollLeft/scrollTop until they stop moving (both tried here), it's
+  // still at the mercy of whatever that specific browser/device actually
+  // does with the animation, and evidently some real phones either never
+  // settle where expected or settle too late — ghosts kept rendering
+  // against the wrong viewport regardless of which completion signal this
+  // used. This sidesteps the whole question: settledViewportBounds()
+  // below computes the ghost ring's/radial ring's safe zone from *this*
+  // known destination instead of the live (possibly still-animating, or
+  // on some devices seemingly never-finishing) DOM scroll position, so
+  // their geometry is correct independent of whether the pan visually
+  // catches up in any particular amount of time. selectionSettled still
+  // gates *when* they're allowed to appear at all (so they don't pop in
+  // while the camera is still visibly moving) — just no longer where they
+  // end up once they do.
+  const lastPanTargetRef = useRef<{ left: number; top: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
   // Right-click on *empty* canvas (as opposed to a node — see contextMenu
   // above) — opens a small type-picker for creating a new, parent-less
@@ -461,6 +481,28 @@ export function MapPage() {
   // before the previous one even finished) can cancel the stale one
   // instead of two polls racing to declare "settled" for the wrong node.
   const settlePollRef = useRef<number | null>(null);
+
+  // Keeps lastPanTargetRef from going stale if the user manually pans the
+  // canvas (drag/pinch/wheel) after selecting a node but before deselecting
+  // it — without this, quick-add ghosts/the radial ring would keep clamping
+  // into whatever rectangle centerOnNode last aimed for, ignoring wherever
+  // the view has since actually moved to. Guarded on `!panInFlightRef.current`
+  // so this doesn't fight the *programmatic* scroll events centerOnNode's
+  // own animation fires while a pan is genuinely still in flight — those
+  // are intermediate positions, not a real destination, and overwriting
+  // the target with one would reintroduce exactly the mid-pan race this
+  // whole ref exists to avoid. A manual scroll can only ever happen once
+  // nothing is animating, so this check alone is enough to tell them apart.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    function onScroll() {
+      if (panInFlightRef.current) return;
+      lastPanTargetRef.current = { left: wrap!.scrollLeft, top: wrap!.scrollTop };
+    }
+    wrap.addEventListener("scroll", onScroll);
+    return () => wrap.removeEventListener("scroll", onScroll);
+  }, []);
 
   // How far (in canvas units) centerOnNode is allowed to scroll past the
   // canvas's own bottom edge — see the bottom-scroll-margin spacer below
@@ -925,7 +967,7 @@ export function MapPage() {
     // once before). Nudging the ring's own center into a safe zone inside
     // the current viewport keeps the whole ring on-screen and evenly
     // spaced regardless of where the selected node itself landed.
-    const bounds = viewportBounds();
+    const bounds = settledViewportBounds();
     const halfSpan = RADIAL_NEIGHBOR_RADIUS + 40;
     const spanX = bounds.maxX - bounds.minX;
     const spanY = bounds.maxY - bounds.minY;
@@ -1030,6 +1072,36 @@ export function MapPage() {
     };
   }
 
+  // Same as viewportBounds(), except it substitutes centerOnNode's own
+  // known destination (lastPanTargetRef — see its own doc comment) for
+  // wrap.scrollLeft/scrollTop wherever a pan is/was heading somewhere in
+  // particular. Quick-add ghosts and the radial neighbor ring both read
+  // this instead of plain viewportBounds() specifically because they're
+  // the two things that have to line up with *where the selected node
+  // ends up*, not with whatever the scroll container happens to read at
+  // the moment they're computed — and that's exactly the value a real
+  // device's own animation timing can't be trusted to have caught up to
+  // yet (or, evidently, ever quite catch up to on some phones). Every
+  // other caller of viewportBounds() (placing a brand new node, clamping a
+  // drag, etc.) is unrelated to any in-flight pan and should keep reading
+  // the real, current scroll position, so this stays a separate function
+  // rather than changing viewportBounds() itself.
+  function settledViewportBounds(): ViewportBounds {
+    const wrap = wrapRef.current;
+    if (!wrap) return FULL_CANVAS_BOUNDS;
+    const target = lastPanTargetRef.current;
+    if (!target) return viewportBounds();
+    const pad = 70;
+    const sheetOpen = linkMode || packMode || (!!selectedNode && multiSelectIds.size === 0);
+    const reserve = sheetOpen ? wrap.clientHeight * panelReserveFrac(isMobileViewport) : 0;
+    return {
+      minX: target.left / zoom + pad,
+      minY: target.top / zoom + pad,
+      maxX: (target.left + wrap.clientWidth) / zoom - pad,
+      maxY: (target.top + wrap.clientHeight - reserve) / zoom - pad,
+    };
+  }
+
   // Pans the canvas so the given node's position lands in the middle of the
   // current viewport, unconditionally — the chosen node (whatever was just
   // clicked/selected) always ends up centered, not just nudged into view.
@@ -1085,6 +1157,11 @@ export function MapPage() {
     const maxTop = Math.max(0, CANVAS_H * zoom - wrap.clientHeight) + bottomScrollMargin * zoom;
     const targetLeft = Math.min(maxLeft, Math.max(0, pos.x * zoom - wrap.clientWidth / 2));
     const targetTop = Math.min(maxTop, Math.max(0, pos.y * zoom - visibleH / 2));
+    // See its own doc comment — recorded regardless of which branch below
+    // actually runs, since settledViewportBounds() should always reflect
+    // the most recent centerOnNode call, not just the ones that had to
+    // scroll somewhere new.
+    lastPanTargetRef.current = { left: targetLeft, top: targetTop };
 
     // Cancel whatever a previous call left running — a newer pan (picking
     // a different node before the last one even settled) fully supersedes
@@ -2914,7 +2991,7 @@ export function MapPage() {
             {quickAddActive && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
                 anchorPos={posFor(selectedNode)}
-                bounds={viewportBounds()}
+                bounds={settledViewportBounds()}
                 onPick={(type, pos) => startQuickAdd(type, pos, selectedNode)}
               />
             )}
