@@ -19,8 +19,23 @@ import { NodeCrown } from "./NodeCrown";
 // that, marking it as "not real yet."
 const ICON_SIZE = 48;
 const GHOST_SCALE = 0.65;
-const RADIUS = 64;
-const EDGE_MARGIN = 40;
+// Smaller on mobile — not just a nicety, a real geometry fix. The ring's
+// own safe-zone recentering below can always keep every ghost on-screen
+// and non-overlapping, but *how far* it has to nudge the ring away from
+// the node scales with RADIUS+EDGE_MARGIN, and mobile's visible strip
+// above the bottom sheet is short (only ~1/3 of the screen — see
+// panelReserveFrac in MapPage.tsx). At the old, flat 64+40, a node
+// anywhere in the lower half of that already-short strip forced the ring
+// so far upward to fit that all 7 ghosts ended up bunched into an arc
+// above the node instead of surrounding it — exactly the "curvy row"
+// this was reported as. Shrinking the ring itself for mobile means it
+// usually fits right where the node already is, needing little or no
+// recentering at all; icon size is left alone (unlike RADIUS) so the
+// actual tap targets don't shrink, just how far apart their centers sit —
+// still comfortably clear of each other at this radius.
+const isMobileViewport = typeof window !== "undefined" && window.innerWidth <= 640;
+const RADIUS = isMobileViewport ? 48 : 64;
+const EDGE_MARGIN = isMobileViewport ? 24 : 40;
 
 interface Props {
   anchorPos: { x: number; y: number };
@@ -34,18 +49,42 @@ interface Props {
 // spot and auto-links it to the anchor — branching an argument tree becomes a
 // single click instead of toolbar button -> modal -> manual placement.
 export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
+  // The anchor itself used to be the ring's center, with each of the 7
+  // points *independently* clamped into bounds afterward — fine when the
+  // anchor sits well clear of every edge, but a node close enough to one
+  // (a phone's own narrow/short visible strip makes "close enough" the
+  // common case, not a rare one, and centerOnNode can only scroll a node
+  // so close to the actual edge of the whole 2400x1600 canvas to begin
+  // with — there's nothing further to scroll into) clamped every point
+  // that would've landed past that edge to the *same* boundary value,
+  // collapsing several ghosts on top of each other into a squashed line
+  // instead of a ring. Centering the ring itself on a point nudged just
+  // far enough inside `bounds` to fit the whole undistorted circle (rather
+  // than clamping each point after the fact) keeps every ghost evenly
+  // spaced and fully clickable regardless of where the node landed — it
+  // just may not sit perfectly centered on the node itself in that case,
+  // which is the unavoidable tradeoff once the node is right at the edge
+  // of the map with nothing beyond it to make room from.
+  const halfSpan = RADIUS + EDGE_MARGIN;
+  const spanX = bounds.maxX - bounds.minX;
+  const spanY = bounds.maxY - bounds.minY;
+  // A viewport narrower/shorter than the ring itself (a tiny window, or a
+  // zoomed-way-out canvas) has no safe zone to clamp into at all — center
+  // the ring on bounds' own midpoint rather than letting min > max invert
+  // the clamp below.
+  const ringCenter =
+    spanX >= halfSpan * 2 && spanY >= halfSpan * 2
+      ? {
+          x: Math.min(bounds.maxX - halfSpan, Math.max(bounds.minX + halfSpan, anchorPos.x)),
+          y: Math.min(bounds.maxY - halfSpan, Math.max(bounds.minY + halfSpan, anchorPos.y)),
+        }
+      : { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
   return (
     <>
       {NODE_TYPES.map((type, i) => {
         const angle = (i / NODE_TYPES.length) * Math.PI * 2 - Math.PI / 2;
-        const x = Math.min(
-          bounds.maxX - EDGE_MARGIN,
-          Math.max(bounds.minX + EDGE_MARGIN, anchorPos.x + RADIUS * Math.cos(angle)),
-        );
-        const y = Math.min(
-          bounds.maxY - EDGE_MARGIN,
-          Math.max(bounds.minY + EDGE_MARGIN, anchorPos.y + RADIUS * Math.sin(angle)),
-        );
+        const x = ringCenter.x + RADIUS * Math.cos(angle);
+        const y = ringCenter.y + RADIUS * Math.sin(angle);
         return (
           <button
             key={type}
