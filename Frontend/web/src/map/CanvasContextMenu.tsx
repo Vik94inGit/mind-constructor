@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NodeTypeIcon } from "./NodeTypeIcon";
+import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
+import type { OutcomeType } from "./OutcomeBadge";
 
 interface Props {
   x: number;
@@ -56,7 +58,18 @@ export function CanvasContextMenu({ x, y, onPick, onClose }: Props) {
     >
       {NODE_TYPES.map((type) => (
         <button key={type} className={item} onClick={() => onPick(type)}>
-          <NodeTypeIcon type={type} size={16} />
+          {/* Same symbol the real node will actually render once created
+              (OutcomeBadge, not NodeTypeIcon's own separate glyph set) —
+              this picker used to show a different icon per type than the
+              node it created ended up with, reading as "wait, that's not
+              what I picked" the moment the real one appeared. "unknown"
+              alone has no outcome symbol to match, so it keeps its own
+              plain NodeTypeIcon glyph, same as the real node does. */}
+          {ringKindFor(type) ? (
+            <OutcomeBadge type={type as OutcomeType} size={16} />
+          ) : (
+            <NodeTypeIcon type={type} size={16} />
+          )}
           {type}
         </button>
       ))}

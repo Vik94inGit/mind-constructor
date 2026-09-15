@@ -18,24 +18,39 @@ import { NodeCrown } from "./NodeCrown";
 // className below) and the reduced opacity are ghost-specific beyond
 // that, marking it as "not real yet."
 const ICON_SIZE = 48;
-const GHOST_SCALE = 0.65;
+// Bumped up from 0.65 — a ghost used to read as a noticeably smaller,
+// harder-to-tap preview than the real node it's standing in for; bigger
+// makes it easier to see and tap, and to actually recognize which type's
+// icon it's previewing at a glance.
+const GHOST_SCALE = 0.85;
 // Smaller on mobile — not just a nicety, a real geometry fix. The ring's
 // own safe-zone recentering below can always keep every ghost on-screen
 // and non-overlapping, but *how far* it has to nudge the ring away from
 // the node scales with RADIUS+EDGE_MARGIN, and mobile's visible strip
 // above the bottom sheet is short (only ~1/3 of the screen — see
-// panelReserveFrac in MapPage.tsx). At the old, flat 64+40, a node
-// anywhere in the lower half of that already-short strip forced the ring
-// so far upward to fit that all 7 ghosts ended up bunched into an arc
-// above the node instead of surrounding it — exactly the "curvy row"
-// this was reported as. Shrinking the ring itself for mobile means it
-// usually fits right where the node already is, needing little or no
-// recentering at all; icon size is left alone (unlike RADIUS) so the
-// actual tap targets don't shrink, just how far apart their centers sit —
-// still comfortably clear of each other at this radius.
+// panelReserveFrac in MapPage.tsx). At too big a radius, a node anywhere
+// in the lower half of that already-short strip forces the ring so far
+// upward to fit that all 7 ghosts end up bunched into an arc above the
+// node instead of surrounding it — the "curvy row" this was reported as
+// once already.
+//
+// The floor both numbers have to clear now: NodeWings (only drawn on this
+// same selected node — see NodeCard) spreads a full ~124px wide, ~62px on
+// each side of the node's own center, wider than the bare 48px icon this
+// ring used to be sized against. A radius that only cleared the icon left
+// the two side-ish ghosts landing right on top of the wingtips — the
+// node reading as "half covered by its own ghosts" the instant it was
+// selected, wings and all. RADIUS here has to clear that 62px wing
+// half-width *plus* a ghost's own half-width (ICON_SIZE*GHOST_SCALE/2 —
+// 20.4px at the scale above) with real margin to spare, on both mobile
+// and desktop — wings don't shrink for mobile, so neither can this floor.
+// Bumped up again from 88/106 — more breathing room between the node
+// (crown/wings included) and the ring than the bare wing-clearance floor
+// strictly requires, so the ring reads as clearly its own thing around the
+// node rather than crowding right up against it.
 const isMobileViewport = typeof window !== "undefined" && window.innerWidth <= 640;
-const RADIUS = isMobileViewport ? 48 : 64;
-const EDGE_MARGIN = isMobileViewport ? 24 : 40;
+const RADIUS = isMobileViewport ? 104 : 126;
+const EDGE_MARGIN = isMobileViewport ? 38 : 58;
 
 interface Props {
   anchorPos: { x: number; y: number };
@@ -58,65 +73,108 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
   // with — there's nothing further to scroll into) clamped every point
   // that would've landed past that edge to the *same* boundary value,
   // collapsing several ghosts on top of each other into a squashed line
-  // instead of a ring. Centering the ring itself on a point nudged just
-  // far enough inside `bounds` to fit the whole undistorted circle (rather
-  // than clamping each point after the fact) keeps every ghost evenly
-  // spaced and fully clickable regardless of where the node landed — it
-  // just may not sit perfectly centered on the node itself in that case,
-  // which is the unavoidable tradeoff once the node is right at the edge
-  // of the map with nothing beyond it to make room from.
-  const halfSpan = RADIUS + EDGE_MARGIN;
-  const spanX = bounds.maxX - bounds.minX;
-  const spanY = bounds.maxY - bounds.minY;
-  // A viewport narrower/shorter than the ring itself has no safe zone to
-  // clamp into at all without inverting the min/max clamp below — on
-  // mobile this isn't the rare "zoomed-way-out canvas" case it sounds
-  // like, it's the *routine* one: the bottom sheet's own 2/3-of-the-screen
-  // reserve (panelReserveFrac in MapPage.tsx) plus this function's own pad
-  // leaves less vertical room than halfSpan*2 on a typical phone, so
-  // spanY fails this check for essentially every mobile selection, not
-  // just ones near a canvas edge. Falling back to bounds' own plain
-  // midpoint here (as this used to) is harmless *most* of the time only
-  // because centerOnNode usually already parks the anchor there too — but
-  // the one time anchorPos and the bounds midpoint actually diverge is
-  // exactly the case this whole file exists for: a node close enough to
-  // the real edge of the 2400x1600 canvas that centerOnNode couldn't pan
-  // it all the way to center. In that case the bounds-midpoint fallback
-  // used to strand the ring floating in the middle of the screen while
-  // the node itself sat pinned against the edge, sometimes 100+px away —
-  // "ghosts not centered around it" near a border, not a squashed ring.
-  // Anchoring the fallback on anchorPos instead (still clamped into
-  // `bounds`, just without the extra halfSpan inset) keeps the ring
-  // visibly attached to its node even when it can't fully fit — a ring
-  // that's a little clipped but clearly belongs to the node it's around
-  // reads far better than one that's fully on-screen but detached from it.
-  const ringCenter =
-    spanX >= halfSpan * 2 && spanY >= halfSpan * 2
-      ? {
-          x: Math.min(bounds.maxX - halfSpan, Math.max(bounds.minX + halfSpan, anchorPos.x)),
-          y: Math.min(bounds.maxY - halfSpan, Math.max(bounds.minY + halfSpan, anchorPos.y)),
-        }
-      : {
-          x: Math.min(bounds.maxX, Math.max(bounds.minX, anchorPos.x)),
-          y: Math.min(bounds.maxY, Math.max(bounds.minY, anchorPos.y)),
-        };
+  // instead of a ring.
+  //
+  // ringCenter itself stays dead simple — just the anchor, clamped into
+  // bounds — because the actual "does it fit" question is answered below by
+  // rx/ry instead. An earlier version (a fixed halfSpan inset) pushed the
+  // whole ring away from the node whenever it didn't fully fit; a plain
+  // circular radius with a final per-point clamp did worse — clamping each
+  // point independently flattened the cramped axis into a near-straight
+  // line, several ghosts landing at the exact same clamped coordinate
+  // instead of a curve.
+  const ringCenter = {
+    x: Math.min(bounds.maxX, Math.max(bounds.minX, anchorPos.x)),
+    y: Math.min(bounds.maxY, Math.max(bounds.minY, anchorPos.y)),
+  };
+  // Elliptical, not circular: rx/ry each shrink independently to whatever
+  // room `bounds` actually has on their own axis (down to their own floor),
+  // rather than sharing one radius that has to fit the *tightest* of all
+  // four directions. A shorter/narrower ring that's still a smooth curve on
+  // a cramped mobile screen reads as a real (if squashed) circle — one
+  // whose tight axis got clamped point-by-point instead just reads as flat.
+  //
+  // The two floors aren't the same number on purpose. MIN_RX can't drop
+  // below what NodeWings needs (see RADIUS's own doc comment — ~62px wing
+  // half-width + a ghost's own ~20px half-width): the two side ghosts sit
+  // at y = ringCenter.y exactly regardless of ry, so *only* rx protects
+  // them from the wingtips, and horizontal room is rarely this tight in
+  // practice anyway (a phone is narrow, not this narrow). MIN_RY only ever
+  // has to clear the node's much shorter crown (NodeCrown's halo/horns,
+  // ~16px tall) plus a ghost's own radius on the way up, and the node's own
+  // icon/badges on the way down — both comfortably smaller than the wings.
+  //
+  // Both floors are still hard-capped at the *raw* distance to their own
+  // edge of `bounds` (availX/availY below, no EDGE_MARGIN subtracted) — not
+  // just floored, capped. A floor alone can't just be "big enough to look
+  // round": pin it at a fixed value and the one time real available room
+  // comes in under that (a genuinely short mobile strip), rx/ry themselves
+  // end up *past* `bounds`, right back to the final per-point clamp
+  // flattening several points onto the same edge value — the exact bug
+  // this rewrite exists to avoid. Capping at the raw distance first means
+  // the floor can stay ambitious (round whenever there's room) while this
+  // axis's own Math.min below always still lands inside `bounds` on its
+  // own, no clamp ever needed.
+  const MIN_RX = 83;
+  const MIN_RY = 60;
+  const availLeft = ringCenter.x - bounds.minX;
+  const availRight = bounds.maxX - ringCenter.x;
+  // + UP_SLACK: `bounds`' own pad (baked in by MapPage's viewportBounds/
+  // settledViewportBounds) is a generic safety margin shared with every
+  // other placement purpose on the canvas — sized generously enough that
+  // giving a little of it back is a far better trade, just for how close
+  // *this* ring's topmost point is allowed to get to that edge, than
+  // letting it overlap the node's own crown (NodeCrown's halo/horns,
+  // which sits close enough above center — see RADIUS's own doc comment —
+  // that the plain pad-limited availUp was cutting it a few px too close
+  // on a short mobile screen: the ring's whole point is to surround the
+  // node, not cover part of it). Only the *up* direction gets this — down/
+  // left/right have no comparable "own decoration" to clear, and staying
+  // capped there is what keeps the final per-point clamp from ever having
+  // to flatten multiple points at once (see MIN_RX/MIN_RY's own doc
+  // comment) — a single topmost point occasionally landing right at this
+  // still-padded edge in a genuinely tiny viewport is a much smaller
+  // artifact than that.
+  const UP_SLACK = 12;
+  const availUp = ringCenter.y - bounds.minY + UP_SLACK;
+  const availDown = bounds.maxY - ringCenter.y;
+  const rx = Math.min(RADIUS, availLeft, availRight, Math.max(MIN_RX, Math.min(availLeft, availRight) - EDGE_MARGIN));
+  // Separate radii for the upper and lower half of the ring — not one
+  // shared ry sized off whichever of availUp/availDown is smaller. That
+  // was silently undoing UP_SLACK above whenever the *bottom* happened to
+  // be the tighter side (routine on mobile — the panel reserve eats space
+  // below the node too, often by a similar amount): ry would still clamp
+  // to the smaller of the two, so the topmost points never actually got
+  // the extra room UP_SLACK was meant to give them.
+  const ryUp = Math.min(RADIUS, availUp, Math.max(MIN_RY, availUp - EDGE_MARGIN));
+  const ryDown = Math.min(RADIUS, availDown, Math.max(MIN_RY, availDown - EDGE_MARGIN));
   return (
     <>
       {NODE_TYPES.map((type, i) => {
+        // Back to a full 360° ring — the node's own caption is hidden
+        // outright while it's selected now (see NodeCard), which was the
+        // actual thing a half-circle was working around (ghosts overlapping
+        // that text below it). With nothing there to overlap, there's no
+        // reason left to give up the bottom half of the ring.
         const angle = (i / NODE_TYPES.length) * Math.PI * 2 - Math.PI / 2;
-        // Final per-point safety clamp into the raw bounds (not the
-        // halfSpan-inset safe zone — that's already baked into ringCenter
-        // on the branch where it applies). A no-op whenever the full ring
-        // already fit — ringCenter was inset by halfSpan there, so every
-        // point already lands inside `bounds` on its own. It only ever
-        // moves a point on the fallback branch above (ringCenter.own doc
-        // comment), where the ring is anchored on the node but may still
-        // be too big to fully fit — this keeps that ring's outermost
-        // points reachable/visible instead of scrolled off, at the cost of
-        // occasionally bunching a couple of them toward the same edge in
-        // that already-cramped case.
-        const x = Math.min(bounds.maxX, Math.max(bounds.minX, ringCenter.x + RADIUS * Math.cos(angle)));
-        const y = Math.min(bounds.maxY, Math.max(bounds.minY, ringCenter.y + RADIUS * Math.sin(angle)));
+        // rx/ryUp/ryDown (not RADIUS) — see their own doc comment: already
+        // sized to fit `bounds`, so this is normally a no-op. Kept as a
+        // final safety net for the one case they can't fully cover
+        // themselves — bounds narrower than even MIN_RX/MIN_RY (a
+        // genuinely tiny viewport, not a real phone) — so a point still
+        // can't render off-screen.
+        const sinA = Math.sin(angle);
+        // bounds.minY - UP_SLACK, not bare bounds.minY: has to match
+        // availUp's own +UP_SLACK above, or this would just clamp the
+        // topmost points straight back down to bare bounds.minY and undo
+        // that slack for exactly the points it was meant to help. Only
+        // applied above center (sinA < 0) — ryDown/the bottom half never
+        // reads UP_SLACK at all.
+        const x = Math.min(bounds.maxX, Math.max(bounds.minX, ringCenter.x + rx * Math.cos(angle)));
+        const y = Math.min(
+          bounds.maxY,
+          Math.max(bounds.minY - (sinA < 0 ? UP_SLACK : 0), ringCenter.y + (sinA < 0 ? ryUp : ryDown) * sinA),
+        );
         return (
           <button
             key={type}

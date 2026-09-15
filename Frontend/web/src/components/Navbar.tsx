@@ -1,6 +1,23 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+// A plain target/bullseye — same concentric-rings-plus-center-dot shape
+// OutcomeBadge's own GoalSymbol draws for a Solution node (the app's own
+// "this is what we're aiming for" motif), standing in here as the app's
+// logo mark instead of that map-specific component's own bigger, 400x300-
+// viewBox SVG. currentColor so it always matches the link text's own
+// color (including its hover state) with no separate color prop to keep
+// in sync.
+function TargetLogo() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   if (!user) return null;
@@ -16,8 +33,9 @@ export function Navbar() {
     <header className="flex items-center gap-6 border-b border-line bg-surface px-6 py-[0.85rem]">
       <NavLink
         to="/"
-        className="text-[1.05rem] font-bold tracking-[-0.01em] text-ink"
+        className="flex items-center gap-[0.45rem] text-[1.05rem] font-bold tracking-[-0.01em] text-ink"
       >
+        <TargetLogo />
         Mind Constructor
       </NavLink>
       <nav className="flex flex-1 gap-4">

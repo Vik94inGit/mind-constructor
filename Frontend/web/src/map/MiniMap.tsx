@@ -67,6 +67,14 @@ interface Props {
   // wrap-scroll reading below needs this to convert between the two —
   // same reasoning as MapPage's own screenToCanvas/zoomAt.
   zoom: number;
+  // MapPage's own hScrollMargin/vScrollMargin (canvas units) — the real
+  // canvas now sits inset by this much within wrap's actually-scrollable
+  // area on every side (see their own doc comment on MapPage), so a scroll
+  // position there is no longer numerically the same as a canvasW/canvasH
+  // coordinate. navigateTo and the "you are here" rect below both need this
+  // to convert between the two, same as MapPage's own screenToCanvas.
+  hScrollMargin: number;
+  vScrollMargin: number;
 }
 
 export function MiniMap({
@@ -78,6 +86,8 @@ export function MiniMap({
   canvasW,
   canvasH,
   zoom,
+  hScrollMargin,
+  vScrollMargin,
 }: Props) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
@@ -150,15 +160,21 @@ export function MiniMap({
     const miniY = Math.min(Math.max(0, clientY - rect.top), MINIMAP_H);
     const canvasX = miniX / scaleX;
     const canvasY = miniY / scaleY;
-    const maxLeft = Math.max(0, canvasW * zoom - wrap.clientWidth);
-    const maxTop = Math.max(0, canvasH * zoom - wrap.clientHeight);
+    // (canvasW + hScrollMargin*2)/(canvasH + vScrollMargin*2): wrap's real
+    // scrollable range now, same padded size MapPage's own centerOnNode
+    // clamps against (see its own doc comment) — not just canvasW/canvasH.
+    const maxLeft = Math.max(0, (canvasW + hScrollMargin * 2) * zoom - wrap.clientWidth);
+    const maxTop = Math.max(0, (canvasH + vScrollMargin * 2) * zoom - wrap.clientHeight);
+    // + hScrollMargin/+ vScrollMargin: canvasX/canvasY are real canvas
+    // coordinates; scrollLeft/scrollTop are screen pixels within the
+    // *padded* canvas — same conversion MapPage's own centerOnNode uses.
     wrap.scrollLeft = Math.min(
       maxLeft,
-      Math.max(0, canvasX * zoom - wrap.clientWidth / 2),
+      Math.max(0, (canvasX + hScrollMargin) * zoom - wrap.clientWidth / 2),
     );
     wrap.scrollTop = Math.min(
       maxTop,
-      Math.max(0, canvasY * zoom - wrap.clientHeight / 2),
+      Math.max(0, (canvasY + vScrollMargin) * zoom - wrap.clientHeight / 2),
     );
   }
 
@@ -370,10 +386,14 @@ export function MiniMap({
             pixels of the rendered (zoomed) canvas — divide back down to
             canvas-coordinate space before scaling to minimap size, same as
             navigateTo above, or this rectangle would shrink to a sliver
-            the moment the real canvas zoomed in. */}
+            the moment the real canvas zoomed in. -hScrollMargin/
+            -vScrollMargin on the position only (not the width/height, a
+            pure size unaffected by the offset) — wrap's scroll position is
+            within the *padded* canvas now, same conversion navigateTo's
+            own +hScrollMargin/+vScrollMargin undoes the other way. */}
         <rect
-          x={(viewport.left / zoom) * scaleX}
-          y={(viewport.top / zoom) * scaleY}
+          x={(viewport.left / zoom - hScrollMargin) * scaleX}
+          y={(viewport.top / zoom - vScrollMargin) * scaleY}
           width={(viewport.width / zoom) * scaleX}
           height={(viewport.height / zoom) * scaleY}
           fill="var(--accent)"

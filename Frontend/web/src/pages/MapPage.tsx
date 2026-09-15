@@ -20,7 +20,8 @@ import { AddMenu } from "../map/AddMenu";
 import { SelectionMenu } from "../map/SelectionMenu";
 import { MiniMap } from "../map/MiniMap";
 import { WeaponMark } from "../map/WeaponMark";
-import { ringKindFor } from "../map/OutcomeBadge";
+import { OutcomeBadge, ringKindFor } from "../map/OutcomeBadge";
+import type { OutcomeType } from "../map/OutcomeBadge";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { Modal } from "../components/Modal";
@@ -270,26 +271,39 @@ export function MapPage() {
     return () => wrap.removeEventListener("scroll", onScroll);
   }, []);
 
-  // How far (in canvas units) centerOnNode is allowed to scroll past the
-  // canvas's own bottom edge — see the bottom-scroll-margin spacer below
-  // for why this exists at all. A full clientHeight's worth (divided back
-  // out of screen pixels into canvas units, same *zoom reasoning every
-  // other screen<->canvas conversion here uses) is generous on purpose:
-  // centerOnNode only ever needs up to ~2/3 of that (see its own
-  // panelReserveFrac()-derived visibleH/2 — mobile's bigger reserve leaves
-  // *less* headroom to need here, not more, so this stays generous either
-  // way), so this comfortably covers it with room to spare rather than
-  // being tuned to the exact minimum and risking falling short after some
-  // future tweak to that fraction.
+  // How far (in canvas units) the *real* 0..CANVAS_W/CANVAS_H content sits
+  // inset from every edge of the actual scrollable area — canvasRef itself
+  // is rendered CANVAS_W+hScrollMargin*2 wide (CANVAS_H+vScrollMargin*2
+  // tall), with the real content positioned at (hScrollMargin,
+  // vScrollMargin) inside it (see its own JSX below). Without this, wrap
+  // can never scroll any node closer to center than "the canvas's own edge
+  // is at the edge of the viewport" — fine for a node in the middle of the
+  // map, but one sitting at/near the real 0/CANVAS_W/CANVAS_H edge has
+  // nowhere left to scroll to: centerOnNode's target gets clamped back to
+  // 0 or maxLeft/maxTop, landing the node pinned near the edge of the
+  // screen instead of centered — and, worse, outside the safe zone
+  // QuickAddGhosts/the radial neighbor ring clamp themselves into (see
+  // their own doc comments), so their ring visibly detached from the node
+  // instead of surrounding it. This margin exists on all four sides so a
+  // node near *any* edge — not just the bottom, which used to be the only
+  // side this was ever added for — can still be scrolled into that safe
+  // zone. A full clientWidth/clientHeight's worth (divided back out of
+  // screen pixels into canvas units, same *zoom reasoning every other
+  // screen<->canvas conversion here uses) is generous on purpose:
+  // centerOnNode only ever needs up to ~half of it, so this comfortably
+  // covers it with room to spare rather than being tuned to the exact
+  // minimum and risking falling short after some future tweak.
   // Recomputed on resize (ResizeObserver, same pattern MiniMap's own
   // viewport tracking already uses) and whenever zoom changes, since both
   // change how many canvas units one screen pixel is worth.
-  const [bottomScrollMargin, setBottomScrollMargin] = useState(0);
+  const [hScrollMargin, setHScrollMargin] = useState(0);
+  const [vScrollMargin, setVScrollMargin] = useState(0);
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
     function update() {
-      setBottomScrollMargin(Math.ceil(wrap!.clientHeight / zoom));
+      setHScrollMargin(Math.ceil(wrap!.clientWidth / zoom));
+      setVScrollMargin(Math.ceil(wrap!.clientHeight / zoom));
     }
     update();
     const resizeObserver = new ResizeObserver(update);
@@ -816,9 +830,14 @@ export function MapPage() {
     const wrap = wrapRef.current;
     if (!wrap) return { x: clientX, y: clientY };
     const rect = wrap.getBoundingClientRect();
+    // - hScrollMargin/vScrollMargin: wrap's own scroll metrics are screen
+    // pixels within the *padded* canvasRef (see its own doc comment) — the
+    // real 0..CANVAS_W/CANVAS_H content sits inset by that margin inside
+    // it, so converting back to a real canvas coordinate has to subtract
+    // it back out.
     return {
-      x: (wrap.scrollLeft + (clientX - rect.left)) / zoom,
-      y: (wrap.scrollTop + (clientY - rect.top)) / zoom,
+      x: (wrap.scrollLeft + (clientX - rect.left)) / zoom - hScrollMargin,
+      y: (wrap.scrollTop + (clientY - rect.top)) / zoom - vScrollMargin,
     };
   }
 
@@ -832,8 +851,9 @@ export function MapPage() {
     const nextZoom = Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, to ?? zoom + delta)) * 100) / 100;
     if (nextZoom === zoom) return;
     const rect = wrap.getBoundingClientRect();
-    const canvasX = (wrap.scrollLeft + (clientX - rect.left)) / zoom;
-    const canvasY = (wrap.scrollTop + (clientY - rect.top)) / zoom;
+    // Same -hScrollMargin/-vScrollMargin conversion as screenToCanvas above.
+    const canvasX = (wrap.scrollLeft + (clientX - rect.left)) / zoom - hScrollMargin;
+    const canvasY = (wrap.scrollTop + (clientY - rect.top)) / zoom - vScrollMargin;
     setZoom(nextZoom);
     // Deferred a frame: scrollLeft/scrollTop set synchronously here would
     // still be measured against the *old* scaled scrollWidth/scrollHeight,
@@ -841,8 +861,11 @@ export function MapPage() {
     // the browser would clamp against stale bounds and this would land in
     // the wrong place.
     requestAnimationFrame(() => {
-      wrap.scrollLeft = canvasX * nextZoom - (clientX - rect.left);
-      wrap.scrollTop = canvasY * nextZoom - (clientY - rect.top);
+      // + margin: back from a real canvas coordinate to padded-canvasRef
+      // screen pixels, same convention centerOnNode's own targetLeft/Top
+      // use.
+      wrap.scrollLeft = (canvasX + hScrollMargin) * nextZoom - (clientX - rect.left);
+      wrap.scrollTop = (canvasY + vScrollMargin) * nextZoom - (clientY - rect.top);
     });
   }
 
@@ -867,11 +890,13 @@ export function MapPage() {
     // (multiSelectIds), which is a slim bar, not a tall sheet.
     const sheetOpen = linkMode || packMode || (!!selectedNode && multiSelectIds.size === 0);
     const reserve = sheetOpen ? wrap.clientHeight * panelReserveFrac(isMobileViewport) : 0;
+    // - hScrollMargin/-vScrollMargin: same padded-canvasRef -> real-canvas
+    // conversion screenToCanvas uses.
     return {
-      minX: wrap.scrollLeft / zoom + pad,
-      minY: wrap.scrollTop / zoom + pad,
-      maxX: (wrap.scrollLeft + wrap.clientWidth) / zoom - pad,
-      maxY: (wrap.scrollTop + wrap.clientHeight - reserve) / zoom - pad,
+      minX: wrap.scrollLeft / zoom + pad - hScrollMargin,
+      minY: wrap.scrollTop / zoom + pad - vScrollMargin,
+      maxX: (wrap.scrollLeft + wrap.clientWidth) / zoom - pad - hScrollMargin,
+      maxY: (wrap.scrollTop + wrap.clientHeight - reserve) / zoom - pad - vScrollMargin,
     };
   }
 
@@ -897,11 +922,13 @@ export function MapPage() {
     const pad = 70;
     const sheetOpen = linkMode || packMode || (!!selectedNode && multiSelectIds.size === 0);
     const reserve = sheetOpen ? wrap.clientHeight * panelReserveFrac(isMobileViewport) : 0;
+    // - hScrollMargin/-vScrollMargin: same padded-canvasRef -> real-canvas
+    // conversion screenToCanvas uses.
     return {
-      minX: target.left / zoom + pad,
-      minY: target.top / zoom + pad,
-      maxX: (target.left + wrap.clientWidth) / zoom - pad,
-      maxY: (target.top + wrap.clientHeight - reserve) / zoom - pad,
+      minX: target.left / zoom + pad - hScrollMargin,
+      minY: target.top / zoom + pad - vScrollMargin,
+      maxX: (target.left + wrap.clientWidth) / zoom - pad - hScrollMargin,
+      maxY: (target.top + wrap.clientHeight - reserve) / zoom - pad - vScrollMargin,
     };
   }
 
@@ -949,17 +976,19 @@ export function MapPage() {
     // *zoom throughout: pos.x/y are canvas-space, but scrollTo/scrollWidth
     // deal in screen pixels of the rendered (scaled) canvas — same
     // conversion as screenToCanvas/zoomAt above, just the other direction.
-    const maxLeft = Math.max(0, CANVAS_W * zoom - wrap.clientWidth);
-    // + bottomScrollMargin*zoom: without it this clamp would cap the scroll
-    // right back at the canvas's own bottom edge, undoing the extra
-    // scrollable room the spacer below was added to provide — a node
-    // sitting near that edge would still get pinned near the bottom of the
-    // screen (behind the panel) even though wrap itself is now able to
-    // scroll further. *zoom to convert bottomScrollMargin (canvas units)
-    // back to screen pixels, same as every other term here.
-    const maxTop = Math.max(0, CANVAS_H * zoom - wrap.clientHeight) + bottomScrollMargin * zoom;
-    const targetLeft = Math.min(maxLeft, Math.max(0, pos.x * zoom - wrap.clientWidth / 2));
-    const targetTop = Math.min(maxTop, Math.max(0, pos.y * zoom - visibleH / 2));
+    // (CANVAS_W + hScrollMargin*2)/(CANVAS_H + vScrollMargin*2): canvasRef's
+    // own real rendered size now (see its own doc comment/JSX) — the margin
+    // on every side is what lets this clamp actually reach 0 or maxLeft/
+    // maxTop for a node sitting right at the real 0/CANVAS_W/CANVAS_H edge
+    // instead of leaving it pinned there with nowhere left to scroll to.
+    const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
+    const maxTop = Math.max(0, (CANVAS_H + vScrollMargin * 2) * zoom - wrap.clientHeight);
+    // + hScrollMargin/+ vScrollMargin: pos.x/y are real canvas coordinates;
+    // scrollTo deals in screen pixels within the *padded* canvasRef (see
+    // screenToCanvas's own doc comment) — same conversion, just the other
+    // direction.
+    const targetLeft = Math.min(maxLeft, Math.max(0, (pos.x + hScrollMargin) * zoom - wrap.clientWidth / 2));
+    const targetTop = Math.min(maxTop, Math.max(0, (pos.y + vScrollMargin) * zoom - visibleH / 2));
     // See its own doc comment — recorded regardless of which branch below
     // actually runs, since settledViewportBounds() should always reflect
     // the most recent centerOnNode call, not just the ones that had to
@@ -2344,6 +2373,32 @@ export function MapPage() {
             className="h-full w-full overflow-auto [overscroll-behavior-x:none] bg-[radial-gradient(circle,var(--line)_1px,transparent_1px)] [background-size:22px_22px]"
             ref={wrapRef}
           >
+          {/* Padded outer sizing/transform wrapper — canvasRef (the real
+              canvas, unchanged below) sits inset within this by
+              hScrollMargin/vScrollMargin on every side (see their own doc
+              comment) instead of filling it edge-to-edge the way it used
+              to. Without this extra margin, wrap could never scroll any
+              node closer to center than "the canvas's own edge is at the
+              edge of the viewport" — a node right at/near the real
+              0/CANVAS_W/CANVAS_H edge had nowhere left to scroll to, so
+              centerOnNode's own clamp pinned it right there, and
+              QuickAddGhosts/the radial ring's own safe-zone clamp then
+              visibly detached their ring from a node sitting outside it.
+              Carries the zoom transform (moved up from canvasRef itself)
+              so the margin scales right along with the real content — a
+              plain fixed pixel margin at zoom 1 would read as a much
+              smaller (or larger) safety net once zoomed. transformOrigin
+              "0 0" keeps that scaling anchored at this wrapper's own
+              top-left, same as canvasRef's own transform used to. */}
+          <div
+            style={{
+              position: "relative",
+              width: CANVAS_W + hScrollMargin * 2,
+              height: CANVAS_H + vScrollMargin * 2,
+              transform: `scale(${zoom})`,
+              transformOrigin: "0 0",
+            }}
+          >
           <div
             ref={canvasRef}
             // select-none: without it, a left-drag on empty canvas (the
@@ -2358,17 +2413,17 @@ export function MapPage() {
             // native selection drag can itself swallow/alter the pointer
             // event stream. NodeCard's own outer div already opts out the
             // same way for the same reason (see its own select-none).
-            className={`relative select-none${linkMode || packMode ? " cursor-crosshair" : ""}`}
-            // width/height stay the canvas's own native 2400x1600 — zoom is
-            // purely a paint-time transform, so every node/ghost/SVG
-            // position below (all still expressed in that native 0..2400
-            // coordinate space) scales along with it automatically, no
-            // separate math needed anywhere else in this JSX. transformOrigin
-            // "0 0" keeps that scaling anchored at the canvas's own top-left,
-            // matching what screenToCanvas/zoomAt/viewportBounds/
-            // centerOnNode above already assume when they read wrap's own
-            // scroll position directly.
-            style={{ width: CANVAS_W, height: CANVAS_H, transform: `scale(${zoom})`, transformOrigin: "0 0" }}
+            className={`absolute select-none${linkMode || packMode ? " cursor-crosshair" : ""}`}
+            // width/height stay the canvas's own native 2400x1600 — every
+            // node/ghost/SVG position below is still expressed in that
+            // native 0..2400 coordinate space, unaffected by this div now
+            // sitting inset within a bigger padded parent rather than
+            // filling it — only the *outer* wrapper's own size/transform
+            // above changed. left/top inset by the same margin
+            // screenToCanvas/zoomAt/viewportBounds/centerOnNode above
+            // already subtract back out when converting a scroll position
+            // to a real canvas coordinate.
+            style={{ left: hScrollMargin, top: vScrollMargin, width: CANVAS_W, height: CANVAS_H }}
             onClick={() => {
               // See onCanvasPointerDown's own onUp comment — the trailing
               // native click a completed marquee drag leaves behind on this
@@ -2386,30 +2441,6 @@ export function MapPage() {
             onPointerDown={onCanvasPointerDown}
             onContextMenu={onCanvasContextMenu}
           >
-            {/* Invisible spacer, not real canvas content — extends wrap's
-                own scrollable range past the canvas's actual bottom edge by
-                bottomScrollMargin canvas units (see its own doc comment).
-                Without this, wrap can never scroll further down than
-                "the canvas's last pixel is at the bottom of the viewport" —
-                fine for a node in the middle of the map, but a node sitting
-                right at/near that bottom edge has nowhere left to scroll
-                to: centerOnNode's target scroll position gets clamped back
-                to that same maxTop, landing the node near the bottom of the
-                screen — right where NodePanel's sheet lives — instead of
-                actually centered above it. 1px wide (not 0 — some browsers
-                don't count a zero-size box toward scrollable overflow at
-                all) and otherwise invisible: no fill, no border, and
-                pointer-events none so it can never intercept a click meant
-                for the canvas beneath it. Doesn't need to *look* like
-                anything either way — scrolling into it just reveals more of
-                wrap's own dot-grid background (see wrap's className above),
-                which already tiles seamlessly across this space exactly
-                like the rest of the canvas. */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute"
-              style={{ left: 0, top: CANVAS_H, width: 1, height: bottomScrollMargin }}
-            />
             <svg
               className="pointer-events-none absolute inset-0 h-full w-full"
               viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
@@ -2553,6 +2584,14 @@ export function MapPage() {
                 const chosenDimmed =
                   !!chosenNodeIds && !chosenNodeIds.has(parentId) && !chosenNodeIds.has(node.nodeId);
                 const dimmed = circleDimmed || chosenDimmed;
+                // The flip side of chosenDimmed — this branch touches the
+                // chosen node itself, not just "isn't dimmed" (which also
+                // covers the plain default state, nothing chosen at all).
+                // Boosted brighter than the normal baseline, not just left
+                // alone, so the chosen node's own connections actually pop
+                // against the dimmed rest instead of only avoiding the fade.
+                const chosenHighlighted =
+                  !!chosenNodeIds && (chosenNodeIds.has(parentId) || chosenNodeIds.has(node.nodeId));
                 return (
                   <line
                     key={`branch-${node.nodeId}`}
@@ -2561,7 +2600,7 @@ export function MapPage() {
                     x2={b.x}
                     y2={b.y}
                     stroke={color}
-                    strokeOpacity={dimmed ? 0.2 : group ? 0.65 : 0.35}
+                    strokeOpacity={dimmed ? 0.12 : chosenHighlighted ? (group ? 0.95 : 0.6) : group ? 0.65 : 0.35}
                     strokeWidth={group ? 1.75 : 1.5}
                     strokeDasharray={group ? undefined : "5 4"}
                     markerEnd="url(#branch-arrow)"
@@ -2627,11 +2666,18 @@ export function MapPage() {
                 // multi-selected) fades, so the selected node's own
                 // connections read clearly against the rest.
                 const dimmed = !!chosenNodeIds && !chosenNodeIds.has(fromId) && !chosenNodeIds.has(toId);
+                // The flip side of `dimmed` — this edge touches the chosen
+                // node itself. Boosted brighter than the plain default
+                // (0.55, used when nothing at all is chosen), not just left
+                // there, so the chosen node's own edges actually pop against
+                // the dimmed rest instead of only avoiding the fade.
+                const highlighted = !!chosenNodeIds && (chosenNodeIds.has(fromId) || chosenNodeIds.has(toId));
                 // Full opacity against var(--danger)/var(--success)'s own
                 // already-saturated colors read as glaring, especially with
                 // several edges overlapping near a busy node — toned down
-                // to 0.55 (dimmed keeps roughly the same ratio to it, not
-                // just to the old 1).
+                // to 0.55 normally (dimmed keeps roughly the same ratio to
+                // it, not just to the old 1); highlighted goes brighter
+                // still, close to full.
                 return (
                   <line
                     key={edge.edgeId}
@@ -2641,7 +2687,7 @@ export function MapPage() {
                     y2={b.y}
                     stroke={color}
                     strokeWidth={2}
-                    strokeOpacity={dimmed ? 0.1 : 0.55}
+                    strokeOpacity={dimmed ? 0.06 : highlighted ? 0.9 : 0.55}
                   />
                 );
               })}
@@ -2864,6 +2910,7 @@ export function MapPage() {
             )}
           </div>
           </div>
+          </div>
           <MiniMap
             wrapRef={wrapRef}
             nodes={visibleNodes}
@@ -2873,6 +2920,8 @@ export function MapPage() {
             canvasW={CANVAS_W}
             canvasH={CANVAS_H}
             zoom={zoom}
+            hScrollMargin={hScrollMargin}
+            vScrollMargin={vScrollMargin}
           />
 
           {/* The whole top toolbar collapses to this one compact floating
@@ -3243,7 +3292,13 @@ export function MapPage() {
       <div className="flex flex-wrap gap-[0.3rem] border-t border-line bg-surface px-3 py-[0.45rem]">
         {NODE_TYPES.map((t) => (
           <span key={t} className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
-            <NodeTypeIcon type={t} size={13} />
+            {/* Same symbol a real node of this type actually renders
+                (OutcomeBadge), not NodeTypeIcon's own separate glyph set —
+                this legend used to teach a different symbol than the one
+                you'd actually see on the map. "unknown" alone has no
+                outcome symbol, so it keeps its own plain NodeTypeIcon
+                glyph, same as a real "unknown" node does. */}
+            {ringKindFor(t) ? <OutcomeBadge type={t as OutcomeType} size={13} /> : <NodeTypeIcon type={t} size={13} />}
             {t}
           </span>
         ))}
@@ -3285,7 +3340,13 @@ export function MapPage() {
           <div className="flex flex-col gap-[0.6rem]">
             {NODE_TYPES.map((t) => (
               <div key={t} className="flex items-center gap-[0.6rem] text-[0.88rem] text-ink">
-                <NodeTypeIcon type={t} size={20} />
+                {/* Same symbol a real node of this type actually renders —
+                    see the bottom legend bar's own matching comment. */}
+                {ringKindFor(t) ? (
+                  <OutcomeBadge type={t as OutcomeType} size={20} />
+                ) : (
+                  <NodeTypeIcon type={t} size={20} />
+                )}
                 {t}
               </div>
             ))}
