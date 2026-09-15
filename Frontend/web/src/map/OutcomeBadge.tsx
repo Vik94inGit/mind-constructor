@@ -1,5 +1,5 @@
 import type { NodeType, SymbolOverride } from "../types";
-import { NODE_TYPE_COLORS } from "../utils/nodeType";
+import { NODE_TYPE_COLORS, ZONE_COLORS } from "../utils/nodeType";
 
 // Just a colored symbol (check/cross/goal/play/pause) — one per outcome
 // NodeType, drawn in that type's own NODE_TYPE_COLORS shade, the same
@@ -40,6 +40,23 @@ export const OUTCOME_TYPES: readonly OutcomeType[] = [
 // WeaponMark's own bow color.
 export function ringKindFor(type: NodeType): "halo" | "horns" | undefined {
   return type === "unknown" ? undefined : OUTCOME_CONFIG[type as OutcomeType]?.ring;
+}
+
+// ringKindFor's own halo/horns classification, but overridden to match a
+// manually-set check/cross symbol when there is one — a check always reads
+// as the halo/positive framing, a cross always as horns/negative, regardless
+// of what the node's own type would normally vote. Falls back to
+// ringKindFor(type) with no override. Shared by NodeCrown and NodeWings so
+// a manually-flagged node's halo-vs-horns decoration agrees with its own
+// recolored border/symbol (see OutcomeBadge's own color computation below)
+// instead of still reading as whatever its base type would have drawn.
+export function effectiveRingKind(
+  type: NodeType,
+  symbolOverride?: SymbolOverride | null,
+): "halo" | "horns" | undefined {
+  if (symbolOverride === "check") return "halo";
+  if (symbolOverride === "cross") return "horns";
+  return ringKindFor(type);
 }
 
 interface SymbolProps {
@@ -128,7 +145,17 @@ export function OutcomeBadge({
   symbolOverride?: SymbolOverride | null;
 }) {
   const config = OUTCOME_CONFIG[type];
-  const color = NODE_TYPE_COLORS[type];
+  // A manual override recolors the symbol to the plain positive/negative
+  // green/red every other "chosen side" signal on the map uses (zones,
+  // branch-arrow/edge colors) — overriding the type's own distinct shade
+  // (NODE_TYPE_COLORS[type]) is the point: the override says "treat this as
+  // positive/negative", not just "draw a different glyph in the same color".
+  const color =
+    symbolOverride === "check"
+      ? ZONE_COLORS.positive
+      : symbolOverride === "cross"
+        ? ZONE_COLORS.negative
+        : NODE_TYPE_COLORS[type];
   const Symbol =
     symbolOverride === "check" ? CheckSymbol : symbolOverride === "cross" ? CrossSymbol : config.Symbol;
 

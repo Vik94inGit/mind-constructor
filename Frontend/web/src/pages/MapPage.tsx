@@ -25,264 +25,30 @@ import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { Modal } from "../components/Modal";
 import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
+import {
+  CANVAS_W,
+  CANVAS_H,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  ZOOM_STEP,
+  CIRCLE_DROP_RADIUS,
+  FULL_CANVAS_BOUNDS,
+  panelReserveFrac,
+  nodeClipboard,
+  setNodeClipboard,
+  hashOffset,
+  computeLinkedNeighborIds,
+  getNodeMinDist,
+  pickNonOverlappingPosition,
+  nodeObstacles,
+  avoidOverlap,
+  circleSentiment,
+  isDescendant,
+} from "../utils/canvasLayout";
+import type { Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
 import { NODE_TYPES } from "../types";
 import type { AttackIndicator, EdgeDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
-
-const CANVAS_W = 2400;
-const CANVAS_H = 1600;
-
-// Canvas zoom bounds/step — see the zoom state and zoomAt() below. 0.5x
-// still leaves individual node captions legible; 2.5x is plenty for
-// picking out detail in a crowded circle without the canvas's own
-// 2400x1600 bound making a fully-zoomed-out view pointless.
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2.5;
-const ZOOM_STEP = 0.35;
-
-// How much of the screen's height NodePanel/LinkPickerPanel's bottom sheet
-// is allowed to cover — kept in one function so centerOnNode (which
-// reserves this much space when parking the chosen node) and
-// viewportBounds (which reserves the same strip when clamping where a new
-// node/ghost is allowed to land) can never drift out of sync with each
-// other, or with the sheet's own max-height (see NodePanel's PANEL_CLASS,
-// whose own max-h-[..dvh] pair has to keep matching these two numbers).
-// Different per device on purpose now: on desktop there's plenty of
-// headroom above even a generous sheet, but a phone's short viewport is
-// what actually makes a mismatch here bite — the old 75dvh sheet against a
-// 40%-reserve camera left the just-selected node (and its quick-add
-// ghosts) parked behind the sheet more often than not, and made every
-// *other* node in that bottom stretch physically untappable (the sheet is
-// opaque and sits above every node in z-index, so a tap there never
-// reaches the canvas at all). 1/3 on desktop leaves two full thirds of the
-// screen clear for the canvas; mobile's own screen is short enough that a
-// sheet worth reading needs more of it, so it gets 2/3 instead, leaving
-// exactly the top third clear (still enough room for the chosen node and
-// its ghosts to land somewhere reachable above the sheet).
-function panelReserveFrac(isMobile: boolean) {
-  return isMobile ? 2 / 3 : 1 / 3;
-}
-
-// Node copy/paste clipboard (see copySelection/pasteClipboard below) —
-// deliberately module-level, not component state/a ref inside MapPage.
-// Navigating from one map to another is a client-side route change
-// (`/maps/:mapId`) that fully unmounts and remounts MapPage, which would
-// wipe out anything held in that component's own state/refs — copying on
-// one map and pasting on another needs this to survive exactly that.
-// Lost on a real page reload (this module gets re-evaluated then), which
-// is fine — it's a live editing convenience for the current tab session,
-// not data anything needs to persist beyond it. sourceMapId records which
-// map the copy was made on, so pasteClipboard can tell a same-map paste
-// (anchor near the originals) from a cross-map one (the originals' own
-// x/y don't mean anything on a different map — anchor in the current
-// viewport instead; see pasteClipboard's own comment).
-let nodeClipboard: { sourceMapId: string; nodes: { text: string; type: NodeType; x: number; y: number }[] } | null = null;
-
-function hashOffset(seed: string, range: number) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 10007;
-  return (h % (range * 2)) - range;
-}
-
-// Every node "linked" to anchorId, either by branch lineage (its direct
-// parentId children, or its own parentId parent) or by an explicit Edge in
-// either direction — the shared union both the radial neighbor ring
-// (radialPositions below) and pack-eligibility (startPackFrom) are built
-// from. Kept as a plain function (not a hook) since both call sites derive
-// it from data they already have on hand, not from any state of their own.
-function computeLinkedNeighborIds(anchorId: string, nodes: NodeDoc[], edges: EdgeDoc[]): Set<string> {
-  const neighborIds = new Set<string>();
-  const anchor = nodes.find((n) => n.nodeId === anchorId);
-  const ownParentId = anchor ? nodeRefId(anchor.parentId) : undefined;
-  if (ownParentId) neighborIds.add(ownParentId);
-  for (const n of nodes) {
-    if (nodeRefId(n.parentId) === anchorId) neighborIds.add(n.nodeId);
-  }
-  for (const e of edges) {
-    const fromId = nodeRefId(e.fromNodeId);
-    const toId = nodeRefId(e.toNodeId);
-    if (fromId === anchorId && toId) neighborIds.add(toId);
-    if (toId === anchorId && fromId) neighborIds.add(fromId);
-  }
-  neighborIds.delete(anchorId);
-  return neighborIds;
-}
-
-// Node icons are 74px wide (icon + caption — 0.8x the original 92px, per
-// the node-size -20% resize) — keep freshly-placed nodes at least that far
-// apart (plus a visible margin) so a new node never lands on top of an
-// existing one. The margin shrinks on a phone-width viewport: the canvas is
-// the same 2400x1600 regardless of screen size, so the same 50px buffer
-// that's comfortable on desktop just means more panning/zooming to see
-// fewer nodes at once on mobile — the 74px icon footprint itself is the one
-// part of this that can't shrink without nodes actually overlapping.
-// Read live (not memoized) since it only matters at the moment a node is
-// placed/dragged, by which point the real viewport width is already known.
-function getNodeMinDist() {
-  const isMobile = typeof window !== "undefined" && window.innerWidth <= 640;
-  return 74 + (isMobile ? 20 : 50);
-}
-
-// The rectangle (in canvas coordinates) a placement is allowed to land in —
-// defaults to the whole canvas, but every creation/drag path below is handed
-// the currently-scrolled-into-view rectangle instead, so a new or dropped
-// node never lands somewhere the user would have to go scroll to find.
-interface ViewportBounds {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-}
-const FULL_CANVAS_BOUNDS: ViewportBounds = { minX: 0, minY: 0, maxX: CANVAS_W, maxY: CANVAS_H };
-
-function pickNonOverlappingPosition(
-  existing: { x: number; y: number }[],
-  bigObstacles: { x: number; y: number; minDist: number }[] = [],
-  bounds: ViewportBounds = FULL_CANVAS_BOUNDS,
-): { x: number; y: number } {
-  const margin = 120;
-  // A viewport narrower/shorter than 2*margin would invert min/max — clamp
-  // each pair together so the search range never goes negative-width.
-  const minX = Math.min(Math.max(margin, bounds.minX), CANVAS_W - margin);
-  const minY = Math.min(Math.max(margin, bounds.minY), CANVAS_H - margin);
-  const maxX = Math.max(minX, Math.min(CANVAS_W - margin, bounds.maxX));
-  const maxY = Math.max(minY, Math.min(CANVAS_H - margin, bounds.maxY));
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const x = minX + Math.random() * (maxX - minX);
-    const y = minY + Math.random() * (maxY - minY);
-    if (
-      existing.every((p) => Math.hypot(p.x - x, p.y - y) >= getNodeMinDist()) &&
-      bigObstacles.every((p) => Math.hypot(p.x - x, p.y - y) >= p.minDist)
-    ) {
-      return { x, y };
-    }
-  }
-  // Viewport is crowded enough that 80 random tries never cleared the
-  // margin — fall back to the same growing-radius spiral used for nodes
-  // with no x/y at all, so placement still terminates instead of
-  // overlapping silently, clamped into view rather than the full canvas.
-  const angle = existing.length * 137.508 * (Math.PI / 180);
-  const radius = 90 + existing.length * 26;
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-  return {
-    x: Math.min(maxX, Math.max(minX, cx + radius * Math.cos(angle))),
-    y: Math.min(maxY, Math.max(minY, cy + radius * Math.sin(angle))),
-  };
-}
-
-// One obstacle to stay clear of — a regular node (minDist ~= its icon
-// footprint) or a big group backdrop (minDist ~= its own radius plus a
-// node's footprint), so the same nudging loop below handles both.
-interface Obstacle {
-  x: number;
-  y: number;
-  minDist: number;
-}
-
-// Deliberately still one flat minDist for every point, not per-node-size
-// aware — every call site today only ever has bare {x,y} points in hand
-// (positions.values(), stripped of which node each one came from), not the
-// NodeDoc each position belongs to. Making this size-tier-aware for real
-// would mean threading node objects (not just positions) through all ~8
-// call sites of this function, several of them in already-dense
-// paste/group-creation code paths — a real but purely cosmetic refinement
-// (a 130% node could in principle still land slightly closer to another
-// node than its bigger visual footprint would ideally want), not a
-// functional bug, so it's left as a known simplification rather than a
-// wider refactor.
-function nodeObstacles(points: { x: number; y: number }[], minDist = getNodeMinDist()): Obstacle[] {
-  return points.map((p) => ({ x: p.x, y: p.y, minDist }));
-}
-
-// Nudges a *desired* position away from whatever it's currently on top of,
-// instead of picking a fresh spot at random — for placements anchored to
-// something specific (a drag's drop point, a quick-add ghost's slot, a
-// weapon node's spot near its target) where a random relocation would lose
-// the "why is it here" relationship pickNonOverlappingPosition doesn't need
-// to preserve. Each retry pushes further along the same line away from
-// whatever it's still colliding with, so it converges instead of orbiting.
-// Obstacles carry their own required clearance — a big group backdrop
-// needs far more room than a regular node does.
-function avoidOverlap(
-  desired: { x: number; y: number },
-  obstacles: Obstacle[],
-  bounds: ViewportBounds = FULL_CANVAS_BOUNDS,
-): { x: number; y: number } {
-  let { x, y } = desired;
-  const margin = 40;
-  for (let attempt = 0; attempt < 24; attempt++) {
-    const collision = obstacles.find((p) => Math.hypot(p.x - x, p.y - y) < p.minDist);
-    if (!collision) break;
-    const dist = Math.hypot(x - collision.x, y - collision.y);
-    const angle = dist > 0.5 ? Math.atan2(y - collision.y, x - collision.x) : attempt * 0.9;
-    const push = collision.minDist - dist + 6;
-    x += Math.cos(angle) * push;
-    y += Math.sin(angle) * push;
-  }
-  // Same min/max-pair clamp as pickNonOverlappingPosition: a too-small
-  // viewport clamps to its own center line rather than inverting.
-  const minX = Math.min(Math.max(margin, bounds.minX), CANVAS_W - margin);
-  const minY = Math.min(Math.max(margin, bounds.minY), CANVAS_H - margin);
-  const maxX = Math.max(minX, Math.min(CANVAS_W - margin, bounds.maxX));
-  const maxY = Math.max(minY, Math.min(CANVAS_H - margin, bounds.maxY));
-  return {
-    x: Math.min(maxX, Math.max(minX, x)),
-    y: Math.min(maxY, Math.max(minY, y)),
-  };
-}
-
-// sentimentOf (imported from utils/nodeType.ts) — matches ringKindFor's own
-// halo/horns split exactly (see OutcomeBadge.tsx's OUTCOME_CONFIG), so
-// whatever ring a node's own badge draws is exactly what its vote counts
-// as. Option counts as positive (same halo ring Success/Solution draw), not
-// neutral — a zone full of halo Option nodes plus one horns Problem/Fail
-// would otherwise have nothing on the positive side of the vote despite
-// every visible ring in it saying "positive." "unknown" alone stays
-// genuinely neutral — it's the one type with no ring to have voted with.
-//
-// A circle's own filter, and the same majority vote the big backdrop's
-// halo/horns color already uses — root counts as a member like any other.
-// A lone non-neutral root already leans a side from the start (majority of
-// one); a tie, or an all-neutral circle, stays uncommitted (null) and
-// filters nothing yet.
-function circleSentiment(members: NodeDoc[]): "positive" | "negative" | null {
-  let pos = 0;
-  let neg = 0;
-  for (const m of members) {
-    const s = sentimentOf(m.type);
-    if (s === "positive") pos++;
-    else if (s === "negative") neg++;
-  }
-  if (pos === neg) return null;
-  return pos > neg ? "positive" : "negative";
-}
-
-// How close a drop has to land to an existing node to read as "onto it"
-// (join its circle) instead of just "near it" (a normal reposition) — well
-// inside getNodeMinDist()'s smallest value, so a deliberate drop-to-join
-// never gets confused with two nodes that simply ended up in the same
-// neighborhood.
-const CIRCLE_DROP_RADIUS = 70;
-
-// Would setting candidateId's parentId to ancestorId close a loop? Walks up
-// from candidateId's *current* parent chain — if ancestorId is already up
-// there, candidateId is one of its descendants, and re-parenting it under
-// its own descendant would cut it (and everything under it) off from the
-// rest of the tree in a cycle. Capped so a corrupt chain can't loop forever.
-function isDescendant(candidateId: string, ancestorId: string, allNodes: NodeDoc[]): boolean {
-  let current = allNodes.find((n) => n.nodeId === candidateId);
-  let hops = 0;
-  while (current && hops < 50) {
-    const parentId = nodeRefId(current.parentId);
-    if (!parentId) return false;
-    if (parentId === ancestorId) return true;
-    current = allNodes.find((n) => n.nodeId === parentId);
-    hops++;
-  }
-  return false;
-}
-
 
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
@@ -727,6 +493,14 @@ export function MapPage() {
       setSelectedId((prev) => (prev && members.some((m) => m.nodeId === prev) ? null : prev));
     };
     const onNodeUnpacked = ({ node }: { node: NodeDoc }) => upsertNode(node);
+    // Someone (the owner — see updateMapAbl's own ownerId check) flipped a
+    // map-wide setting, most commonly the Discussion/Personal mode toggle
+    // (see isPersonalMode/toggleMapMode below) — merge just the changed
+    // fields in rather than replacing `map` outright, so this can't
+    // clobber a selectedCircle/color update this client applied locally in
+    // between this broadcast being sent and received.
+    const onMapUpdated = ({ map: updated }: { map: MapDoc }) =>
+      setMap((prev) => (prev ? { ...prev, ...updated } : updated));
 
     socket.on("node:created", onNodeCreated);
     socket.on("node:updated", onNodeUpdated);
@@ -739,6 +513,7 @@ export function MapPage() {
     socket.on("node:protected", onNodeProtected);
     socket.on("node:packed", onNodePacked);
     socket.on("node:unpacked", onNodeUnpacked);
+    socket.on("map:updated", onMapUpdated);
 
     return () => {
       socket.off("node:created", onNodeCreated);
@@ -750,6 +525,7 @@ export function MapPage() {
       socket.off("circle:selected", onCircleSelected);
       socket.off("circle:deselected", onCircleDeselected);
       socket.off("node:protected", onNodeProtected);
+      socket.off("map:updated", onMapUpdated);
       socket.off("node:packed", onNodePacked);
       socket.off("node:unpacked", onNodeUnpacked);
       leaveMap(mapId);
@@ -757,6 +533,15 @@ export function MapPage() {
   }, [mapId, loading, upsertNode, upsertEdge, applyCircleSelection]);
 
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
+  // Any node "chosen" on the map right now — a multi-select takes priority
+  // (it's the more specific state), falling back to the plain single
+  // selection. Null when nothing at all is chosen, the one case edges/
+  // branch-arrows stay fully lit. Feeds the same dimming both the branch
+  // arrows and plain Edges apply below — previously that only kicked in
+  // for a multi-select, leaving every edge full-opacity while a single
+  // node was selected even though that's already the map's "I'm focused on
+  // this one" state everywhere else (NodeCard's own outline/health/wings).
+  const chosenNodeIds = multiSelectIds.size > 0 ? multiSelectIds : selectedId ? new Set([selectedId]) : null;
   // Same condition that gates the quick-add ghost ring below — reused here
   // so every other node dims while it's showing, putting the focus on the
   // selected node and its type-to-create options instead of competing with
@@ -971,19 +756,37 @@ export function MapPage() {
     const halfSpan = RADIAL_NEIGHBOR_RADIUS + 40;
     const spanX = bounds.maxX - bounds.minX;
     const spanY = bounds.maxY - bounds.minY;
+    // See QuickAddGhosts' own matching doc comment — same fallback fix.
+    // panelReserveFrac's 2/3 mobile reserve leaves less vertical room than
+    // halfSpan*2 for essentially every mobile selection, so this fallback
+    // isn't a rare "tiny window" case — falling back to bounds' own plain
+    // midpoint instead of anchoring on `center` used to strand the ring
+    // floating mid-screen, detached from a node sitting pinned near a real
+    // canvas edge (the one case centerOnNode can't actually center it).
+    // Anchoring on `center` here too (still clamped into `bounds`, just
+    // without the halfSpan inset) keeps neighbors visibly attached to the
+    // selected node even when the full safe-zone clamp doesn't fit.
     const ringCenter =
       spanX >= halfSpan * 2 && spanY >= halfSpan * 2
         ? {
             x: Math.min(bounds.maxX - halfSpan, Math.max(bounds.minX + halfSpan, center.x)),
             y: Math.min(bounds.maxY - halfSpan, Math.max(bounds.minY + halfSpan, center.y)),
           }
-        : { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+        : {
+            x: Math.min(bounds.maxX, Math.max(bounds.minX, center.x)),
+            y: Math.min(bounds.maxY, Math.max(bounds.minY, center.y)),
+          };
     const map = new Map<string, { x: number; y: number }>();
     neighbors.forEach((id, i) => {
       const angle = (i / neighbors.length) * Math.PI * 2 - Math.PI / 2;
+      // Final per-point safety clamp — see QuickAddGhosts' own matching
+      // comment. No-op whenever the full ring already fit inside the
+      // halfSpan-inset safe zone; only trims the fallback branch's
+      // outermost members back into `bounds` so a neighbor can't scroll
+      // off-screen entirely just because RADIAL_NEIGHBOR_RADIUS didn't fit.
       map.set(id, {
-        x: ringCenter.x + RADIAL_NEIGHBOR_RADIUS * Math.cos(angle),
-        y: ringCenter.y + RADIAL_NEIGHBOR_RADIUS * Math.sin(angle),
+        x: Math.min(bounds.maxX, Math.max(bounds.minX, ringCenter.x + RADIAL_NEIGHBOR_RADIUS * Math.cos(angle))),
+        y: Math.min(bounds.maxY, Math.max(bounds.minY, ringCenter.y + RADIAL_NEIGHBOR_RADIUS * Math.sin(angle))),
       });
     });
     return map;
@@ -1332,6 +1135,17 @@ export function MapPage() {
     for (const g of nodeGroups) {
       for (const m of g.members) map.set(m.nodeId, g.sentiment);
     }
+    return map;
+  }, [nodeGroups]);
+
+  // Just the root/parent of each circle, keyed by its own id — what
+  // NodeCard reads to draw its small crown badge (a "this is what the
+  // circle radiates from" marker, distinct from groupSentimentByNode above,
+  // which covers every member). Colored by the same majority-vote sentiment
+  // as the circle's own zone backdrop, per nodeGroups.
+  const circleRootSentimentByNode = useMemo(() => {
+    const map = new Map<string, "positive" | "negative">();
+    for (const g of nodeGroups) map.set(g.rootId, g.sentiment);
     return map;
   }, [nodeGroups]);
 
@@ -2224,7 +2038,7 @@ export function MapPage() {
         const pos = positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
         return { text: n.text, type: n.type, x: pos.x, y: pos.y };
       });
-    if (copied.length > 0) nodeClipboard = { sourceMapId: mapId, nodes: copied };
+    if (copied.length > 0) setNodeClipboard({ sourceMapId: mapId, nodes: copied });
   }
 
   async function pasteClipboard() {
@@ -2470,6 +2284,24 @@ export function MapPage() {
   }
 
   const isOwner = map.ownerId === user?._id;
+  // Map.discussionMode's real meaning now — see Backend/CLAUDE.md's own
+  // updated doc comment. Undefined/true is "Discussion" (the default: full
+  // combat controls visible, current/historical behavior), explicit false
+  // is "Personal" (combat controls hidden — just nodes/edges/circles for
+  // solo organizing). Never coerced with `!!` anywhere this is read — that
+  // would collapse the undefined "never touched" default to false/Personal
+  // instead of true/Discussion.
+  const isDiscussionMode = map.discussionMode !== false;
+  async function toggleMapMode() {
+    if (!isOwner || !mapId) return;
+    setActionError(null);
+    try {
+      const updated = await mapsApi.updateMap(mapId, { discussionMode: !isDiscussionMode });
+      setMap(updated);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : "Failed to change map mode");
+    }
+  }
 
   // Reused across this toolbar's several same-styled buttons — kept local
   // (not shared across files) so every className stays one look-here-and-
@@ -2718,9 +2550,9 @@ export function MapPage() {
                 // `muted` computation and the plain-Edge dimming just below).
                 const isStabilized = !!group && map?.selectedCircle?.rootId === group.rootId;
                 const circleDimmed = !!group && !!map?.selectedCircle && !isStabilized;
-                const multiSelectDimmed =
-                  multiSelectIds.size > 0 && !multiSelectIds.has(parentId) && !multiSelectIds.has(node.nodeId);
-                const dimmed = circleDimmed || multiSelectDimmed;
+                const chosenDimmed =
+                  !!chosenNodeIds && !chosenNodeIds.has(parentId) && !chosenNodeIds.has(node.nodeId);
+                const dimmed = circleDimmed || chosenDimmed;
                 return (
                   <line
                     key={`branch-${node.nodeId}`}
@@ -2729,7 +2561,7 @@ export function MapPage() {
                     x2={b.x}
                     y2={b.y}
                     stroke={color}
-                    strokeOpacity={dimmed ? 0.2 : group ? 0.85 : 0.45}
+                    strokeOpacity={dimmed ? 0.2 : group ? 0.65 : 0.35}
                     strokeWidth={group ? 1.75 : 1.5}
                     strokeDasharray={group ? undefined : "5 4"}
                     markerEnd="url(#branch-arrow)"
@@ -2790,11 +2622,16 @@ export function MapPage() {
                     : edge.sentiment === "positive"
                       ? "var(--success)"
                       : "var(--ink-soft)";
-                // Same multi-select dimming the branch arrows above and
-                // NodeCard's own `muted` prop apply — an edge with neither
-                // end in the group selection fades, so the selected nodes'
-                // own connections read clearly against the rest.
-                const dimmed = multiSelectIds.size > 0 && !multiSelectIds.has(fromId) && !multiSelectIds.has(toId);
+                // Same chosen-node dimming the branch arrows above apply —
+                // an edge with neither end chosen (selected or
+                // multi-selected) fades, so the selected node's own
+                // connections read clearly against the rest.
+                const dimmed = !!chosenNodeIds && !chosenNodeIds.has(fromId) && !chosenNodeIds.has(toId);
+                // Full opacity against var(--danger)/var(--success)'s own
+                // already-saturated colors read as glaring, especially with
+                // several edges overlapping near a busy node — toned down
+                // to 0.55 (dimmed keeps roughly the same ratio to it, not
+                // just to the old 1).
                 return (
                   <line
                     key={edge.edgeId}
@@ -2804,7 +2641,7 @@ export function MapPage() {
                     y2={b.y}
                     stroke={color}
                     strokeWidth={2}
-                    strokeOpacity={dimmed ? 0.15 : 1}
+                    strokeOpacity={dimmed ? 0.1 : 0.55}
                   />
                 );
               })}
@@ -2883,10 +2720,11 @@ export function MapPage() {
                   // cursor honest about which nodes will really respond.
                   canDrag={isOwnNode(node) && (moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))}
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
+                  parentCrownSentiment={circleRootSentimentByNode.get(node.nodeId)}
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   linkModeActive={linkMode}
-                  discussionMode={!!map.discussionMode}
+                  discussionMode={isDiscussionMode}
                   celebrate={celebrateIds.has(node.nodeId)}
                   flightVector={flightVector}
                   muted={
@@ -3109,6 +2947,34 @@ export function MapPage() {
             >
               ✥
             </button>
+            {/* Owner-only — updateMapDao's own ownerId filter would reject
+                this from anyone else anyway, so the button just doesn't
+                offer what the server would refuse. Discussion (the
+                default) shows every combat control below; Personal hides
+                them — see isDiscussionMode's own doc comment. */}
+            {isOwner && (
+              <button
+                type="button"
+                className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border text-[0.95rem] font-semibold hover:bg-surface-2 ${
+                  isDiscussionMode
+                    ? "border-transparent bg-transparent text-ink"
+                    : "border-accent bg-accent-soft text-accent-ink"
+                }`}
+                title={
+                  isDiscussionMode
+                    ? "Discussion mode: on — combat (attack/protect) is visible. Click to switch to Personal mode."
+                    : "Personal mode: on — combat (attack/protect) is hidden for solo organizing. Click to switch back to Discussion mode."
+                }
+                onClick={toggleMapMode}
+              >
+                {/* Plain text-presentation glyphs (no emoji variation
+                    selector), not the colorful ⚔️/🧠 emoji this used to be —
+                    matches the rest of this cluster's own monochrome
+                    icons (✥ above, +/← beside it) instead of standing out
+                    as the one brightly-colored button among them. */}
+                {isDiscussionMode ? "⚔" : "✎"}
+              </button>
+            )}
           </div>
 
           {/* Zoom controls — stacked directly above the minimap in the same
@@ -3261,6 +3127,7 @@ export function MapPage() {
                 nodes={nodes}
                 edges={edges}
                 currentUserId={user._id}
+                discussionMode={isDiscussionMode}
                 onClose={() => setSelectedId(null)}
                 onSelectNode={(id) => {
                   setSelectedId(id);

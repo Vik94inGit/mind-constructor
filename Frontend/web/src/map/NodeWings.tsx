@@ -1,5 +1,5 @@
-import { ringKindFor } from "./OutcomeBadge";
-import type { NodeType } from "../types";
+import { effectiveRingKind } from "./OutcomeBadge";
+import type { NodeType, SymbolOverride } from "../types";
 
 // Wings get their own color, independent of the type's own symbol color —
 // angel wings are always dark blue, devil wings are always dark gray,
@@ -62,9 +62,18 @@ const WINGS_WIDTH = 280 * (48 / 108);
 // optional, on only for whichever node is currently chosen; `type` with
 // no halo/horns classification (just "unknown") never gets wings, same as
 // it never gets a crown.
-export function NodeWings({ type, show }: { type: NodeType; show: boolean }) {
+export function NodeWings({
+  type,
+  show,
+  symbolOverride,
+}: {
+  type: NodeType;
+  show: boolean;
+  /** Manually forces angel/devil to match a check/cross override — see effectiveRingKind. */
+  symbolOverride?: SymbolOverride | null;
+}) {
   if (!show) return null;
-  const kind = ringKindFor(type);
+  const kind = effectiveRingKind(type, symbolOverride);
   if (!kind) return null;
   const wingsKind = kind === "halo" ? "angel" : "devil";
 

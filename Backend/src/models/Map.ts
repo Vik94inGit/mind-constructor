@@ -49,12 +49,17 @@ export const MapSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Flips combat's own-node rule: normally you can only attack someone
-    // else's node (see attackAbl's CannotAttackOwnNodeError); in discussion
-    // mode that's inverted — you can only challenge your *own* claims, not
-    // anyone else's. Toggleable any time (PATCH /api/:mapId), not fixed at
-    // creation. See abl/attackAbl.ts.
-    discussionMode: { type: Boolean, default: false },
+    // No longer gates any combat rule server-side (see attackAbl.ts's own
+    // doc comment — combat is fully open regardless of this field). Now a
+    // plain per-map UI setting instead: true (the default — every map
+    // starts here) is "Discussion" mode, showing every combat control on
+    // the frontend; explicit false is "Personal" mode, hiding them for
+    // solo organizing. Toggleable any time by the map's owner
+    // (PATCH /api/:mapId). Defaulting true, not false, matters here: it's
+    // what keeps every newly-created map's combat controls visible by
+    // default, matching the app's behavior from before this toggle existed
+    // at all.
+    discussionMode: { type: Boolean, default: true },
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields

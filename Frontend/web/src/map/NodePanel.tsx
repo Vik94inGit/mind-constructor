@@ -110,6 +110,8 @@ interface Props {
   nodes: NodeDoc[];
   edges: EdgeDoc[];
   currentUserId: string;
+  /** MapPage's isDiscussionMode — Personal mode (false) hides the Attack/Protect tabs entirely; everything else (Info/Links/Pack/History, including the read-only "Protects"/"Protected by" lines) stays visible either way. */
+  discussionMode: boolean;
   onClose: () => void;
   onDeleted: (nodeId: string) => void;
   /** Fired after a direct panel-side PATCH (currently just the symbol-override toggle below) with the server's response, so the canvas/other panels stay in sync — same upsert-by-id MapPage already does for every other node update. */
@@ -143,6 +145,7 @@ export function NodePanel({
   nodes,
   edges,
   currentUserId,
+  discussionMode,
   onClose,
   onDeleted,
   onUpdated,
@@ -241,9 +244,12 @@ export function NodePanel({
 
   // Combat is fully open now (see attackAbl.ts's own comment) — no
   // own-node rule, no weapon-node exclusion, no already-defeated block.
-  // Mirrors MapPage's canAttackNode exactly: any node is a valid target.
+  // Mirrors MapPage's canAttackNode exactly: any node is a valid target —
+  // the one remaining gate is client-side only, Personal mode hiding the
+  // Attack tab/controls entirely (the backend itself never checks
+  // discussionMode for this — see Backend/CLAUDE.md's own doc comment).
   function computeCanAttack() {
-    return true;
+    return discussionMode;
   }
   const canAttack = computeCanAttack();
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
@@ -261,11 +267,22 @@ export function NodePanel({
     "info",
     "links",
     ...(canAttack ? (["attack"] as const) : []),
-    "protect",
+    ...(discussionMode ? (["protect"] as const) : []),
     ...(packedMembers.length > 0 ? (["pack"] as const) : []),
     "history",
   ];
   const [tab, setTab] = useState<Tab>("info");
+
+  // Someone (the owner) flipped Discussion/Personal mode while this panel
+  // was already open on the Attack or Protect tab — that tab's own button
+  // just vanished from the row above (see `tabs`), so fall back to Info
+  // rather than leaving `tab` pointed at a pane with no button and no
+  // content (both content blocks below are gated by the same discussionMode
+  // check, so it would otherwise render as a silently blank sheet).
+  useEffect(() => {
+    if (!discussionMode && (tab === "attack" || tab === "protect")) setTab("info");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discussionMode]);
 
   useEffect(() => {
     setError(null);
@@ -736,7 +753,16 @@ export function NodePanel({
                   className="inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.8rem] font-semibold capitalize transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50"
                   style={
                     node.manualZone === z
-                      ? { borderColor: ZONE_COLORS[z], background: `${ZONE_COLORS[z]}26`, color: ZONE_COLORS[z] }
+                      ? {
+                          borderColor: ZONE_COLORS[z],
+                          // ZONE_COLORS is now a var(--zone-...) reference
+                          // (see its own doc comment), not a bare hex
+                          // literal — can't just append a hex alpha suffix
+                          // to it like "26" any more, so color-mix does the
+                          // same ~15% tint instead.
+                          background: `color-mix(in srgb, ${ZONE_COLORS[z]} 15%, transparent)`,
+                          color: ZONE_COLORS[z],
+                        }
                       : { borderColor: "var(--line)", background: "var(--surface)", color: "var(--ink)" }
                   }
                   onClick={() => handleSetZone(z)}
@@ -930,7 +956,7 @@ export function NodePanel({
         </div>
       )}
 
-      {tab === "protect" && (
+      {tab === "protect" && discussionMode && (
         <div className="mt-4">
           {isCreator ? (
             <>

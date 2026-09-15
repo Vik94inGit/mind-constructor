@@ -68,23 +68,55 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
   const halfSpan = RADIUS + EDGE_MARGIN;
   const spanX = bounds.maxX - bounds.minX;
   const spanY = bounds.maxY - bounds.minY;
-  // A viewport narrower/shorter than the ring itself (a tiny window, or a
-  // zoomed-way-out canvas) has no safe zone to clamp into at all — center
-  // the ring on bounds' own midpoint rather than letting min > max invert
-  // the clamp below.
+  // A viewport narrower/shorter than the ring itself has no safe zone to
+  // clamp into at all without inverting the min/max clamp below — on
+  // mobile this isn't the rare "zoomed-way-out canvas" case it sounds
+  // like, it's the *routine* one: the bottom sheet's own 2/3-of-the-screen
+  // reserve (panelReserveFrac in MapPage.tsx) plus this function's own pad
+  // leaves less vertical room than halfSpan*2 on a typical phone, so
+  // spanY fails this check for essentially every mobile selection, not
+  // just ones near a canvas edge. Falling back to bounds' own plain
+  // midpoint here (as this used to) is harmless *most* of the time only
+  // because centerOnNode usually already parks the anchor there too — but
+  // the one time anchorPos and the bounds midpoint actually diverge is
+  // exactly the case this whole file exists for: a node close enough to
+  // the real edge of the 2400x1600 canvas that centerOnNode couldn't pan
+  // it all the way to center. In that case the bounds-midpoint fallback
+  // used to strand the ring floating in the middle of the screen while
+  // the node itself sat pinned against the edge, sometimes 100+px away —
+  // "ghosts not centered around it" near a border, not a squashed ring.
+  // Anchoring the fallback on anchorPos instead (still clamped into
+  // `bounds`, just without the extra halfSpan inset) keeps the ring
+  // visibly attached to its node even when it can't fully fit — a ring
+  // that's a little clipped but clearly belongs to the node it's around
+  // reads far better than one that's fully on-screen but detached from it.
   const ringCenter =
     spanX >= halfSpan * 2 && spanY >= halfSpan * 2
       ? {
           x: Math.min(bounds.maxX - halfSpan, Math.max(bounds.minX + halfSpan, anchorPos.x)),
           y: Math.min(bounds.maxY - halfSpan, Math.max(bounds.minY + halfSpan, anchorPos.y)),
         }
-      : { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+      : {
+          x: Math.min(bounds.maxX, Math.max(bounds.minX, anchorPos.x)),
+          y: Math.min(bounds.maxY, Math.max(bounds.minY, anchorPos.y)),
+        };
   return (
     <>
       {NODE_TYPES.map((type, i) => {
         const angle = (i / NODE_TYPES.length) * Math.PI * 2 - Math.PI / 2;
-        const x = ringCenter.x + RADIUS * Math.cos(angle);
-        const y = ringCenter.y + RADIUS * Math.sin(angle);
+        // Final per-point safety clamp into the raw bounds (not the
+        // halfSpan-inset safe zone — that's already baked into ringCenter
+        // on the branch where it applies). A no-op whenever the full ring
+        // already fit — ringCenter was inset by halfSpan there, so every
+        // point already lands inside `bounds` on its own. It only ever
+        // moves a point on the fallback branch above (ringCenter.own doc
+        // comment), where the ring is anchored on the node but may still
+        // be too big to fully fit — this keeps that ring's outermost
+        // points reachable/visible instead of scrolled off, at the cost of
+        // occasionally bunching a couple of them toward the same edge in
+        // that already-cramped case.
+        const x = Math.min(bounds.maxX, Math.max(bounds.minX, ringCenter.x + RADIUS * Math.cos(angle)));
+        const y = Math.min(bounds.maxY, Math.max(bounds.minY, ringCenter.y + RADIUS * Math.sin(angle)));
         return (
           <button
             key={type}

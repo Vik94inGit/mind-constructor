@@ -126,6 +126,14 @@ export function MiniMap({
     [nodes],
   );
 
+  // Just the rootId of every circle in `groups` — what the per-node dots
+  // loop below reads to skip a circle's own root (it gets the bigger crown
+  // marker instead, not a dot underneath it too).
+  const groupRootIds = useMemo(
+    () => new Set(groups.map((g) => g.rootId)),
+    [groups],
+  );
+
   // Centers the real viewport on wherever (clientX, clientY) lands in
   // minimap-space — shared by both a plain click (jump) and every
   // pointermove while dragging (pan), so a drag reads as continuously
@@ -289,7 +297,7 @@ export function MiniMap({
               y2={b.y * scaleY}
               stroke={color}
               strokeWidth={0.75}
-              strokeOpacity={0.8}
+              strokeOpacity={0.65}
             />
           );
         })}
@@ -301,8 +309,12 @@ export function MiniMap({
             meaningless color. Weapon (attacking) nodes carry a real outcome
             type of their own (the attacker's actual objection — see
             attackAbl.ts) and get a dot the same as any other node now, per
-            the user's own "attacking node show" ask. */}
+            the user's own "attacking node show" ask. A circle parent (see
+            groupRootIds/the crown loop below) is skipped here too — it gets
+            the bigger crown marker instead of a dot, not a dot underneath
+            it as well. */}
         {nodes.map((n) => {
+          if (groupRootIds.has(n.nodeId)) return null;
           const sentiment = sentimentOf(n.type);
           if (!sentiment) return null;
           const p = positions.get(n.nodeId);
@@ -318,6 +330,39 @@ export function MiniMap({
                   ? ZONE_COLORS.positive
                   : ZONE_COLORS.negative
               }
+            />
+          );
+        })}
+        {/* Circle-parent crowns — the same root nodes `groups` above already
+            identifies (2+ direct parentId-children — see MapPage's own
+            nodeGroups/parentCrownSentiment, the real canvas's matching
+            marker) get a crown here too, instead of the plain dot, so a
+            circle is spottable from the minimap without scrolling to it.
+            A plain filled shape, not the 👑 glyph the real canvas uses — a
+            color emoji's own fill can't be restyled (fill/color have no
+            effect on it at all, only ever rendering in its own fixed gold),
+            and the whole point here is to match the same positive/negative
+            split every other marker on this minimap uses instead of
+            standing out in gold. Reads `g.sentiment` straight off the same
+            group data the zone polygons above already draw from — never
+            null (nodeGroups only ever keeps a group that has a majority),
+            unlike a bare node's own sentimentOf. Centered right on the
+            node's own position (replacing its dot, not sitting above it)
+            and drawn 1.5x the size a plain dot would be, so a circle's root
+            reads as visibly its own kind of marker rather than a dot with a
+            tiny afterthought stuck on top. */}
+        {groups.map((g) => {
+          const p = positions.get(g.rootId);
+          if (!p) return null;
+          const color = g.sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative;
+          const cx = p.x * scaleX;
+          const cy = p.y * scaleY;
+          return (
+            <path
+              key={`crown-${g.rootId}`}
+              d="M-3.9,2.7 L-3.9,-1.2 L-1.95,0.75 L0,-2.7 L1.95,0.75 L3.9,-1.2 L3.9,2.7 Z"
+              transform={`translate(${cx}, ${cy})`}
+              fill={color}
             />
           );
         })}

@@ -29,11 +29,12 @@ export const WEAPON_ARROW_COUNT: Record<WeaponIcon, number> = {
 // MiniMap's own scaled-down copy — plus grouped branch-arrow lines and the
 // minimap's own per-node dots). Used to be duplicated as a bare hex literal
 // at each site with no shared constant; pulled out here so a future re-tune
-// only ever touches one place. Plain green/red now — reads unambiguously as
-// "positive side" / "negative side" at the small sizes both the minimap
-// dots and its zone polygons render at, more so than the earlier gold/
-// deep-orange pair.
-export const ZONE_COLORS = { positive: "#22c55e", negative: "#ef4444" } as const;
+// only ever touches one place. Reads off index.css's own --zone-positive/
+// --zone-negative (a plain green/red pair, muted a step further under dark
+// mode there — see that file's own doc comment) rather than a hardcoded hex
+// pair, so this stays in sync with the rest of the theme instead of being
+// the one color pair on the map that never dims for dark mode.
+export const ZONE_COLORS = { positive: "var(--zone-positive)", negative: "var(--zone-negative)" } as const;
 
 // A node type's own positive/negative lean — the same halo/horns split
 // OutcomeBadge.tsx's ringKindFor already classifies by (halo=positive,

@@ -27,6 +27,14 @@
   --n-fail: #b23a48;
   --n-unknown: #8a8f98;
 
+  /* The one green/red pair every "which side is this on" signal shares —
+     zone backdrops, a grouped branch-arrow's color, a manually-overridden
+     node's recolor, the minimap's dots — see utils/nodeType.ts's own
+     ZONE_COLORS, which reads these instead of a hardcoded hex pair so
+     dark mode below can tone them down same as everything else here. */
+  --zone-positive: #22c55e;
+  --zone-negative: #ef4444;
+
   --radius: 10px;
   --shadow: 0 1px 2px rgba(24, 27, 36, 0.06), 0 6px 20px -8px rgba(24, 27, 36, 0.15);
 }
@@ -46,6 +54,26 @@
     --danger-bg: #3a1a1d;
     --success: #7fd98a;
     --success-bg: #16321c;
+
+    /* Softer than the light-mode versions above — a node's own colored
+       border/edges/zones read as noticeably more saturated against a dark
+       background than the same hex ever did on the light paper color, so
+       dark mode gets its own toned-down set rather than inheriting the
+       light-mode values unchanged (which every node-type color used to do
+       — this file's dark-mode block never touched --n-* or --zone-* at
+       all until now). Same hue as each light-mode counterpart, just pulled
+       down in saturation/lightness so the map itself doesn't outshine the
+       rest of the (already muted) dark theme around it. */
+    --n-problem: #a8623f;
+    --n-poption: #a3823f;
+    --n-option: #5b74a3;
+    --n-solution: #3d7d72;
+    --n-success: #5c8f68;
+    --n-fail: #a15561;
+    --n-unknown: #7d828c;
+
+    --zone-positive: #4b9f63;
+    --zone-negative: #c1555a;
   }
 }
 
@@ -71,6 +99,9 @@
   --color-n-success: var(--n-success);
   --color-n-fail: var(--n-fail);
   --color-n-unknown: var(--n-unknown);
+
+  --color-zone-positive: var(--zone-positive);
+  --color-zone-negative: var(--zone-negative);
 
   --radius-card: var(--radius);
   --shadow-card: var(--shadow);
