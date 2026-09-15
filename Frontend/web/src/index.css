@@ -39,9 +39,15 @@
   --shadow: 0 1px 2px rgba(24, 27, 36, 0.06), 0 6px 20px -8px rgba(24, 27, 36, 0.15);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #eceef3;
+/* Explicit data-theme attribute, not a prefers-color-scheme media query —
+   index.html's own inline script sets this before first paint (reading a
+   saved choice, else falling back to the OS preference, the same fallback
+   a plain media query used to provide on its own) and ThemeProvider
+   (src/theme/ThemeContext.tsx) keeps it in sync afterward, toggled from
+   the navbar. A bare media query can't be overridden by an in-app choice
+   at all; this can. */
+:root[data-theme="dark"] {
+  --ink: #eceef3;
     --ink-soft: #a6adbe;
     --paper: #12141b;
     --surface: #1a1d26;
@@ -74,7 +80,6 @@
 
     --zone-positive: #4b9f63;
     --zone-negative: #c1555a;
-  }
 }
 
 @theme inline {

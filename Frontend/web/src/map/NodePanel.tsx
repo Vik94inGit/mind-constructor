@@ -7,6 +7,7 @@ import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
 import { ATTACK_NODE_TYPES, MANUAL_ZONE_COLORS, NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
+import { useI18n } from "../i18n/I18nContext";
 
 // Same 100%/115%/130% scale NodeCard's own SIZE_MULTIPLIERS uses, just for
 // the button labels here — kept as a separate literal rather than imported
@@ -140,6 +141,7 @@ export function NodePanel({
   onUnpacked,
   onExportText,
 }: Props) {
+  const { t } = useI18n();
   const isCreator = idOf(node.userId) === currentUserId;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -476,16 +478,16 @@ export function NodePanel({
   const nodeById = (id: string) => nodes.find((n) => n.nodeId === id);
 
   const tabLabel: Record<Tab, string> = {
-    info: "Info",
+    info: t.map.panelTabs.info,
     // Everything that used to live in the Info tab (Edit/Pack/Delete, Size,
     // Zone, Symbol, health, and the weapon/protection relationship lines)
     // moved onto this same "links" tab, on top of what it already had —
     // "Modify" is the label for all of that combined now, not just linking.
-    links: "Modify",
-    attack: "Attack",
-    protect: "Protect",
-    pack: `Packed (${packedMembers.length})`,
-    history: "History",
+    links: t.map.panelTabs.modify,
+    attack: t.map.panelTabs.attack,
+    protect: t.map.panelTabs.protect,
+    pack: t.map.panelTabs.packed(packedMembers.length),
+    history: t.map.panelTabs.history,
   };
 
   return (
