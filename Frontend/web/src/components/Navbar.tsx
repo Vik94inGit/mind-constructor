@@ -1,5 +1,8 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n/I18nContext";
+import { ThemeToggle } from "./ThemeToggle";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 // A plain target/bullseye — same concentric-rings-plus-center-dot shape
 // OutcomeBadge's own GoalSymbol draws for a Solution node (the app's own
@@ -20,6 +23,7 @@ function TargetLogo() {
 
 export function Navbar() {
   const { user, isAdmin, logout } = useAuth();
+  const { t } = useI18n();
   if (!user) return null;
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -40,21 +44,23 @@ export function Navbar() {
       </NavLink>
       <nav className="flex flex-1 gap-4">
         <NavLink to="/" end className={navLinkClass}>
-          Maps
+          {t.nav.maps}
         </NavLink>
         {isAdmin && (
           <NavLink to="/admin" className={navLinkClass}>
-            Admin
+            {t.nav.admin}
           </NavLink>
         )}
       </nav>
       <div className="flex items-center gap-[0.7rem]">
+        <LanguageSwitcher />
+        <ThemeToggle />
         <span className="text-[0.85rem] text-ink-soft">{user.username}</span>
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-120ms enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => logout()}
         >
-          Log out
+          {t.nav.logout}
         </button>
       </div>
     </header>

@@ -4,10 +4,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiRequestError } from "../api/client";
 import { GoogleSignInButton } from "../components/GoogleSignInButton";
+import { useI18n } from "../i18n/I18nContext";
 
 export function RegisterPage() {
   const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +24,7 @@ export function RegisterPage() {
       await register(username, email, password);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Something went wrong");
+      setError(err instanceof ApiRequestError ? err.message : t.auth.register.genericError);
     } finally {
       setBusy(false);
     }
@@ -39,7 +41,7 @@ export function RegisterPage() {
       await loginWithGoogle(idToken);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Something went wrong");
+      setError(err instanceof ApiRequestError ? err.message : t.auth.register.genericError);
     } finally {
       setBusy(false);
     }
@@ -48,15 +50,15 @@ export function RegisterPage() {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       <div className="w-full max-w-[380px] rounded-card border border-line bg-surface p-8 shadow-card">
-        <h1 className="mb-[0.3rem] text-[1.4rem] font-bold">Create your account</h1>
-        <p className="mb-6 text-[0.88rem] text-ink-soft">Start mapping out your next decision.</p>
+        <h1 className="mb-[0.3rem] text-[1.4rem] font-bold">{t.auth.register.title}</h1>
+        <p className="mb-6 text-[0.88rem] text-ink-soft">{t.auth.register.subtitle}</p>
         {error && (
           <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
         )}
         <form onSubmit={onSubmit}>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="username" className="text-[0.8rem] font-semibold text-ink-soft">
-              Username
+              {t.auth.register.username}
             </label>
             <input
               id="username"
@@ -68,7 +70,7 @@ export function RegisterPage() {
           </div>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="email" className="text-[0.8rem] font-semibold text-ink-soft">
-              Email
+              {t.auth.register.email}
             </label>
             <input
               id="email"
@@ -81,7 +83,7 @@ export function RegisterPage() {
           </div>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="password" className="text-[0.8rem] font-semibold text-ink-soft">
-              Password
+              {t.auth.register.password}
             </label>
             <input
               id="password"
@@ -93,7 +95,7 @@ export function RegisterPage() {
               className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
             />
             <span className="text-[0.8rem] text-danger">
-              {password && password.length < 6 ? "At least 6 characters" : ""}
+              {password && password.length < 6 ? t.auth.register.passwordHint : ""}
             </span>
           </div>
           <button
@@ -101,17 +103,17 @@ export function RegisterPage() {
             type="submit"
             disabled={busy}
           >
-            {busy ? "Creating account…" : "Register"}
+            {busy ? t.auth.register.submitting : t.auth.register.submit}
           </button>
         </form>
         <div className="my-4 flex items-center gap-3 text-[0.75rem] text-ink-soft before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
-          or
+          {t.auth.register.or}
         </div>
         <div className="flex justify-center">
           <GoogleSignInButton onCredential={onGoogleCredential} />
         </div>
         <div className="mt-4 text-center text-[0.85rem] text-ink-soft">
-          Already have an account? <Link to="/login">Log in</Link>
+          {t.auth.register.haveAccount} <Link to="/login">{t.auth.register.loginLink}</Link>
         </div>
       </div>
     </div>

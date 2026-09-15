@@ -7,6 +7,7 @@ import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { getSocket, joinMap, leaveMap } from "../api/socket";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n/I18nContext";
 import { NodeCard } from "../map/NodeCard";
 import { NodePanel } from "../map/NodePanel";
 import { LinkPickerPanel } from "../map/LinkPickerPanel";
@@ -25,6 +26,8 @@ import type { OutcomeType } from "../map/OutcomeBadge";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { Modal } from "../components/Modal";
+import { ThemeToggle } from "../components/ThemeToggle";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import {
   CANVAS_W,
@@ -55,6 +58,7 @@ export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useI18n();
 
   const [map, setMap] = useState<MapDoc | null>(null);
   const [nodes, setNodes] = useState<NodeDoc[]>([]);
@@ -2307,7 +2311,7 @@ export function MapPage() {
         <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">
           {error || "Map not found"}
         </div>
-        <Link to="/">&larr; Back to maps</Link>
+        <Link to="/">&larr; {t.map.toolbar.back}</Link>
       </div>
     );
   }
@@ -2934,7 +2938,7 @@ export function MapPage() {
             <Link
               to="/"
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
-              title="Back to maps"
+              title={t.map.toolbar.back}
             >
               &larr;
             </Link>
@@ -2942,7 +2946,7 @@ export function MapPage() {
               <button
                 type="button"
                 className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[1.05rem] font-semibold text-ink hover:bg-surface-2"
-                title="Add"
+                title={t.map.toolbar.add}
                 onClick={() => setShowAddMenu((v) => !v)}
               >
                 +
@@ -2991,7 +2995,7 @@ export function MapPage() {
               className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border text-[0.95rem] font-semibold hover:bg-surface-2 ${
                 moveMode ? "border-accent bg-accent-soft text-accent-ink" : "border-transparent bg-transparent text-ink"
               }`}
-              title={moveMode ? "Move nodes: on — tap Done to go back to just selecting" : "Move nodes: off — turn on to drag nodes around"}
+              title={moveMode ? t.map.toolbar.moveOn : t.map.toolbar.moveOff}
               onClick={() => setMoveMode((v) => !v)}
             >
               ✥
@@ -3011,8 +3015,8 @@ export function MapPage() {
                 }`}
                 title={
                   isDiscussionMode
-                    ? "Discussion mode: on — combat (attack/protect) is visible. Click to switch to Personal mode."
-                    : "Personal mode: on — combat (attack/protect) is hidden for solo organizing. Click to switch back to Discussion mode."
+                    ? t.map.toolbar.discussionTooltip
+                    : t.map.toolbar.personalTooltip
                 }
                 onClick={toggleMapMode}
               >
@@ -3024,6 +3028,13 @@ export function MapPage() {
                 {isDiscussionMode ? "⚔" : "✎"}
               </button>
             )}
+            {/* Global Navbar (which normally hosts these) is hidden on the
+                map route — see App.tsx's onMapPage check — so this is the
+                only place a map-page user can reach them. */}
+            <div className="ml-1 flex items-center gap-1 border-l border-line pl-1">
+              <LanguageSwitcher />
+              <ThemeToggle />
+            </div>
           </div>
 
           {/* Zoom controls — stacked directly above the minimap in the same
@@ -3040,7 +3051,7 @@ export function MapPage() {
               type="button"
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={zoom <= MIN_ZOOM}
-              title="Zoom out"
+              title={t.map.toolbar.zoomOut}
               onClick={() => {
                 const r = wrapRef.current?.getBoundingClientRect();
                 if (!r) return;
@@ -3053,7 +3064,7 @@ export function MapPage() {
               type="button"
               className="inline-flex h-7 min-w-[3.2rem] cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent px-1 text-[0.72rem] font-semibold text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={zoom === 1}
-              title="Reset zoom"
+              title={t.map.toolbar.zoomReset}
               onClick={() => {
                 const r = wrapRef.current?.getBoundingClientRect();
                 if (!r) return;
@@ -3066,7 +3077,7 @@ export function MapPage() {
               type="button"
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={zoom >= MAX_ZOOM}
-              title="Zoom in"
+              title={t.map.toolbar.zoomIn}
               onClick={() => {
                 const r = wrapRef.current?.getBoundingClientRect();
                 if (!r) return;
@@ -3290,16 +3301,25 @@ export function MapPage() {
           Tighter gap/padding/font too, so more items fit per row before
           any wrapping is needed at all. */}
       <div className="flex flex-wrap gap-[0.3rem] border-t border-line bg-surface px-3 py-[0.45rem]">
-        {NODE_TYPES.map((t) => (
-          <span key={t} className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
+        {/* nt, not t — this file's own translation object is already
+            destructured as `t` (useI18n) at the top of the component; a
+            per-item loop variable of the same name would shadow it within
+            this callback instead of colliding outright, which still works
+            but reads as a landmine for the next edit in here. */}
+        {NODE_TYPES.map((nt) => (
+          <span key={nt} className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
             {/* Same symbol a real node of this type actually renders
                 (OutcomeBadge), not NodeTypeIcon's own separate glyph set —
                 this legend used to teach a different symbol than the one
                 you'd actually see on the map. "unknown" alone has no
                 outcome symbol, so it keeps its own plain NodeTypeIcon
                 glyph, same as a real "unknown" node does. */}
-            {ringKindFor(t) ? <OutcomeBadge type={t as OutcomeType} size={13} /> : <NodeTypeIcon type={t} size={13} />}
-            {t}
+            {ringKindFor(nt) ? (
+              <OutcomeBadge type={nt as OutcomeType} size={13} />
+            ) : (
+              <NodeTypeIcon type={nt} size={13} />
+            )}
+            {nt}
           </span>
         ))}
         <span className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
@@ -3307,14 +3327,14 @@ export function MapPage() {
             className="mr-[0.3rem] inline-block h-2 w-2 flex-shrink-0 rounded-full"
             style={{ background: "var(--success)" }}
           />
-          positive circle
+          {t.map.legend.positiveCircle}
         </span>
         <span className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
           <span
             className="mr-[0.3rem] inline-block h-2 w-2 flex-shrink-0 rounded-full"
             style={{ background: "var(--danger)" }}
           />
-          negative circle / under fire
+          {t.map.legend.negativeCircle}
         </span>
       </div>
 
@@ -3336,18 +3356,19 @@ export function MapPage() {
       )}
 
       {showNodeTypesLegend && (
-        <Modal title="Node types" onClose={() => setShowNodeTypesLegend(false)}>
+        <Modal title={t.map.addMenu.nodeTypes} onClose={() => setShowNodeTypesLegend(false)}>
           <div className="flex flex-col gap-[0.6rem]">
-            {NODE_TYPES.map((t) => (
-              <div key={t} className="flex items-center gap-[0.6rem] text-[0.88rem] text-ink">
+            {/* nt, not t — see the bottom legend bar's own matching comment. */}
+            {NODE_TYPES.map((nt) => (
+              <div key={nt} className="flex items-center gap-[0.6rem] text-[0.88rem] text-ink">
                 {/* Same symbol a real node of this type actually renders —
                     see the bottom legend bar's own matching comment. */}
-                {ringKindFor(t) ? (
-                  <OutcomeBadge type={t as OutcomeType} size={20} />
+                {ringKindFor(nt) ? (
+                  <OutcomeBadge type={nt as OutcomeType} size={20} />
                 ) : (
-                  <NodeTypeIcon type={t} size={20} />
+                  <NodeTypeIcon type={nt} size={20} />
                 )}
-                {t}
+                {nt}
               </div>
             ))}
           </div>

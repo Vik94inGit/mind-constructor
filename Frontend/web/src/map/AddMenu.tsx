@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useI18n } from "../i18n/I18nContext";
 
 interface Props {
   isOwner: boolean;
@@ -20,6 +21,7 @@ interface Props {
 // Escape pattern as NodeContextMenu, just without that one's fixed x/y
 // placement.
 export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onNodeTypes, onExportText, onClose }: Props) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -47,20 +49,20 @@ export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onNod
     >
       {isOwner && (
         <button className={item} onClick={onInvite}>
-          Invite user
+          {t.map.addMenu.invite}
         </button>
       )}
       <button className={item} onClick={onCreateNode}>
-        Create new node
+        {t.map.addMenu.createNode}
       </button>
       <button className={item} onClick={onCreateCircle}>
-        Create circle
+        {t.map.addMenu.createCircle}
       </button>
       <button className={item} onClick={onNodeTypes}>
-        Node types
+        {t.map.addMenu.nodeTypes}
       </button>
       <button className={item} onClick={onExportText}>
-        Export text
+        {t.map.addMenu.exportText}
       </button>
     </div>
   );

@@ -10,29 +10,27 @@ import { MapSummaryModal } from "../components/MapSummaryModal";
 import { CardMenu } from "../components/CardMenu";
 import { ApiRequestError } from "../api/client";
 import type { MapDoc, MapTemplate } from "../types";
+import { useI18n } from "../i18n/I18nContext";
+import type { Translation } from "../i18n/translations";
 
 type Filter = mapsApi.MapFilter;
 
-// Mirrors the backend's MAP_TEMPLATES keys (see abl/mapAbl.ts) — the label/
-// description pairs shown in CreateMapModal's "Starting point" picker below.
-// Order here is the order they're offered in.
-const TEMPLATE_OPTIONS: { value: MapTemplate; label: string; description: string }[] = [
-  { value: "blank", label: "Blank canvas", description: "Start from nothing." },
-  { value: "single-problem", label: "Single Problem", description: "One root node to branch off." },
-  {
-    value: "decision-tree",
-    label: "Decision tree",
-    description: "A Problem with two Options already branched off it.",
-  },
-  {
-    value: "pro-con",
-    label: "Pro / Con",
-    description: "A topic with one case-for and one case-against branch.",
-  },
+// Mirrors the backend's MAP_TEMPLATES keys (see abl/mapAbl.ts) — the
+// label/description pairs shown in CreateMapModal's "Starting point"
+// picker below, now read from the active translation (t.dashboard.
+// createModal.templates) instead of a hardcoded English pair, so this list
+// only has to know the *order* and which value maps to which translation
+// key.
+const TEMPLATE_KEYS: { value: MapTemplate; key: keyof Translation["dashboard"]["createModal"]["templates"] }[] = [
+  { value: "blank", key: "blank" },
+  { value: "single-problem", key: "singleProblem" },
+  { value: "decision-tree", key: "decisionTree" },
+  { value: "pro-con", key: "proCon" },
 ];
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("all");
   const [maps, setMaps] = useState<MapDoc[]>([]);
@@ -55,7 +53,7 @@ export function DashboardPage() {
       setMaps(loaded);
       loadNodeCounts(loaded);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to load maps");
+      setError(err instanceof ApiRequestError ? err.message : t.dashboard.loadError);
     } finally {
       setLoading(false);
     }
@@ -88,23 +86,29 @@ export function DashboardPage() {
   }, [filter]);
 
   async function handleDelete(map: MapDoc) {
-    if (!confirm(`Delete "${map.name}"? This removes every node on it too.`)) return;
+    if (!confirm(t.dashboard.deleteConfirm(map.name))) return;
     await mapsApi.deleteMap(map.mapId);
     setMaps((prev) => prev.filter((m) => m.mapId !== map.mapId));
   }
+
+  const filterLabels: Record<Filter, string> = {
+    all: t.dashboard.filter.all,
+    owned: t.dashboard.filter.owned,
+    shared: t.dashboard.filter.shared,
+  };
 
   return (
     <div className="mx-auto w-full max-w-[1080px] px-6 pt-8 pb-16">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="m-0 text-2xl font-bold">Your maps</h1>
-          <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">Boards you own or were invited to.</p>
+          <h1 className="m-0 text-2xl font-bold">{t.dashboard.title}</h1>
+          <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">{t.dashboard.subtitle}</p>
         </div>
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-4 py-[0.55rem] text-[0.88rem] font-semibold text-white transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => setShowCreate(true)}
         >
-          + New map
+          {t.dashboard.newMap}
         </button>
       </div>
 
@@ -117,7 +121,7 @@ export function DashboardPage() {
             }`}
             onClick={() => setFilter(f)}
           >
-            {f[0].toUpperCase() + f.slice(1)}
+            {filterLabels[f]}
           </button>
         ))}
       </div>
@@ -127,10 +131,10 @@ export function DashboardPage() {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-ink-soft">Loading maps…</div>
+        <div className="p-12 text-center text-ink-soft">{t.dashboard.loading}</div>
       ) : maps.length === 0 ? (
         <div className="rounded-card border border-dashed border-line px-6 py-12 text-center text-ink-soft">
-          No maps here yet. {filter !== "owned" ? "" : "Create one to get started."}
+          {t.dashboard.empty} {filter !== "owned" ? "" : t.dashboard.emptyOwnedHint}
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
@@ -149,28 +153,28 @@ export function DashboardPage() {
                 <h3 className="m-0 pr-[1.9rem] text-[1.05rem] font-bold">{map.name}</h3>
                 <div className="flex flex-wrap gap-[0.6rem] text-[0.78rem] text-ink-soft">
                   <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
-                    {map.memberCount ?? 0} member(s)
+                    {t.dashboard.card.members(map.memberCount ?? 0)}
                   </span>
                   {map.mapId in nodeCounts && (
                     <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
-                      {nodeCounts[map.mapId]} node(s)
+                      {t.dashboard.card.nodes(nodeCounts[map.mapId])}
                     </span>
                   )}
                   {isOwner && (
                     <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
-                      Owner
+                      {t.dashboard.card.owner}
                     </span>
                   )}
                 </div>
                 <div className="absolute top-[0.6rem] right-[0.6rem]" onClick={(e) => e.stopPropagation()}>
                   <CardMenu
                     items={[
-                      { label: "Summary", onClick: () => setSummaryMap(map) },
+                      { label: t.dashboard.menu.summary, onClick: () => setSummaryMap(map) },
                       ...(isOwner
                         ? [
-                            { label: "Edit", onClick: () => setEditMap(map) },
-                            { label: "Invite", onClick: () => setInviteMap(map) },
-                            { label: "Delete", danger: true, onClick: () => handleDelete(map) },
+                            { label: t.dashboard.menu.edit, onClick: () => setEditMap(map) },
+                            { label: t.dashboard.menu.invite, onClick: () => setInviteMap(map) },
+                            { label: t.dashboard.menu.delete, danger: true, onClick: () => handleDelete(map) },
                           ]
                         : []),
                     ]}
@@ -231,6 +235,7 @@ export function DashboardPage() {
 }
 
 function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated: (map: MapDoc) => void }) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [ownerColor, setOwnerColor] = useState("#22c55e");
   const [color, setColor] = useState("#e08a3e");
@@ -246,21 +251,21 @@ function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated
       const map = await mapsApi.createMap({ name, ownerColor, color, template });
       onCreated(map);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to create map");
+      setError(err instanceof ApiRequestError ? err.message : t.dashboard.createModal.error);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Modal title="New map" onClose={onClose}>
+    <Modal title={t.dashboard.createModal.title} onClose={onClose}>
       {error && (
         <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
       )}
       <form onSubmit={onSubmit}>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label htmlFor="map-name" className="text-[0.8rem] font-semibold text-ink-soft">
-            Name
+            {t.dashboard.createModal.name}
           </label>
           <input
             id="map-name"
@@ -272,35 +277,38 @@ function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated
           />
         </div>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
-          <label className="text-[0.8rem] font-semibold text-ink-soft">Your color on this map</label>
+          <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.ownerColor}</label>
           <ColorPicker value={ownerColor} onChange={setOwnerColor} />
         </div>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
-          <label className="text-[0.8rem] font-semibold text-ink-soft">Board color</label>
+          <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.boardColor}</label>
           <ColorPicker value={color} onChange={setColor} />
         </div>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
-          <label className="text-[0.8rem] font-semibold text-ink-soft">Starting point</label>
+          <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.startingPoint}</label>
           <div className="grid grid-cols-2 gap-[0.5rem]">
-            {TEMPLATE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setTemplate(opt.value)}
-                className={`cursor-pointer rounded-lg border px-[0.7rem] py-[0.55rem] text-left transition-[background-color,border-color] duration-[120ms] ${
-                  template === opt.value
-                    ? "border-accent bg-accent-soft"
-                    : "border-line bg-surface hover:bg-surface-2"
-                }`}
-              >
-                <div
-                  className={`text-[0.82rem] font-semibold ${template === opt.value ? "text-accent-ink" : "text-ink"}`}
+            {TEMPLATE_KEYS.map((opt) => {
+              const label = t.dashboard.createModal.templates[opt.key];
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTemplate(opt.value)}
+                  className={`cursor-pointer rounded-lg border px-[0.7rem] py-[0.55rem] text-left transition-[background-color,border-color] duration-[120ms] ${
+                    template === opt.value
+                      ? "border-accent bg-accent-soft"
+                      : "border-line bg-surface hover:bg-surface-2"
+                  }`}
                 >
-                  {opt.label}
-                </div>
-                <div className="mt-[0.1rem] text-[0.72rem] text-ink-soft">{opt.description}</div>
-              </button>
-            ))}
+                  <div
+                    className={`text-[0.82rem] font-semibold ${template === opt.value ? "text-accent-ink" : "text-ink"}`}
+                  >
+                    {label.label}
+                  </div>
+                  <div className="mt-[0.1rem] text-[0.72rem] text-ink-soft">{label.desc}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="mt-[1.2rem] flex justify-end gap-[0.6rem]">
@@ -309,14 +317,14 @@ function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated
             className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onClose}
           >
-            Cancel
+            {t.dashboard.createModal.cancel}
           </button>
           <button
             type="submit"
             className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-4 py-[0.55rem] text-[0.88rem] font-semibold text-white transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={busy || !name}
           >
-            {busy ? "Creating…" : "Create map"}
+            {busy ? t.dashboard.createModal.submitting : t.dashboard.createModal.submit}
           </button>
         </div>
       </form>
@@ -337,6 +345,7 @@ function EditMapModal({
   onClose: () => void;
   onSaved: (map: MapDoc) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState(map.name);
   const [color, setColor] = useState(map.color || "#e08a3e");
   const [error, setError] = useState<string | null>(null);
@@ -356,21 +365,21 @@ function EditMapModal({
       const updated = await mapsApi.updateMap(map.mapId, updates);
       onSaved(updated);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to update map");
+      setError(err instanceof ApiRequestError ? err.message : t.dashboard.editModal.error);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Modal title={`Edit "${map.name}"`} onClose={onClose}>
+    <Modal title={t.dashboard.editModal.title(map.name)} onClose={onClose}>
       {error && (
         <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
       )}
       <form onSubmit={onSubmit}>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label htmlFor="edit-map-name" className="text-[0.8rem] font-semibold text-ink-soft">
-            Name
+            {t.dashboard.editModal.name}
           </label>
           <input
             id="edit-map-name"
@@ -382,7 +391,7 @@ function EditMapModal({
           />
         </div>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
-          <label className="text-[0.8rem] font-semibold text-ink-soft">Board color</label>
+          <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.editModal.boardColor}</label>
           <ColorPicker value={color} onChange={setColor} />
         </div>
         <div className="mt-[1.2rem] flex justify-end gap-[0.6rem]">
@@ -391,14 +400,14 @@ function EditMapModal({
             className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onClose}
           >
-            Cancel
+            {t.dashboard.editModal.cancel}
           </button>
           <button
             type="submit"
             className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-4 py-[0.55rem] text-[0.88rem] font-semibold text-white transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={busy || !trimmedName || !dirty}
           >
-            {busy ? "Saving…" : "Save changes"}
+            {busy ? t.dashboard.editModal.submitting : t.dashboard.editModal.submit}
           </button>
         </div>
       </form>
