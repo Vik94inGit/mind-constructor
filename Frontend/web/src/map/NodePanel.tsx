@@ -24,25 +24,6 @@ function isMobileViewport() {
   return typeof window !== "undefined" && window.innerWidth <= 640;
 }
 
-// The panel's own persistent header (shown above every tab, not just Info)
-// used to just print the node's full text, wrapping to however many lines
-// it needed — fine for a short claim, but a long one pushed the tabs
-// themselves (and the close button) further down, or off the always-visible
-// area on a short mobile sheet. Derives a short label instead: first line
-// only (a node's text is conceptually one claim, not a paragraph — a
-// second line, if the author added one, reads as elaboration, not
-// headline), truncated at a word boundary if even that first line runs
-// long. The full text is never lost to this — it's exactly what the Info
-// tab's own scrollable body below shows in full.
-const HEADER_MAX_CHARS = 48;
-function stripHeader(text: string): string {
-  const firstLine = text.split("\n")[0].trim();
-  if (firstLine.length <= HEADER_MAX_CHARS) return firstLine;
-  const cut = firstLine.slice(0, HEADER_MAX_CHARS);
-  const lastSpace = cut.lastIndexOf(" ");
-  return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
-}
-
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own
 // onClick), same as a native sheet dismisses on a tap outside it. Used to
@@ -509,28 +490,43 @@ export function NodePanel({
 
   return (
     <div className={PANEL_CLASS}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-[0.5rem]">
-          <div
-            className="flex flex-shrink-0 items-center text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase"
-            title={node.type}
-          >
-            <NodeTypeIcon type={node.type} />
-          </div>
-          <div className="min-w-0">
-            {/* stripHeader — a short, single-line label, not the full text
-                (see its own doc comment); the Info tab below is where the
-                complete text actually lives, scrollable. `title` puts the
-                full text back one hover away on desktop, same fallback a
-                truncated label anywhere else in this app would use. */}
-            <p className="m-0 truncate text-[0.88rem] leading-snug text-ink" title={node.text}>
-              {stripHeader(node.text)}
-            </p>
-            <p className="m-0 text-[0.72rem] text-ink-soft">
+      {/* Type/byline and the tabs now share one row instead of stacking as
+          two — freeing up a whole row of this panel's own limited height
+          (capped at 34dvh/67dvh — see PANEL_CLASS) means the actual node
+          text (the Info tab's content, or whichever tab is open) shows up
+          a beat sooner, closer to "at a glance" instead of behind a header
+          that was mostly just chrome. flex-wrap: on a narrow phone with
+          every tab present (Attack/Protect/Pack/History all at once) this
+          can still wrap to a second line — the tabs themselves already
+          handle that gracefully (see their own flex-wrap), this just lets
+          the icon/byline join that same wrap instead of always claiming a
+          fixed-height row of their own. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line pb-[0.7rem]">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex flex-shrink-0 items-center gap-[0.4rem]">
+            <div
+              className="flex items-center text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase"
+              title={node.type}
+            >
+              <NodeTypeIcon type={node.type} />
+            </div>
+            {/* No title/caption here any more — the node's own text is
+                still readable in the Info tab below (scrollable, full
+                text), just not repeated as a header up here. */}
+            <p className="m-0 text-[0.72rem] whitespace-nowrap text-ink-soft">
               {node.isWeapon ? "🏹 " : ""}by {usernameOf(node.userId as any)}
               {node.isFirstNode ? " · root" : ""}
             </p>
           </div>
+          {tabs.length > 1 && (
+            <div className="flex flex-wrap gap-[0.35rem]">
+              {tabs.map((t) => (
+                <button key={t} className={tabBtn(tab === t)} onClick={() => setTab(t)}>
+                  {tabLabel[t]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <button className={closeBtn} onClick={onClose}>
           ✕
@@ -539,16 +535,6 @@ export function NodePanel({
 
       {error && (
         <div className="mt-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
-
-      {tabs.length > 1 && (
-        <div className="mt-4 flex flex-wrap gap-[0.35rem] border-b border-line pb-[0.8rem]">
-          {tabs.map((t) => (
-            <button key={t} className={tabBtn(tab === t)} onClick={() => setTab(t)}>
-              {tabLabel[t]}
-            </button>
-          ))}
-        </div>
       )}
 
       {tab === "info" && (

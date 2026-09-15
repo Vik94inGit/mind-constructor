@@ -236,8 +236,12 @@ export function NodeCard({
   // first. defeated > dragging > muted for opacity; readonly > dragging for
   // cursor. Filter (grayscale) is muted's alone — nothing else ever touched
   // that property, so it doesn't participate in the opacity precedence at all.
-  const opacityClass = node.defeated ? "opacity-55" : dragging ? "opacity-85" : muted ? "opacity-32" : "";
-  const filterClass = muted ? "grayscale-[35%]" : "";
+  // muted's own numbers pushed further down (was opacity-32/grayscale-35%)
+  // — the chosen node and its quick-add ghosts are meant to be the one
+  // clear center of attention on screen while they're up; everything else
+  // needs to properly recede, not just slightly fade.
+  const opacityClass = node.defeated ? "opacity-55" : dragging ? "opacity-85" : muted ? "opacity-16" : "";
+  const filterClass = muted ? "grayscale-[65%]" : "";
   const cursorClass = readonly ? "cursor-default" : dragging ? "cursor-grabbing" : "cursor-grab";
   // Position updates (left/top, applied via inline style) need to be
   // instant while actively dragging — only once released does the
@@ -626,7 +630,7 @@ export function NodeCard({
       </div>
       {inlineEditing ? (
         <input
-          className="mt-[0.35rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+          className="mt-[0.6rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
           autoFocus
           value={draftText}
           onChange={(e) => setDraftText(e.target.value)}
@@ -645,8 +649,20 @@ export function NodeCard({
           }}
           onBlur={resolveInlineEdit}
         />
-      ) : (
-        <div className="mt-[0.35rem] line-clamp-2 text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink">
+      ) : selected ? null : (
+        <div
+          // bg-surface + rounded + a touch of horizontal padding: an edge
+          // line, another node's chaotic drift, a zone polygon — anything
+          // rendered behind this caption (this whole overlay SVG sits below
+          // NodeCard in z-index, so it's always something behind, never in
+          // front) used to show straight through the plain transparent text
+          // block, visually cutting through the caption and making it
+          // harder to read wherever it happened to cross. An opaque chip
+          // behind the text stops that regardless of what's actually back
+          // there, rather than trying to keep every other layer clear of
+          // wherever captions might land.
+          className="mt-[0.6rem] line-clamp-2 rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink"
+        >
           {node.text}
         </div>
       )}
