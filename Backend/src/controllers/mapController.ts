@@ -241,6 +241,8 @@ export const updateMap = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "Map not found" });
     }
 
+    broadcastToMap(resolvedMapId, "map:updated", { map: updatedMap });
+
     return res.status(200).json({ success: true, map: updatedMap });
   } catch (error) {
     if (error instanceof ValidationError) {

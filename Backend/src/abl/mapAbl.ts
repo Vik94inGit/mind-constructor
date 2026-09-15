@@ -76,9 +76,9 @@ const createMapSchema = z.object({
   ownerColor: hexColor("ownerColor"),
   color: hexColor("color").optional(),
   template: z.enum(MAP_TEMPLATE_KEYS).optional(),
-  // See Map.discussionMode / attackAbl.ts. Defaults to false (normal
-  // combat rules) via the Map model itself — omitting this is exactly the
-  // same as sending false.
+  // See Map.discussionMode's own doc comment. Defaults to true (Discussion
+  // — combat controls visible) via the Map model itself — omitting this is
+  // exactly the same as sending true.
   discussionMode: z.boolean().optional(),
 });
 

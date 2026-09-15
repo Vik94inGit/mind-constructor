@@ -1,5 +1,5 @@
-import { ringKindFor } from "./OutcomeBadge";
-import type { NodeType } from "../types";
+import { effectiveRingKind } from "./OutcomeBadge";
+import type { NodeType, SymbolOverride } from "../types";
 
 // The halo/horns crown always draws in one of these two, regardless of
 // the specific type's own border color (which stays per-type — blue for
@@ -30,8 +30,15 @@ const HORNS_RED = "#b23a48";
 // stroke coordinate inside it are left alone, so the whole drawing just
 // scales down uniformly rather than needing separately-tuned small-size
 // numbers that could drift out of proportion over time.
-export function NodeCrown({ type }: { type: NodeType }) {
-  const kind = ringKindFor(type);
+export function NodeCrown({
+  type,
+  symbolOverride,
+}: {
+  type: NodeType;
+  /** Manually forces halo/horns to match a check/cross override — see effectiveRingKind. */
+  symbolOverride?: SymbolOverride | null;
+}) {
+  const kind = effectiveRingKind(type, symbolOverride);
   if (!kind) return null;
 
   if (kind === "halo") {

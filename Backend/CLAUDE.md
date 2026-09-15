@@ -129,7 +129,14 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `CannotAttackOwnNodeError`, `CanOnlyAttackOwnNodeError`, `CannotRetaliateError`,
   `NodeAlreadyDefeatedError`, and `WeaponOnCooldownError` are all dead (never thrown), kept exported
   only because `nodeController.ts` still pattern-matches on them defensively — `Map.discussionMode`
-  is likewise an inert, unused field now. The one mechanic that survives from the old
+  is inert as far as the combat rules above go (nothing here reads it any more), but it's no longer
+  unused: it's a plain per-map UI setting now (owner-only PATCH via `updateMapAbl`/
+  `PATCH /api/:mapId`, broadcast to the room as `map:updated` so every member's client stays in
+  sync), which a frontend reads to decide whether to show its own combat controls at all —
+  "Discussion" mode (`discussionMode !== false`, i.e. the default) leaves them visible; "Personal"
+  mode (`discussionMode === false`) hides them client-side only. Combat itself stays exactly as
+  open either way — this field has never gated any backend combat rule since the own-node-only days
+  described above, and still doesn't. The one mechanic that survives from the old
   ownership-gated "retaliation" concept: landing a hit on a weapon node still heals *that weapon
   node's own target's parent* (`Node.parentId`, not the weapon node or its target itself) by a fixed
   `RETALIATION_HEAL_AMOUNT`, via `healNodeDao` — capped at 100, and never clears `defeated` on its

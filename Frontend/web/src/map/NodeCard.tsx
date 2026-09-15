@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { NODE_TYPE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
+import { NODE_TYPE_COLORS, ZONE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
 import { NodeCrown } from "./NodeCrown";
@@ -97,9 +97,11 @@ interface Props {
   dragging: boolean;
   canDrag: boolean;
   groupSentiment?: "positive" | "negative";
+  /** Set only for a circle's own root/parent node (MapPage's circleRootSentimentByNode) — draws the small crown badge below, colored by the circle's majority pos/neg vote. Undefined for every other node, root or not part of any circle. */
+  parentCrownSentiment?: "positive" | "negative";
   indicator?: AttackIndicator;
   linkModeActive: boolean;
-  /** Map.discussionMode — hides the health ring until hover instead of showing it always. See ringStyle below. */
+  /** MapPage's isDiscussionMode (Map.discussionMode !== false) — Personal mode (explicit false) hides the health ring outright, selected or not. Omitted/undefined defaults to true (Discussion), never coerced with `!!`. See showHealth below. */
   discussionMode?: boolean;
   /** True for exactly one render: the moment this node was created in this session. */
   celebrate?: boolean;
@@ -135,6 +137,7 @@ export function NodeCard({
   dragging,
   canDrag,
   groupSentiment,
+  parentCrownSentiment,
   indicator,
   linkModeActive,
   discussionMode,
@@ -362,12 +365,17 @@ export function NodeCard({
     : undefined;
 
   // Health only ever shows for the chosen (selected) node — every other
-  // node keeps it hidden, discussion mode/circle membership or not: a
-  // whole map's worth of health rings all visible at once read as noise,
-  // and a circle's own halo/horns backdrop already communicates its
-  // members' status anyway. Applies uniformly to every node type — this
-  // div's own ring is health's one and only home.
-  const showHealth = selected;
+  // node keeps it hidden, circle membership or not: a whole map's worth of
+  // health rings all visible at once read as noise, and a circle's own
+  // halo/horns backdrop already communicates its members' status anyway.
+  // Applies uniformly to every node type — this div's own ring is health's
+  // one and only home. In Personal mode (discussionMode explicitly false —
+  // see MapPage's isDiscussionMode) it never shows at all, selected or
+  // not: health is a combat concept, meaningless once combat's own
+  // controls are hidden for solo organizing. `discussionMode` defaults to
+  // true (not false) when omitted, matching MapPage's own "undefined means
+  // Discussion" contract.
+  const showHealth = discussionMode !== false && selected;
 
   // Ring is a conic-gradient read off CSS custom properties, so the health
   // sweep and its color are just two variables — no per-type CSS needed.
@@ -444,7 +452,13 @@ export function NodeCard({
   // the same CSS property, so that red under-fire border could never
   // actually render, indicator or not. Deciding the color in JS instead,
   // so whichever one applies is really what gets set.
-  const circleBorderColor = indicator ? "var(--danger)" : NODE_TYPE_COLORS[displayType];
+  const circleBorderColor = indicator
+    ? "var(--danger)"
+    : node.symbolOverride === "check"
+      ? ZONE_COLORS.positive
+      : node.symbolOverride === "cross"
+        ? ZONE_COLORS.negative
+        : NODE_TYPE_COLORS[displayType];
 
   // Counter-scales this node's own visual content against MapPage's canvas
   // zoom, so icons/captions stay a constant size on screen while zooming —
@@ -501,6 +515,29 @@ export function NodeCard({
             {packedCount}
           </div>
         )}
+        {/* Circle parent/root marker — a node with 2+ direct parentId-
+            children (MapPage's nodeGroups) gets a small crown badge,
+            colored by the same positive/negative majority vote that colors
+            its own zone backdrop — "this node is what the circle radiates
+            from," at a glance. Independent of NodeCrown just below (every
+            outcome-type node's own halo/horns framing, parent or not).
+            Just the glyph, no badge circle/border — unlike the indicator/
+            pack-count/protection badges it sits alongside, this isn't a
+            count or a toggle, so it doesn't need their "chip" chrome; a
+            plain tinted emoji (color via drop-shadow, since an emoji's own
+            fill can't be restyled directly) reads lighter at a glance. Top-
+            left corner, same as before. */}
+        {parentCrownSentiment && (
+          <div
+            className="absolute -top-1.5 -left-1.5 text-[0.8rem] leading-none"
+            style={{
+              filter: `drop-shadow(0 0 1.5px ${ZONE_COLORS[parentCrownSentiment]}) drop-shadow(0 0 1.5px ${ZONE_COLORS[parentCrownSentiment]})`,
+            }}
+            title={`Circle parent (${parentCrownSentiment})`}
+          >
+            👑
+          </div>
+        )}
         {/* Protection nodes always carry this badge, active attacker or
             not — the user's own "if attacking node absent, protect is just
             a usual node but with shield" case. Bottom-left corner: the
@@ -518,14 +555,14 @@ export function NodeCard({
         {/* Halo/horns — see NodeCrown's own doc comment; shared with
             QuickAddGhosts so a ghost previews this too, not just the bare
             symbol. */}
-        <NodeCrown type={displayType} />
+        <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />
         {/* Wings — see NodeWings's own doc comment for why this is a
             separate, never-resized overlay rather than living inside
             OutcomeBadge. Placed before the bordered circle below in DOM
             order (both z-index:auto) so the circle paints over the
             wings' own base, same "flanking the head, not stamped on top
             of it" look the wings always had. */}
-        <NodeWings type={displayType} show={selected} />
+        <NodeWings type={displayType} show={selected} symbolOverride={node.symbolOverride} />
         {/* No more weapon-type badge here — which weapon landed used to
             show as a little corner label on the objection node itself.
             That's dropped in favor of the pointer MapPage draws between
@@ -542,7 +579,7 @@ export function NodeCard({
           {inlineEditing ? (
             <button
               type="button"
-              className={`flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-surface p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${circleBorderClass}`}
+              className={`flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-black p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${circleBorderClass}`}
               style={{ borderColor: circleBorderColor }}
               title="Click to change type"
               onPointerDown={(e) => e.stopPropagation()}
@@ -563,7 +600,15 @@ export function NodeCard({
             </button>
           ) : (
             <div
-              className={`flex h-full w-full items-center justify-center rounded-full bg-surface ${circleBorderClass}`}
+              // bg-black, not bg-surface: a node's own inner circle reads
+              // as the "artwork" (type color border + icon/symbol) sitting
+              // on top of it, and a plain black backdrop gives every
+              // type's own (now-muted, see index.css) color the most
+              // consistent, highest-contrast stage to sit on regardless of
+              // which theme/surface color the rest of the app is currently
+              // using — unlike the panel/toolbar chrome, this was never
+              // meant to blend into the page background.
+              className={`flex h-full w-full items-center justify-center rounded-full bg-black ${circleBorderClass}`}
               style={{ borderColor: circleBorderColor }}
             >
               {isOutcome ? (
@@ -581,7 +626,7 @@ export function NodeCard({
       </div>
       {inlineEditing ? (
         <input
-          className="mt-[0.35rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+          className="mt-[0.35rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
           autoFocus
           value={draftText}
           onChange={(e) => setDraftText(e.target.value)}
@@ -601,7 +646,7 @@ export function NodeCard({
           onBlur={resolveInlineEdit}
         />
       ) : (
-        <div className="mt-[0.35rem] line-clamp-2 text-center text-[0.58rem] leading-[1.25] break-words text-ink">
+        <div className="mt-[0.35rem] line-clamp-2 text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink">
           {node.text}
         </div>
       )}
