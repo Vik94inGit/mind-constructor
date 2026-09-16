@@ -67,6 +67,25 @@
      dark navy on its own, so an extra outline would be pure noise. */
   --crown-outline: #000000;
 
+  /* NodeCard own inner icon circle color, shared with QuickAddGhosts own
+     ghost preview fill (see both callers own bg-[var(--node-fill)] usage)
+     so a real node and the ghost that previewed it always look the same,
+     not a light preview standing in for a solid black node. Light-brown
+     here, the same tan as --accent-soft above, not plain white — ties the
+     node fill into the app own existing brand palette instead of a
+     neutral white. Written as its own literal hex, not var(--accent-soft)
+     — Tailwind own CSS processing here silently drops a custom property
+     whose value is itself a var() reference (confirmed live: --node-fill
+     computed to an empty string, and the node fill rendered fully
+     transparent, when this was var(--accent-soft) instead), so this stays
+     a plain color that happens to match --accent-soft rather than a
+     reference to it; if --accent-soft above ever changes, update this by
+     hand too. Dark mode keeps the black this was always hardcoded to
+     before — every node-type and OutcomeBadge color was tuned for a dark
+     backdrop there, and dark mode own --surface, a dark navy, would not
+     read as a meaningfully different choice anyway. */
+  --node-fill: #f1e1cc;
+
   --radius: 10px;
   --shadow: 0 1px 2px rgba(24, 27, 36, 0.06), 0 6px 20px -8px rgba(24, 27, 36, 0.15);
 }
