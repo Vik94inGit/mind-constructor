@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
+import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, NodeDoc } from "../types";
 
 // Smaller than the original per-node dots (which were 2.2px and colored one
@@ -32,7 +33,7 @@ interface MiniMapGroup {
   cx: number;
   cy: number;
   r: number;
-  sentiment: "positive" | "negative";
+  sentiment: Sentiment;
   // Same outline polygon the real canvas draws as this group's "zone" —
   // see MapPage's own nodeGroups. Drawn here too (scaled down) instead of
   // falling back to the plain cx/cy/r circle, so the minimap's shape
@@ -238,17 +239,9 @@ export function MiniMap({
             points={g.outline
               .map((p) => `${p.x * scaleX},${p.y * scaleY}`)
               .join(" ")}
-            fill={
-              g.sentiment === "positive"
-                ? ZONE_COLORS.positive
-                : ZONE_COLORS.negative
-            }
+            fill={ZONE_COLORS[g.sentiment]}
             fillOpacity={0.26}
-            stroke={
-              g.sentiment === "positive"
-                ? ZONE_COLORS.positive
-                : ZONE_COLORS.negative
-            }
+            stroke={ZONE_COLORS[g.sentiment]}
             strokeOpacity={0.6}
             strokeWidth={0.75}
           />
@@ -361,16 +354,17 @@ export function MiniMap({
             split every other marker on this minimap uses instead of
             standing out in gold. Reads `g.sentiment` straight off the same
             group data the zone polygons above already draw from — never
-            null (nodeGroups only ever keeps a group that has a majority),
-            unlike a bare node's own sentimentOf. Centered right on the
-            node's own position (replacing its dot, not sitting above it)
-            and drawn 1.5x the size a plain dot would be, so a circle's root
-            reads as visibly its own kind of marker rather than a dot with a
-            tiny afterthought stuck on top. */}
+            null (nodeGroups keeps every 2+-child node now, tied/all-
+            "unknown" groups included as "neutral" — see circleSentiment's
+            own doc comment), unlike a bare node's own sentimentOf. Centered
+            right on the node's own position (replacing its dot, not
+            sitting above it) and drawn 1.5x the size a plain dot would be,
+            so a circle's root reads as visibly its own kind of marker
+            rather than a dot with a tiny afterthought stuck on top. */}
         {groups.map((g) => {
           const p = positions.get(g.rootId);
           if (!p) return null;
-          const color = g.sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative;
+          const color = ZONE_COLORS[g.sentiment];
           const cx = p.x * scaleX;
           const cy = p.y * scaleY;
           return (

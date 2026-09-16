@@ -24,17 +24,30 @@ export const WEAPON_ARROW_COUNT: Record<WeaponIcon, number> = {
   spear: 3,
 };
 
-// The one positive/negative color pair every "zone" backdrop uses (a
-// circle's own halo/horns-colored polygon — MapPage's Zones SVG block and
-// MiniMap's own scaled-down copy — plus grouped branch-arrow lines and the
-// minimap's own per-node dots). Used to be duplicated as a bare hex literal
-// at each site with no shared constant; pulled out here so a future re-tune
-// only ever touches one place. Reads off index.css's own --zone-positive/
-// --zone-negative (a plain green/red pair, muted a step further under dark
-// mode there — see that file's own doc comment) rather than a hardcoded hex
-// pair, so this stays in sync with the rest of the theme instead of being
-// the one color pair on the map that never dims for dark mode.
-export const ZONE_COLORS = { positive: "var(--zone-positive)", negative: "var(--zone-negative)" } as const;
+// A circle/zone's own majority-vote outcome — shared by MapPage's nodeGroups
+// (the zone backdrop) and MiniMap's matching copy, so both always agree on
+// what a given group's color/state is instead of maintaining two separate
+// "positive"/"negative" unions that could drift apart.
+export type Sentiment = "positive" | "negative" | "neutral";
+
+// The color triple every "zone" backdrop uses (a circle's own halo/horns/
+// neutral-colored polygon — MapPage's Zones SVG block and MiniMap's own
+// scaled-down copy — plus grouped branch-arrow lines and the minimap's own
+// per-node dots). Used to be duplicated as a bare hex literal at each site
+// with no shared constant; pulled out here so a future re-tune only ever
+// touches one place. Reads off index.css's own --zone-positive/--zone-
+// negative/--zone-neutral (muted a step further under dark mode there — see
+// that file's own doc comment) rather than a hardcoded hex triple, so this
+// stays in sync with the rest of the theme instead of being the one color
+// set on the map that never dims for dark mode. neutral: a tied vote (or an
+// all-"unknown" group, nothing to vote with at all) still gets a zone now —
+// see canvasLayout.ts's own circleSentiment doc comment — just an
+// uncommitted gray one instead of leaning either side.
+export const ZONE_COLORS: Record<Sentiment, string> = {
+  positive: "var(--zone-positive)",
+  negative: "var(--zone-negative)",
+  neutral: "var(--zone-neutral)",
+};
 
 // A node type's own positive/negative lean — the same halo/horns split
 // OutcomeBadge.tsx's ringKindFor already classifies by (halo=positive,

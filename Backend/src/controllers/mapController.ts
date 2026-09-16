@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
   deleteMapDao,
   getNodesByMapDao,
+  getNodesTextDao,
   getMapByIdDao,
   getMapSummaryDao,
 } from "../dao/mapsDao.js";
@@ -218,6 +219,40 @@ export const getNodesByMap = async (req: Request, res: Response) => {
     return res.status(200).json(nodes);
   } catch (error) {
     console.error("getNodesByMap error:", error);
+    return res
+      .status(500)
+      .json({ success: false, error: "Internal Server Error" });
+  }
+};
+
+// Backfills the `text` getNodesByMap's own listing deliberately omits (see
+// getNodesByMapDao's doc comment) — POST, not GET, since the id list can be
+// arbitrarily long and doesn't belong in a query string. Body: { nodeIds }.
+export const getNodesText = async (req: Request, res: Response) => {
+  try {
+    const { mapId } = req.params;
+    const currentUserId = req.user?._id;
+    if (!currentUserId) {
+      return res
+        .status(401)
+        .json({ success: false, error: "Not authenticated" });
+    }
+    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
+    const { nodeIds } = req.body as { nodeIds?: unknown };
+    if (!Array.isArray(nodeIds) || nodeIds.length === 0 || !nodeIds.every((id) => typeof id === "string")) {
+      return res
+        .status(400)
+        .json({ success: false, error: "nodeIds must be a non-empty array of strings" });
+    }
+
+    const text = await getNodesTextDao(resolvedMapId, currentUserId, nodeIds);
+    if (text === null) {
+      return res.status(404).json({ success: false, error: "Map not found" });
+    }
+
+    return res.status(200).json({ success: true, text });
+  } catch (error) {
+    console.error("getNodesText error:", error);
     return res
       .status(500)
       .json({ success: false, error: "Internal Server Error" });

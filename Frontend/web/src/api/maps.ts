@@ -97,3 +97,17 @@ export async function selectCircle(mapId: string, rootId: string): Promise<Selec
 export async function deselectCircle(mapId: string): Promise<void> {
   await apiRequest<{ success: boolean }>(`/api/${mapId}/circles/deselect`, { method: "POST" });
 }
+
+// Backfills the `text` listNodes' own initial fetch deliberately omits (see
+// Backend's getNodesByMapDao) — called lazily, in bulk, only for whichever
+// nodes actually need their real text right now (a circle's own parent, a
+// chosen cluster's members, a node whose panel/inline-edit just opened, or
+// an export about to run). ids outside this map are just absent from the
+// result rather than erroring.
+export async function getNodesText(mapId: string, nodeIds: string[]): Promise<Record<string, string>> {
+  const res = await apiRequest<{ success: boolean; text: Record<string, string> }>(
+    `/api/${mapId}/nodes/text`,
+    { method: "POST", body: { nodeIds } },
+  );
+  return res.text;
+}

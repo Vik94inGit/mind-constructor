@@ -77,46 +77,51 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
   //
   // ringCenter itself stays dead simple — just the anchor, clamped into
   // bounds — because the actual "does it fit" question is answered below by
-  // rx/ry instead. An earlier version (a fixed halfSpan inset) pushed the
-  // whole ring away from the node whenever it didn't fully fit; a plain
-  // circular radius with a final per-point clamp did worse — clamping each
-  // point independently flattened the cramped axis into a near-straight
+  // R instead. An earlier version (a fixed halfSpan inset) pushed the whole
+  // ring away from the node whenever it didn't fully fit; a *naive* plain
+  // circular radius with only a final per-point clamp did worse — clamping
+  // each point independently flattened the cramped axis into a near-straight
   // line, several ghosts landing at the exact same clamped coordinate
-  // instead of a curve.
+  // instead of a curve. R below avoids that: it's pre-shrunk to whatever
+  // `bounds` actually has (down to a real floor — see MIN_RADIUS's own
+  // comment — rather than shrinking all the way to zero) *before* any
+  // point is placed, so the final per-point clamp only ever has to nudge
+  // the handful of points nearest a tight edge, not rescue the whole ring.
   const ringCenter = {
     x: Math.min(bounds.maxX, Math.max(bounds.minX, anchorPos.x)),
     y: Math.min(bounds.maxY, Math.max(bounds.minY, anchorPos.y)),
   };
-  // Elliptical, not circular: rx/ry each shrink independently to whatever
-  // room `bounds` actually has on their own axis (down to their own floor),
-  // rather than sharing one radius that has to fit the *tightest* of all
-  // four directions. A shorter/narrower ring that's still a smooth curve on
-  // a cramped mobile screen reads as a real (if squashed) circle — one
-  // whose tight axis got clamped point-by-point instead just reads as flat.
+  // One shared radius — a genuine circle, not an ellipse. A previous
+  // version here let rx/ry shrink independently on their own axis (use
+  // whatever room each direction actually has), reasoning that a shorter,
+  // still-round-looking curve beats a full circle clamped flat on its tight
+  // axis. In practice it read badly the one time it actually mattered: the
+  // bottom sheet reserves a big chunk of screen height (see
+  // panelReserveFrac — 1/2 on mobile, was 2/3), so vertical room is
+  // routinely much tighter than horizontal. rx stayed close to its own
+  // floor while ry got
+  // squeezed far below it, stretching the "ring" into a flat, wide oval
+  // that read as a row of ghosts, not a circle. A single radius, capped by
+  // whichever of the four directions has the least room, can't do that —
+  // it comes out smaller on a cramped screen, but it's always round.
   //
-  // The two floors aren't the same number on purpose. MIN_RX can't drop
-  // below what NodeWings needs (see RADIUS's own doc comment — ~62px wing
-  // half-width + a ghost's own ~20px half-width): the two side ghosts sit
-  // at y = ringCenter.y exactly regardless of ry, so *only* rx protects
-  // them from the wingtips, and horizontal room is rarely this tight in
-  // practice anyway (a phone is narrow, not this narrow). MIN_RY only ever
-  // has to clear the node's much shorter crown (NodeCrown's halo/horns,
-  // ~16px tall) plus a ghost's own radius on the way up, and the node's own
-  // icon/badges on the way down — both comfortably smaller than the wings.
-  //
-  // Both floors are still hard-capped at the *raw* distance to their own
-  // edge of `bounds` (availX/availY below, no EDGE_MARGIN subtracted) — not
-  // just floored, capped. A floor alone can't just be "big enough to look
-  // round": pin it at a fixed value and the one time real available room
-  // comes in under that (a genuinely short mobile strip), rx/ry themselves
-  // end up *past* `bounds`, right back to the final per-point clamp
-  // flattening several points onto the same edge value — the exact bug
-  // this rewrite exists to avoid. Capping at the raw distance first means
-  // the floor can stay ambitious (round whenever there's room) while this
-  // axis's own Math.min below always still lands inside `bounds` on its
-  // own, no clamp ever needed.
-  const MIN_RX = 83;
-  const MIN_RY = 60;
+  // MIN_RADIUS matches the old MIN_RX, not MIN_RY: with one shared radius,
+  // the same number places the left/right ghosts too (at y = ringCenter.y
+  // exactly), so it still has to clear NodeWings' ~62px half-width + a
+  // ghost's own ~20px half-width (see RADIUS's own doc comment) — the more
+  // restrictive of the two old floors, now the only one. And it's a *real*
+  // floor, not just floored-then-capped-at-the-raw-distance advice the way
+  // the old rx/ry were: R never drops below it, even when the raw room
+  // available is smaller still. That raw-distance cap sounded safe (never
+  // exceed `bounds`) but had its own failure mode, worse than the
+  // flattened-row bug it replaced — on a short screen with a tall panel
+  // open, the tightest available direction could come in at just a few px,
+  // pulling R down toward zero and collapsing every ghost onto nearly the
+  // same point instead of a ring at all. A little deliberate overflow past
+  // `bounds` (handled by the final per-point clamp below, same as ever)
+  // reads far better than that: a few extreme points sit right at the edge
+  // instead of every point bunching together in the middle.
+  const MIN_RADIUS = 83;
   const availLeft = ringCenter.x - bounds.minX;
   const availRight = bounds.maxX - ringCenter.x;
   // + UP_SLACK: `bounds`' own pad (baked in by MapPage's viewportBounds/
@@ -129,25 +134,12 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
   // that the plain pad-limited availUp was cutting it a few px too close
   // on a short mobile screen: the ring's whole point is to surround the
   // node, not cover part of it). Only the *up* direction gets this — down/
-  // left/right have no comparable "own decoration" to clear, and staying
-  // capped there is what keeps the final per-point clamp from ever having
-  // to flatten multiple points at once (see MIN_RX/MIN_RY's own doc
-  // comment) — a single topmost point occasionally landing right at this
-  // still-padded edge in a genuinely tiny viewport is a much smaller
-  // artifact than that.
+  // left/right have no comparable "own decoration" to clear.
   const UP_SLACK = 12;
   const availUp = ringCenter.y - bounds.minY + UP_SLACK;
   const availDown = bounds.maxY - ringCenter.y;
-  const rx = Math.min(RADIUS, availLeft, availRight, Math.max(MIN_RX, Math.min(availLeft, availRight) - EDGE_MARGIN));
-  // Separate radii for the upper and lower half of the ring — not one
-  // shared ry sized off whichever of availUp/availDown is smaller. That
-  // was silently undoing UP_SLACK above whenever the *bottom* happened to
-  // be the tighter side (routine on mobile — the panel reserve eats space
-  // below the node too, often by a similar amount): ry would still clamp
-  // to the smaller of the two, so the topmost points never actually got
-  // the extra room UP_SLACK was meant to give them.
-  const ryUp = Math.min(RADIUS, availUp, Math.max(MIN_RY, availUp - EDGE_MARGIN));
-  const ryDown = Math.min(RADIUS, availDown, Math.max(MIN_RY, availDown - EDGE_MARGIN));
+  const tightest = Math.min(availLeft, availRight, availUp, availDown);
+  const R = Math.min(RADIUS, Math.max(MIN_RADIUS, tightest - EDGE_MARGIN));
   return (
     <>
       {NODE_TYPES.map((type, i) => {
@@ -156,24 +148,30 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
         // actual thing a half-circle was working around (ghosts overlapping
         // that text below it). With nothing there to overlap, there's no
         // reason left to give up the bottom half of the ring.
-        const angle = (i / NODE_TYPES.length) * Math.PI * 2 - Math.PI / 2;
-        // rx/ryUp/ryDown (not RADIUS) — see their own doc comment: already
-        // sized to fit `bounds`, so this is normally a no-op. Kept as a
-        // final safety net for the one case they can't fully cover
-        // themselves — bounds narrower than even MIN_RX/MIN_RY (a
-        // genuinely tiny viewport, not a real phone) — so a point still
-        // can't render off-screen.
+        //
+        // Negated i: NODE_TYPES' own order reads counter-clockwise from the
+        // top (was clockwise) — the first type still lands straight up
+        // (i=0 keeps angle at -90°), only the direction the rest of the
+        // list sweeps around the circle flips.
+        const angle = (-i / NODE_TYPES.length) * Math.PI * 2 - Math.PI / 2;
+        // R (not RADIUS) — sized to fit `bounds` whenever there's room for
+        // that, but R's own MIN_RADIUS floor wins even when there isn't
+        // (see its own comment) — so this clamp does real work on a tight
+        // screen, not just a theoretical no-op: it's what keeps the
+        // handful of points nearest the tight axis right at the edge of
+        // `bounds` instead of past it, while the rest of the ring still
+        // gets its full, undistorted radius.
         const sinA = Math.sin(angle);
         // bounds.minY - UP_SLACK, not bare bounds.minY: has to match
         // availUp's own +UP_SLACK above, or this would just clamp the
         // topmost points straight back down to bare bounds.minY and undo
         // that slack for exactly the points it was meant to help. Only
-        // applied above center (sinA < 0) — ryDown/the bottom half never
-        // reads UP_SLACK at all.
-        const x = Math.min(bounds.maxX, Math.max(bounds.minX, ringCenter.x + rx * Math.cos(angle)));
+        // applied above center (sinA < 0) — the bottom half never reads
+        // UP_SLACK at all.
+        const x = Math.min(bounds.maxX, Math.max(bounds.minX, ringCenter.x + R * Math.cos(angle)));
         const y = Math.min(
           bounds.maxY,
-          Math.max(bounds.minY - (sinA < 0 ? UP_SLACK : 0), ringCenter.y + (sinA < 0 ? ryUp : ryDown) * sinA),
+          Math.max(bounds.minY - (sinA < 0 ? UP_SLACK : 0), ringCenter.y + R * sinA),
         );
         return (
           <button
@@ -202,7 +200,12 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
                   NodeCrown's own doc comment. */}
               <NodeCrown type={type} />
               <div
-                className="flex h-full w-full animate-quick-add-pulse items-center justify-center rounded-full border-2 bg-surface shadow-card"
+                // bg-[var(--node-fill)], not bg-surface: same fill the real
+                // node this previews will actually render with (see index.css's
+                // own --node-fill comment and NodeCard's matching usage) —
+                // a ghost is a preview, so it should look like the thing it
+                // is standing in for, not a lighter/different stand-in.
+                className="flex h-full w-full animate-quick-add-pulse items-center justify-center rounded-full border-2 bg-[var(--node-fill)] shadow-card"
                 style={{ borderColor: NODE_TYPE_COLORS[type] }}
               >
                 {/* Same icon a node of this type will actually render with

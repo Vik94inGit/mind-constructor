@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 
-import { findNodeDao, deleteNodeDao } from "../dao/nodeDao.js";
+import { findNodeDao, deleteNodeDao, deleteManyNodesDao } from "../dao/nodeDao.js";
 import { findPublicMapIdDao } from "../dao/mapsDao.js";
 import { broadcastToMap } from "../realtime/io.js";
 import {
@@ -421,6 +421,51 @@ export const deleteNode = async (
     return res.status(200).json({ success: true, deletedId: nodeId, damagedProtectedNode });
   } catch (error) {
     console.error("deleteNode error:", error);
+    return res.status(500).json({ success: false, error: "Server error" });
+  }
+};
+
+// Bulk counterpart of deleteNode — the frontend's multi-select "Delete N
+// nodes" used to fire one DELETE per node in parallel; this collapses that
+// into a single request. Same ownership contract as the single-node route
+// (see deleteManyNodesDao): an id the caller doesn't own, or that's already
+// gone, is silently skipped rather than failing the whole batch.
+export const deleteManyNodes = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Unauthorized User missing" });
+    }
+
+    const { nodeIds } = req.body as { nodeIds?: unknown };
+    if (!Array.isArray(nodeIds) || nodeIds.length === 0 || !nodeIds.every((id) => typeof id === "string")) {
+      return res
+        .status(400)
+        .json({ success: false, error: "nodeIds must be a non-empty array of strings" });
+    }
+
+    const results = await deleteManyNodesDao(nodeIds, userId);
+
+    // Same per-node broadcast deleteNode's own controller does above, just
+    // for every node this batch actually deleted — grouped implicitly by
+    // whichever map each one belongs to, since nothing here assumes a
+    // multi-selection is all on the same map.
+    for (const { node, damagedProtectedNode } of results) {
+      const publicMapId = await findPublicMapIdDao(node.mapId);
+      if (!publicMapId) continue;
+      broadcastToMap(publicMapId, "node:deleted", { nodeId: node.nodeId });
+      if (damagedProtectedNode) broadcastToMap(publicMapId, "node:updated", damagedProtectedNode);
+    }
+
+    return res.status(200).json({
+      success: true,
+      deleted: results.map(({ node, damagedProtectedNode }) => ({
+        deletedId: node.nodeId,
+        damagedProtectedNode,
+      })),
+    });
+  } catch (error) {
+    console.error("deleteManyNodes error:", error);
     return res.status(500).json({ success: false, error: "Server error" });
   }
 };
