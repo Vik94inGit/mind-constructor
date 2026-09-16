@@ -6,6 +6,7 @@ import {
   getAllMaps,
   getMapSummary,
   getNodesByMap,
+  getNodesText,
   getMapById,
   updateMap,
   deleteMap,
@@ -31,6 +32,7 @@ router.post("/:mapId/invite", protect, inviteUserToMap);
 router.patch("/:mapId/color", protect, setMyMapColor);
 router.get("/:mapId/summary", protect, getMapSummary);
 router.get("/:mapId/nodes", protect, getNodesByMap);
+router.post("/:mapId/nodes/text", protect, getNodesText);
 router.get("/:mapId/edges", protect, getEdgesByMap);
 router.post("/:mapId/circles/select", protect, selectMapCircle);
 router.post("/:mapId/circles/deselect", protect, deselectMapCircle);

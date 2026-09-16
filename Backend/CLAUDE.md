@@ -60,7 +60,14 @@ Strict layering, one direction only: **routes → controllers → abl → dao �
   `src/middleware/auth.ts`. No logic here. Mounted in [server.ts](server.ts) as `/api/auth`,
   `/api/nodes`, `/api/edges`, and `/api` (map routes — note the mount point itself has no `/maps`
   segment, so these resolve as `/api/{mapId}/{nodes,edges,circles/select,circles/deselect,
-attack-indicators,summary}`, not `/api/maps/{mapId}/...`).
+attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (body: `{ nodeIds }`)
+  is the bulk counterpart of `DELETE /api/nodes/:nodeId` — one request for a multi-select delete
+  instead of N parallel single-node ones; same per-node ownership check, silently skipping any id
+  the caller doesn't own rather than failing the whole batch. `GET /:mapId/nodes` no longer sends
+  each node's own `text` (see `getNodesByMapDao`'s `.select("-text")`) — a frontend now hides most
+  node captions by default, so most of a map's text used to ride along on every load for nothing;
+  `POST /:mapId/nodes/text` (body: `{ nodeIds }`, via `getNodesTextDao`) is the lazy backfill the
+  client calls, in bulk, only for whichever nodes actually need their real text right now.
 - **`src/controllers/*.ts`** — HTTP concerns only: pull `req.user`/`req.params`/`req.body`, call
   one ABL function, translate its return value and thrown error classes into a status code + JSON
   body, call `broadcastToMap` on success. Every handler is a `try/catch` that pattern-matches on

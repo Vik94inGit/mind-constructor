@@ -29,6 +29,7 @@ import { Modal } from "../components/Modal";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
+import type { Sentiment } from "../utils/nodeType";
 import {
   CANVAS_W,
   CANVAS_H,
@@ -53,6 +54,11 @@ import type { Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
 import { NODE_TYPES } from "../types";
 import type { AttackIndicator, EdgeDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
+
+// A Problem-type node's own child counts as "addressing" it (see
+// unsolvedProblemIds below) only if it's one of these — a plain Problem or
+// Fail child piled on top doesn't count as a proposal.
+const ADDRESSES_PROBLEM_TYPES = new Set<NodeType>(["Success", "Option", "Solution"]);
 
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
@@ -126,8 +132,25 @@ export function MapPage() {
   // stacked with the minimap/zoom-controls cluster (see the JSX below).
   // showAddMenu/showNodeTypesLegend are that menu's own open/closed state.
   const [showAddMenu, setShowAddMenu] = useState(false);
+  // Collapses Back/+/Move down to a single "⋮" button (Discussion/Personal
+  // mode stays separately visible either way — see its own comment further
+  // down) while the quick-add ghost ring is up (see quickAddActive below) —
+  // that cluster floats at z-[45], above the ghosts' own z-[33], so a ghost
+  // that happens to land near the top-left corner could render right
+  // underneath it; shrinking most of the cluster to one small button all
+  // but eliminates that, and frees up the corner for a bigger ring besides.
+  // Manually reset to true (re-showing the full toolbar without waiting for
+  // quick-add to end) and reset back to false the next time quick-add
+  // activates fresh — see the effect below.
+  const [forceShowToolbar, setForceShowToolbar] = useState(false);
   const [showNodeTypesLegend, setShowNodeTypesLegend] = useState(false);
   const [showExportText, setShowExportText] = useState(false);
+  // Set to a circle-parent's own rootId while its cluster-scoped "Extract
+  // text" modal (extractClusterText/collectClusterSubtree) is open — null
+  // otherwise. A separate flag from showExportText since the two scopes
+  // (whole map vs. one cluster) never overlap and need different node
+  // lists/titles passed into the same ExportTextModal.
+  const [extractClusterRootId, setExtractClusterRootId] = useState<string | null>(null);
   // The multi-select pill's own "Actions" dropdown (see SelectionMenu) —
   // Copy/Group into circle/Delete for the current multiSelectIds.
   const [showSelectionMenu, setShowSelectionMenu] = useState(false);
@@ -413,7 +436,15 @@ export function MapPage() {
         edgesApi.listEdges(mapId),
       ]);
       setMap(mapDoc);
-      setNodes(nodeList);
+      // Backend's listNodes deliberately omits each node's own `text` (see
+      // getNodesByMapDao) — comes back `undefined` over the wire despite
+      // NodeDoc's own `text: string`. Normalized to "" right here, once, so
+      // every other read of node.text in this file can keep trusting that
+      // type instead of null-checking it everywhere; "" doubles as the
+      // "text not loaded yet" sentinel ensureNodeText below checks for,
+      // which is safe precisely because a real node's text is never
+      // actually empty (backend validation requires non-blank text).
+      setNodes(nodeList.map((n) => ({ ...n, text: n.text ?? "" })));
       setEdges(edgeList);
       refreshInsights(mapId);
     } catch (err) {
@@ -423,6 +454,48 @@ export function MapPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapId]);
+
+  // Backfills real text for whichever node ids actually need it right now
+  // (see the loadAll comment above for why most nodes start out with ""
+  // instead of their real text) and returns every requested id's now-known
+  // text — a caller that just wants the UI to pick it up eventually (a
+  // caption, a panel) can fire this and ignore the return value, since the
+  // setNodes call below re-renders them anyway; a caller that has to build
+  // something from the text *synchronously right after awaiting* (copying,
+  // exporting) can't just re-read `nodes` afterward — this same function
+  // call's own closure over `nodes` is whatever it was at render time, not
+  // whatever setNodes below just applied — so it has to consume the
+  // returned map instead. fetchedTextIds remembers every id this has
+  // already resolved at least once, so a node that's genuinely empty text
+  // (shouldn't happen — backend validation requires non-blank text, but
+  // this is the one thing standing between that assumption breaking and an
+  // infinite refetch loop) is never retried forever.
+  const fetchedTextIds = useRef<Set<string>>(new Set());
+  async function ensureNodeText(ids: string[]): Promise<Record<string, string>> {
+    const have: Record<string, string> = {};
+    const missing: string[] = [];
+    for (const id of new Set(ids)) {
+      const n = nodes.find((nn) => nn.nodeId === id);
+      if (n && (n.text !== "" || fetchedTextIds.current.has(id))) have[id] = n.text;
+      else missing.push(id);
+    }
+    if (missing.length === 0 || !mapId) return have;
+    try {
+      const fetched = await mapsApi.getNodesText(mapId, missing);
+      missing.forEach((id) => {
+        fetchedTextIds.current.add(id);
+        have[id] = fetched[id] ?? "";
+      });
+      setNodes((prev) => prev.map((n) => (n.nodeId in fetched ? { ...n, text: fetched[n.nodeId] } : n)));
+    } catch {
+      // Best-effort — leave these ids out of fetchedTextIds so whatever
+      // triggers ensureNodeText next (a re-render, a retry) gets another
+      // shot instead of a permanently blank caption/panel; `have` simply
+      // won't carry an entry for them, same as any other id it can't
+      // resolve.
+    }
+    return have;
+  }
 
   async function refreshInsights(id: string) {
     try {
@@ -568,6 +641,13 @@ export function MapPage() {
   // see its own doc comment.
   const quickAddActive =
     !!(selectedNode && isOwnNode(selectedNode) && !linkMode && !packMode && !dragState) && selectionSettled;
+
+  // See forceShowToolbar's own doc comment — every fresh quick-add starts
+  // collapsed again, regardless of whether a previous one was manually
+  // expanded.
+  useEffect(() => {
+    if (!quickAddActive) setForceShowToolbar(false);
+  }, [quickAddActive]);
   // Same "focus on the one thing" treatment as quickAddActive above, keyed
   // off a *chosen circle* instead of a selected node — every node outside
   // the chosen circle (a member of some other circle, or standalone) dims,
@@ -775,7 +855,7 @@ export function MapPage() {
     const spanX = bounds.maxX - bounds.minX;
     const spanY = bounds.maxY - bounds.minY;
     // See QuickAddGhosts' own matching doc comment — same fallback fix.
-    // panelReserveFrac's 2/3 mobile reserve leaves less vertical room than
+    // panelReserveFrac's 1/2 mobile reserve leaves less vertical room than
     // halfSpan*2 for essentially every mobile selection, so this fallback
     // isn't a rare "tiny window" case — falling back to bounds' own plain
     // midpoint instead of anchoring on `center` used to strand the ring
@@ -886,8 +966,8 @@ export function MapPage() {
     if (!wrap) return FULL_CANVAS_BOUNDS;
     const pad = 70;
     // NodePanel/LinkPickerPanel's bottom sheet (see panelReserveFrac's own
-    // doc comment) physically covers the bottom third (two thirds on
-    // mobile) of the screen while it's open — shrink the placeable
+    // doc comment) physically covers the bottom third (half on mobile) of
+    // the screen while it's open — shrink the placeable
     // rectangle by the same amount so a freshly-created node (or a
     // quick-add ghost, which reads this via MapPage's own bounds prop)
     // never lands underneath it. Skipped for the group-selection footer
@@ -1070,6 +1150,24 @@ export function MapPage() {
     settleTimeoutRef.current = setTimeout(finish, 3000);
   }
 
+  // Pans to a fixed canvas point rather than any one node's own position —
+  // used below to center a circle/cluster the moment it becomes the chosen
+  // one, which has no single "the node" the way an ordinary selection does.
+  // Same target-rectangle math centerOnNode uses, just without any of its
+  // settle-detection/quick-add-ghost machinery: nothing here needs to know
+  // the instant this pan actually lands, since a chosen cluster has no
+  // ghosts fanning off it the way a selected node does.
+  function centerOnPoint(x: number, y: number) {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const visibleH = Math.max(150, wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport)));
+    const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
+    const maxTop = Math.max(0, (CANVAS_H + vScrollMargin * 2) * zoom - wrap.clientHeight);
+    const targetLeft = Math.min(maxLeft, Math.max(0, (x + hScrollMargin) * zoom - wrap.clientWidth / 2));
+    const targetTop = Math.min(maxTop, Math.max(0, (y + vScrollMargin) * zoom - visibleH / 2));
+    wrap.scrollTo({ left: targetLeft, top: targetTop, behavior: "smooth" });
+  }
+
   // Replays a weapon's arrow flight (see WeaponMark) — alongside
   // centerOnNode's camera pan, so clicking either end of an attack reads as
   // "watch it land on that" rather than just an instant jump. The nonce
@@ -1107,12 +1205,14 @@ export function MapPage() {
   // Any node with 2+ direct parentId-children reads as a group ("circle") —
   // general on purpose, same as linkCycles below: this fires whether the
   // star came from dragging one node onto another or just from branching
-  // off the same node several times over. Majority of the group's own node
-  // *types* decides halo vs horns; a tie, or a group made entirely of
-  // "unknown" nodes (the only type with no ring, so no vote — see
-  // sentimentOf), draws nothing — there's no majority to color it by.
-  // Built from visibleNodes, not nodes — a packed-away member shouldn't
-  // still read as a circle child on the canvas it no longer appears on.
+  // off the same node several times over. Every such node gets a zone now,
+  // unconditionally — majority of the group's own node *types* decides
+  // halo vs horns; a tie, or a group made entirely of "unknown" nodes (the
+  // only type with no ring, so no vote — see sentimentOf), gets a neutral
+  // gray zone instead of no zone at all (see circleSentiment's own doc
+  // comment). Built from visibleNodes, not nodes — a packed-away member
+  // shouldn't still read as a circle child on the canvas it no longer
+  // appears on.
   const nodeGroups = useMemo(() => {
     const childrenByParent = new Map<string, NodeDoc[]>();
     for (const n of visibleNodes) {
@@ -1124,7 +1224,7 @@ export function MapPage() {
     const groups: {
       rootId: string;
       members: NodeDoc[];
-      sentiment: "positive" | "negative";
+      sentiment: Sentiment;
       cx: number;
       cy: number;
       r: number;
@@ -1146,7 +1246,6 @@ export function MapPage() {
       if (!root) continue;
       const members = [root, ...children];
       const sentiment = circleSentiment(members);
-      if (!sentiment) continue;
       const pts = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
       const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
@@ -1159,12 +1258,58 @@ export function MapPage() {
     return groups;
   }, [visibleNodes, positions]);
 
+  // Circle-parent nodes always show their caption (see NodeCard's
+  // showCaption) — this backfills their real text the moment a node becomes
+  // one, rather than waiting on some other trigger (opening its panel, an
+  // export) that might never come for a node nobody's actually clicked yet.
+  useEffect(() => {
+    const rootIds = nodeGroups.map((g) => g.rootId);
+    if (rootIds.length > 0) ensureNodeText(rootIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodeGroups]);
+
+  // Every member of the currently-chosen cluster shows its caption too (see
+  // NodeCard's inChosenCircle) — backfill all of them the instant a circle
+  // becomes the chosen one, same trigger the centering effect below reacts
+  // to.
+  useEffect(() => {
+    if (spotlightedNodeIds && spotlightedNodeIds.length > 0) ensureNodeText(spotlightedNodeIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spotlightedNodeIds]);
+
+  // Centers the viewport on a circle/cluster the instant it becomes the
+  // chosen one (handleCircleBackdropClick) — same "whatever you just picked
+  // is always brought to the middle of the screen" rule centerOnNode already
+  // applies to a single node, just aimed at the cluster's own centroid
+  // (nodeGroups' cx/cy) instead of one node's position. Keyed only off the
+  // rootId, not the whole selectedCircle object — a fresh object arrives on
+  // every socket echo/API response even when it still names the same
+  // circle, and re-panning on each of those would fight anyone who'd since
+  // scrolled elsewhere without actually releasing it.
+  useEffect(() => {
+    const rootId = map?.selectedCircle?.rootId;
+    if (!rootId) return;
+    const group = nodeGroups.find((g) => g.rootId === rootId);
+    if (!group) return;
+    centerOnPoint(group.cx, group.cy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map?.selectedCircle?.rootId]);
+
+  // NodePanel needs a selected node's real text regardless of how it got
+  // selected (a plain click, the panel's own "Points at" link, a weapon
+  // replay, …) — one backfill trigger here covers all of those instead of
+  // repeating this at every call site that can set selectedId.
+  useEffect(() => {
+    if (selectedId) ensureNodeText([selectedId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   // Every circle member's sentiment, keyed by node id — what NodeCard reads
   // to decide its dashed outline and whether it's eligible to chaotic-drift
   // at all (see NodeCard's `chaotic`). A node in no circle isn't in this
   // map and never drifts, regardless of node.locked.
   const groupSentimentByNode = useMemo(() => {
-    const map = new Map<string, "positive" | "negative">();
+    const map = new Map<string, Sentiment>();
     for (const g of nodeGroups) {
       for (const m of g.members) map.set(m.nodeId, g.sentiment);
     }
@@ -1177,7 +1322,7 @@ export function MapPage() {
   // which covers every member). Colored by the same majority-vote sentiment
   // as the circle's own zone backdrop, per nodeGroups.
   const circleRootSentimentByNode = useMemo(() => {
-    const map = new Map<string, "positive" | "negative">();
+    const map = new Map<string, Sentiment>();
     for (const g of nodeGroups) map.set(g.rootId, g.sentiment);
     return map;
   }, [nodeGroups]);
@@ -1253,6 +1398,28 @@ export function MapPage() {
     return map;
   }, [indicators]);
 
+  // A Problem node with no Success/Option/Solution child yet — nothing's
+  // actually been proposed against it — pulses (see NodeCard's own
+  // `unsolved` prop / index.css's unsolved-problem-pulse). "Addresses it"
+  // is deliberately narrow (see ADDRESSES_PROBLEM_TYPES above): a Problem
+  // with only more Problem/Fail children branched off it still counts as
+  // unsolved, same as one with none at all — piling on more problems isn't
+  // a proposal. Built from `nodes`, not visibleNodes: a packed-away child
+  // still counts as "this got addressed", it just doesn't render on the
+  // canvas any more.
+  const unsolvedProblemIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const n of nodes) {
+      if (n.type !== "Problem" || n.isWeapon) continue;
+      const hasAddressingChild = nodes.some(
+        (child) => nodeRefId(child.parentId) === n.nodeId && ADDRESSES_PROBLEM_TYPES.has(child.type),
+      );
+      if (!hasAddressingChild) ids.add(n.nodeId);
+    }
+    return ids;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes]);
+
   // ----- dragging -----
 
   // What dragging `dragged` to (x,y) would land it on, if anything — the
@@ -1302,14 +1469,21 @@ export function MapPage() {
     // drop-target check here at all (see the plan's own scope note) — a
     // group drop is always a plain bulk reposition; each member persists
     // with its own PATCH /api/nodes/:nodeId (no bulk endpoint exists), all
-    // in parallel.
-    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)) {
+    // in parallel. Skipped when the pointer-downed node itself is locked
+    // (Node.locked — its circle is the currently-chosen one, see
+    // handleCircleBackdropClick): a chosen cluster holds its position for
+    // good, so falls through to the ordinary long-press/tap paths below
+    // instead of starting a reposition.
+    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !node.locked) {
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       dragMoved.current = false;
+      // !n.locked too — a locked member caught up in a wider multi-selection
+      // still can't move even if the node the drag actually started from
+      // isn't itself locked.
       const memberIds = Array.from(multiSelectIds).filter((id) => {
         const n = nodes.find((nn) => nn.nodeId === id);
-        return !!n && isOwnNode(n) && !n.isWeapon;
+        return !!n && isOwnNode(n) && !n.isWeapon && !n.locked;
       });
       const startPositions = new Map(
         memberIds.map((id) => [id, posFor(nodes.find((n) => n.nodeId === id)!)]),
@@ -1371,8 +1545,13 @@ export function MapPage() {
     // Move toggle) instead of arming from the very first pointerdown on
     // any node, so a phone's own touch imprecision while just trying to
     // tap a node can no longer relocate — or even re-parent — it by
-    // accident.
-    if (!moveMode) {
+    // accident. node.locked takes the same path even with Move on — a
+    // chosen circle's own members hold their position for good (see the
+    // group-drag branch's own comment above), so Move toggled on never
+    // re-arms a reposition for one of them either; touch long-press-to-
+    // multiselect still works, since picking a locked node into some other
+    // selection doesn't move anything.
+    if (!moveMode || node.locked) {
       if (e.pointerType !== "touch") return;
       const touchStartX = e.clientX;
       const touchStartY = e.clientY;
@@ -1383,6 +1562,11 @@ export function MapPage() {
         window.removeEventListener("pointermove", onIdleMove);
         window.removeEventListener("pointerup", onIdleUp);
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        // Same contract onCanvasPointerDown's marquee onUp already follows —
+        // starting a multi-selection always clears any stale single
+        // selection, so it can't resurface (a NodePanel popping back open
+        // for a node nobody re-picked) once the group empties back out.
+        setSelectedId(null);
         setMultiSelectIds((prev) => {
           const next = new Set(prev);
           if (next.has(node.nodeId)) next.delete(node.nodeId);
@@ -1453,6 +1637,10 @@ export function MapPage() {
         setDragState(null);
         setDropTarget(null);
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        // See the other long-press timer's own comment above (the !moveMode
+        // branch) — same "starting a multi-selection clears any stale
+        // single selection" contract the marquee already follows.
+        setSelectedId(null);
         setMultiSelectIds((prev) => {
           const next = new Set(prev);
           if (next.has(node.nodeId)) next.delete(node.nodeId);
@@ -1626,11 +1814,19 @@ export function MapPage() {
   // deliberately not a node double-click any more (see zoom controls below,
   // which claim that gesture instead), so editing only ever starts from an
   // explicit, hard-to-fat-finger control.
-  function startInlineEdit(node: NodeDoc) {
+  async function startInlineEdit(node: NodeDoc) {
     setContextMenu(null);
     setPendingCreate(null);
     setSelectedId(node.nodeId);
-    if (canEditNode(node)) setInlineEditId(node.nodeId);
+    if (!canEditNode(node)) return;
+    // Awaited, not fire-and-forget: NodeCard seeds its draft from node.text
+    // the instant inlineEditing flips true, and again on every later change
+    // to node.text while still editing (so a slower typist can still get
+    // clobbered if this landed *during* editing instead of before it) — so
+    // the real text has to be in `nodes` before setInlineEditId turns
+    // editing on, not just requested around the same time as it.
+    await ensureNodeText([node.nodeId]);
+    setInlineEditId(node.nodeId);
   }
 
   function handleNodeClick(node: NodeDoc, shiftKey = false) {
@@ -2060,18 +2256,101 @@ export function MapPage() {
   // one, below) still nudges clear of whatever's already there regardless.
   const PASTE_OFFSET = 40;
 
-  function copySelection() {
+  async function copySelection() {
     if (!mapId) return;
     const ids = multiSelectIds.size > 0 ? Array.from(multiSelectIds) : selectedId ? [selectedId] : [];
     if (ids.length === 0) return;
-    const copied = ids
+    const candidates = ids
       .map((id) => nodes.find((n) => n.nodeId === id))
-      .filter((n): n is NodeDoc => !!n && !n.isWeapon)
-      .map((n) => {
-        const pos = positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-        return { text: n.text, type: n.type, x: pos.x, y: pos.y };
-      });
+      .filter((n): n is NodeDoc => !!n && !n.isWeapon);
+    if (candidates.length === 0) return;
+    // Awaited, not read straight off `n.text` — a marquee/long-press pick
+    // never necessarily opened any of these nodes first, so their real text
+    // may not have loaded yet (see ensureNodeText's own doc comment on why
+    // its *return value*, not a re-read of `nodes`, is what's safe to use
+    // right after awaiting it).
+    const textById = await ensureNodeText(candidates.map((n) => n.nodeId));
+    const copied = candidates.map((n) => {
+      const pos = positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+      return { text: textById[n.nodeId] ?? n.text, type: n.type, x: pos.x, y: pos.y };
+    });
     if (copied.length > 0) setNodeClipboard({ sourceMapId: mapId, nodes: copied });
+  }
+
+  // SelectionMenu's "Copy as text" — unlike copySelection above (which feeds
+  // Ctrl/Cmd+V's in-app duplicate-paste), this writes plain text straight to
+  // the OS clipboard for pasting into a doc/chat/wherever, same
+  // navigator.clipboard.writeText pattern ExportTextModal/NodePanel already
+  // use for their own Copy buttons. Ordered top-to-bottom/left-to-right (not
+  // selection order) so the text reads in the same spatial order as the
+  // canvas, same tie-break buildTreeExport uses.
+  async function copySelectionAsText() {
+    const ids = multiSelectIds.size > 0 ? Array.from(multiSelectIds) : selectedId ? [selectedId] : [];
+    if (ids.length === 0) return;
+    const picked = ids
+      .map((id) => nodes.find((n) => n.nodeId === id))
+      .filter((n): n is NodeDoc => !!n && !n.isWeapon && !n.isProtection)
+      .sort((a, b) => {
+        const pa = positions.get(a.nodeId) ?? { x: a.x ?? 0, y: a.y ?? 0 };
+        const pb = positions.get(b.nodeId) ?? { x: b.x ?? 0, y: b.y ?? 0 };
+        return pa.y - pb.y || pa.x - pb.x;
+      });
+    if (picked.length === 0) return;
+    // See copySelection's own comment above — same reason this reads the
+    // returned map instead of `n.text` directly.
+    const textById = await ensureNodeText(picked.map((n) => n.nodeId));
+    const text = picked.map((n) => `${n.type}: ${textById[n.nodeId] ?? n.text}`).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      setActionError("Copy failed — this browser blocked clipboard access.");
+    }
+  }
+
+  // The "+" AddMenu's whole-map "Export text" — the only place this now
+  // lives (NodePanel's own copy of this same button is gone; a parent node
+  // gets the cluster-scoped extractClusterText below instead). Backfills
+  // every visible, real node's text before opening the modal — buildTreeExport
+  // needs all of it at once, unlike the other export/copy actions above,
+  // which only ever need a chosen few nodes' worth.
+  async function openExportText() {
+    const ids = visibleNodes.filter((n) => !n.isWeapon && !n.isProtection).map((n) => n.nodeId);
+    if (ids.length > 0) await ensureNodeText(ids);
+    setShowExportText(true);
+  }
+
+  // NodePanel's own "Extract text" for a circle's parent node — scoped to
+  // just that node's own cluster (itself + its direct children) plus, for
+  // any child that's itself the root of a further cluster, that cluster too
+  // — recursively, so a whole chain of nested clusters headed by this
+  // node's own descendants comes along, but nothing outside this node's own
+  // branch does. Same buildTreeExport-shaped output as the whole-map export
+  // (see textExport.ts), just walked from one starting node instead of
+  // every root on the map.
+  function collectClusterSubtree(rootId: string): NodeDoc[] {
+    const collected = new Map<string, NodeDoc>();
+    const queue = [rootId];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      const group = nodeGroups.find((g) => g.rootId === id);
+      if (!group) continue;
+      for (const member of group.members) {
+        if (collected.has(member.nodeId)) continue;
+        collected.set(member.nodeId, member);
+        // A member that's itself a cluster's own root gets that cluster
+        // pulled in too — nodeGroups.find above will pick it up on a later
+        // pass through the queue.
+        queue.push(member.nodeId);
+      }
+    }
+    return Array.from(collected.values());
+  }
+
+  async function extractClusterText(rootId: string) {
+    const subtree = collectClusterSubtree(rootId);
+    if (subtree.length === 0) return;
+    await ensureNodeText(subtree.map((n) => n.nodeId));
+    setExtractClusterRootId(rootId);
   }
 
   async function pasteClipboard() {
@@ -2131,26 +2410,33 @@ export function MapPage() {
     }
   }
 
-  // SelectionMenu's "Delete N nodes" — one DELETE per selected node, in
-  // parallel, same shape as pasteClipboard's own Promise.all(createNode).
-  // Confirms once for the whole batch rather than once per node (the
-  // single-node handleDeleteNode's own confirm() would be absurd N times
-  // in a row here).
+  // SelectionMenu's "Delete N nodes" — one bulk DELETE /api/nodes request
+  // (Backend's deleteManyNodesDao) instead of N parallel single-node
+  // DELETEs. Confirms once for the whole batch rather than once per node
+  // (the single-node handleDeleteNode's own confirm() would be absurd N
+  // times in a row here). The backend silently skips any id the caller
+  // doesn't own instead of failing the whole batch, so `deleted` can be a
+  // strict subset of `ids` — local state is reconciled against `deleted`,
+  // not the original selection, so a partial delete doesn't drop nodes that
+  // were never actually removed.
   async function deleteSelection() {
     const ids = Array.from(multiSelectIds);
     if (ids.length === 0) return;
     if (!confirm(`Delete ${ids.length} node${ids.length === 1 ? "" : "s"}?`)) return;
     setActionError(null);
     try {
-      const results = await Promise.all(ids.map((id) => nodesApi.deleteNode(id)));
+      const { deleted } = await nodesApi.deleteManyNodes(ids);
+      const deletedIds = new Set(deleted.map((d) => d.deletedId));
       // Any protection node in the batch releases its own banked damage
       // onto whatever it was defending — see Backend's deleteNodeDao.
-      results.forEach((res) => {
-        if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
+      deleted.forEach(({ damagedProtectedNode }) => {
+        if (damagedProtectedNode) upsertNode(damagedProtectedNode);
       });
-      setNodes((prev) => prev.filter((n) => !ids.includes(n.nodeId)));
+      setNodes((prev) => prev.filter((n) => !deletedIds.has(n.nodeId)));
       setEdges((prev) =>
-        prev.filter((e) => !ids.includes(nodeRefId(e.fromNodeId) ?? "") && !ids.includes(nodeRefId(e.toNodeId) ?? "")),
+        prev.filter(
+          (e) => !deletedIds.has(nodeRefId(e.fromNodeId) ?? "") && !deletedIds.has(nodeRefId(e.toNodeId) ?? ""),
+        ),
       );
       setMultiSelectIds(new Set());
       if (mapId) refreshInsights(mapId);
@@ -2250,14 +2536,13 @@ export function MapPage() {
             viewportBounds(),
           );
           return nodesApi.createNode(mapId, {
-            // "Option" (not "unknown", like the root) — circleSentiment
-            // needs at least one non-"unknown" member to draw a backdrop
-            // at all (a majority-vote of ties/no-votes draws nothing —
-            // see nodeGroups' own doc comment), so an all-"unknown" trio
-            // would create a real parentId circle that never actually
-            // *looks* like one until someone manually retypes a member.
-            // Giving both children a real (positive) type up front means
-            // "Create circle" shows an actual circle immediately.
+            // "Option" (not "unknown", like the root) — an all-"unknown"
+            // trio would still draw a zone now (circleSentiment returns
+            // "neutral" for a tied/no-vote group instead of skipping it —
+            // see nodeGroups' own doc comment), but a flat gray backdrop is
+            // a duller first impression than an actual colored one. Giving
+            // both children a real (positive) type up front means "Create
+            // circle" shows a leaning, halo-colored circle immediately.
             text: "New node",
             type: "Option",
             x: placed.x,
@@ -2453,7 +2738,8 @@ export function MapPage() {
                 Zones: the outline polygon traced through every member of a group (root + its 2+
                 direct parentId-children — see nodeGroups) — a triangle at the 3-member minimum,
                 growing to a quad/pentagon/hexagon/… as the group grows, colored by the group's
-                own majority sentiment (positive-majority halo-gold, negative-majority horns-red).
+                own majority sentiment (positive-majority halo-gold, negative-majority horns-red,
+                a tied/all-"unknown" group neutral gray — see circleSentiment's own doc comment).
                 Deepest layer on the canvas, under even the link figures below — every member
                 stays a real, individually clickable node; this is purely a backdrop. Shape
                 actually reflects the tree's own spread now instead of one fixed bounding circle
@@ -2463,7 +2749,7 @@ export function MapPage() {
                 snapshot. Same "click to stabilize" control the old plain-circle backdrop had.
               */}
               {nodeGroups.map((g) => {
-                const color = g.sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative;
+                const color = ZONE_COLORS[g.sentiment];
                 // Same "chosen one stays fuller-opacity, every other zone
                 // dims" spotlight the branch-arrow lines below (and the
                 // minimap's own zones) use — one shared signal for which
@@ -2559,7 +2845,8 @@ export function MapPage() {
                 the direction/depth of who-branched-off-whom stays visible inside its own zone. A
                 branch that's part of a "circle" (its parent has 2+ such children — see
                 nodeGroups) is colored by the group's own majority sentiment (positive-majority
-                halo-gold, negative-majority horns-red), same as the zone it's inside, and doubles
+                halo-gold, negative-majority horns-red, neutral gray on a tie), same as the zone
+                it's inside, and doubles
                 as that circle's stabilize/release control too — one more place to click it,
                 alongside the zone shape itself. A lone branch (its parent has just this one
                 child, no group at all — nothing for a zone to enclose) keeps the plain,
@@ -2573,7 +2860,7 @@ export function MapPage() {
                 const a = posFor(parentNode);
                 const b = posFor(node);
                 const group = nodeGroups.find((g) => g.rootId === parentId);
-                const color = group ? (group.sentiment === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative) : "var(--accent)";
+                const color = group ? ZONE_COLORS[group.sentiment] : "var(--accent)";
                 // Same "chosen one stays full-opacity, every other circle
                 // dims" spotlight the old backdrop drew — see its own
                 // removed comment for why. Ungrouped branches never dim for
@@ -2768,11 +3055,17 @@ export function MapPage() {
                   // regardless — see onNodePointerDown's own group-drag
                   // branch) — this just keeps NodeCard's own grab/grabbing
                   // cursor honest about which nodes will really respond.
-                  canDrag={isOwnNode(node) && (moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))}
+                  canDrag={
+                    isOwnNode(node) &&
+                    !node.locked &&
+                    (moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))
+                  }
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
                   parentCrownSentiment={circleRootSentimentByNode.get(node.nodeId)}
+                  inChosenCircle={!!spotlightedNodeIds?.includes(node.nodeId)}
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
+                  unsolved={unsolvedProblemIds.has(node.nodeId)}
                   linkModeActive={linkMode}
                   discussionMode={isDiscussionMode}
                   celebrate={celebrateIds.has(node.nodeId)}
@@ -2935,6 +3228,8 @@ export function MapPage() {
               (which stays put, bottom-right, on its own): above
               canvas/panel, below a real modal. */}
           <div className="absolute top-3 left-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
+            {!quickAddActive || forceShowToolbar ? (
+            <>
             <Link
               to="/"
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
@@ -2979,7 +3274,7 @@ export function MapPage() {
                   }}
                   onExportText={() => {
                     setShowAddMenu(false);
-                    setShowExportText(true);
+                    openExportText();
                   }}
                 />
               )}
@@ -3000,11 +3295,39 @@ export function MapPage() {
             >
               ✥
             </button>
+            {/* Global Navbar (which normally hosts these) is hidden on the
+                map route — see App.tsx's onMapPage check — so this is the
+                only place a map-page user can reach them. */}
+            <div className="ml-1 flex items-center gap-1 border-l border-line pl-1">
+              <LanguageSwitcher />
+              <ThemeToggle />
+            </div>
+            </>
+            ) : (
+              // Collapsed while a node's own quick-add ring is up — see
+              // forceShowToolbar's own doc comment. Expands the full
+              // cluster back (without waiting for quick-add to end) rather
+              // than opening some separate menu of its own — everything it
+              // would show is already right here, just one click further.
+              <button
+                type="button"
+                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
+                title={t.map.toolbar.expandToolbar}
+                onClick={() => setForceShowToolbar(true)}
+              >
+                ⋮
+              </button>
+            )}
             {/* Owner-only — updateMapDao's own ownerId filter would reject
                 this from anyone else anyway, so the button just doesn't
                 offer what the server would refuse. Discussion (the
                 default) shows every combat control below; Personal hides
-                them — see isDiscussionMode's own doc comment. */}
+                them — see isDiscussionMode's own doc comment. Exempted from
+                the collapse above (unlike Back/+/Move) — toggling combat
+                visibility is something you're just as likely to want while
+                a node's own quick-add ring is up as any other time, so
+                collapsing it away behind "⋮" too would bury a control
+                that's actually in more, not less, demand right then. */}
             {isOwner && (
               <button
                 type="button"
@@ -3028,13 +3351,6 @@ export function MapPage() {
                 {isDiscussionMode ? "⚔" : "✎"}
               </button>
             )}
-            {/* Global Navbar (which normally hosts these) is hidden on the
-                map route — see App.tsx's onMapPage check — so this is the
-                only place a map-page user can reach them. */}
-            <div className="ml-1 flex items-center gap-1 border-l border-line pl-1">
-              <LanguageSwitcher />
-              <ThemeToggle />
-            </div>
           </div>
 
           {/* Zoom controls — stacked directly above the minimap in the same
@@ -3150,6 +3466,10 @@ export function MapPage() {
                       setShowSelectionMenu(false);
                       copySelection();
                     }}
+                    onCopyText={() => {
+                      setShowSelectionMenu(false);
+                      copySelectionAsText();
+                    }}
                     onGroupCircle={() => {
                       setShowSelectionMenu(false);
                       groupSelectionIntoCircle();
@@ -3229,7 +3549,8 @@ export function MapPage() {
                 }}
                 onStartPack={() => startPackFrom(selectedNode.nodeId)}
                 onUnpacked={(unpacked) => upsertNode(unpacked)}
-                onExportText={() => setShowExportText(true)}
+                isClusterParent={circleRootSentimentByNode.has(selectedNode.nodeId)}
+                onExtractText={() => extractClusterText(selectedNode.nodeId)}
               />
             </>
           )
@@ -3383,6 +3704,27 @@ export function MapPage() {
           onClose={() => setShowExportText(false)}
         />
       )}
+
+      {extractClusterRootId &&
+        (() => {
+          const rootNode = nodes.find((n) => n.nodeId === extractClusterRootId);
+          if (!rootNode) return null;
+          // Reuses ExportTextModal/buildTreeExport as-is — handing it just
+          // this cluster's own subtree (see collectClusterSubtree) instead
+          // of every node on the map makes it build the exact same
+          // section-per-parent document, just scoped to this one branch.
+          // mapName doubles as the modal's own title label here — there's
+          // no separate "scope name" prop, and the root's own text reads
+          // fine in that slot ("Export text — "<root text> cluster"").
+          return (
+            <ExportTextModal
+              mapName={`${rootNode.text} cluster`}
+              nodes={collectClusterSubtree(extractClusterRootId)}
+              positions={positions}
+              onClose={() => setExtractClusterRootId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

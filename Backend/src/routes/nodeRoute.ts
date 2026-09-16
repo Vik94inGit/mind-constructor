@@ -5,6 +5,7 @@ import {
   createNode,
   updateNode,
   deleteNode,
+  deleteManyNodes,
   attackNode,
   getNodeAttackHistory,
   protectNode,
@@ -16,6 +17,12 @@ import { protect } from "#src/middleware/auth.js";
 const router = Router();
 router.post<{ mapId: string }>("/:mapId", protect, createNode);
 router.get<{ nodeId: string }>("/:nodeId", protect, getNodeById);
+
+// Bulk delete — a bare DELETE /api/nodes with a { nodeIds } body, distinct
+// from DELETE /:nodeId below (an empty path never matches a route that
+// requires a :nodeId segment, so registration order doesn't matter here,
+// unlike a bulk route that could collide with a param route).
+router.delete("/", protect, deleteManyNodes);
 
 router.patch<{ nodeId: string }>("/:nodeId", protect, updateNode);
 router.delete<{ nodeId: string }>("/:nodeId", protect, deleteNode);
