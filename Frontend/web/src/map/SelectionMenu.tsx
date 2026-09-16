@@ -5,22 +5,23 @@ interface Props {
   canGroupCircle: boolean;
   onDelete: () => void;
   onCopy: () => void;
+  onCopyText: () => void;
   onGroupCircle: () => void;
   onClose: () => void;
 }
 
 // The multi-select pill's own "Actions" dropdown (see MapPage's group-
-// selection bottom sheet) — Delete/Copy/Group into circle for the current
-// multiSelectIds. Positioned by its parent (a `relative` wrapper around the
-// trigger button), opening *upward* since the pill itself lives at the very
-// bottom of the screen — the trigger sits on the *left* side of the pill,
-// next to the selection count (not next to Deselect on the right), on
-// purpose: the pill's right side is exactly where the minimap/zoom-controls
-// cluster already floats, and this menu opening from there would run
-// straight under/behind them. Same dismiss-on-outside-click/Escape pattern
-// as every other menu in this app (NodeContextMenu, CanvasContextMenu,
-// AddMenu).
-export function SelectionMenu({ count, canGroupCircle, onDelete, onCopy, onGroupCircle, onClose }: Props) {
+// selection bottom sheet) — Delete/Copy/Copy as text/Group into circle for
+// the current multiSelectIds. Positioned by its parent (a `relative` wrapper
+// around the trigger button), opening *upward* since the pill itself lives
+// at the very bottom of the screen — the trigger sits on the *left* side of
+// the pill, next to the selection count (not next to Deselect on the
+// right), on purpose: the pill's right side is exactly where the minimap/
+// zoom-controls cluster already floats, and this menu opening from there
+// would run straight under/behind them. Same dismiss-on-outside-click/
+// Escape pattern as every other menu in this app (NodeContextMenu,
+// CanvasContextMenu, AddMenu).
+export function SelectionMenu({ count, canGroupCircle, onDelete, onCopy, onCopyText, onGroupCircle, onClose }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -50,6 +51,9 @@ export function SelectionMenu({ count, canGroupCircle, onDelete, onCopy, onGroup
     >
       <button className={item} onClick={onCopy}>
         Copy
+      </button>
+      <button className={item} onClick={onCopyText}>
+        Copy as text
       </button>
       <button
         className={item}

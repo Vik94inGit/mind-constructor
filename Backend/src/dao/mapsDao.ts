@@ -84,12 +84,50 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   // filter for anyone who wasn't looking at a still-live tab. Keep this in
   // sync with NODE_POPULATE by hand; the two aren't shared code since this
   // one is scoped to a whole map's nodes rather than one at a time.
+  // .select("-text"): a node's own `text` is the one field this list
+  // deliberately leaves out — a whole map's worth of full node text used to
+  // ride along on every initial load even though the frontend now shows
+  // almost none of it up front (captions are hidden by default, see
+  // NodeCard's showCaption). The client fetches the real text lazily, in
+  // bulk, only for the nodes that actually need it right now — a circle's
+  // own parent (always shown), a chosen cluster's members, or whatever
+  // NodePanel/inline-edit/an export just opened — via getNodesTextDao
+  // below. Populated refs (parentId/targetNodeId/…) keep their own small
+  // "nodeId text type" projection as-is: those are reference labels for a
+  // bounded few other nodes, not the whole map, so there's nothing to save
+  // by stripping them too.
   return await Node.find({ mapId: map._id })
+    .select("-text")
     .populate("userId", "username")
     .populate("parentId", "nodeId text type")
     .populate("targetNodeId", "nodeId text type")
     .populate("protectsNodeId", "nodeId text type")
     .populate("packedIntoNodeId", "nodeId text type");
+};
+
+// Bulk, on-demand fetch of just the `text` field for a set of nodes on one
+// map — what the frontend calls to backfill whatever getNodesByMapDao left
+// out (see its own doc comment above) once it actually needs those nodes'
+// real text. Same membership gate as getNodesByMapDao; ids outside this map
+// (or belonging to a map the caller isn't a member of) are silently absent
+// from the result rather than erroring — the caller only asked for text it
+// can see, and anything else just isn't there.
+export const getNodesTextDao = async (
+  publicMapId: string,
+  userId: string,
+  nodeIds: string[],
+): Promise<Record<string, string> | null> => {
+  const map = await Map.findOne({ mapId: publicMapId, members: userId });
+  if (!map) return null;
+
+  const rows = await Node.find(
+    { mapId: map._id, nodeId: { $in: nodeIds } },
+    "nodeId text",
+  ).lean<{ nodeId: string; text: string }[]>();
+
+  const byId: Record<string, string> = {};
+  for (const row of rows) byId[row.nodeId] = row.text;
+  return byId;
 };
 
 export const createMapDao = async (mapData: {

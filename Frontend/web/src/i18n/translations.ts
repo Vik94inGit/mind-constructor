@@ -96,6 +96,7 @@ export interface Translation {
       zoomOut: string;
       zoomReset: string;
       zoomIn: string;
+      expandToolbar: string;
     };
     addMenu: {
       invite: string;
@@ -214,6 +215,7 @@ const en: Translation = {
       zoomOut: "Zoom out",
       zoomReset: "Reset zoom",
       zoomIn: "Zoom in",
+      expandToolbar: "Show toolbar",
     },
     addMenu: {
       invite: "Invite user",
@@ -322,6 +324,7 @@ const cs: Translation = {
       zoomOut: "Oddálit",
       zoomReset: "Obnovit přiblížení",
       zoomIn: "Přiblížit",
+      expandToolbar: "Zobrazit panel nástrojů",
     },
     addMenu: {
       invite: "Pozvat uživatele",
@@ -430,6 +433,7 @@ const uk: Translation = {
       zoomOut: "Зменшити",
       zoomReset: "Скинути масштаб",
       zoomIn: "Збільшити",
+      expandToolbar: "Показати панель інструментів",
     },
     addMenu: {
       invite: "Запросити користувача",
@@ -538,6 +542,7 @@ const ru: Translation = {
       zoomOut: "Уменьшить",
       zoomReset: "Сбросить масштаб",
       zoomIn: "Увеличить",
+      expandToolbar: "Показать панель инструментов",
     },
     addMenu: {
       invite: "Пригласить пользователя",

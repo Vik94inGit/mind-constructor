@@ -244,10 +244,11 @@ export const updateNodeDao = async (
 // the health change live rather than only on next reload (unlike the other
 // cascades below, which stay silent — a health change is worth more than
 // those).
-export const deleteNodeDao = async (publicNodeId: string, userId: string) => {
-  const node = await Node.findOneAndDelete({ nodeId: publicNodeId, userId });
-  if (!node) return null;
-
+// Shared by deleteNodeDao/deleteManyNodesDao — runs the same protection-
+// release + cascade cleanup for one already-deleted node document. Kept
+// separate so a bulk delete doesn't re-fetch/re-derive any of this per node
+// differently from the single-node path.
+const cascadeAfterNodeDeleted = async (node: InstanceType<typeof Node>) => {
   let damagedProtectedNode = null;
   if (node.isProtection && node.protectsNodeId && node.blockedDamage > 0) {
     const protectedNode = await Node.findById(node.protectsNodeId);
@@ -279,7 +280,35 @@ export const deleteNodeDao = async (publicNodeId: string, userId: string) => {
     Node.updateMany({ packedIntoNodeId: node._id }, { $set: { packedIntoNodeId: null } }),
   ]);
 
+  return damagedProtectedNode;
+};
+
+export const deleteNodeDao = async (publicNodeId: string, userId: string) => {
+  const node = await Node.findOneAndDelete({ nodeId: publicNodeId, userId });
+  if (!node) return null;
+
+  const damagedProtectedNode = await cascadeAfterNodeDeleted(node);
   return { node, damagedProtectedNode };
+};
+
+// Bulk counterpart of deleteNodeDao, for the multi-select "Delete N nodes"
+// action — one query per id rather than a single $in delete, since each
+// node's own cascade (protection release, edge/parentId/weapon/pack
+// cleanup) has to run against *that* node's real document, not a batch.
+// Ownership is enforced the same way as the single-delete path (nodeId +
+// userId in the same findOneAndDelete filter): an id the caller doesn't own,
+// or that's already gone, is silently skipped rather than failing the whole
+// batch — the caller only asked to delete their own selection, and any ids
+// that don't match just weren't deleted, same as if they'd never been sent.
+export const deleteManyNodesDao = async (publicNodeIds: string[], userId: string) => {
+  const results: { node: InstanceType<typeof Node>; damagedProtectedNode: InstanceType<typeof Node> | null }[] = [];
+  for (const publicNodeId of publicNodeIds) {
+    const node = await Node.findOneAndDelete({ nodeId: publicNodeId, userId });
+    if (!node) continue;
+    const damagedProtectedNode = await cascadeAfterNodeDeleted(node);
+    results.push({ node, damagedProtectedNode });
+  }
+  return results;
 };
 
 // Locks exactly the given nodes and unlocks everything else on the map —

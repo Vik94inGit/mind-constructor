@@ -116,10 +116,11 @@ describe("mapsDao", () => {
   it("getNodesByMapDao - returns all nodes on the map for a member", async () => {
     const map = { _id: "m1", mapId: "pub123" };
     vi.mocked(Map.findOne).mockResolvedValue(map as never);
-    // Node.find(...).populate(...).populate(...).populate(...) — a real
-    // Mongoose Query stays chainable across populate() and is itself
-    // thenable, so the mock needs the same shape.
+    // Node.find(...).select(...).populate(...).populate(...).populate(...) —
+    // a real Mongoose Query stays chainable across select()/populate() and
+    // is itself thenable, so the mock needs the same shape.
     const chain: any = {};
+    chain.select = vi.fn().mockReturnValue(chain);
     chain.populate = vi.fn().mockReturnValue(chain);
     chain.then = (resolve: any) => resolve([{ text: "n1" }]);
     vi.mocked(Node.find).mockReturnValue(chain);
@@ -127,6 +128,7 @@ describe("mapsDao", () => {
     const result = await getNodesByMapDao("pub123", "user1");
 
     expect(Node.find).toHaveBeenCalledWith({ mapId: "m1" });
+    expect(chain.select).toHaveBeenCalledWith("-text");
     expect(chain.populate).toHaveBeenNthCalledWith(1, "userId", "username");
     expect(chain.populate).toHaveBeenNthCalledWith(2, "parentId", "nodeId text type");
     expect(chain.populate).toHaveBeenNthCalledWith(3, "targetNodeId", "nodeId text type");

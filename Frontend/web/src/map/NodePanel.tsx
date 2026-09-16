@@ -37,11 +37,16 @@ function isMobileViewport() {
 // almost nothing for the canvas above it: the just-selected node (and its
 // quick-add ghosts) routinely landed *behind* the sheet, and every other
 // node in that bottom stretch became physically untappable, since the
-// sheet is opaque and always paints above the canvas. Two thirds on mobile
+// sheet is opaque and always paints above the canvas. Half on mobile
 // instead (below Tailwind's `sm` = MapPage's own 640px isMobileViewport
 // cutoff) — a phone's shorter screen needs more of it for a sheet worth
-// reading, and centerOnNode still parks the chosen node in the third left
-// above it. These 1/3 and 2/3 figures are shared with MapPage — see its
+// reading, and centerOnNode still parks the chosen node in the half left
+// above it. Was 2/3 (leaving only a third clear) until that turned out too
+// tight for QuickAddGhosts' own ring: the node ended up sitting right
+// against this sheet's edge, so the ring's own bottom half got clamped
+// there and rendered invisibly underneath it (opaque, z-46, above the
+// ghosts' z-33) — see panelReserveFrac's own doc comment for the full
+// story. These 1/3 and 1/2 figures are shared with MapPage — see its
 // own panelReserveFrac() doc comment for why they have to match:
 // MapPage's centerOnNode reserves exactly this much room when parking the
 // chosen node above the sheet, and viewportBounds reserves it too when
@@ -67,7 +72,7 @@ function isMobileViewport() {
 // modal (Modal.tsx, z-50), which should stay on top of everything,
 // this panel included.
 const PANEL_CLASS =
-  "fixed inset-x-0 bottom-0 z-[46] max-h-[67dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+  "fixed inset-x-0 bottom-0 z-[46] max-h-[50dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
 // Every section below used to render stacked, all at once — text, health,
 // CRUD, links, the whole attack form, and history — which made this panel
@@ -118,8 +123,10 @@ interface Props {
   onStartPack: () => void;
   /** One packed member got unpacked back to a normal, visible node. */
   onUnpacked: (node: NodeDoc) => void;
-  /** Asks MapPage to open the whole-map text export modal (see textExport.ts/ExportTextModal) — a map-wide action, reachable from any node's own Modify tab rather than only the "+" toolbar menu. */
-  onExportText: () => void;
+  /** True when this node is a circle's own root/parent (2+ direct parentId-children — MapPage's circleRootSentimentByNode). Gates the "Extract text" button below: the whole-map export moved to the "+" toolbar menu only, so a plain non-parent node's panel no longer offers any text export at all. */
+  isClusterParent: boolean;
+  /** Asks MapPage to open a text export scoped to this node's own cluster — plus, recursively, any cluster rooted at one of its children (see MapPage's collectClusterSubtree). Only ever called when isClusterParent is true. */
+  onExtractText: () => void;
 }
 
 export function NodePanel({
@@ -139,7 +146,8 @@ export function NodePanel({
   onProtected,
   onStartPack,
   onUnpacked,
-  onExportText,
+  isClusterParent,
+  onExtractText,
 }: Props) {
   const { t } = useI18n();
   const isCreator = idOf(node.userId) === currentUserId;
@@ -494,7 +502,7 @@ export function NodePanel({
     <div className={PANEL_CLASS}>
       {/* Type/byline and the tabs now share one row instead of stacking as
           two — freeing up a whole row of this panel's own limited height
-          (capped at 34dvh/67dvh — see PANEL_CLASS) means the actual node
+          (capped at 34dvh/50dvh — see PANEL_CLASS) means the actual node
           text (the Info tab's content, or whichever tab is open) shows up
           a beat sooner, closer to "at a glance" instead of behind a header
           that was mostly just chrome. flex-wrap: on a narrow phone with
@@ -867,15 +875,17 @@ export function NodePanel({
             </div>
           )}
 
-          <div className="mt-4 border-t border-line pt-4">
-            <button
-              className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={onExportText}
-              title="Export every node's text on this whole map, not just this one — same as the toolbar's own Export text"
-            >
-              Export map text…
-            </button>
-          </div>
+          {isClusterParent && (
+            <div className="mt-4 border-t border-line pt-4">
+              <button
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={onExtractText}
+                title="Export this node's own cluster's text — plus any cluster rooted at one of its children, recursively. The whole map's own text export moved to the + toolbar menu."
+              >
+                Extract text…
+              </button>
+            </div>
+          )}
         </div>
       )}
 

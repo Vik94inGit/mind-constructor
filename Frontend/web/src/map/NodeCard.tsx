@@ -97,8 +97,10 @@ interface Props {
   dragging: boolean;
   canDrag: boolean;
   groupSentiment?: "positive" | "negative";
-  /** Set only for a circle's own root/parent node (MapPage's circleRootSentimentByNode) — draws the small crown badge below, colored by the circle's majority pos/neg vote. Undefined for every other node, root or not part of any circle. */
+  /** Set only for a circle's own root/parent node (MapPage's circleRootSentimentByNode) — draws the small crown badge below, colored by the circle's majority pos/neg vote. Undefined for every other node, root or not part of any circle. Also the one thing (besides `inChosenCircle`) that keeps this node's own caption showing by default — see `showCaption` below. */
   parentCrownSentiment?: "positive" | "negative";
+  /** This node belongs to the currently-chosen circle (MapPage's `map.selectedCircle`, via chosenCircleMemberIds) — shows its caption too, root or not, so a studied cluster reads with every member's text visible at once instead of just its parent's. */
+  inChosenCircle?: boolean;
   indicator?: AttackIndicator;
   linkModeActive: boolean;
   /** MapPage's isDiscussionMode (Map.discussionMode !== false) — Personal mode (explicit false) hides the health ring outright, selected or not. Omitted/undefined defaults to true (Discussion), never coerced with `!!`. See showHealth below. */
@@ -138,6 +140,7 @@ export function NodeCard({
   canDrag,
   groupSentiment,
   parentCrownSentiment,
+  inChosenCircle,
   indicator,
   linkModeActive,
   discussionMode,
@@ -228,6 +231,18 @@ export function NodeCard({
   const chaotic =
     !!groupSentiment && !node.locked && !dragging && !selected && !multiSelected && !inlineEditing;
   const readonly = !canDrag;
+  // Captions are hidden by default now — a whole map's worth of text
+  // labels competing for attention read as clutter, same reasoning
+  // healthVisibilityClass's own doc comment already gives for hiding every
+  // node's health ring until it's the one thing being looked at. A circle's
+  // own root/parent keeps its caption regardless (parentCrownSentiment is
+  // only ever set for one), so a map at rest still reads as a set of named
+  // clusters radiating from labeled parents, not a field of anonymous
+  // icons. Once a circle becomes the chosen one (inChosenCircle, keyed off
+  // map.selectedCircle), every one of its members shows its caption too —
+  // studying a cluster up close is exactly when every member's own text
+  // actually matters.
+  const showCaption = !!parentCrownSentiment || !!inChosenCircle;
   // Opacity/cursor each have one property multiple states could set — CSS
   // cascade resolves that per-property, not per-modifier, so it's resolved
   // the same way here: state precedence follows the order these used to be
@@ -583,7 +598,7 @@ export function NodeCard({
           {inlineEditing ? (
             <button
               type="button"
-              className={`flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-black p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${circleBorderClass}`}
+              className={`flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-[var(--node-fill)] p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${circleBorderClass}`}
               style={{ borderColor: circleBorderColor }}
               title="Click to change type"
               onPointerDown={(e) => e.stopPropagation()}
@@ -604,15 +619,18 @@ export function NodeCard({
             </button>
           ) : (
             <div
-              // bg-black, not bg-surface: a node's own inner circle reads
-              // as the "artwork" (type color border + icon/symbol) sitting
-              // on top of it, and a plain black backdrop gives every
-              // type's own (now-muted, see index.css) color the most
-              // consistent, highest-contrast stage to sit on regardless of
-              // which theme/surface color the rest of the app is currently
-              // using — unlike the panel/toolbar chrome, this was never
-              // meant to blend into the page background.
-              className={`flex h-full w-full items-center justify-center rounded-full bg-black ${circleBorderClass}`}
+              // bg-[var(--node-fill)], not bg-surface: a node's own inner
+              // circle reads as the "artwork" (type color border + icon/
+              // symbol) sitting on top of it, and this stays a fixed,
+              // deliberately-chosen backdrop (black in dark mode, a light
+              // brown/tan in light — see index.css's own --node-fill
+              // comment) rather than whatever --surface happens to be for
+              // the rest of the app's chrome at the moment — unlike the
+              // panel/toolbar chrome, this was never meant to blend into
+              // the page background. Same value QuickAddGhosts' own ghost
+              // fill uses, so a ghost previews a real node's actual look
+              // instead of a differently-colored stand-in.
+              className={`flex h-full w-full items-center justify-center rounded-full bg-[var(--node-fill)] ${circleBorderClass}`}
               style={{ borderColor: circleBorderColor }}
             >
               {isOutcome ? (
@@ -649,7 +667,7 @@ export function NodeCard({
           }}
           onBlur={resolveInlineEdit}
         />
-      ) : selected ? null : (
+      ) : selected || !showCaption ? null : (
         <div
           // bg-surface + rounded + a touch of horizontal padding: an edge
           // line, another node's chaotic drift, a zone polygon — anything

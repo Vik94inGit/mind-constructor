@@ -48,6 +48,15 @@ export function NodeCrown({
         height="16"
         viewBox="0 0 34 20"
         className="pointer-events-none absolute -top-[10.4px] left-1/2 z-[1] -translate-x-1/2"
+        // A soft drop-shadow, not just the gold stroke alone — var(--surface)
+        // is #ffffff in light mode, the same near-white as the map's own
+        // --paper background it sits on, so the fill alone used to all but
+        // disappear there, leaving just a thin gold ring with no visible
+        // disc behind it. The shadow gives the halo a real edge against any
+        // background regardless of theme (harmless, if redundant, in dark
+        // mode where --surface already contrasts against --paper on its
+        // own).
+        style={{ filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35))" }}
         aria-hidden="true"
       >
         <ellipse cx="17" cy="12" rx="15" ry="6.5" fill="var(--surface)" stroke={HALO_GOLD} strokeWidth="2.5" />

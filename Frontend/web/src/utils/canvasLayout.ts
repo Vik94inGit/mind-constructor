@@ -34,11 +34,23 @@ export const ZOOM_STEP = 0.35;
 // opaque and sits above every node in z-index, so a tap there never
 // reaches the canvas at all). 1/3 on desktop leaves two full thirds of the
 // screen clear for the canvas; mobile's own screen is short enough that a
-// sheet worth reading needs more of it, so it gets 2/3 instead, leaving
-// exactly the top third clear (still enough room for the chosen node and
-// its ghosts to land somewhere reachable above the sheet).
+// sheet worth reading needs more of it, so it gets 1/2 instead, leaving
+// the top half clear.
+//
+// Was 2/3 on mobile — cut back to 1/2 because the quick-add ghost ring
+// (QuickAddGhosts) needs real room on *both* sides of the node, not just
+// above it: with only the top third clear, the node ends up sitting right
+// against the sheet's own edge, so the bottom half of the ring gets
+// clamped to that edge (bounds.maxY) and renders right underneath the
+// sheet — invisible, since the sheet is opaque and sits above the ghosts
+// in z-index (z-46 vs z-33). The ring's own circle-fix (see its MIN_RADIUS
+// comment) keeps every point mathematically on a real circle, but a
+// circle half-hidden behind an opaque sheet still reads as "just the
+// visible top arc" — a row, not a ring. 1/2 doesn't eliminate the
+// clamp in every case, but it gives the ring meaningfully more room to
+// actually close underneath the node before hitting that edge.
 export function panelReserveFrac(isMobile: boolean) {
-  return isMobile ? 2 / 3 : 1 / 3;
+  return isMobile ? 1 / 2 : 1 / 3;
 }
 
 // Node copy/paste clipboard (see MapPage's own copySelection/pasteClipboard)

@@ -7,7 +7,7 @@
 :root {
   --ink: #181b24;
   --ink-soft: #565e72;
-  --paper: #f3f4f7;
+  --paper: #f8f9fb;
   --surface: #ffffff;
   --surface-2: #eaecf1;
   --line: #dce0e8;
@@ -21,7 +21,7 @@
 
   --n-problem: #c1502e;
   --n-poption: #b8862e;
-  --n-option: #3b5ba5;
+  --n-option: #5b7ea6;
   --n-solution: #1f7a6c;
   --n-success: #3f7d53;
   --n-fail: #b23a48;
@@ -34,6 +34,25 @@
      dark mode below can tone them down same as everything else here. */
   --zone-positive: #22c55e;
   --zone-negative: #ef4444;
+
+  /* NodeCard own inner icon circle color, shared with QuickAddGhosts own
+     ghost preview fill (see both callers own bg-[var(--node-fill)] usage)
+     so a real node and the ghost that previewed it always look the same,
+     not a light preview standing in for a solid black node. Light-brown
+     here, the same tan as --accent-soft above, not plain white — ties the
+     node fill into the app own existing brand palette instead of a
+     neutral white. Written as its own literal hex, not var(--accent-soft)
+     — Tailwind own CSS processing here silently drops a custom property
+     whose value is itself a var() reference (confirmed live: --node-fill
+     computed to an empty string, and the node fill rendered fully
+     transparent, when this was var(--accent-soft) instead), so this stays
+     a plain color that happens to match --accent-soft rather than a
+     reference to it; if --accent-soft above ever changes, update this by
+     hand too. Dark mode keeps the black this was always hardcoded to
+     before — every node-type and OutcomeBadge color was tuned for a dark
+     backdrop there, and dark mode own --surface, a dark navy, would not
+     read as a meaningfully different choice anyway. */
+  --node-fill: #f1e1cc;
 
   --radius: 10px;
   --shadow: 0 1px 2px rgba(24, 27, 36, 0.06), 0 6px 20px -8px rgba(24, 27, 36, 0.15);
@@ -80,6 +99,11 @@
 
     --zone-positive: #4b9f63;
     --zone-negative: #c1555a;
+
+    /* See :root own --node-fill comment above — unchanged from the plain
+       black this was hardcoded to before, just expressed as a variable
+       now so light mode above can differ. */
+    --node-fill: #000000;
 }
 
 @theme inline {

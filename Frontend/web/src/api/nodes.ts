@@ -32,6 +32,18 @@ export async function deleteNode(nodeId: string) {
   );
 }
 
+// Bulk counterpart of deleteNode, for the multi-select "Delete N nodes"
+// action — one request instead of N parallel DELETEs. Same per-node
+// ownership contract as the single-node route: an id the caller doesn't own
+// (or that's already gone) is silently skipped server-side rather than
+// failing the whole batch, so `deleted` may be shorter than `nodeIds`.
+export async function deleteManyNodes(nodeIds: string[]) {
+  return apiRequest<{
+    success: boolean;
+    deleted: { deletedId: string; damagedProtectedNode: NodeDoc | null }[];
+  }>(`/api/nodes`, { method: "DELETE", body: { nodeIds } });
+}
+
 // Attacking always creates a real content node alongside the damage — type
 // is restricted to AttackNodeType (Problem/Problematic option/Fail), text
 // is the attacker's actual objection, both required by the backend.
