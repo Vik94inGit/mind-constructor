@@ -361,19 +361,36 @@ export const MiniMap = memo(function MiniMap({
             sitting above it) and drawn 1.5x the size a plain dot would be,
             so a circle's root reads as visibly its own kind of marker
             rather than a dot with a tiny afterthought stuck on top. */}
+        {/* Positioned at the group's own cx/cy, not positions.get(rootId):
+            a circle's parent renders at the center of its zone (see
+            MapPage's posFor), so its stored x/y isn't where it actually
+            is on the real canvas. The ring is the same small circle the
+            real canvas draws around every circle parent (see MapPage's
+            "Circle-parent ring"), scaled down and sized to enclose the
+            crown rather than to scale — 34 canvas units would be ~2.5px
+            here, smaller than the crown itself. */}
         {groups.map((g) => {
-          const p = positions.get(g.rootId);
-          if (!p) return null;
           const color = ZONE_COLORS[g.sentiment];
-          const cx = p.x * scaleX;
-          const cy = p.y * scaleY;
+          const cx = g.cx * scaleX;
+          const cy = g.cy * scaleY;
           return (
-            <path
-              key={`crown-${g.rootId}`}
-              d="M-3.9,2.7 L-3.9,-1.2 L-1.95,0.75 L0,-2.7 L1.95,0.75 L3.9,-1.2 L3.9,2.7 Z"
-              transform={`translate(${cx}, ${cy})`}
-              fill={color}
-            />
+            <g key={`crown-${g.rootId}`}>
+              <circle
+                cx={cx}
+                cy={cy}
+                r={5.5}
+                fill={color}
+                fillOpacity={0.2}
+                stroke={color}
+                strokeOpacity={0.75}
+                strokeWidth={0.9}
+              />
+              <path
+                d="M-3.9,2.7 L-3.9,-1.2 L-1.95,0.75 L0,-2.7 L1.95,0.75 L3.9,-1.2 L3.9,2.7 Z"
+                transform={`translate(${cx}, ${cy}) scale(0.8)`}
+                fill={color}
+              />
+            </g>
           );
         })}
         {/* /zoom: viewport.* is wrap's own scroll/client size in screen

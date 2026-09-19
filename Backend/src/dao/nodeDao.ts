@@ -64,6 +64,7 @@ export const createNodeMutationDao = async (
   mapInternalId: MapInternalId,
   nodeData: {
     text: string;
+    title?: string;
     type: NodeType;
     x?: number;
     y?: number;
@@ -78,6 +79,7 @@ export const createNodeMutationDao = async (
     mapId: mapInternalId,
     userId: nodeData.userId,
     text: nodeData.text,
+    title: nodeData.title,
     type: nodeData.type,
     parentId: nodeData.parentId,
     x: nodeData.x,

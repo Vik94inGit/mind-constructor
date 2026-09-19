@@ -31,6 +31,9 @@ const hexColor = (fieldName: string) =>
 // here at all.
 interface TemplateNodeSpec {
   text: string;
+  // Optional short canvas label — see Node.title. Omitted means the
+  // frontend falls back to the start of `text`.
+  title?: string;
   type: NodeType;
   children?: TemplateNodeSpec[];
 }
@@ -77,6 +80,7 @@ const MAP_TEMPLATES = {
   demo: [
     {
       text: "Should we launch the new feature?",
+      title: "Launch the feature?",
       type: "Problem",
       children: [
         {
@@ -85,7 +89,11 @@ const MAP_TEMPLATES = {
           children: [{ text: "Faster user feedback", type: "Success" }],
         },
         {
-          text: "Wait for more testing",
+          // Longer text than fits on the canvas, with a title standing in
+          // for it — the other nodes here show the fallback (the text's own
+          // first words) instead, so the demo shows both.
+          text: "Wait for more testing before we release anything to users",
+          title: "Wait and test first",
           type: "Option",
           children: [{ text: "Risk of missing the window", type: "Fail" }],
         },
@@ -121,7 +129,7 @@ async function seedTemplateNodes(
 ) {
   for (const spec of specs) {
     const node = await createNodeAbl(
-      { text: spec.text, type: spec.type, parentId: parentPublicId },
+      { text: spec.text, title: spec.title, type: spec.type, parentId: parentPublicId },
       publicMapId,
       ownerId,
     );

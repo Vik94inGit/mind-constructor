@@ -48,6 +48,9 @@ import {
   pickNonOverlappingPosition,
   nodeObstacles,
   avoidOverlap,
+  findFreeShift,
+  siblingsClearOfCenter,
+  layoutUnpositioned,
   isDescendant,
   computeNodeGroups,
   computeLinkCycles,
@@ -316,12 +319,15 @@ export function MapPage() {
   // instead of surrounding it. This margin exists on all four sides so a
   // node near *any* edge — not just the bottom, which used to be the only
   // side this was ever added for — can still be scrolled into that safe
-  // zone. A full clientWidth/clientHeight's worth (divided back out of
+  // zone. Exactly half a clientWidth/clientHeight (divided back out of
   // screen pixels into canvas units, same *zoom reasoning every other
-  // screen<->canvas conversion here uses) is generous on purpose:
-  // centerOnNode only ever needs up to ~half of it, so this comfortably
-  // covers it with room to spare rather than being tuned to the exact
-  // minimum and risking falling short after some future tweak.
+  // screen<->canvas conversion here uses): that's the most centerOnNode
+  // ever needs to put an edge node dead center, so anything more is just
+  // empty blind zone to scroll through. It used to be a full viewport's
+  // worth, which left half a screen of nothing past every border; the
+  // margin itself is drawn dimmed and hatched (see the padded wrapper's own
+  // JSX) so it reads as "outside the map", with the real canvas framed as
+  // the active space.
   // Recomputed on resize (ResizeObserver, same pattern MiniMap's own
   // viewport tracking already uses) and whenever zoom changes, since both
   // change how many canvas units one screen pixel is worth.
@@ -331,8 +337,8 @@ export function MapPage() {
     const wrap = wrapRef.current;
     if (!wrap) return;
     function update() {
-      setHScrollMargin(Math.ceil(wrap!.clientWidth / zoom));
-      setVScrollMargin(Math.ceil(wrap!.clientHeight / zoom));
+      setHScrollMargin(Math.ceil(wrap!.clientWidth / zoom / 2));
+      setVScrollMargin(Math.ceil(wrap!.clientHeight / zoom / 2));
     }
     update();
     const resizeObserver = new ResizeObserver(update);
@@ -718,15 +724,13 @@ export function MapPage() {
       return avoidOverlap(desired, nodeObstacles(Array.from(map.values())));
     }
 
-    regular.forEach((n, i) => {
-      if (typeof n.x === "number" && typeof n.y === "number") {
-        map.set(n.nodeId, { x: n.x, y: n.y });
-      } else {
-        const angle = i * 137.508 * (Math.PI / 180);
-        const radius = 70 + i * 22;
-        map.set(n.nodeId, { x: CANVAS_W / 2 + radius * Math.cos(angle), y: CANVAS_H / 2 + radius * Math.sin(angle) });
-      }
-    });
+    for (const n of regular) {
+      if (typeof n.x === "number" && typeof n.y === "number") map.set(n.nodeId, { x: n.x, y: n.y });
+    }
+    // Nodes with no stored x/y (everything a template map seeds) get laid out
+    // from their parents outward — see layoutUnpositioned for why this isn't
+    // just a spiral over every node any more.
+    for (const [id, pos] of layoutUnpositioned(regular, map)) map.set(id, pos);
     weapons.forEach((n) => {
       if (typeof n.x === "number" && typeof n.y === "number") {
         map.set(n.nodeId, { x: n.x, y: n.y });
@@ -899,19 +903,54 @@ export function MapPage() {
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
     const radial = radialPositions?.get(node.nodeId);
     if (radial) return radial;
-    // A circle's own root/parent renders at its group's own centroid, not
-    // its own raw stored x/y — the other half of "this is what the circle
-    // radiates from" (see NodeCard's own isCircleParent size-bump/stable
-    // treatment): sitting dead center of the ring its children are placed
-    // around, not off to whichever side its own x/y happened to land.
+    // A circle's own root/parent renders at its group's own center — the
+    // centroid of its children (see canvasLayout.ts's computeNodeGroups),
+    // which is also the center of the zone drawn around them — not its own
+    // raw stored x/y. The other half of "this is what the circle radiates
+    // from" (see NodeCard's own isCircleParent size-bump/stable
+    // treatment): dead center of its own zone, always, so its stored x/y
+    // never matters for where it shows. Dragging it moves the whole circle
+    // instead (see onNodePointerDown's carriedChildren).
     // nodeGroups (defined further down this component, referenced here via
     // closure — same forward-reference pattern already used for
     // radialPositions above) recomputes cx/cy from real stored positions
     // any time a member's own x/y actually changes, so this only moves the
     // root when something in the group genuinely moved, not every render.
+    return restingPos(node);
+  }
+
+  // Where a node sits when nothing is dragging or being laid out around a
+  // selection — a circle's parent at its center, everything else at its
+  // stored/base position. posFor's own fallthrough, and what every overlap
+  // check below measures against.
+  function restingPos(node: NodeDoc) {
     const ownGroup = nodeGroups.find((g) => g.rootId === node.nodeId);
     if (ownGroup) return { x: ownGroup.cx, y: ownGroup.cy };
     return positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+  }
+
+  // The points a new or moved node has to stay clear of: every *visible*
+  // node's resting position, minus `exclude` (the thing being placed, plus
+  // anything moving along with it). Not `positions` directly — that has a
+  // circle's parent at its own stored x/y rather than where it's drawn (the
+  // center of its zone), and still counts nodes packed out of sight, so
+  // placements were both landing on top of drawn parents and being pushed
+  // away from invisible ones.
+  function obstaclePoints(exclude?: Set<string>) {
+    return visibleNodes.filter((n) => !exclude?.has(n.nodeId)).map(restingPos);
+  }
+
+  // The extra rule for placing a *child* of `parentId` (see
+  // siblingsClearOfCenter in canvasLayout.ts): a circle's parent is drawn at
+  // the centroid of its children, so where a new or moved child lands decides
+  // where the parent ends up — and it can't be allowed to end up on top of
+  // one. `movingId` is the child being moved (already one of the siblings, so
+  // it's left out and replaced by the candidate spot).
+  function siblingRule(parentId: string, movingId?: string) {
+    const siblings = visibleNodes
+      .filter((n) => nodeRefId(n.parentId) === parentId && n.nodeId !== movingId)
+      .map(restingPos);
+    return (p: { x: number; y: number }) => siblingsClearOfCenter(siblings, p);
   }
 
   // screenToCanvas: converts a screen point (e.g. clientX/clientY) into
@@ -1235,19 +1274,10 @@ export function MapPage() {
   // one, rather than waiting on some other trigger (opening its panel, an
   // export) that might never come for a node nobody's actually clicked yet.
   useEffect(() => {
-    const rootIds = nodeGroups.map((g) => g.rootId);
+    const rootIds = nodeGroups.filter((g) => !g.members[0]?.title).map((g) => g.rootId);
     if (rootIds.length > 0) ensureNodeText(rootIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeGroups]);
-
-  // A node with no parentId at all always shows its caption too (see
-  // NodeCard's showCaption) — same backfill-on-becoming-one reasoning as
-  // the circle-root effect just above, just keyed off a plainer condition.
-  useEffect(() => {
-    const rootIds = nodes.filter((n) => !n.parentId).map((n) => n.nodeId);
-    if (rootIds.length > 0) ensureNodeText(rootIds);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes]);
 
   // Every member of the currently-chosen cluster shows its caption too (see
   // NodeCard's inChosenCircle) — backfill all of them the instant a circle
@@ -1296,6 +1326,20 @@ export function MapPage() {
     }
     return map;
   }, [nodeGroups]);
+
+  // Every node outside any circle (a single node, or one whose parent has
+  // only the one child) always shows its caption too — see NodeCard's
+  // showCaption — so its real text gets backfilled the moment it's in that
+  // state, same reasoning as the circle-root effect further up. A node that
+  // *is* in a circle only needs its text once that circle is chosen, which
+  // spotlightedNodeIds' own effect already covers.
+  useEffect(() => {
+    // A node with a title captions itself with that (already in hand, unlike
+    // text) — nothing to fetch for it.
+    const ids = nodes.filter((n) => !groupSentimentByNode.has(n.nodeId) && !n.title).map((n) => n.nodeId);
+    if (ids.length > 0) ensureNodeText(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, groupSentimentByNode]);
 
   // Just the root/parent of each circle, keyed by its own id — what
   // NodeCard reads to draw its small crown badge (a "this is what the
@@ -1372,11 +1416,17 @@ export function MapPage() {
     dragged: NodeDoc,
     x: number,
     y: number,
+    // Nodes moving along with `dragged` (a circle's children, when its parent
+    // is the one being dragged) — never a drop target: they're right around
+    // the parent by construction, so without this almost every drop of a
+    // parent landed "on" one of its own children and was refused as
+    // dropping a node onto its own branch.
+    carriedIds?: ReadonlySet<string>,
   ): { target: NodeDoc; valid: boolean; reason?: string } | null {
     let closest: NodeDoc | null = null;
     let closestDist = CIRCLE_DROP_RADIUS;
     for (const n of nodes) {
-      if (n.nodeId === dragged.nodeId || n.isWeapon) continue;
+      if (n.nodeId === dragged.nodeId || n.isWeapon || carriedIds?.has(n.nodeId)) continue;
       const p = positions.get(n.nodeId);
       if (!p) continue;
       const d = Math.hypot(p.x - x, p.y - y);
@@ -1445,8 +1495,21 @@ export function MapPage() {
           return;
         }
         const p = screenToCanvas(ev.clientX, ev.clientY);
-        const dx = p.x - startPt.x;
-        const dy = p.y - startPt.y;
+        // One shift for the whole selection, chosen so none of it lands on
+        // another node (or inside a circle's backdrop it isn't already part
+        // of) — see findFreeShift. The per-node clamp below still applies
+        // as a last resort if the canvas is too crowded for any shift.
+        const memberSet = new Set(memberIds);
+        const memberGroups = new Set(
+          nodeGroups
+            .filter((g) => g.members.some((m) => memberSet.has(m.nodeId)))
+            .map((g) => g.rootId),
+        );
+        const { dx, dy } = findFreeShift(
+          [...startPositions.values()],
+          { dx: p.x - startPt.x, dy: p.y - startPt.y },
+          [...nodeObstacles(obstaclePoints(memberSet)), ...bigNodeObstacles(memberGroups)],
+        );
         const margin = 60;
         setActionError(null);
         try {
@@ -1533,6 +1596,20 @@ export function MapPage() {
     const start = posFor(node);
     setDragState({ nodeId: node.nodeId, x: start.x, y: start.y });
 
+    // A circle's root is pinned to the center of its own zone (see posFor),
+    // so dragging it can't mean "move just this node" — it'd snap straight
+    // back. It carries its own (owned, unlocked) children along by the same
+    // delta instead, live via groupDragState (posFor reads that first), and
+    // persists them all on drop. Children someone else owns can't be moved
+    // from here and simply stay put.
+    const ownRootGroup = nodeGroups.find((g) => g.rootId === node.nodeId);
+    const carriedChildren = ownRootGroup
+      ? ownRootGroup.members.filter((m) => m.nodeId !== node.nodeId && isOwnNode(m) && !m.locked)
+      : [];
+    const carriedStart = new Map(carriedChildren.map((m) => [m.nodeId, posFor(m)] as const));
+    const carriedIds: ReadonlySet<string> = new Set(carriedStart.keys());
+    if (carriedChildren.length > 0) setGroupDragState(new Map(carriedStart));
+
     // screenToCanvas divides by `zoom` — canvasRef is visually scaled via a
     // CSS transform now (see the zoom controls below), so its own
     // getBoundingClientRect() reports a *rendered* size (CANVAS_W*zoom
@@ -1569,6 +1646,7 @@ export function MapPage() {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         setDragState(null);
+        setGroupDragState(null);
         setDropTarget(null);
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
         // See the other long-press timer's own comment above (the !moveMode
@@ -1597,7 +1675,12 @@ export function MapPage() {
       const y = p.y - offsetY;
       dragMoved.current = true;
       setDragState({ nodeId: node.nodeId, x, y });
-      const found = findDropTarget(node, x, y);
+      if (carriedStart.size > 0) {
+        const dx = x - start.x;
+        const dy = y - start.y;
+        setGroupDragState(new Map([...carriedStart].map(([id, pos]) => [id, { x: pos.x + dx, y: pos.y + dy }])));
+      }
+      const found = findDropTarget(node, x, y, carriedIds);
       setDropTarget(found ? { nodeId: found.target.nodeId, valid: found.valid } : null);
     }
 
@@ -1615,8 +1698,9 @@ export function MapPage() {
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
-      const found = dragMoved.current ? findDropTarget(node, x, y) : null;
+      const found = dragMoved.current ? findDropTarget(node, x, y, carriedIds) : null;
       setDragState(null);
+      setGroupDragState(null);
       setDropTarget(null);
       if (dragMoved.current) {
         if (found && !found.valid) {
@@ -1635,10 +1719,13 @@ export function MapPage() {
           // exactly on top of it, same nudge-from-collision every other
           // placement uses.
           const target = found.target;
-          const others = Array.from(positions.entries())
-            .filter(([id]) => id !== node.nodeId)
-            .map(([, p]) => p);
-          const placed = avoidOverlap({ x, y }, nodeObstacles(others), viewportBounds());
+          const others = obstaclePoints(new Set([node.nodeId]));
+          const placed = avoidOverlap(
+            { x, y },
+            nodeObstacles(others),
+            viewportBounds(),
+            siblingRule(target.nodeId, node.nodeId),
+          );
           setActionError(null);
           try {
             const updated = await nodesApi.updateNode(node.nodeId, {
@@ -1657,19 +1744,42 @@ export function MapPage() {
         // Nudge clear of everything else — except the node's own group, if
         // it belongs to one, since that backdrop is drawn around it and
         // repositioning within it is expected.
-        const others = Array.from(positions.entries())
-          .filter(([id]) => id !== node.nodeId)
-          .map(([, p]) => p);
+        // carriedStart's ids are excluded too: a circle's root sits at the
+        // center of its own children, so they're all within minDist of it by
+        // construction — and they're moving along with it, not obstacles.
+        const others = obstaclePoints(new Set([node.nodeId, ...carriedStart.keys()]));
         const ownGroups = new Set(
           nodeGroups
             .filter((g) => g.rootId === node.nodeId || g.members.some((m) => m.nodeId === node.nodeId))
             .map((g) => g.rootId),
         );
-        const dropped = avoidOverlap(
-          { x, y },
-          [...nodeObstacles(others), ...bigNodeObstacles(ownGroups)],
-          viewportBounds(),
-        );
+        const dropObstacles = [...nodeObstacles(others), ...bigNodeObstacles(ownGroups)];
+        // A circle's root drags its children with it, so what has to clear
+        // the other nodes is the *whole set* moving together — one shift for
+        // all of them (findFreeShift), not a per-node nudge that would tear
+        // the circle apart. A lone node is just nudged clear on its own.
+        let dropped: { x: number; y: number };
+        let carriedShift = { dx: 0, dy: 0 };
+        if (carriedStart.size > 0) {
+          carriedShift = findFreeShift([start, ...carriedStart.values()], { dx: x - start.x, dy: y - start.y }, dropObstacles);
+          dropped = { x: start.x + carriedShift.dx, y: start.y + carriedShift.dy };
+        } else {
+          // A child being moved *within* its own circle has to keep the
+          // circle's parent (drawn at the children's centroid) clear of
+          // every child — see siblingRule. Dragged out past the circle's
+          // edge it's about to stop being a member (leftCircle, below), so
+          // there's nothing to keep clear of.
+          const ownParentId = nodeRefId(node.parentId);
+          const ownParentCircle = ownParentId ? nodeGroups.find((g) => g.rootId === ownParentId) : undefined;
+          const staysInCircle =
+            !!ownParentCircle && Math.hypot(x - ownParentCircle.cx, y - ownParentCircle.cy) <= ownParentCircle.r;
+          dropped = avoidOverlap(
+            { x, y },
+            dropObstacles,
+            viewportBounds(),
+            staysInCircle ? siblingRule(ownParentId!, node.nodeId) : undefined,
+          );
+        }
 
         // Dragged clear of its own circle's backdrop (not just repositioned
         // within it) — read as "pull this node out", clearing parentId so it
@@ -1682,6 +1792,29 @@ export function MapPage() {
         const parentId = nodeRefId(node.parentId);
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
         const leftCircle = !!ownCircle && Math.hypot(dropped.x - ownCircle.cx, dropped.y - ownCircle.cy) > ownCircle.r;
+
+        // A circle's root: its children move by the same shift the root
+        // itself just took (see carriedShift above).
+        if (carriedStart.size > 0) {
+          const moved = new Map(
+            [...carriedStart].map(([id, pos]) => [
+              id,
+              { x: pos.x + carriedShift.dx, y: pos.y + carriedShift.dy },
+            ]),
+          );
+          setNodes((prev) => prev.map((n) => (moved.has(n.nodeId) ? { ...n, ...moved.get(n.nodeId)! } : n)));
+          setActionError(null);
+          try {
+            await Promise.all(
+              [...moved].map(async ([id, pos]) => {
+                const updated = await nodesApi.updateNode(id, { x: pos.x, y: pos.y });
+                upsertNode(updated);
+              }),
+            );
+          } catch (err) {
+            setActionError(err instanceof ApiRequestError ? err.message : "Failed to move the circle");
+          }
+        }
 
         setNodes((prev) =>
           prev.map((n) =>
@@ -2143,8 +2276,9 @@ export function MapPage() {
     );
     const placed = avoidOverlap(
       pos,
-      [...nodeObstacles(Array.from(positions.values())), ...bigNodeObstacles(ownGroups)],
+      [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles(ownGroups)],
       viewportBounds(),
+      siblingRule(parent.nodeId),
     );
     setInlineEditId(null);
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId });
@@ -2305,7 +2439,7 @@ export function MapPage() {
     if (!sameMap) {
       const cx = clipboard.nodes.reduce((s, n) => s + n.x, 0) / clipboard.nodes.length;
       const cy = clipboard.nodes.reduce((s, n) => s + n.y, 0) / clipboard.nodes.length;
-      const anchor = pickNonOverlappingPosition(Array.from(positions.values()), bigNodeObstacles(), viewportBounds());
+      const anchor = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
       anchorDx = anchor.x - cx;
       anchorDy = anchor.y - cy;
     }
@@ -2317,7 +2451,7 @@ export function MapPage() {
             : { x: x + anchorDx, y: y + anchorDy };
           const placed = avoidOverlap(
             desired,
-            [...nodeObstacles(Array.from(positions.values())), ...bigNodeObstacles()],
+            [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()],
             viewportBounds(),
           );
           return nodesApi.createNode(mapId, { text, type, x: placed.x, y: placed.y, parentId: null });
@@ -2445,7 +2579,7 @@ export function MapPage() {
     if (!mapId) return;
     setActionError(null);
     try {
-      const rootPos = pickNonOverlappingPosition(Array.from(positions.values()), bigNodeObstacles(), viewportBounds());
+      const rootPos = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
       const root = await nodesApi.createNode(mapId, {
         text: "New circle",
         type: "unknown",
@@ -2466,7 +2600,7 @@ export function MapPage() {
           const desired = { x: rootPos.x + radius * Math.cos(angle), y: rootPos.y + radius * Math.sin(angle) };
           const placed = avoidOverlap(
             desired,
-            [...nodeObstacles([...Array.from(positions.values()), rootPos]), ...bigNodeObstacles()],
+            [...nodeObstacles([...obstaclePoints(), rootPos]), ...bigNodeObstacles()],
             viewportBounds(),
           );
           return nodesApi.createNode(mapId, {
@@ -2596,7 +2730,7 @@ export function MapPage() {
               reads as "go back." Setting it here too stops the chain at
               the canvas itself, before it ever reaches the document. */}
           <div
-            className="h-full w-full overflow-auto [overscroll-behavior-x:none] bg-[radial-gradient(circle,var(--line)_1px,transparent_1px)] [background-size:22px_22px]"
+            className="h-full w-full overflow-auto [overscroll-behavior-x:none]"
             ref={wrapRef}
           >
           {/* Padded outer sizing/transform wrapper — canvasRef (the real
@@ -2623,6 +2757,16 @@ export function MapPage() {
               height: CANVAS_H + vScrollMargin * 2,
               transform: `scale(${zoom})`,
               transformOrigin: "0 0",
+              // The blind zone: everything in this wrapper *outside* the
+              // real canvas inset within it — a darkened, hatched band on
+              // every side, so it reads as "past the edge of the map" and
+              // the framed canvas (see its own style below) reads as the
+              // one active space. The dot grid that used to sit on the
+              // scroll container itself now lives on the canvas instead,
+              // so it stops at the border rather than continuing under
+              // the blind zone.
+              background:
+                "repeating-linear-gradient(45deg, color-mix(in srgb, var(--ink) 9%, transparent) 0 1px, transparent 1px 9px), color-mix(in srgb, #000 14%, var(--paper))",
             }}
           >
           <div
@@ -2639,7 +2783,7 @@ export function MapPage() {
             // native selection drag can itself swallow/alter the pointer
             // event stream. NodeCard's own outer div already opts out the
             // same way for the same reason (see its own select-none).
-            className={`absolute select-none${linkMode || packMode ? " cursor-crosshair" : ""}`}
+            className={`absolute select-none bg-paper bg-[radial-gradient(circle,var(--line)_1px,transparent_1px)] [background-size:22px_22px]${linkMode || packMode ? " cursor-crosshair" : ""}`}
             // width/height stay the canvas's own native 2400x1600 — every
             // node/ghost/SVG position below is still expressed in that
             // native 0..2400 coordinate space, unaffected by this div now
@@ -2649,7 +2793,16 @@ export function MapPage() {
             // screenToCanvas/zoomAt/viewportBounds/centerOnNode above
             // already subtract back out when converting a scroll position
             // to a real canvas coordinate.
-            style={{ left: hScrollMargin, top: vScrollMargin, width: CANVAS_W, height: CANVAS_H }}
+            style={{
+              left: hScrollMargin,
+              top: vScrollMargin,
+              width: CANVAS_W,
+              height: CANVAS_H,
+              // The active space's border — drawn outside the box (outline,
+              // not border) so it never eats into the 2400x1600 coordinate
+              // space every node position is expressed in.
+              outline: "3px solid color-mix(in srgb, var(--ink) 55%, transparent)",
+            }}
             onClick={() => {
               // See onCanvasPointerDown's own onUp comment — the trailing
               // native click a completed marquee drag leaves behind on this
@@ -3228,7 +3381,7 @@ export function MapPage() {
                   onCreateNode={() => {
                     setShowAddMenu(false);
                     const pos = pickNonOverlappingPosition(
-                      Array.from(positions.values()),
+                      obstaclePoints(),
                       bigNodeObstacles(),
                       viewportBounds(),
                     );
@@ -3545,8 +3698,9 @@ export function MapPage() {
             );
             const pos = avoidOverlap(
               posFor(anchor),
-              [...nodeObstacles(Array.from(positions.values())), ...bigNodeObstacles(ownGroups)],
+              [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles(ownGroups)],
               viewportBounds(),
+              siblingRule(anchor.nodeId),
             );
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: anchor.nodeId });
@@ -3574,7 +3728,7 @@ export function MapPage() {
           onPick={(type) => {
             const pos = avoidOverlap(
               { x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY },
-              [...nodeObstacles(Array.from(positions.values())), ...bigNodeObstacles()],
+              [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()],
               viewportBounds(),
             );
             setCanvasContextMenu(null);

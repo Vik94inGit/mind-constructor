@@ -22,8 +22,13 @@ export class CrossMapParentError extends Error {}
 export class ParentNotOwnedError extends Error {}
 export class SelfParentError extends Error {}
 
+// Shared by create/update: same cap as Node.title's own maxlength. Empty is
+// valid (it's how "no title" is stored, and how an update clears one).
+const titleSchema = z.string().trim().max(80, "title must be at most 80 characters");
+
 const createNodeSchema = z.object({
   text: z.string().min(1, "text is required"),
+  title: titleSchema.optional(),
   type: z.enum(NODE_TYPES, {
     error: () => `type is required and must be one of: ${NODE_TYPES.join(", ")}`,
   }),
@@ -82,6 +87,8 @@ export const createNodeAbl = async (
 const updateNodeSchema = z
   .object({
     text: z.string().min(1).optional(),
+    // "" clears the title (back to the text's own first words).
+    title: titleSchema.optional(),
     type: z.enum(NODE_TYPES, {
       error: () => `type must be one of: ${NODE_TYPES.join(", ")}`,
     }).optional(),

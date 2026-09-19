@@ -7,6 +7,7 @@ import type { OutcomeType } from "./OutcomeBadge";
 import { NodeCrown } from "./NodeCrown";
 import { NodeWings } from "./NodeWings";
 import { NodeTypeIcon } from "./NodeTypeIcon";
+import { CAPTION_WIDTH } from "../utils/canvasLayout";
 import {
   burstParticles,
   ANGEL_PARTICLE_COLORS,
@@ -260,15 +261,19 @@ export const NodeCard = memo(function NodeCard({
   // own root/parent keeps its caption regardless (parentCrownSentiment is
   // only ever set for one), so a map at rest still reads as a set of named
   // clusters radiating from labeled parents, not a field of anonymous
-  // icons. A node with no parentId at all keeps its caption too, circle
-  // root or not — every branch on the map starts from *some* named
-  // top-level node (a Problem, a standalone topic, …), and that's exactly
-  // the thing a map at rest should read as radiating from, same as a
-  // circle's own root. Once a circle becomes the chosen one (inChosenCircle,
-  // keyed off map.selectedCircle), every one of its members shows its
-  // caption too — studying a cluster up close is exactly when every
-  // member's own text actually matters.
-  const showCaption = !!parentCrownSentiment || !!inChosenCircle || !node.parentId;
+  // icons. A node in no circle at all (groupSentiment unset — a lone node,
+  // or one whose parent has only the one child) keeps its caption too:
+  // there's no zone around it to say what it is, so its own text is the
+  // only thing that can, and a member inside a circle has its zone (and
+  // the circle's parent's title) doing that job instead. Once a circle
+  // becomes the chosen one (inChosenCircle, keyed off map.selectedCircle),
+  // every one of its members shows its caption too — studying a cluster up
+  // close is exactly when every member's own text actually matters.
+  const showCaption = !groupSentiment || !!parentCrownSentiment || !!inChosenCircle;
+  // What the caption says: the node's own title if it has one, otherwise the
+  // start of its text (the line-clamp on the chip is what cuts it off, so
+  // "first words" needs no separate truncation here).
+  const captionLabel = node.title?.trim() || node.text;
   // Opacity/cursor each have one property multiple states could set — CSS
   // cascade resolves that per-property, not per-modifier, so it's resolved
   // the same way here: state precedence follows the order these used to be
@@ -340,7 +345,14 @@ export const NodeCard = memo(function NodeCard({
     // scroll the canvas out from under your finger instead. touch-none
     // opts this element out of that native gesture so the pointermove
     // handler in MapPage's onNodePointerDown gets every event instead.
-    "group absolute flex w-[74px] touch-none [transform:translate(-50%,-50%)] select-none flex-col items-center",
+    // pointer-events-none: this box is 74px wide and as tall as icon +
+    // caption, and used to take every click inside it — with nodes (and
+    // their wide captions) packed around a circle's parent, that meant the
+    // zone drawn *underneath* them was covered almost end to end and
+    // effectively unclickable. Only the icon circle takes the pointer now
+    // (pointer-events-auto on it below); the handlers stay on this div and
+    // still fire, by bubbling up from that circle.
+    "group pointer-events-none absolute flex w-[74px] touch-none [transform:translate(-50%,-50%)] select-none flex-col items-center",
     zIndexClass,
     transitionClass,
     cursorClass,
@@ -550,8 +562,22 @@ export const NodeCard = memo(function NodeCard({
       {/* See inverseScaleStyle's own comment above for why this is a
           separate element from the outer positioning div rather than
           folded into its own transform. */}
-      <div className="flex w-full flex-col items-center" style={inverseScaleStyle}>
-      <div className="relative h-[48px] w-[48px]">
+      {/* relative: the title/edit input/link label below are absolutely
+          positioned off the bottom of the icon (top-full), *not* stacked
+          under it in normal flow. In flow they made this whole block —
+          and so the outer div that translate(-50%,-50%) centers on the
+          node's x/y — icon-plus-title tall, which pushed the icon itself
+          up off that point by half the title's height (~15px). A node with
+          no title showing sat exactly on its x/y and one with a title
+          didn't, so a circle's parent (the one node that always shows its
+          title) never looked centered in its own zone. With only the icon
+          in flow, x/y is the icon's center for every node, always. */}
+      <div className="relative flex w-full flex-col items-center" style={inverseScaleStyle}>
+      {/* pointer-events-auto: the one part of this node that takes the
+          pointer (the outer div is pointer-events-none — see its class
+          list). Handlers all live on that outer div and reach it by
+          bubbling from here. */}
+      <div className="pointer-events-auto relative h-[48px] w-[48px]">
         {indicator && (
           <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
             {indicator.incomingNegativeEdges}
@@ -680,7 +706,7 @@ export const NodeCard = memo(function NodeCard({
       </div>
       {inlineEditing ? (
         <input
-          className="mt-[0.6rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+          className="pointer-events-auto absolute top-full left-0 mt-[0.6rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
           autoFocus
           value={draftText}
           onChange={(e) => setDraftText(e.target.value)}
@@ -699,7 +725,7 @@ export const NodeCard = memo(function NodeCard({
           }}
           onBlur={resolveInlineEdit}
         />
-      ) : selected || !showCaption ? null : (
+      ) : selected || !showCaption || !captionLabel ? null : (
         <div
           // bg-surface + rounded + a touch of horizontal padding: an edge
           // line, another node's chaotic drift, a zone polygon — anything
@@ -711,13 +737,44 @@ export const NodeCard = memo(function NodeCard({
           // behind the text stops that regardless of what's actually back
           // there, rather than trying to keep every other layer clear of
           // wherever captions might land.
-          className="mt-[0.6rem] line-clamp-2 rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink"
+          //
+          // CAPTION_WIDTH wide (twice the node's own 74px), still two rows —
+          // roughly twice as much of the title fits as before. items-center
+          // on the parent column centers a child wider than it, so this
+          // overhangs the node evenly on both sides. Not pointer-enabled
+          // (the whole node div isn't — see its own class list): a caption
+          // is only ever read, and a wide chip that also swallowed clicks
+          // sat right on top of whatever zone the node belongs to.
+          //
+          // scale(1/sizeMultiplier): this sits inside the wrapper that
+          // scales the whole node by its size tier, so without undoing that
+          // a circle's parent (always 130%) got a 192px caption — wider
+          // than the spacing getNodeMinDist() budgets for (CAPTION_WIDTH),
+          // and wide enough to run into its own children. The chip stays
+          // CAPTION_WIDTH on screen at every size.
+          className="absolute top-full left-1/2 mt-[0.6rem] line-clamp-2 rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink"
+          style={{
+            width: CAPTION_WIDTH,
+            // translateX(-50%) centers it under the icon (left-1/2 puts its
+            // left edge there); scale undoes the size tier, about its top
+            // center so it doesn't drift sideways or up into the icon.
+            transform: `translateX(-50%) scale(${1 / sizeMultiplier})`,
+            transformOrigin: "50% 0",
+          }}
         >
-          {node.text}
+          {captionLabel}
         </div>
       )}
       {linkModeActive && (
-        <div className="mt-[0.1rem] text-[0.65rem] font-semibold text-accent">link?</div>
+        // Absolute like the caption (see the wrapper's own comment) — pushed
+        // clear of it when one's showing, since both hang off the icon's
+        // bottom edge.
+        <div
+          className="absolute top-full left-1/2 -translate-x-1/2 text-[0.65rem] font-semibold whitespace-nowrap text-accent"
+          style={{ marginTop: !inlineEditing && !selected && showCaption && captionLabel ? "3.4rem" : "0.6rem" }}
+        >
+          link?
+        </div>
       )}
       </div>
     </div>

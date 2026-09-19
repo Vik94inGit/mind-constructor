@@ -163,6 +163,10 @@ export function NodePanel({
   // canvas's own inline editor (double-click a node, or the Edit button
   // below, both of which still hand off to that same inline editor).
   const [textDraft, setTextDraft] = useState(node.text);
+  // The optional canvas title (see NodeDoc.title) — its own single-line
+  // field above the text, saved on Enter/blur the same way the text is.
+  // Unlike text it's never lazy-loaded, so there's no backfill to wait for.
+  const [titleDraft, setTitleDraft] = useState(node.title ?? "");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Transient "Copied!" confirmation on the Info tab's own Copy button —
   // auto-clears, same pattern the mobile-focused parts of this file already
@@ -274,6 +278,7 @@ export function NodePanel({
     setProtectText("");
     setProtectType("Solution");
     setTextDraft(node.text);
+    setTitleDraft(node.title ?? "");
     setExpanded(false);
     setTab("info");
     nodesApi
@@ -332,6 +337,26 @@ export function NodePanel({
       onUpdated(updated);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Failed to update text");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Empty is a valid save here (unlike text): it clears the title, sending
+  // the canvas back to showing the start of the text. A no-op if unchanged.
+  async function handleTitleSave() {
+    const trimmed = titleDraft.trim();
+    if (trimmed === (node.title ?? "")) {
+      setTitleDraft(node.title ?? "");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { title: trimmed });
+      onUpdated(updated);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Failed to update title");
     } finally {
       setBusy(false);
     }
@@ -570,6 +595,30 @@ export function NodePanel({
               own Enter-inserts-a-newline handling below, unchanged);
               anyone else gets a plain read-only, same-sized block —
               reading a node's full text shouldn't require owning it. */}
+          {/* Optional title — what the canvas shows under the node instead
+              of the start of the text. Owner edits it; anyone else just
+              sees it (or nothing, when there isn't one) as a heading. */}
+          {isCreator ? (
+            <input
+              id="node-title"
+              type="text"
+              maxLength={80}
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              disabled={busy}
+              placeholder="Title (optional) — otherwise the first words of the text show"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
+              onBlur={handleTitleSave}
+              className="mb-2 w-full rounded-lg border border-line bg-surface px-[0.7rem] py-[0.45rem] text-[0.88rem] font-semibold font-[inherit] text-ink placeholder:font-normal placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
+            />
+          ) : (
+            node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>
+          )}
           {isCreator ? (
             <textarea
               id="node-text"
