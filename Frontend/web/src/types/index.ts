@@ -144,6 +144,8 @@ export interface EdgeNodeRef {
 export interface NodeDoc {
   nodeId: string;
   text: string;
+  /** Optional short canvas label (see Backend's Node.title). Empty/absent means "none" — the canvas falls back to the start of `text`. Unlike `text` this arrives with the initial node list, no lazy backfill needed. */
+  title?: string;
   type: NodeType;
   x?: number;
   y?: number;

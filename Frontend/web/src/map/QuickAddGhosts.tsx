@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
@@ -70,6 +70,11 @@ interface Props {
 // spot and auto-links it to the anchor — branching an argument tree becomes a
 // single click instead of toolbar button -> modal -> manual placement.
 export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
+  // Which ghost a single click has picked out — its type name shows only
+  // once picked. A click no longer creates anything (that used to be one
+  // tap, easy to trigger by accident on a phone and impossible to preview);
+  // it just tells you which type this is, and a double-click creates it.
+  const [armedType, setArmedType] = useState<NodeType | null>(null);
   // Read live, every render — see the doc comment above RADIUS/EDGE_MARGIN's
   // old module-level home for why this can't be hoisted back out to module
   // scope.
@@ -196,10 +201,18 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
             // panel (and the ghost ring with it) rather than picking a
             // type. See NodeCard's own zIndexClass for the rest of this
             // scheme (nodes at z-31/32, the pending-create card at z-33 too).
-            className="absolute z-[33] flex -translate-x-1/2 -translate-y-1/2 cursor-pointer flex-col items-center border-0 bg-transparent p-0 opacity-75 transition-[opacity,transform] duration-[150ms] ease-[ease] hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.1] hover:opacity-100 focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.1] focus-visible:opacity-100"
-            style={{ left: x, top: y }}
-            title={`Add ${type} node`}
+            className={`absolute z-[33] flex -translate-x-1/2 -translate-y-1/2 cursor-pointer flex-col items-center border-0 bg-transparent p-0 transition-[opacity,transform] duration-[150ms] ease-[ease] hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.1] hover:opacity-100 focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.1] focus-visible:opacity-100 ${
+              armedType === type ? "scale-[1.1] opacity-100" : "opacity-75"
+            }`}
+            // touchAction: manipulation — lets a double-tap reach onDoubleClick
+            // on a phone instead of the browser claiming it as double-tap-to-zoom.
+            style={{ left: x, top: y, touchAction: "manipulation" }}
+            title={`${type} — double-click to add`}
             onClick={(e) => {
+              e.stopPropagation();
+              setArmedType(type);
+            }}
+            onDoubleClick={(e) => {
               e.stopPropagation();
               onPick(type, { x, y });
             }}
@@ -231,19 +244,22 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
                 )}
               </div>
             </div>
-            {/* A visible label, not just the button's own hover `title`
-                above — a hover tooltip never shows at all on a touch
+            {/* Shown only for the ghost a click has picked out (see
+                armedType) — a hover tooltip never shows at all on a touch
                 device, which is exactly where a bare icon is hardest to
-                identify at a glance (no cursor to rest on it and wait).
+                identify, so the click itself is what reveals the type.
                 Same small-chip-over-clutter styling NodeCard's own caption
-                uses, so a ghost's label reads clearly against the canvas
-                behind it regardless of what's back there. whitespace-nowrap:
-                these sit close enough together around the ring that a
-                wrapped two-line label would start overlapping its neighbors'
-                own text, worse than the single line running a little wide. */}
-            <div className="mt-[0.3rem] rounded-[3px] bg-surface px-[0.25rem] py-[0.05rem] text-[0.62rem] leading-[1.2] font-medium whitespace-nowrap text-ink">
-              {type}
-            </div>
+                uses, so it reads clearly against the canvas behind it.
+                whitespace-nowrap: these sit close enough together around
+                the ring that a wrapped two-line label would start
+                overlapping its neighbors', worse than one line running a
+                little wide. */}
+            {armedType === type && (
+              <div className="mt-[0.3rem] flex flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card">
+                <span className="text-[0.66rem] font-semibold">{type}</span>
+                <span className="text-[0.55rem] text-ink-soft">double-click to add</span>
+              </div>
+            )}
           </button>
         );
       })}

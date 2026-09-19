@@ -54,6 +54,13 @@ export const NodeSchema = new mongoose.Schema(
   {
     nodeId: { type: String, required: true, unique: true }, // public id, safe to expose in URLs/JSON
     text: { type: String, required: true },
+    // An optional short label shown on the canvas in place of the text's
+    // first words. Empty (the default) means "no title" — the frontend then
+    // falls back to the start of `text`. Unlike `text`, this rides along on
+    // the initial node list (see getNodesByMapDao's own `-text` projection):
+    // it's capped small enough that a whole map's titles are a rounding
+    // error next to what stripping `text` saved.
+    title: { type: String, default: "", trim: true, maxlength: 80 },
     type: { type: String, enum: NODE_TYPES, required: true }, // mandatory: forces the author to categorize every node
     x: Number, // Coordinates for the UI
     y: Number,
