@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { nanoid } from "nanoid";
 import { User } from "../models/User.js";
 import { Map } from "../models/Map.js";
 import { Node } from "../models/Node.js";
@@ -30,7 +31,6 @@ export const createUserDao = async (data: CreateUserInput) => {
     email: data.email,
     passwordHash,
   });
-  console.log("Created user:", user);
   return user;
 };
 
@@ -57,6 +57,19 @@ export const createGoogleUserDao = async (data: CreateGoogleUserInput) => {
   return user;
 };
 
+// No passwordHash, no googleId — a fresh throwaway account for a visitor
+// trying the app without registering (see authAbl.ts's
+// createDemoSessionAbl). username/email both carry a random suffix since
+// both are unique-indexed and nothing meaningful identifies this visitor.
+export const createDemoUserDao = async () => {
+  const suffix = nanoid(8);
+  return await User.create({
+    username: `demo-${suffix}`,
+    email: `demo-${suffix}@demo.mindconstructor.local`,
+    isDemo: true,
+  });
+};
+
 // Links a Google account onto an existing password-registered user found by
 // email — same person signing in a different way, not a second account.
 export const linkGoogleIdDao = async (id: string, googleId: string) => {
@@ -79,8 +92,12 @@ export const updateUserDao = async (id: string, updates: UpdateUserInput) => {
   return User.findByIdAndUpdate(id, payload);
 };
 
+// .select("-passwordHash").lean() — the controller strips passwordHash
+// again itself (toPublicUser), but there's no reason to fetch it or pay for
+// document hydration for a list that's only ever serialized, never
+// mutated/saved back.
 export const getAllUsersDao = async () => {
-  return await User.find({});
+  return await User.find({}).select("-passwordHash").lean();
 };
 
 export const deleteUserDao = async (id: string) => {
@@ -96,7 +113,6 @@ export const deleteAllDao = async () => {
     User.deleteMany({}),
     Map.deleteMany({}),
     Node.deleteMany({}),
-    // Node.deleteMany({}),
   ]);
   console.log(`Deleted ${users.deletedCount} users`);
   console.log(`Deleted ${maps.deletedCount} maps`);

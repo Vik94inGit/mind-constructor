@@ -1,6 +1,7 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 import {
   findNodeByPublicIdDao,
+  findNodesByPublicIdsDao,
   listNodesByMapInternalIdDao,
   countPackedMembersDao,
   packNodesMutationDao,
@@ -20,6 +21,7 @@ import { ValidationError } from "../src/abl/errors.js";
 
 vi.mock("../src/dao/nodeDao.js", () => ({
   findNodeByPublicIdDao: vi.fn(),
+  findNodesByPublicIdsDao: vi.fn(),
   listNodesByMapInternalIdDao: vi.fn(),
   countPackedMembersDao: vi.fn(),
   packNodesMutationDao: vi.fn(),
@@ -32,14 +34,25 @@ vi.mock("../src/dao/edgeDao.js", () => ({
 
 const container = { _id: "c1", mapId: "m1", userId: "owner1", parentId: null };
 
+// findNodesByPublicIdsDao resolves every picked id in one batched call —
+// this fixture-driven mock stands in for "the DB has these nodes, filtered
+// to whichever ids were actually asked for," same as the real query's
+// { nodeId: { $in: publicNodeIds }, mapId } filter would return.
+function mockMembers(...nodes: { nodeId: string; _id: string; mapId: string; userId: string }[]) {
+  vi.mocked(findNodesByPublicIdsDao).mockImplementation(async (ids) =>
+    nodes.filter((n) => ids.includes(n.nodeId)) as never,
+  );
+}
+
 describe("packAbl", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Neutral defaults every test can override: no branch neighbors, no
-    // edges, container not yet packed with anything.
+    // edges, container not yet packed with anything, no members found.
     vi.mocked(listNodesByMapInternalIdDao).mockResolvedValue([]);
     vi.mocked(findEdgesByNodeInternalIdDao).mockResolvedValue([]);
     vi.mocked(countPackedMembersDao).mockResolvedValue(0);
+    vi.mocked(findNodesByPublicIdsDao).mockResolvedValue([]);
   });
 
   describe("packNodesAbl", () => {
@@ -67,21 +80,19 @@ describe("packAbl", () => {
     });
 
     it("throws PackMemberNotFoundError when a picked node doesn't exist", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockImplementation(async (id) =>
-        (id === "container1" ? container : null) as never,
-      );
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(container as never);
+      // findNodesByPublicIdsDao's default (empty array) mock applies — the
+      // "ghost" id simply doesn't come back.
 
       await expect(
         packNodesAbl("container1", "owner1", { nodeIds: ["ghost"] }),
       ).rejects.toThrow(PackMemberNotFoundError);
+      expect(findNodesByPublicIdsDao).toHaveBeenCalledWith(["ghost"], "m1");
     });
 
     it("throws PackMemberNotEligibleError for a node that's neither Edge- nor branch-linked to the container", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockImplementation(async (id) =>
-        (id === "container1"
-          ? container
-          : { _id: "stranger1", mapId: "m1", userId: "owner1" }) as never,
-      );
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(container as never);
+      mockMembers({ nodeId: "stranger1", _id: "stranger1", mapId: "m1", userId: "owner1" });
       // No edges, no branch relationship set up in beforeEach's defaults.
 
       await expect(
@@ -91,11 +102,8 @@ describe("packAbl", () => {
     });
 
     it("accepts a direct branch child as eligible", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockImplementation(async (id) =>
-        (id === "container1"
-          ? container
-          : { _id: "child1", mapId: "m1", userId: "owner1" }) as never,
-      );
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(container as never);
+      mockMembers({ nodeId: "child1", _id: "child1", mapId: "m1", userId: "owner1" });
       vi.mocked(listNodesByMapInternalIdDao).mockResolvedValue([
         { _id: "child1", nodeId: "child1", parentId: "c1" },
       ] as never);
@@ -112,11 +120,8 @@ describe("packAbl", () => {
 
     it("accepts the container's own branch parent as eligible", async () => {
       const withParent = { ...container, parentId: "grandparent1" };
-      vi.mocked(findNodeByPublicIdDao).mockImplementation(async (id) =>
-        (id === "container1"
-          ? withParent
-          : { _id: "grandparent1", mapId: "m1", userId: "owner1" }) as never,
-      );
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(withParent as never);
+      mockMembers({ nodeId: "grandparent1", _id: "grandparent1", mapId: "m1", userId: "owner1" });
       vi.mocked(packNodesMutationDao).mockResolvedValue({} as never);
 
       await packNodesAbl("container1", "owner1", { nodeIds: ["grandparent1"] });
@@ -125,11 +130,8 @@ describe("packAbl", () => {
     });
 
     it("accepts an Edge-linked node (either direction) as eligible", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockImplementation(async (id) =>
-        (id === "container1"
-          ? container
-          : { _id: "linked1", mapId: "m1", userId: "owner1" }) as never,
-      );
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(container as never);
+      mockMembers({ nodeId: "linked1", _id: "linked1", mapId: "m1", userId: "owner1" });
       vi.mocked(findEdgesByNodeInternalIdDao).mockResolvedValue([
         { fromNodeId: "linked1", toNodeId: "c1" },
       ] as never);
@@ -141,11 +143,8 @@ describe("packAbl", () => {
     });
 
     it("bumps the container's sizeTier to 2 on its first-ever pack, before the mutation", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockImplementation(async (id) =>
-        (id === "container1"
-          ? container
-          : { _id: "child1", mapId: "m1", userId: "owner1" }) as never,
-      );
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(container as never);
+      mockMembers({ nodeId: "child1", _id: "child1", mapId: "m1", userId: "owner1" });
       vi.mocked(listNodesByMapInternalIdDao).mockResolvedValue([
         { _id: "child1", nodeId: "child1", parentId: "c1" },
       ] as never);
@@ -158,11 +157,8 @@ describe("packAbl", () => {
     });
 
     it("does not bump sizeTier when the container already had a packed member", async () => {
-      vi.mocked(findNodeByPublicIdDao).mockImplementation(async (id) =>
-        (id === "container1"
-          ? container
-          : { _id: "child2", mapId: "m1", userId: "owner1" }) as never,
-      );
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(container as never);
+      mockMembers({ nodeId: "child2", _id: "child2", mapId: "m1", userId: "owner1" });
       vi.mocked(listNodesByMapInternalIdDao).mockResolvedValue([
         { _id: "child2", nodeId: "child2", parentId: "c1" },
       ] as never);

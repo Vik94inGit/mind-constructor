@@ -12,6 +12,7 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import {
   findNodeByPublicIdDao,
+  findNodesByPublicIdsDao,
   listNodesByMapInternalIdDao,
   countPackedMembersDao,
   packNodesMutationDao,
@@ -83,11 +84,17 @@ export const packNodesAbl = async (
 
   const eligibleIds = await computeEligiblePackCandidateIdsAbl(container);
 
+  // One batched query for every picked id instead of one findNodeByPublicIdDao
+  // call per id — already scoped to the container's own map, so a node
+  // belonging to a different map simply won't come back (same effective
+  // result the old per-id mapId check produced).
+  const foundMembers = await findNodesByPublicIdsDao(memberPublicIds, container.mapId);
+  const memberByPublicId = new Map(foundMembers.map((m) => [m.nodeId, m]));
+
   const members = [];
   for (const publicMemberId of memberPublicIds) {
-    const member = await findNodeByPublicIdDao(publicMemberId);
+    const member = memberByPublicId.get(publicMemberId);
     if (!member) throw new PackMemberNotFoundError();
-    if (member.mapId.toString() !== container.mapId.toString()) throw new PackMemberNotFoundError();
     if (!eligibleIds.has(member._id.toString())) throw new PackMemberNotEligibleError();
     members.push(member);
   }

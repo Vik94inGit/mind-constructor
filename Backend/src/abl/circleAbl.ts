@@ -5,6 +5,16 @@ import { parseOrThrow } from "./errors.js";
 
 export class CircleNotFoundError extends Error {}
 
+// Note on duplication: this module and packAbl.ts's own
+// computeEligiblePackCandidateIdsAbl both fetch a map's nodes via
+// listNodesByMapInternalIdDao and loop its parentId field. They're not the
+// same shape, though — this one groups *every* node by its parent across the
+// whole map (to find every parent with 2+ children), while packAbl's only
+// tests membership against a single anchor node's own children. Genuinely
+// different queries over the same raw data, not the same logic duplicated;
+// left as two separate loops rather than forcing a shared "adjacency map"
+// helper that would have to serve both shapes.
+
 // A "circle": a node with 2+ direct parentId-children — the parentId "star"
 // a frontend draws as a halo/horns backdrop around a node and its branch
 // children. Deliberately *not* the old same-sentiment k-core cluster this

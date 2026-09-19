@@ -8,9 +8,11 @@ import {
   findUserByGoogleIdDao,
   findUserByUsernameDao,
   createGoogleUserDao,
+  createDemoUserDao,
   linkGoogleIdDao,
 } from "../dao/userDao.js";
 import { parseOrThrow } from "./errors.js";
+import { createMapAbl } from "./mapAbl.js";
 
 export class EmailAlreadyInUseError extends Error {}
 export class InvalidCredentialsError extends Error {}
@@ -164,4 +166,27 @@ export const googleAuthAbl = async (input: unknown) => {
   const token = generateToken(user._id.toString());
 
   return { user, token };
+};
+
+// Same accent orange used by index.css's own --accent — no color picker for
+// a visitor who hasn't seen the app yet, so this just matches the app's own
+// brand color rather than an arbitrary pick.
+const DEMO_OWNER_COLOR = "#b5651d";
+
+// "Try it without registering" — a real account and a real, owned map, not
+// a client-side mock: mints a throwaway user (createDemoUserDao) and a
+// fresh copy of the "demo" template (see mapAbl.ts's MAP_TEMPLATES) through
+// the exact same createMapAbl a real user's "new map" flow goes through, so
+// this gets the exact same node-creation/circle-detection behavior a real
+// map would. Isolated per visitor — everyone who tries the demo gets their
+// own copy, not a shared one others could disrupt.
+export const createDemoSessionAbl = async () => {
+  const user = await createDemoUserDao();
+  const token = generateToken(user._id.toString());
+  const map = await createMapAbl(
+    { name: "Demo map", ownerColor: DEMO_OWNER_COLOR, template: "demo" },
+    user._id.toString(),
+  );
+
+  return { user, token, map };
 };

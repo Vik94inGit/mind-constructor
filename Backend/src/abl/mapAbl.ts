@@ -67,6 +67,31 @@ const MAP_TEMPLATES = {
       ],
     },
   ],
+  // Seeded onto every fresh demo account (see authAbl.ts's
+  // createDemoSessionAbl) — deliberately the richest built-in template, not
+  // just a nudge to start from: a Problem with two Option children forms an
+  // actual auto-detected circle (circleAbl.ts's 2+-children rule) right out
+  // of the gate, and each Option's own outcome child gives a halo/horns
+  // framing to look at too, so a first-time visitor lands on something that
+  // already demonstrates the app rather than a blank canvas.
+  demo: [
+    {
+      text: "Should we launch the new feature?",
+      type: "Problem",
+      children: [
+        {
+          text: "Ship it now",
+          type: "Option",
+          children: [{ text: "Faster user feedback", type: "Success" }],
+        },
+        {
+          text: "Wait for more testing",
+          type: "Option",
+          children: [{ text: "Risk of missing the window", type: "Fail" }],
+        },
+      ],
+    },
+  ],
 } satisfies Record<string, TemplateNodeSpec[]>;
 
 const MAP_TEMPLATE_KEYS = Object.keys(MAP_TEMPLATES) as (keyof typeof MAP_TEMPLATES)[];

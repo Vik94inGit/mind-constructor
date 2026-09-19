@@ -21,8 +21,8 @@ import {
   CircleNotFoundError,
 } from "../abl/circleAbl.js";
 import { computeAttackIndicatorsAbl } from "../abl/attackIndicatorAbl.js";
-import { ValidationError } from "../abl/errors.js";
 import { broadcastToMap } from "../realtime/io.js";
+import { handleAblError } from "./errorHandling.js";
 
 // ========== CREATE MAP ==========
 export const createMap = async (req: Request, res: Response) => {
@@ -40,13 +40,10 @@ export const createMap = async (req: Request, res: Response) => {
 
     return res.status(201).json(newMap);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    console.error("createMap error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "createMap",
+    });
   }
 };
 
@@ -74,19 +71,18 @@ export const setMyMapColor = async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, map });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof ColorTakenError) {
-      return res.status(409).json({
-        success: false,
-        error: "That color is already taken by another member of this map",
-      });
-    }
-    console.error("setMyMapColor error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [
+          ColorTakenError,
+          409,
+          "That color is already taken by another member of this map",
+        ],
+      ],
+      { message: "Internal Server Error", logLabel: "setMyMapColor" },
+    );
   }
 };
 
@@ -114,11 +110,10 @@ export const inviteUserToMap = async (req: Request, res: Response) => {
       map: updatedMap,
     });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    console.error("inviteUserToMap error:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
+    return handleAblError(res, error, [], {
+      message: "Server error",
+      logLabel: "inviteUserToMap",
+    });
   }
 };
 
@@ -142,8 +137,7 @@ export const getMapById = async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, map });
   } catch (error) {
-    console.error("getMapById error:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
+    return handleAblError(res, error, [], { message: "Server error", logLabel: "getMapById" });
   }
 };
 // C
@@ -164,8 +158,7 @@ export const getAllMaps = async (req: Request, res: Response) => {
     const maps = await getMapsAbl(currentUserId, req.query.filter);
     return res.status(200).json({ success: true, maps });
   } catch (error) {
-    console.error("getAllMaps error:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
+    return handleAblError(res, error, [], { message: "Server error", logLabel: "getAllMaps" });
   }
 };
 
@@ -195,8 +188,7 @@ export const getMapSummary = async (req: Request, res: Response) => {
       ...summary,
     });
   } catch (error) {
-    console.error("getMapSummary error:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
+    return handleAblError(res, error, [], { message: "Server error", logLabel: "getMapSummary" });
   }
 };
 
@@ -218,10 +210,10 @@ export const getNodesByMap = async (req: Request, res: Response) => {
 
     return res.status(200).json(nodes);
   } catch (error) {
-    console.error("getNodesByMap error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "getNodesByMap",
+    });
   }
 };
 
@@ -252,10 +244,10 @@ export const getNodesText = async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, text });
   } catch (error) {
-    console.error("getNodesText error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "getNodesText",
+    });
   }
 };
 
@@ -280,13 +272,10 @@ export const updateMap = async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, map: updatedMap });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    console.error("updateMap error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "updateMap",
+    });
   }
 };
 
@@ -308,10 +297,10 @@ export const deleteMap = async (req: Request, res: Response) => {
       result,
     });
   } catch (error) {
-    console.error("deleteMap error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "deleteMap",
+    });
   }
 };
 
@@ -334,10 +323,10 @@ export const getEdgesByMap = async (req: Request, res: Response) => {
 
     return res.status(200).json(edges);
   } catch (error) {
-    console.error("getEdgesByMap error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "getEdgesByMap",
+    });
   }
 };
 
@@ -361,13 +350,10 @@ export const getMapAttackIndicators = async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    console.error("getMapAttackIndicators error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "getMapAttackIndicators",
+    });
   }
 };
 
@@ -394,19 +380,18 @@ export const selectMapCircle = async (req: Request, res: Response) => {
     broadcastToMap(resolvedMapId, "circle:selected", { selectedCircle: result.selectedCircle });
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof CircleNotFoundError) {
-      return res.status(404).json({
-        success: false,
-        error: "Circle not found — the graph may have changed since it was computed",
-      });
-    }
-    console.error("selectMapCircle error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [
+          CircleNotFoundError,
+          404,
+          "Circle not found — the graph may have changed since it was computed",
+        ],
+      ],
+      { message: "Internal Server Error", logLabel: "selectMapCircle" },
+    );
   }
 };
 
@@ -431,9 +416,9 @@ export const deselectMapCircle = async (req: Request, res: Response) => {
     broadcastToMap(resolvedMapId, "circle:deselected", { selectedCircle: null });
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
-    console.error("deselectMapCircle error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "deselectMapCircle",
+    });
   }
 };

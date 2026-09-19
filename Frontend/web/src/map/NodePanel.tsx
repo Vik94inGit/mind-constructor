@@ -3,6 +3,7 @@ import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { idOf, nodeRefId, usernameOf, ZONE_COLORS } from "../utils/nodeType";
+import { isMobileViewport } from "../utils/canvasLayout";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
 import { ATTACK_NODE_TYPES, MANUAL_ZONE_COLORS, NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
@@ -15,15 +16,6 @@ import { useI18n } from "../i18n/I18nContext";
 // internals isn't a pattern this codebase otherwise uses; this pairing is
 // simple enough not to be worth a shared constants file).
 const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "130%" };
-
-// Same 640px threshold MapPage's own isMobileViewport uses (not shared as
-// an import — this file has no existing dependency on that one, and the
-// two only need to ever agree on the cutoff, not on being the same
-// function). Read live, not memoized, for the same reason: it only matters
-// at the moment a key is actually pressed.
-function isMobileViewport() {
-  return typeof window !== "undefined" && window.innerWidth <= 640;
-}
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own

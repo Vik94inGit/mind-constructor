@@ -1,10 +1,10 @@
-import { apiRequest, setToken, clearToken } from "./client";
+import { apiRequest, setToken, setDemoMapId, clearToken } from "./client";
 import type { User } from "../types";
 
 interface AuthResponse {
   success: boolean;
   token: string;
-  user: Pick<User, "_id" | "username" | "email" | "role">;
+  user: Pick<User, "_id" | "username" | "email" | "role" | "isDemo">;
 }
 
 export async function register(username: string, email: string, password: string) {
@@ -35,6 +35,24 @@ export async function googleLogin(idToken: string) {
   });
   setToken(res.token);
   return res.user;
+}
+
+interface DemoAuthResponse extends AuthResponse {
+  map: { mapId: string };
+}
+
+// "Try it without registering" — mints a real throwaway account and a real,
+// already-seeded map server-side (see Backend's createDemoSessionAbl), so
+// this returns the new map's own id too: the caller has somewhere to
+// navigate straight to, not just a logged-in user with an empty dashboard.
+export async function tryDemo() {
+  const res = await apiRequest<DemoAuthResponse>("/api/auth/demo", {
+    method: "POST",
+    auth: false,
+  });
+  setToken(res.token);
+  setDemoMapId(res.map.mapId);
+  return { user: res.user, mapId: res.map.mapId };
 }
 
 export async function logout() {

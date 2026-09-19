@@ -5,10 +5,6 @@ import { getMapByIdDao } from "./mapsDao.js";
 
 type InternalId = mongoose.Types.ObjectId | string;
 
-export const findEdgeByPublicIdDao = async (publicEdgeId: string) => {
-  return await Edge.findOne({ edgeId: publicEdgeId });
-};
-
 // Populated the same way getEdgesByMapDao lists edges — otherwise the edge
 // handed back right after creation looks different (raw internal ObjectIds
 // instead of { nodeId, text, type }) than one read back from a fresh page
@@ -32,12 +28,14 @@ export const createEdgeMutationDao = async (edgeData: {
 };
 
 // Only the edge's creator may delete it — same pattern as node ownership.
+// Populates mapId (just its own public mapId field) so the controller can
+// read the map's public id straight off the deleted edge instead of a
+// separate findPublicMapIdDao round-trip.
 export const deleteEdgeDao = async (publicEdgeId: string, userId: string) => {
-  return await Edge.findOneAndDelete({ edgeId: publicEdgeId, userId });
-};
-
-export const findEdgesByMapInternalIdDao = async (mapInternalId: InternalId) => {
-  return await Edge.find({ mapId: mapInternalId }).lean();
+  return await Edge.findOneAndDelete({ edgeId: publicEdgeId, userId }).populate(
+    "mapId",
+    "mapId",
+  );
 };
 
 // Only members of the map may list its edges — same membership pattern as

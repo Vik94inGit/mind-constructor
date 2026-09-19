@@ -34,15 +34,26 @@ export function Navbar() {
     }`;
 
   return (
-    <header className="flex items-center gap-6 border-b border-line bg-surface px-6 py-[0.85rem]">
+    // gap-3, not gap-6, below sm — every child group here has its own
+    // internal spacing already; the wide 6-unit gap between *groups* is a
+    // desktop-only nicety, not something a 375px-wide phone has room to
+    // spare (see the overflow this whole row used to run into: username +
+    // logout button pushed clean off the right edge, "Mind Constructor"
+    // wrapping onto its own second line and pushing the row taller still).
+    <header className="flex items-center gap-3 sm:gap-6 border-b border-line bg-surface px-3 sm:px-6 py-[0.85rem]">
       <NavLink
         to="/"
         className="flex items-center gap-[0.45rem] text-[1.05rem] font-bold tracking-[-0.01em] text-ink"
       >
         <TargetLogo />
-        Mind Constructor
+        {/* The wordmark text is the single biggest thing in this row not
+            already load-bearing (the logo mark alone still reads as "home"
+            — NavLink's own click target, not just decoration) — dropped
+            below sm rather than shrunk, same "cut it, don't just make it
+            smaller and hope" reasoning as the username below. */}
+        <span className="hidden sm:inline">Mind Constructor</span>
       </NavLink>
-      <nav className="flex flex-1 gap-4">
+      <nav className="flex flex-1 gap-2 sm:gap-4">
         <NavLink to="/" end className={navLinkClass}>
           {t.nav.maps}
         </NavLink>
@@ -52,10 +63,16 @@ export function Navbar() {
           </NavLink>
         )}
       </nav>
-      <div className="flex items-center gap-[0.7rem]">
+      <div className="flex items-center gap-[0.4rem] sm:gap-[0.7rem]">
         <LanguageSwitcher />
         <ThemeToggle />
-        <span className="text-[0.85rem] text-ink-soft">{user.username}</span>
+        {/* Dropped below sm, not truncated — a demo account's own username
+            (demo-<8 random chars>) is exactly the kind of long, not
+            particularly meaningful string that reads worse clipped to a
+            few characters than just left off a cramped header entirely;
+            it's still shown in full elsewhere (Info tab's "by <username>"
+            on any node, the members list). */}
+        <span className="hidden sm:inline text-[0.85rem] text-ink-soft">{user.username}</span>
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-120ms enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => logout()}

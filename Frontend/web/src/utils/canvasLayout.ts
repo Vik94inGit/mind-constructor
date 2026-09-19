@@ -73,10 +73,41 @@ export function setNodeClipboard(value: typeof nodeClipboard) {
   nodeClipboard = value;
 }
 
-export function hashOffset(seed: string, range: number) {
+// Low-level seeded-hash primitive shared by this file's own hashOffset,
+// NodeCard's flightOffset, and NodeCard's seededRandoms — three independent
+// "hash a string into pseudo-random number(s)" implementations used to live
+// separately (slightly different mod bases, one returning a single number,
+// one an {x,y} pair, one an array of N fracts), which meant three formulas
+// to keep straight for what's conceptually the same trick. Consolidated
+// here as the one primitive all three now derive from — count independent
+// pseudo-random values in [0, 1) from one seed, matching seededRandoms's own
+// existing contract exactly (same mod base, same per-index sin/fract
+// formula) since that's both the most general of the three (the other two
+// each only need a subset of what it already produces) and the one on the
+// hottest path (every drifting/chaotic node re-reads it on every render via
+// chaosStyle), so its own output for a given seed stays bit-identical to
+// before — nothing about which drift waypoints an already-visible node
+// picked changes. hashOffset/flightOffset below are reimplemented as thin
+// wrappers around this instead of keeping their own separate hash loops;
+// their own numeric output for a given seed shifts as a result (different
+// mod base than before), which isn't a functional change — same output
+// range/shape either way — just a one-time visual reshuffle of exactly
+// which offset/flight-direction an existing weapon node's animation seed
+// happens to land on, not worth keeping a third formula around to avoid.
+export function hashSeed(seed: string, count: number): number[] {
   let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 10007;
-  return (h % (range * 2)) - range;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 1000003;
+  const out: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const v = Math.sin(h + i * 999.317) * 43758.5453;
+    out.push(v - Math.floor(v)); // fract() — always in [0, 1)
+  }
+  return out;
+}
+
+export function hashOffset(seed: string, range: number) {
+  const [r] = hashSeed(seed, 1);
+  return Math.floor(r * range * 2) - range;
 }
 
 // Every node "linked" to anchorId, either by branch lineage (its direct
@@ -103,19 +134,34 @@ export function computeLinkedNeighborIds(anchorId: string, nodes: NodeDoc[], edg
   return neighborIds;
 }
 
+// Shared phone-width breakpoint — used to be independently duplicated in
+// (at least) this file's own getNodeMinDist, MapPage.tsx, NodePanel.tsx, and
+// QuickAddGhosts.tsx; consolidated here as the one place that decides what
+// "mobile" means for canvas layout purposes. Read live (not memoized) since
+// every call site only cares at the moment something is actually placed/
+// rendered, by which point the real viewport width is already known.
+export function isMobileViewport(): boolean {
+  return typeof window !== "undefined" && window.innerWidth <= 640;
+}
+
 // Node icons are 74px wide (icon + caption — 0.8x the original 92px, per
 // the node-size -20% resize) — keep freshly-placed nodes at least that far
 // apart (plus a visible margin) so a new node never lands on top of an
-// existing one. The margin shrinks on a phone-width viewport: the canvas is
-// the same 2400x1600 regardless of screen size, so the same 50px buffer
-// that's comfortable on desktop just means more panning/zooming to see
-// fewer nodes at once on mobile — the 74px icon footprint itself is the one
-// part of this that can't shrink without nodes actually overlapping.
+// existing one. 96, not 74, is the actual base footprint used below — a
+// circle-parent node always renders at the 130% size tier now (see
+// NodeCard's own sizeMultiplier override), and this stays one flat minDist
+// for every point regardless of which node ends up there (see nodeObstacles'
+// own doc comment on why it isn't size-tier-aware), so the margin has to
+// assume the biggest a node can render at, not just the 100% default — a
+// smaller node placed with this much clearance still just has extra room to
+// spare. The margin itself shrinks on a phone-width viewport: the canvas is
+// the same 2400x1600 regardless of screen size, so the same buffer that's
+// comfortable on desktop just means more panning/zooming to see fewer nodes
+// at once on mobile.
 // Read live (not memoized) since it only matters at the moment a node is
 // placed/dragged, by which point the real viewport width is already known.
 export function getNodeMinDist() {
-  const isMobile = typeof window !== "undefined" && window.innerWidth <= 640;
-  return 74 + (isMobile ? 20 : 50);
+  return 96 + (isMobileViewport() ? 25 : 60);
 }
 
 // The rectangle (in canvas coordinates) a placement is allowed to land in —
@@ -278,4 +324,111 @@ export function isDescendant(candidateId: string, ancestorId: string, allNodes: 
     hops++;
   }
   return false;
+}
+
+export interface NodeGroup {
+  rootId: string;
+  members: NodeDoc[];
+  sentiment: Sentiment;
+  cx: number;
+  cy: number;
+  r: number;
+  outline: { x: number; y: number }[];
+}
+
+// Any node with 2+ direct parentId-children reads as a group ("circle") —
+// general on purpose, same as computeLinkCycles below: this fires whether
+// the star came from dragging one node onto another or just from branching
+// off the same node several times over. Built from visibleNodes (a packed-
+// away member shouldn't still read as a circle child on the canvas it no
+// longer appears on), but resolves each root against the full `allNodes`
+// list, matching MapPage's own original behavior — a root can be visible
+// via its children even if something unusual hid the root node itself.
+// Moved out of MapPage.tsx unchanged (same "pure canvas geometry" reasoning
+// as every other function in this file) — see MapPage's own `nodeGroups`
+// useMemo, which now just wraps this.
+export function computeNodeGroups(
+  visibleNodes: NodeDoc[],
+  allNodes: NodeDoc[],
+  positions: Map<string, { x: number; y: number }>,
+): NodeGroup[] {
+  const childrenByParent = new Map<string, NodeDoc[]>();
+  for (const n of visibleNodes) {
+    const parentId = nodeRefId(n.parentId);
+    if (!parentId) continue;
+    if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+    childrenByParent.get(parentId)!.push(n);
+  }
+  const groups: NodeGroup[] = [];
+  for (const [rootId, children] of childrenByParent) {
+    if (children.length < 2) continue;
+    const root = allNodes.find((n) => n.nodeId === rootId);
+    if (!root) continue;
+    const members = [root, ...children];
+    const sentiment = circleSentiment(members);
+    const pts = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
+    const outline = pts
+      .slice()
+      .sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+    groups.push({ rootId, members, sentiment, cx, cy, r, outline });
+  }
+  return groups;
+}
+
+// Any closed loop in the Link graph (not branch-arrows, not weapon marks —
+// specifically Edge documents "Link nodes" creates) reads as a "figure" and
+// gets colored in; a simple two-node link never can, there's nothing to
+// close. General on purpose: fires whether the loop was made in one
+// multi-select or pieced together one link at a time. DFS over an
+// undirected adjacency, capped on both search depth and result count so a
+// pathologically dense graph can't make this expensive. Moved out of
+// MapPage.tsx unchanged — see MapPage's own `linkCycles` useMemo, which now
+// just wraps this.
+export function computeLinkCycles(edges: EdgeDoc[]): string[][] {
+  if (edges.length > 120) return [];
+  const adjacency = new Map<string, Set<string>>();
+  for (const edge of edges) {
+    const a = nodeRefId(edge.fromNodeId);
+    const b = nodeRefId(edge.toNodeId);
+    if (!a || !b || a === b) continue;
+    if (!adjacency.has(a)) adjacency.set(a, new Set());
+    if (!adjacency.has(b)) adjacency.set(b, new Set());
+    adjacency.get(a)!.add(b);
+    adjacency.get(b)!.add(a);
+  }
+
+  const MAX_CYCLE_LEN = 6;
+  const MAX_CYCLES = 24;
+  const found: string[][] = [];
+  const seenKeys = new Set<string>();
+
+  function dfs(start: string, current: string, path: string[], visiting: Set<string>) {
+    if (found.length >= MAX_CYCLES || path.length > MAX_CYCLE_LEN) return;
+    for (const next of adjacency.get(current) ?? []) {
+      if (found.length >= MAX_CYCLES) return;
+      if (next === start && path.length >= 3) {
+        const key = [...path].sort().join(",");
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          found.push([...path]);
+        }
+        continue;
+      }
+      if (visiting.has(next)) continue;
+      visiting.add(next);
+      path.push(next);
+      dfs(start, next, path, visiting);
+      path.pop();
+      visiting.delete(next);
+    }
+  }
+
+  for (const start of adjacency.keys()) {
+    if (found.length >= MAX_CYCLES) break;
+    dfs(start, start, [start], new Set([start]));
+  }
+  return found;
 }

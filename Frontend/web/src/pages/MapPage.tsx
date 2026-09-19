@@ -44,11 +44,13 @@ import {
   hashOffset,
   computeLinkedNeighborIds,
   getNodeMinDist,
+  isMobileViewport as computeIsMobileViewport,
   pickNonOverlappingPosition,
   nodeObstacles,
   avoidOverlap,
-  circleSentiment,
   isDescendant,
+  computeNodeGroups,
+  computeLinkCycles,
 } from "../utils/canvasLayout";
 import type { Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
@@ -697,11 +699,11 @@ export function MapPage() {
     // companions anchored at the same spot don't stack. Falls back to
     // refPos itself if the creator has no other node left to anchor near.
     function placeCompanionNode(n: NodeDoc, refPos: { x: number; y: number }) {
-      const creatorId = idOf(n.userId as any);
+      const creatorId = idOf(n.userId);
       let base = refPos;
       let closestDist = Infinity;
       for (const own of regular) {
-        if (own.nodeId === n.nodeId || idOf(own.userId as any) !== creatorId) continue;
+        if (own.nodeId === n.nodeId || idOf(own.userId) !== creatorId) continue;
         const p = map.get(own.nodeId);
         if (!p) continue;
         const d = Math.hypot(p.x - refPos.x, p.y - refPos.y);
@@ -825,7 +827,7 @@ export function MapPage() {
   // work" on mobile — the picker opened, but some of the very nodes it
   // needed you to tap were off-screen. 110px keeps a full-diameter ring
   // (220px) comfortably inside even a narrow phone width.
-  const isMobileViewport = typeof window !== "undefined" && window.innerWidth <= 640;
+  const isMobileViewport = computeIsMobileViewport();
   const RADIAL_NEIGHBOR_RADIUS = isMobileViewport ? 110 : 190;
   const RADIAL_MAX_NEIGHBORS = 10;
   const radialPositions = useMemo(() => {
@@ -897,6 +899,18 @@ export function MapPage() {
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
     const radial = radialPositions?.get(node.nodeId);
     if (radial) return radial;
+    // A circle's own root/parent renders at its group's own centroid, not
+    // its own raw stored x/y — the other half of "this is what the circle
+    // radiates from" (see NodeCard's own isCircleParent size-bump/stable
+    // treatment): sitting dead center of the ring its children are placed
+    // around, not off to whichever side its own x/y happened to land.
+    // nodeGroups (defined further down this component, referenced here via
+    // closure — same forward-reference pattern already used for
+    // radialPositions above) recomputes cx/cy from real stored positions
+    // any time a member's own x/y actually changes, so this only moves the
+    // root when something in the group genuinely moved, not every render.
+    const ownGroup = nodeGroups.find((g) => g.rootId === node.nodeId);
+    if (ownGroup) return { x: ownGroup.cx, y: ownGroup.cy };
     return positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
   }
 
@@ -1203,60 +1217,18 @@ export function MapPage() {
   }, [nodes]);
 
   // Any node with 2+ direct parentId-children reads as a group ("circle") —
-  // general on purpose, same as linkCycles below: this fires whether the
-  // star came from dragging one node onto another or just from branching
-  // off the same node several times over. Every such node gets a zone now,
-  // unconditionally — majority of the group's own node *types* decides
-  // halo vs horns; a tie, or a group made entirely of "unknown" nodes (the
-  // only type with no ring, so no vote — see sentimentOf), gets a neutral
-  // gray zone instead of no zone at all (see circleSentiment's own doc
-  // comment). Built from visibleNodes, not nodes — a packed-away member
-  // shouldn't still read as a circle child on the canvas it no longer
-  // appears on.
-  const nodeGroups = useMemo(() => {
-    const childrenByParent = new Map<string, NodeDoc[]>();
-    for (const n of visibleNodes) {
-      const parentId = nodeRefId(n.parentId);
-      if (!parentId) continue;
-      if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
-      childrenByParent.get(parentId)!.push(n);
-    }
-    const groups: {
-      rootId: string;
-      members: NodeDoc[];
-      sentiment: Sentiment;
-      cx: number;
-      cy: number;
-      r: number;
-      // The "zone" outline: every member's own current position (root
-      // included), sorted by angle around the centroid so connecting them
-      // in order traces a simple (non-self-crossing) polygon around the
-      // group instead of an old fixed circle — a triangle at the 3-member
-      // minimum (2 children + root), growing to a quad/pentagon/hexagon/…
-      // as the group grows. Recomputed from `positions` on every render
-      // (including mid-drag, via posFor/dragState), so dragging a member
-      // live-deforms its own zone the same way it already moves the
-      // member itself — nothing is a snapshot here. See MapPage's own
-      // "zone" render block and MiniMap's matching one.
-      outline: { x: number; y: number }[];
-    }[] = [];
-    for (const [rootId, children] of childrenByParent) {
-      if (children.length < 2) continue;
-      const root = nodes.find((n) => n.nodeId === rootId);
-      if (!root) continue;
-      const members = [root, ...children];
-      const sentiment = circleSentiment(members);
-      const pts = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-      const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-      const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-      const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
-      const outline = pts
-        .slice()
-        .sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-      groups.push({ rootId, members, sentiment, cx, cy, r, outline });
-    }
-    return groups;
-  }, [visibleNodes, positions]);
+  // general on purpose, same as linkCycles below. See canvasLayout.ts's own
+  // computeNodeGroups doc comment for the full reasoning (zone color vote,
+  // outline polygon, etc.) — the grouping logic itself lives there now as a
+  // pure function of these three inputs, this just wraps it in the memo.
+  // Deliberately still keyed off [visibleNodes, positions] only, not `nodes`
+  // too, even though the function resolves each root against `nodes` —
+  // matching this hook's original dependency list exactly rather than
+  // changing behavior as part of a pure relocation.
+  const nodeGroups = useMemo(
+    () => computeNodeGroups(visibleNodes, nodes, positions),
+    [visibleNodes, positions],
+  );
 
   // Circle-parent nodes always show their caption (see NodeCard's
   // showCaption) — this backfills their real text the moment a node becomes
@@ -1267,6 +1239,15 @@ export function MapPage() {
     if (rootIds.length > 0) ensureNodeText(rootIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeGroups]);
+
+  // A node with no parentId at all always shows its caption too (see
+  // NodeCard's showCaption) — same backfill-on-becoming-one reasoning as
+  // the circle-root effect just above, just keyed off a plainer condition.
+  useEffect(() => {
+    const rootIds = nodes.filter((n) => !n.parentId).map((n) => n.nodeId);
+    if (rootIds.length > 0) ensureNodeText(rootIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes]);
 
   // Every member of the currently-chosen cluster shows its caption too (see
   // NodeCard's inChosenCircle) — backfill all of them the instant a circle
@@ -1339,58 +1320,11 @@ export function MapPage() {
       .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + getNodeMinDist() * 0.6 }));
   }
 
-  // Any closed loop in the Link graph (not branch-arrows, not weapon marks
-  // — specifically the edges "Link nodes" draws) reads as a figure and gets
-  // colored in; a simple two-node link never can, there's nothing to close.
-  // General on purpose: this fires whether the loop was made in one
-  // multi-select or pieced together one link at a time. DFS over an
-  // undirected adjacency, capped on both search depth and result count so
-  // a pathologically dense graph can't make this expensive.
-  const linkCycles = useMemo(() => {
-    if (edges.length > 120) return [];
-    const adjacency = new Map<string, Set<string>>();
-    for (const edge of edges) {
-      const a = nodeRefId(edge.fromNodeId);
-      const b = nodeRefId(edge.toNodeId);
-      if (!a || !b || a === b) continue;
-      if (!adjacency.has(a)) adjacency.set(a, new Set());
-      if (!adjacency.has(b)) adjacency.set(b, new Set());
-      adjacency.get(a)!.add(b);
-      adjacency.get(b)!.add(a);
-    }
-
-    const MAX_CYCLE_LEN = 6;
-    const MAX_CYCLES = 24;
-    const found: string[][] = [];
-    const seenKeys = new Set<string>();
-
-    function dfs(start: string, current: string, path: string[], visiting: Set<string>) {
-      if (found.length >= MAX_CYCLES || path.length > MAX_CYCLE_LEN) return;
-      for (const next of adjacency.get(current) ?? []) {
-        if (found.length >= MAX_CYCLES) return;
-        if (next === start && path.length >= 3) {
-          const key = [...path].sort().join(",");
-          if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            found.push([...path]);
-          }
-          continue;
-        }
-        if (visiting.has(next)) continue;
-        visiting.add(next);
-        path.push(next);
-        dfs(start, next, path, visiting);
-        path.pop();
-        visiting.delete(next);
-      }
-    }
-
-    for (const start of adjacency.keys()) {
-      if (found.length >= MAX_CYCLES) break;
-      dfs(start, start, [start], new Set([start]));
-    }
-    return found;
-  }, [edges]);
+  // Any closed loop in the Link graph reads as a "figure" and gets colored
+  // in — see canvasLayout.ts's own computeLinkCycles doc comment for the
+  // full reasoning; the DFS itself lives there now as a pure function of
+  // `edges` alone, this just wraps it in the memo.
+  const linkCycles = useMemo(() => computeLinkCycles(edges), [edges]);
 
   const indicatorByNode = useMemo(() => {
     const map = new Map<string, AttackIndicator>();
@@ -1785,7 +1719,7 @@ export function MapPage() {
   // rather than the toolbar. Client-side only: this can't stop a crafted
   // request straight to the API, just the UI paths.
   function isOwnNode(node: NodeDoc) {
-    return idOf(node.userId as any) === user?._id;
+    return idOf(node.userId) === user?._id;
   }
 
   // Owner-only — text/type editing isn't otherwise restricted (an earlier
@@ -2596,7 +2530,10 @@ export function MapPage() {
         <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">
           {error || "Map not found"}
         </div>
-        <Link to="/">&larr; {t.map.toolbar.back}</Link>
+        {/* A demo session has nowhere else to go — see the toolbar's own
+            matching omission below, and ProtectedRoute's own redirect,
+            which would just bounce this link straight back here anyway. */}
+        {!user?.isDemo && <Link to="/">&larr; {t.map.toolbar.back}</Link>}
       </div>
     );
   }
@@ -2809,6 +2746,34 @@ export function MapPage() {
                       stroke={color}
                       strokeOpacity={0.5}
                       strokeWidth={2.5}
+                    />
+                  );
+                })}
+              {/*
+                Circle-parent ring: a small automatic version of the manual zone circle just
+                above, drawn around every circle root/parent (circleRootSentimentByNode — same
+                nodes NodeCard's own crown badge marks), colored the same way its zone backdrop
+                already is (majority pos/neg/neutral vote). Same fixed-radius-circle shape as a
+                manual zone, just tighter (close around the node itself, not a wide zone) and
+                never owner-chosen — this one exists for every circle root automatically,
+                alongside the crown badge rather than instead of it.
+              */}
+              {visibleNodes
+                .filter((n) => circleRootSentimentByNode.has(n.nodeId))
+                .map((n) => {
+                  const p = posFor(n);
+                  const color = ZONE_COLORS[circleRootSentimentByNode.get(n.nodeId)!];
+                  return (
+                    <circle
+                      key={`circle-parent-ring-${n.nodeId}`}
+                      cx={p.x}
+                      cy={p.y}
+                      r={34}
+                      fill={color}
+                      fillOpacity={0.16}
+                      stroke={color}
+                      strokeOpacity={0.6}
+                      strokeWidth={2}
                     />
                   );
                 })}
@@ -3230,6 +3195,11 @@ export function MapPage() {
           <div className="absolute top-3 left-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
             {!quickAddActive || forceShowToolbar ? (
             <>
+            {/* Omitted outright for a demo session — see ProtectedRoute's
+                own redirect, which sends "/" straight back here anyway;
+                a demo account has exactly the one map it was seeded with,
+                nowhere else to go back to. */}
+            {!user?.isDemo && (
             <Link
               to="/"
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
@@ -3237,6 +3207,7 @@ export function MapPage() {
             >
               &larr;
             </Link>
+            )}
             <div className="relative">
               <button
                 type="button"

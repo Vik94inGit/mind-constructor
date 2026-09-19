@@ -19,6 +19,11 @@ const UserSchema = new mongoose.Schema(
     googleId: { type: String, unique: true, sparse: true },
     role: { type: String, enum: USER_ROLES, default: "user" },
     isBlocked: { type: Boolean, default: false }, // blocked users can't authenticate, even with a valid token
+    // A throwaway account minted by authAbl.ts's createDemoSessionAbl — a
+    // real user in every other respect (real JWT, real owned map), just
+    // flagged so it can be told apart later (e.g. a future cleanup pass;
+    // none exists yet).
+    isDemo: { type: Boolean, default: false },
   },
   {
     toJSON: {

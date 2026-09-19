@@ -3,12 +3,13 @@ import {
   registerAbl,
   loginAbl,
   googleAuthAbl,
+  createDemoSessionAbl,
   EmailAlreadyInUseError,
   InvalidCredentialsError,
   AccountBlockedError,
   GoogleTokenInvalidError,
 } from "../abl/authAbl.js";
-import { ValidationError } from "../abl/errors.js";
+import { handleAblError } from "./errorHandling.js";
 
 // ========== REGISTER ==========
 export const register = async (req: Request, res: Response) => {
@@ -23,20 +24,16 @@ export const register = async (req: Request, res: Response) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        isDemo: user.isDemo,
       },
     });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof EmailAlreadyInUseError) {
-      return res.status(409).json({ success: false, error: "Email already in use" });
-    }
-    console.error("register error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Internal Server Error",
-    });
+    return handleAblError(
+      res,
+      error,
+      [[EmailAlreadyInUseError, 409, "Email already in use"]],
+      { message: "Internal Server Error", logLabel: "register" },
+    );
   }
 };
 
@@ -53,23 +50,19 @@ export const login = async (req: Request, res: Response) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        isDemo: user.isDemo,
       },
     });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof InvalidCredentialsError) {
-      return res.status(401).json({ success: false, error: "Invalid email or password" });
-    }
-    if (error instanceof AccountBlockedError) {
-      return res.status(403).json({ success: false, error: "This account has been blocked" });
-    }
-    console.error("login error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Internal Server Error",
-    });
+    return handleAblError(
+      res,
+      error,
+      [
+        [InvalidCredentialsError, 401, "Invalid email or password"],
+        [AccountBlockedError, 403, "This account has been blocked"],
+      ],
+      { message: "Internal Server Error", logLabel: "login" },
+    );
   }
 };
 // ========== GOOGLE ==========
@@ -87,22 +80,46 @@ export const googleAuth = async (req: Request, res: Response) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        isDemo: user.isDemo,
       },
     });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof GoogleTokenInvalidError) {
-      return res.status(401).json({ success: false, error: "Invalid Google sign-in" });
-    }
-    if (error instanceof AccountBlockedError) {
-      return res.status(403).json({ success: false, error: "This account has been blocked" });
-    }
-    console.error("google auth error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Internal Server Error",
+    return handleAblError(
+      res,
+      error,
+      [
+        [GoogleTokenInvalidError, 401, "Invalid Google sign-in"],
+        [AccountBlockedError, 403, "This account has been blocked"],
+      ],
+      { message: "Internal Server Error", logLabel: "google auth" },
+    );
+  }
+};
+
+// ========== DEMO ==========
+// No request body — every call mints a brand-new throwaway account and map
+// (see createDemoSessionAbl), so there's nothing to validate and nothing
+// but a 500 to catch.
+export const demoAuth = async (_req: Request, res: Response) => {
+  try {
+    const { user, token, map } = await createDemoSessionAbl();
+
+    return res.status(201).json({
+      success: true,
+      token,
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isDemo: user.isDemo,
+      },
+      map: { mapId: map.mapId },
+    });
+  } catch (error) {
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "demo auth",
     });
   }
 };
@@ -117,10 +134,9 @@ export const logout = async (req: Request, res: Response) => {
         "Logged out successfully. Please remove the token from your client.",
     });
   } catch (error) {
-    console.error("logout error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Internal Server Error",
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "logout",
     });
   }
 };

@@ -19,9 +19,8 @@ const HORNS_RED = "#b23a48";
 // SVG, since OutcomeBadge's own canvas would have to be exactly that 48px
 // circle's size for the two to align at all, and every attempt to cram
 // the ring, wings, and health all into one shared canvas left something
-// misaligned or clipped somewhere. Halo fills with var(--node-fill) — the
-// same theme-aware color the real node's own icon circle underneath it
-// fills with, see index.css — horns fill solid (HORNS_RED) instead; a
+// misaligned or clipped somewhere. Halo is an open ring (fill="none"),
+// nothing behind it painted over — horns fill solid (HORNS_RED) instead; a
 // devil's horns read as a solid dark shape, not an outline. Returns null
 // for a type with no halo/horns framing ("unknown", or a type ringKindFor
 // doesn't classify).
@@ -60,29 +59,13 @@ export function NodeCrown({
         // doc comment), so the halo's own on-screen size is unchanged.
         viewBox="0 0 34 24"
         className="pointer-events-none absolute -top-[10.4px] left-1/2 z-[1] -translate-x-1/2"
-        // A soft drop-shadow, not just the gold stroke alone — var(--surface)
-        // is #ffffff in light mode, the same near-white as the map's own
-        // --paper background it sits on, so the fill alone used to all but
-        // disappear there, leaving just a thin gold ring with no visible
-        // disc behind it. The shadow gives the halo a real edge against any
-        // background regardless of theme (harmless, if redundant, in dark
-        // mode where --surface already contrasts against --paper on its
-        // own).
-        style={{ filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35))" }}
         aria-hidden="true"
       >
-        {/* A plain black outline ring in light mode, not a drop-shadow — a
-            shadow/glow filter read as a soft, blurry halo-around-the-halo
-            instead of a crisp edge, especially at this small a size.
-            Drawn first, larger than the real halo below (+1 on both radii)
-            with a wide stroke and no fill, so only its own outer sliver
-            peeks out from behind the real halo's fill+gold stroke, reading
-            as a thin black rim around the whole shape. var(--crown-outline)
-            is transparent in dark mode (see index.css), where --node-fill
-            (black there) already contrasts against --paper on its own — so
-            this second ellipse renders nothing extra there. */}
-        <ellipse cx="17" cy="12" rx="16" ry="7.5" fill="none" stroke="var(--crown-outline)" strokeWidth="2" />
-        <ellipse cx="17" cy="12" rx="15" ry="6.5" fill="var(--node-fill)" stroke={HALO_GOLD} strokeWidth="2.5" />
+        {/* No fill — an open gold ring, not a disc. Whatever's behind it
+            (the node icon itself, sitting just below) shows straight
+            through the middle instead of the halo painting its own
+            backdrop over it. */}
+        <ellipse cx="17" cy="12" rx="15" ry="6.5" fill="none" stroke={HALO_GOLD} strokeWidth="4.5" />
       </svg>
     );
   }
