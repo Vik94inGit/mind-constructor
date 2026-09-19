@@ -19,13 +19,6 @@ console.log(
 );
 
 const app: Express = express();
-app.get("/__debug", (req, res) => {
-  console.log("🔥🔥🔥 DEBUG ENDPOINT HIT 🔥🔥🔥");
-  res.status(200).json({
-    server: "THIS IS MY EXPRESS SERVER",
-    port: PORT,
-  });
-});
 const PORT: number = Number(process.env.PORT) || 3000;
 
 console.log("DEBUG: Script is starting...");

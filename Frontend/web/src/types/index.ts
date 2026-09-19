@@ -70,6 +70,8 @@ export interface User {
   email: string;
   role?: "user" | "admin";
   isBlocked?: boolean;
+  /** A throwaway "try without registering" account (see Backend's createDemoSessionAbl) — gates ProtectedRoute's dashboard/home redirect. */
+  isDemo?: boolean;
 }
 
 export interface MemberColor {

@@ -75,4 +75,11 @@ export const MapSchema = new mongoose.Schema(
   },
 );
 
+// members: queried via $or/members filter in getMapsDao, getMapByIdDao,
+// getNodesByMapDao, getNodesTextDao, getMapSummaryDao, removeUserFromMapsDao.
+MapSchema.index({ members: 1 });
+// ownerId: queried in getMapsDao (filterType "owned"), deleteMapDao,
+// listMapsByOwnerDao, inviteUserToMapDao, updateMapDao.
+MapSchema.index({ ownerId: 1 });
+
 export const Map = mongoose.model("Map", MapSchema);

@@ -1,10 +1,21 @@
 const API_URL: string = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const TOKEN_KEY = "mc_token";
+// The one map a demo session (see api/auth.ts's tryDemo) is ever allowed
+// onto — ProtectedRoute reads this to bounce a demo user's own dashboard/
+// home requests straight back to it instead. Cleared alongside the token
+// (see clearToken below) so a stale id from an earlier demo session never
+// leaks into whatever logs in next in the same browser.
+const DEMO_MAP_ID_KEY = "mc_demo_map_id";
 
 export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
 export const setToken = (token: string): void => localStorage.setItem(TOKEN_KEY, token);
-export const clearToken = (): void => localStorage.removeItem(TOKEN_KEY);
+export const getDemoMapId = (): string | null => localStorage.getItem(DEMO_MAP_ID_KEY);
+export const setDemoMapId = (mapId: string): void => localStorage.setItem(DEMO_MAP_ID_KEY, mapId);
+export const clearToken = (): void => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(DEMO_MAP_ID_KEY);
+};
 
 export class ApiRequestError extends Error {
   status: number;

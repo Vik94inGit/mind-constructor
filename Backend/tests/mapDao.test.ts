@@ -11,7 +11,6 @@ import {
   updateMapDao,
   inviteUserToMapDao,
   deleteMapDao,
-  listMapIdsDao,
   listMapsByOwnerDao,
   getMapSummaryDao,
   setMemberColorMutationDao,
@@ -59,8 +58,14 @@ describe("mapsDao", () => {
     expect(result).toEqual(mockMap);
   });
 
+  // Map.find(query).lean() — a real Mongoose Query stays chainable across
+  // .lean() and is itself thenable, so the mock needs the same shape.
+  function leanFind(result: unknown[]) {
+    return { lean: vi.fn().mockResolvedValue(result) } as never;
+  }
+
   it("getMapsDao - 'owned' filter queries by ownerId", async () => {
-    vi.mocked(Map.find).mockResolvedValue([] as never);
+    vi.mocked(Map.find).mockReturnValue(leanFind([]));
 
     await getMapsDao("user1", "owned");
 
@@ -68,7 +73,7 @@ describe("mapsDao", () => {
   });
 
   it("getMapsDao - 'shared' filter excludes maps the user owns", async () => {
-    vi.mocked(Map.find).mockResolvedValue([] as never);
+    vi.mocked(Map.find).mockReturnValue(leanFind([]));
 
     await getMapsDao("user1", "shared");
 
@@ -79,11 +84,42 @@ describe("mapsDao", () => {
   });
 
   it("getMapsDao - defaults to 'all' membership", async () => {
-    vi.mocked(Map.find).mockResolvedValue([] as never);
+    vi.mocked(Map.find).mockReturnValue(leanFind([]));
 
     await getMapsDao("user1");
 
     expect(Map.find).toHaveBeenCalledWith({ $or: [{ members: "user1" }] });
+  });
+
+  it("getMapsDao - strips _id/__v and internal-only fields, keeps memberCount", async () => {
+    vi.mocked(Map.find).mockReturnValue(
+      leanFind([
+        {
+          _id: "m1",
+          __v: 0,
+          mapId: "pub123",
+          name: "Test",
+          color: "#fff",
+          ownerId: "user1",
+          members: ["user1", "user2"],
+          memberColors: [{ userId: "user1", color: "#fff" }],
+          pendingInvites: [],
+          selectedCircle: null,
+        },
+      ]),
+    );
+
+    const result = await getMapsDao("user1");
+
+    expect(result).toEqual([
+      {
+        mapId: "pub123",
+        name: "Test",
+        color: "#fff",
+        ownerId: "user1",
+        memberCount: 2,
+      },
+    ]);
   });
 
   it("getMapByIdDao - finds a map the user is a member of", async () => {
@@ -116,22 +152,23 @@ describe("mapsDao", () => {
   it("getNodesByMapDao - returns all nodes on the map for a member", async () => {
     const map = { _id: "m1", mapId: "pub123" };
     vi.mocked(Map.findOne).mockResolvedValue(map as never);
-    // Node.find(...).select(...).populate(...).populate(...).populate(...) —
-    // a real Mongoose Query stays chainable across select()/populate() and
-    // is itself thenable, so the mock needs the same shape.
+    // Node.find(...).select(...).populate(...)x5.lean() — a real Mongoose
+    // Query stays chainable across select()/populate()/lean() and is itself
+    // thenable, so the mock needs the same shape.
     const chain: any = {};
     chain.select = vi.fn().mockReturnValue(chain);
     chain.populate = vi.fn().mockReturnValue(chain);
-    chain.then = (resolve: any) => resolve([{ text: "n1" }]);
+    chain.lean = vi.fn().mockResolvedValue([{ text: "n1" }]);
     vi.mocked(Node.find).mockReturnValue(chain);
 
     const result = await getNodesByMapDao("pub123", "user1");
 
     expect(Node.find).toHaveBeenCalledWith({ mapId: "m1" });
-    expect(chain.select).toHaveBeenCalledWith("-text");
+    expect(chain.select).toHaveBeenCalledWith("-text -_id -__v");
     expect(chain.populate).toHaveBeenNthCalledWith(1, "userId", "username");
-    expect(chain.populate).toHaveBeenNthCalledWith(2, "parentId", "nodeId text type");
-    expect(chain.populate).toHaveBeenNthCalledWith(3, "targetNodeId", "nodeId text type");
+    expect(chain.populate).toHaveBeenNthCalledWith(2, "parentId", "-_id nodeId text type");
+    expect(chain.populate).toHaveBeenNthCalledWith(3, "targetNodeId", "-_id nodeId text type");
+    expect(chain.lean).toHaveBeenCalled();
     expect(result).toEqual([{ text: "n1" }]);
   });
 
@@ -215,16 +252,6 @@ describe("mapsDao", () => {
     expect(Node.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
     expect(Map.findByIdAndDelete).toHaveBeenCalledWith("m1");
     expect(result).toEqual(map);
-  });
-
-  it("listMapIdsDao - selects only the public mapId field", async () => {
-    const mockIds = [{ mapId: "a" }, { mapId: "b" }];
-    vi.mocked(Map.find).mockResolvedValue(mockIds as never);
-
-    const result = await listMapIdsDao();
-
-    expect(Map.find).toHaveBeenCalledWith({}, "mapId");
-    expect(result).toEqual(mockIds);
   });
 
   it("listMapsByOwnerDao - queries maps by ownerId", async () => {

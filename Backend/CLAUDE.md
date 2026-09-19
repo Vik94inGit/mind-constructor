@@ -106,6 +106,14 @@ payload)` is the one function controllers call after a mutation commits; it's a 
   creating a brand-new one with a username derived from the email's local part. `User.passwordHash`
   is therefore optional: a Google-only account never gets one, and `loginAbl` treats that the same
   as a wrong password rather than a distinct error, so a probing login can't tell which case it hit.
+- **`src/abl/authAbl.ts`** `createDemoSessionAbl` (`POST /api/auth/demo`, no request body) — "try it
+  without registering": mints a throwaway `User` (`isDemo: true`, no password/googleId,
+  `createDemoUserDao`) and a real, already-seeded `Map` for it via `mapAbl.ts`'s own `createMapAbl`
+  (the `"demo"` `MAP_TEMPLATES` entry — a Problem with two Option children, each with its own
+  Success/Fail child, so it's already an auto-detected circle). Isolated per visitor, not a shared
+  map — every call creates a brand-new account+map pair. Returns the same `{ token, user }` shape
+  every other auth endpoint does, plus `{ map: { mapId } }` so the frontend can navigate straight
+  there. No cleanup job for these accounts exists yet.
 - **`src/abl/circleAbl.ts`** — a "circle" is a node with 2+ direct `parentId`-children (the
   parentId "star" a frontend draws as a plain translucent, sentiment-colored backdrop — positive-
   majority halo color vs. negative-majority horns color, no actual halo/horns/wings artwork).

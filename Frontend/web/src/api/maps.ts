@@ -46,14 +46,6 @@ export async function inviteMember(mapId: string, userIdToInvite: string): Promi
   return res.map;
 }
 
-export async function setMyColor(mapId: string, color: string): Promise<MapDoc> {
-  const res = await apiRequest<{ success: boolean; map: MapDoc }>(`/api/${mapId}/color`, {
-    method: "PATCH",
-    body: { color },
-  });
-  return res.map;
-}
-
 export interface MapSummary extends MapDoc {
   nodeCount: number;
   // Zero-filled for every known NodeType, not just the ones present on the

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, NodeDoc } from "../types";
@@ -78,7 +78,7 @@ interface Props {
   vScrollMargin: number;
 }
 
-export function MiniMap({
+export const MiniMap = memo(function MiniMap({
   wrapRef,
   nodes,
   edges,
@@ -398,4 +398,4 @@ export function MiniMap({
       </svg>
     </div>
   );
-}
+});

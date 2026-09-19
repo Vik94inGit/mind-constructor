@@ -5,12 +5,6 @@ import { Attack, type WeaponKey } from "../models/Attack.js";
 
 type InternalId = mongoose.Types.ObjectId | string;
 
-export const getLastAttackDao = async (attackerId: string, weapon: WeaponKey) => {
-  return await Attack.findOne({ attackerId, weapon })
-    .sort({ createdAt: -1 })
-    .lean();
-};
-
 export const applyDamageDao = async (
   nodeInternalId: InternalId,
   newHealth: number,
@@ -42,12 +36,13 @@ export const logAttackDao = async (attackData: {
 // nothing else in this app un-defeats a node either, so healing isn't
 // special-cased into becoming the first thing that does.
 export const healNodeDao = async (nodeInternalId: InternalId, amount: number) => {
-  const node = await Node.findById(nodeInternalId);
-  if (!node) return null;
-  const newHealth = Math.min(100, (node.health ?? 100) + amount);
+  // Single atomic update via an aggregation-pipeline update expression,
+  // instead of a read-then-write pair — health defaults to 100 in the
+  // schema, but a document read via a plain query could still (in theory)
+  // predate that default, so $ifNull mirrors the old `?? 100` fallback.
   return await Node.findByIdAndUpdate(
     nodeInternalId,
-    { $set: { health: newHealth } },
+    [{ $set: { health: { $min: [100, { $add: [{ $ifNull: ["$health", 100] }, amount] }] } } }],
     { new: true },
   ).populate(NODE_POPULATE);
 };

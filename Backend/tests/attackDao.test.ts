@@ -2,7 +2,6 @@ import { describe, beforeEach, it, expect, vi } from "vitest";
 import { Node } from "../src/models/Node.js";
 import { Attack } from "../src/models/Attack.js";
 import {
-  getLastAttackDao,
   applyDamageDao,
   logAttackDao,
   getAttackHistoryByNodeDao,
@@ -24,15 +23,6 @@ vi.mock("../src/models/Attack.js", async () => {
 describe("attackDao", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it("getLastAttackDao - looks up the attacker's most recent use of a weapon", async () => {
-    const lean = vi.fn().mockResolvedValue({ createdAt: new Date() });
-    vi.mocked(Attack.findOne).mockReturnValue({ sort: () => ({ lean }) } as never);
-
-    await getLastAttackDao("attacker1", "nitpick");
-
-    expect(Attack.findOne).toHaveBeenCalledWith({ attackerId: "attacker1", weapon: "nitpick" });
   });
 
   it("applyDamageDao - sets health and defeated on the node", async () => {

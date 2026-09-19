@@ -7,7 +7,10 @@
 :root {
   --ink: #181b24;
   --ink-soft: #565e72;
-  --paper: #f8f9fb;
+  /* Light cream-brown, not near-white — swapped with --node-fill below so
+     a node's own white fill actually stands out against the canvas
+     instead of both reading as roughly the same near-white. */
+  --paper: #f1e1cc;
   --surface: #ffffff;
   --surface-2: #eaecf1;
   --line: #dce0e8;
@@ -42,49 +45,21 @@
 
   /* NodeCard own inner icon circle color, shared with QuickAddGhosts own
      ghost preview fill (see both callers own bg-[var(--node-fill)] usage)
-     so a real node and the ghost that previewed it always look the same,
-     not a light preview standing in for a solid black node. Light-brown
-     here, the same tan as --accent-soft above, not plain white — ties the
-     node fill into the app own existing brand palette instead of a
-     neutral white. Written as its own literal hex, not var(--accent-soft)
-     — Tailwind own CSS processing here silently drops a custom property
-     whose value is itself a var() reference (confirmed live: --node-fill
-     computed to an empty string, and the node fill rendered fully
-     transparent, when this was var(--accent-soft) instead), so this stays
-     a plain color that happens to match --accent-soft rather than a
-     reference to it; if --accent-soft above ever changes, update this by
-     hand too. Dark mode keeps the black this was always hardcoded to
+     so a real node and the ghost that previewed it always look the same.
+     Plain white here, not the light-brown/tan this used to be — that tan
+     moved to --paper above instead, so the swap reads as "nodes are the
+     bright thing sitting on a warm canvas" rather than both landing on
+     roughly the same near-white. Written as its own literal hex, not
+     var(--surface) — Tailwind own CSS processing here silently drops a
+     custom property whose value is itself a var() reference (confirmed
+     live: --node-fill computed to an empty string, and the node fill
+     rendered fully transparent, when this was a var() reference instead),
+     so this stays a plain color rather than a reference to another
+     variable. Dark mode keeps the black this was always hardcoded to
      before — every node-type and OutcomeBadge color was tuned for a dark
      backdrop there, and dark mode own --surface, a dark navy, would not
      read as a meaningfully different choice anyway. */
-  --node-fill: #f1e1cc;
-
-  /* NodeCrown's own halo outline — a plain black ring around the whole
-     halo shape (fill + gold stroke both) in light mode, replacing an
-     earlier drop-shadow attempt that read as a faint, blurry glow rather
-     than a real edge. Transparent in dark mode (below): the halo's own
-     --node-fill (black there) already reads clearly against --paper's
-     dark navy on its own, so an extra outline would be pure noise. */
-  --crown-outline: #000000;
-
-  /* NodeCard own inner icon circle color, shared with QuickAddGhosts own
-     ghost preview fill (see both callers own bg-[var(--node-fill)] usage)
-     so a real node and the ghost that previewed it always look the same,
-     not a light preview standing in for a solid black node. Light-brown
-     here, the same tan as --accent-soft above, not plain white — ties the
-     node fill into the app own existing brand palette instead of a
-     neutral white. Written as its own literal hex, not var(--accent-soft)
-     — Tailwind own CSS processing here silently drops a custom property
-     whose value is itself a var() reference (confirmed live: --node-fill
-     computed to an empty string, and the node fill rendered fully
-     transparent, when this was var(--accent-soft) instead), so this stays
-     a plain color that happens to match --accent-soft rather than a
-     reference to it; if --accent-soft above ever changes, update this by
-     hand too. Dark mode keeps the black this was always hardcoded to
-     before — every node-type and OutcomeBadge color was tuned for a dark
-     backdrop there, and dark mode own --surface, a dark navy, would not
-     read as a meaningfully different choice anyway. */
-  --node-fill: #f1e1cc;
+  --node-fill: #ffffff;
 
   --radius: 10px;
   --shadow: 0 1px 2px rgba(24, 27, 36, 0.06), 0 6px 20px -8px rgba(24, 27, 36, 0.15);
@@ -139,9 +114,6 @@
        black this was hardcoded to before, just expressed as a variable
        now so light mode above can differ. */
     --node-fill: #000000;
-    /* See :root own --crown-outline comment above — no outline needed
-       here, so this stays transparent. */
-    --crown-outline: transparent;
 }
 
 @theme inline {

@@ -140,4 +140,17 @@ export const NodeSchema = new mongoose.Schema(
   },
 );
 
+// mapId: every map-load query (getNodesByMapDao, listNodesByMapInternalIdDao,
+// countNodesByMapInternalIdDao, ...) filters on this.
+NodeSchema.index({ mapId: 1 });
+// parentId: circleAbl.ts's circle detection and the cascadeAfterNodeDeleted
+// parentId-clearing update both filter on this unscoped by anything else.
+NodeSchema.index({ parentId: 1 });
+// targetNodeId: cascadeAfterNodeDeleted's weapon-node cleanup filters on this
+// (combined with isWeapon) unscoped by anything else.
+NodeSchema.index({ targetNodeId: 1 });
+// Compound, matching findActiveProtectorDao's exact filter shape (checked on
+// every attack).
+NodeSchema.index({ protectsNodeId: 1, isProtection: 1, defeated: 1 });
+
 export const Node = mongoose.model("Node", NodeSchema);

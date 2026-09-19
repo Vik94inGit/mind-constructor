@@ -26,6 +26,8 @@ export interface Translation {
       noAccount: string;
       registerLink: string;
       genericError: string;
+      tryDemo: string;
+      tryDemoBusy: string;
     };
     register: {
       title: string;
@@ -143,6 +145,8 @@ const en: Translation = {
       noAccount: "No account?",
       registerLink: "Register",
       genericError: "Something went wrong",
+      tryDemo: "Try it without an account",
+      tryDemoBusy: "Setting up your demo…",
     },
     register: {
       title: "Create your account",
@@ -252,6 +256,8 @@ const cs: Translation = {
       noAccount: "Nemáte účet?",
       registerLink: "Registrovat se",
       genericError: "Něco se pokazilo",
+      tryDemo: "Vyzkoušet bez účtu",
+      tryDemoBusy: "Připravujeme vaše demo…",
     },
     register: {
       title: "Vytvořte si účet",
@@ -361,6 +367,8 @@ const uk: Translation = {
       noAccount: "Немає облікового запису?",
       registerLink: "Зареєструватися",
       genericError: "Щось пішло не так",
+      tryDemo: "Спробувати без реєстрації",
+      tryDemoBusy: "Готуємо вашу демо-версію…",
     },
     register: {
       title: "Створіть обліковий запис",
@@ -470,6 +478,8 @@ const ru: Translation = {
       noAccount: "Нет аккаунта?",
       registerLink: "Зарегистрироваться",
       genericError: "Что-то пошло не так",
+      tryDemo: "Попробовать без регистрации",
+      tryDemoBusy: "Готовим ваше демо…",
     },
     register: {
       title: "Создайте аккаунт",

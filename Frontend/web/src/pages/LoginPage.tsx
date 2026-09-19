@@ -7,7 +7,7 @@ import { GoogleSignInButton } from "../components/GoogleSignInButton";
 import { useI18n } from "../i18n/I18nContext";
 
 export function LoginPage() {
-  const { login, loginWithGoogle, user } = useAuth();
+  const { login, loginWithGoogle, tryDemo, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useI18n();
@@ -41,6 +41,22 @@ export function LoginPage() {
     try {
       await loginWithGoogle(idToken);
       navigate("/", { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.auth.login.genericError);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Straight to the freshly-seeded demo map, not "/" — a visitor trying the
+  // app without an account wants to land on something to actually look at,
+  // not an otherwise-empty dashboard with one map card on it.
+  async function onTryDemo() {
+    setError(null);
+    setBusy(true);
+    try {
+      const mapId = await tryDemo();
+      navigate(`/maps/${mapId}`, { replace: true });
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.auth.login.genericError);
     } finally {
@@ -97,6 +113,14 @@ export function LoginPage() {
         <div className="flex justify-center">
           <GoogleSignInButton onCredential={onGoogleCredential} />
         </div>
+        <button
+          type="button"
+          onClick={onTryDemo}
+          disabled={busy}
+          className="mt-3 inline-flex w-full cursor-pointer items-center justify-center rounded-lg border border-line bg-transparent px-4 py-[0.55rem] text-[0.85rem] font-medium text-ink-soft transition-[background-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? t.auth.login.tryDemoBusy : t.auth.login.tryDemo}
+        </button>
         <div className="mt-4 text-center text-[0.85rem] text-ink-soft">
           {t.auth.login.noAccount} <Link to="/register">{t.auth.login.registerLink}</Link>
         </div>

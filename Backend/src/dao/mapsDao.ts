@@ -17,7 +17,11 @@ export const getMapsDao = async (
       : filterType === "shared"
         ? { members: currentUserId, ownerId: { $ne: currentUserId } }
         : { $or: [{ members: currentUserId }] };
-  const maps = await Map.find(query);
+  // .lean() — this list is only ever serialized to JSON for the dashboard,
+  // never mutated/saved back. A leaned result skips the schema's own toJSON
+  // transform (which normally strips _id/__v), so those are stripped by
+  // hand below instead, same as m.toJSON() used to do.
+  const maps = await Map.find(query).lean();
   // A dashboard card only ever needs enough to render itself
   // (name/color/ownerId) plus how many members there are — memberColors/
   // pendingInvites/selectedCircle used to ride along on every card in this
@@ -28,7 +32,7 @@ export const getMapsDao = async (
   // itself is dropped the same way here, replaced by its own length —
   // never sent as the raw id array on this list endpoint.
   return maps.map((m) => {
-    const { memberColors, pendingInvites, selectedCircle, members, ...rest } = m.toJSON();
+    const { memberColors, pendingInvites, selectedCircle, members, _id, __v, ...rest } = m as any;
     return { ...rest, memberCount: Array.isArray(members) ? members.length : 0 };
   });
 };
@@ -65,6 +69,22 @@ export const findPublicMapIdDao = async (mapInternalId: unknown): Promise<string
   return map?.mapId ?? null;
 };
 
+// Batched counterpart of findPublicMapIdDao — resolves several internal map
+// _ids to their public mapIds in one query instead of one round-trip each.
+// Used by nodeController.ts's deleteManyNodes, which already has each
+// deleted node's own (internal) mapId in hand and only needs to dedupe +
+// resolve the unique ones actually touched by a given batch.
+export const findPublicMapIdsDao = async (
+  mapInternalIds: unknown[],
+): Promise<Record<string, string>> => {
+  const maps = await Map.find({ _id: { $in: mapInternalIds } }, "mapId").lean<
+    { _id: { toString(): string }; mapId: string }[]
+  >();
+  const byInternalId: Record<string, string> = {};
+  for (const m of maps) byInternalId[m._id.toString()] = m.mapId;
+  return byInternalId;
+};
+
 export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   // Only members of the map may list its nodes; all members see all nodes.
   const map = await Map.findOne({ mapId: publicMapId, members: userId });
@@ -96,13 +116,23 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   // "nodeId text type" projection as-is: those are reference labels for a
   // bounded few other nodes, not the whole map, so there's nothing to save
   // by stripping them too.
+  // .lean() — this list is only ever serialized to JSON on every map load,
+  // never mutated/saved back. A leaned result skips the schema's own toJSON
+  // transform (which normally strips _id/__v on the node itself, and on any
+  // populated Node-ref field, since those apply Node's own transform too
+  // when serialized as nested documents) — replicated here via projection
+  // instead: "-_id" on the node itself and on every populated Node ref.
+  // userId (a User ref) is left as-is: User's own toJSON only strips __v,
+  // not _id, so its populated shape here already matches that (select
+  // "username" alone still includes _id by default, same as before).
   return await Node.find({ mapId: map._id })
-    .select("-text")
+    .select("-text -_id -__v")
     .populate("userId", "username")
-    .populate("parentId", "nodeId text type")
-    .populate("targetNodeId", "nodeId text type")
-    .populate("protectsNodeId", "nodeId text type")
-    .populate("packedIntoNodeId", "nodeId text type");
+    .populate("parentId", "-_id nodeId text type")
+    .populate("targetNodeId", "-_id nodeId text type")
+    .populate("protectsNodeId", "-_id nodeId text type")
+    .populate("packedIntoNodeId", "-_id nodeId text type")
+    .lean();
 };
 
 // Bulk, on-demand fetch of just the `text` field for a set of nodes on one
@@ -217,10 +247,6 @@ export const deleteMapDao = async (publicMapId: string, userId: string) => {
 
   // 3. Delete the map itself using its internal Mongo _id
   return await Map.findByIdAndDelete(map._id);
-};
-
-export const listMapIdsDao = async () => {
-  return await Map.find({}, "mapId");
 };
 
 export const listMapsByOwnerDao = async (ownerId: string) => {

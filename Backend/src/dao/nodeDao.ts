@@ -10,6 +10,21 @@ export const findNodeByPublicIdDao = async (publicNodeId: string) => {
   return await Node.findOne({ nodeId: publicNodeId });
 };
 
+// Batched counterpart of findNodeByPublicIdDao — resolves several public
+// nodeIds within one map in a single query, scoped to that map up front (a
+// node belonging to a different map simply won't come back, same effective
+// result as findNodeByPublicIdDao + a separate cross-map check). Used by
+// packAbl.ts's member validation instead of one findNodeByPublicIdDao call
+// per picked node. Unpopulated, same reasoning as findNodeByInternalIdDao —
+// the caller only tests membership/ownership fields, not a client-shaped
+// response.
+export const findNodesByPublicIdsDao = async (
+  publicNodeIds: string[],
+  mapInternalId: MapInternalId,
+) => {
+  return await Node.find({ nodeId: { $in: publicNodeIds }, mapId: mapInternalId });
+};
+
 // Internal-id lookup, unpopulated — used specifically by attackAbl's
 // retaliation rule to resolve a weapon node's own targetNodeId (an
 // internal ObjectId ref, not a public nodeId) back to the real node it
@@ -27,12 +42,18 @@ export const findNodeByInternalIdDao = async (
 // { nodeId, text, type }, userId to { username }) — otherwise a node that
 // arrives via create/update/attack instead of the initial list fetch looks
 // different (raw internal ObjectIds) until the next full reload.
+// mapId is included (just its own public mapId field) so a populated node
+// already carries the map's public id — controllers that used to make a
+// separate findPublicMapIdDao round-trip after a mutation that already
+// returns a NODE_POPULATE'd node can read it straight off the node instead
+// (see nodeController.ts/edgeController.ts).
 export const NODE_POPULATE = [
   { path: "userId", select: "username" },
   { path: "parentId", select: "nodeId text type" },
   { path: "targetNodeId", select: "nodeId text type" },
   { path: "protectsNodeId", select: "nodeId text type" },
   { path: "packedIntoNodeId", select: "nodeId text type" },
+  { path: "mapId", select: "mapId" },
 ];
 
 // Pure mutation — the membership check and the isFirstNode calculation both
@@ -92,6 +113,15 @@ export const createWeaponNodeMutationDao = async (
     isWeapon: true,
     weaponIcon: data.weaponIcon,
     targetNodeId: data.targetNodeId,
+    // Parented to its own target on arrival — every other new node gets an
+    // easy, already-chosen parent for free (branching off an existing one
+    // via "create child here"/quick-add); a weapon node used to be the one
+    // exception, always born parentless and needing its own separate
+    // drag-to-join-a-circle afterward to get one at all. An objection
+    // reads naturally as attached to the thing it objects to anyway, and
+    // this can still be dragged elsewhere or cleared later like any other
+    // node's parentId.
+    parentId: data.targetNodeId,
   });
   return weaponNode.populate(NODE_POPULATE);
 };
@@ -264,8 +294,11 @@ const cascadeAfterNodeDeleted = async (node: InstanceType<typeof Node>) => {
 
   await Promise.all([
     Edge.deleteMany({ $or: [{ fromNodeId: node._id }, { toNodeId: node._id }] }),
-    Node.updateMany({ parentId: node._id }, { $set: { parentId: null } }),
-    Node.deleteMany({ isWeapon: true, targetNodeId: node._id }),
+    // Scoped to the deleted node's own map — without mapId these two used to
+    // scan every node in the whole database looking for a matching
+    // parentId/targetNodeId, not just this node's own map.
+    Node.updateMany({ mapId: node.mapId, parentId: node._id }, { $set: { parentId: null } }),
+    Node.deleteMany({ mapId: node.mapId, isWeapon: true, targetNodeId: node._id }),
     // Deleting a protected node takes its shields down with it — same
     // "the thing it points at is gone, so it goes too" reasoning as the
     // weapon-node line above. Any *other* protector's own blockedDamage
@@ -287,7 +320,12 @@ export const deleteNodeDao = async (publicNodeId: string, userId: string) => {
   const node = await Node.findOneAndDelete({ nodeId: publicNodeId, userId });
   if (!node) return null;
 
+  // cascadeAfterNodeDeleted needs node.mapId as a raw ObjectId to scope its
+  // own queries, so it runs before this populates it — only afterward do we
+  // resolve it to the map's public id, so the controller can read it straight
+  // off the returned node instead of its own separate findPublicMapIdDao call.
   const damagedProtectedNode = await cascadeAfterNodeDeleted(node);
+  await node.populate({ path: "mapId", select: "mapId" });
   return { node, damagedProtectedNode };
 };
 

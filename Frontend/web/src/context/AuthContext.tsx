@@ -12,6 +12,11 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  /** "Try it without registering" — see api/auth.ts's tryDemo. Resolves to
+   *  the freshly-seeded demo map's own id so the caller can navigate
+   *  straight there, the one thing this flow needs that every other login
+   *  path here doesn't. */
+  tryDemo: () => Promise<string>;
   logout: () => Promise<void>;
   refreshSelf: () => Promise<void>;
 }
@@ -60,6 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await authApi.googleLogin(idToken));
   }, []);
 
+  const tryDemo = useCallback(async () => {
+    const { user: demoUser, mapId } = await authApi.tryDemo();
+    setUser(demoUser);
+    return mapId;
+  }, []);
+
   const logout = useCallback(async () => {
     await authApi.logout();
     setUser(null);
@@ -83,10 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       loginWithGoogle,
+      tryDemo,
       logout,
       refreshSelf,
     }),
-    [user, loading, login, register, loginWithGoogle, logout, refreshSelf],
+    [user, loading, login, register, loginWithGoogle, tryDemo, logout, refreshSelf],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

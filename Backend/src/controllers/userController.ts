@@ -14,6 +14,7 @@ import {
   CannotActOnSelfError,
   UserNotFoundError,
 } from "../abl/userAbl.js";
+import { handleAblError } from "./errorHandling.js";
 
 interface idParams {
   id: string;
@@ -50,10 +51,10 @@ export const createUser = async (req: Request, res: Response) => {
 
     return res.status(201).json(toPublicUser(user));
   } catch (error) {
-    console.error("createUser error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "createUser",
+    });
   }
 };
 
@@ -63,10 +64,10 @@ export const getAllUsers = async (req: Request, res: Response) => {
     const users = Array.isArray(result) ? result : [];
     return res.status(200).json(users.map(toPublicUser));
   } catch (error) {
-    console.error("getAllUsers error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "getAllUsers",
+    });
   }
 };
 
@@ -81,10 +82,10 @@ export const getUserById = async (req: Request<idParams>, res: Response) => {
 
     return res.status(200).json(toPublicUser(user));
   } catch (error) {
-    console.error("getUserById error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "getUserById",
+    });
   }
 };
 
@@ -113,10 +114,10 @@ export const updateUser = async (req: Request<idParams>, res: Response) => {
 
     return res.status(200).json(toPublicUser(user));
   } catch (error) {
-    console.error("updateUser error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "updateUser",
+    });
   }
 };
 
@@ -133,16 +134,15 @@ export const deleteUser = async (req: Request<idParams>, res: Response) => {
 
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
-    if (error instanceof CannotActOnSelfError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof UserNotFoundError) {
-      return res.status(404).json({ success: false, error: "User not found" });
-    }
-    console.error("deleteUser error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [CannotActOnSelfError, 400, (e) => ({ error: e.message })],
+        [UserNotFoundError, 404, "User not found"],
+      ],
+      { message: "Internal Server Error", logLabel: "deleteUser" },
+    );
   }
 };
 
@@ -159,16 +159,15 @@ export const blockUser = async (req: Request<idParams>, res: Response) => {
 
     return res.status(200).json({ success: true, user: toPublicUser(user) });
   } catch (error) {
-    if (error instanceof CannotActOnSelfError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof UserNotFoundError) {
-      return res.status(404).json({ success: false, error: "User not found" });
-    }
-    console.error("blockUser error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [CannotActOnSelfError, 400, (e) => ({ error: e.message })],
+        [UserNotFoundError, 404, "User not found"],
+      ],
+      { message: "Internal Server Error", logLabel: "blockUser" },
+    );
   }
 };
 
@@ -180,13 +179,10 @@ export const unblockUser = async (req: Request<idParams>, res: Response) => {
 
     return res.status(200).json({ success: true, user: toPublicUser(user) });
   } catch (error) {
-    if (error instanceof UserNotFoundError) {
-      return res.status(404).json({ success: false, error: "User not found" });
-    }
-    console.error("unblockUser error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [[UserNotFoundError, 404, "User not found"]], {
+      message: "Internal Server Error",
+      logLabel: "unblockUser",
+    });
   }
 };
 
@@ -204,9 +200,9 @@ export const deleteAll = async (req: Request, res: Response) => {
       .status(200)
       .json({ success: true, message: "All users deleted" });
   } catch (error) {
-    console.error("deleteAllUsers error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "deleteAllUsers",
+    });
   }
 };

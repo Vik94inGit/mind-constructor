@@ -1,6 +1,8 @@
+import { memo } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
+import { isMobileViewport } from "../utils/canvasLayout";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
@@ -48,9 +50,13 @@ const GHOST_SCALE = 0.85;
 // (crown/wings included) and the ring than the bare wing-clearance floor
 // strictly requires, so the ring reads as clearly its own thing around the
 // node rather than crowding right up against it.
-const isMobileViewport = typeof window !== "undefined" && window.innerWidth <= 640;
-const RADIUS = isMobileViewport ? 104 : 126;
-const EDGE_MARGIN = isMobileViewport ? 38 : 58;
+//
+// RADIUS/EDGE_MARGIN themselves are computed inside the component body (see
+// below), not here at module scope — a module-level `window.innerWidth`
+// read is only ever evaluated once, at first import, so it never picks up a
+// resize or rotation after the page first loads. isMobileViewport() (shared
+// with getNodeMinDist/MapPage/NodePanel — see utils/canvasLayout.ts) is a
+// plain function precisely so every call site can read it live instead.
 
 interface Props {
   anchorPos: { x: number; y: number };
@@ -63,7 +69,13 @@ interface Props {
 // node type. Clicking a ghost creates a real node of that type at the ghost's
 // spot and auto-links it to the anchor — branching an argument tree becomes a
 // single click instead of toolbar button -> modal -> manual placement.
-export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
+export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
+  // Read live, every render — see the doc comment above RADIUS/EDGE_MARGIN's
+  // old module-level home for why this can't be hoisted back out to module
+  // scope.
+  const mobile = isMobileViewport();
+  const RADIUS = mobile ? 104 : 126;
+  const EDGE_MARGIN = mobile ? 38 : 58;
   // The anchor itself used to be the ring's center, with each of the 7
   // points *independently* clamped into bounds afterward — fine when the
   // anchor sits well clear of every edge, but a node close enough to one
@@ -219,9 +231,22 @@ export function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
                 )}
               </div>
             </div>
+            {/* A visible label, not just the button's own hover `title`
+                above — a hover tooltip never shows at all on a touch
+                device, which is exactly where a bare icon is hardest to
+                identify at a glance (no cursor to rest on it and wait).
+                Same small-chip-over-clutter styling NodeCard's own caption
+                uses, so a ghost's label reads clearly against the canvas
+                behind it regardless of what's back there. whitespace-nowrap:
+                these sit close enough together around the ring that a
+                wrapped two-line label would start overlapping its neighbors'
+                own text, worse than the single line running a little wide. */}
+            <div className="mt-[0.3rem] rounded-[3px] bg-surface px-[0.25rem] py-[0.05rem] text-[0.62rem] leading-[1.2] font-medium whitespace-nowrap text-ink">
+              {type}
+            </div>
           </button>
         );
       })}
     </>
   );
-}
+});

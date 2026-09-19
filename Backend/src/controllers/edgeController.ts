@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { deleteEdgeDao } from "../dao/edgeDao.js";
-import { findPublicMapIdDao } from "../dao/mapsDao.js";
 import { broadcastToMap } from "../realtime/io.js";
 import {
   createEdgeAbl,
@@ -10,7 +9,7 @@ import {
   CrossMapEdgeError,
   NodeNotOwnedError,
 } from "../abl/edgeAbl.js";
-import { ValidationError } from "../abl/errors.js";
+import { handleAblError } from "./errorHandling.js";
 
 interface edgeIdParams {
   edgeId: string;
@@ -32,37 +31,18 @@ export const createEdge = async (req: Request<{ mapId: string }>, res: Response)
     broadcastToMap(mapId, "edge:created", edge);
     return res.status(201).json(edge);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof SelfLoopError) {
-      return res.status(400).json({
-        success: false,
-        error: "fromNodeId and toNodeId can't be the same node",
-      });
-    }
-    if (error instanceof NodeNotFoundError) {
-      return res.status(404).json({ success: false, error: "Node not found" });
-    }
-    if (error instanceof CrossMapEdgeError) {
-      return res.status(400).json({
-        success: false,
-        error: "Both nodes must belong to the same map",
-      });
-    }
-    if (error instanceof NodeNotOwnedError) {
-      return res.status(403).json({
-        success: false,
-        error: "You can only link nodes you created",
-      });
-    }
-    if (error instanceof MapNotFoundError) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-    console.error("createEdge error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to create edge" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [SelfLoopError, 400, "fromNodeId and toNodeId can't be the same node"],
+        [NodeNotFoundError, 404, "Node not found"],
+        [CrossMapEdgeError, 400, "Both nodes must belong to the same map"],
+        [NodeNotOwnedError, 403, "You can only link nodes you created"],
+        [MapNotFoundError, 404, "Map not found"],
+      ],
+      { message: "Failed to create edge", logLabel: "createEdge" },
+    );
   }
 };
 
@@ -83,12 +63,11 @@ export const deleteEdge = async (req: Request<edgeIdParams>, res: Response) => {
       return res.status(404).json({ success: false, error: "Edge not found" });
     }
 
-    const publicMapId = await findPublicMapIdDao(edge.mapId);
+    const publicMapId = (edge.mapId as unknown as { mapId?: string } | null)?.mapId ?? null;
     if (publicMapId) broadcastToMap(publicMapId, "edge:deleted", { edgeId });
 
     return res.status(200).json({ success: true, deletedId: edgeId });
   } catch (error) {
-    console.error("deleteEdge error:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
+    return handleAblError(res, error, [], { message: "Server error", logLabel: "deleteEdge" });
   }
 };

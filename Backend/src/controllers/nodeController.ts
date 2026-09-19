@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 
 import { findNodeDao, deleteNodeDao, deleteManyNodesDao } from "../dao/nodeDao.js";
-import { findPublicMapIdDao } from "../dao/mapsDao.js";
+import { findPublicMapIdsDao } from "../dao/mapsDao.js";
 import { broadcastToMap } from "../realtime/io.js";
 import {
   createNodeAbl,
@@ -31,8 +31,8 @@ import {
   PackMemberNotFoundError,
   PackMemberNotEligibleError,
 } from "../abl/packAbl.js";
-import { ValidationError } from "../abl/errors.js";
 import { WEAPONS, type WeaponKey } from "../models/Attack.js";
+import { handleAblError } from "./errorHandling.js";
 
 const isWeaponKey = (value: unknown): value is WeaponKey =>
   typeof value === "string" && value in WEAPONS;
@@ -63,10 +63,10 @@ export const getNodeById = async (
     }
     return res.status(200).json({ node });
   } catch (error) {
-    console.error("getNodeById error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "getNodeById",
+    });
   }
 };
 
@@ -89,32 +89,18 @@ export const createNode = async (
     broadcastToMap(mapId, "node:created", node);
     return res.status(201).json(node);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    // Thrown when the map doesn't exist, or the caller isn't a member of it.
-    if (error instanceof MapNotFoundError) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-    if (error instanceof ParentNotFoundError) {
-      return res.status(404).json({ success: false, error: "Parent node not found" });
-    }
-    if (error instanceof CrossMapParentError) {
-      return res.status(400).json({
-        success: false,
-        error: "Parent node must belong to the same map",
-      });
-    }
-    if (error instanceof ParentNotOwnedError) {
-      return res.status(403).json({
-        success: false,
-        error: "You can only branch off nodes you created",
-      });
-    }
-    console.error("createNode error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to create Node" });
+    return handleAblError(
+      res,
+      error,
+      [
+        // Thrown when the map doesn't exist, or the caller isn't a member of it.
+        [MapNotFoundError, 404, "Map not found"],
+        [ParentNotFoundError, 404, "Parent node not found"],
+        [CrossMapParentError, 400, "Parent node must belong to the same map"],
+        [ParentNotOwnedError, 403, "You can only branch off nodes you created"],
+      ],
+      { message: "Failed to create Node", logLabel: "createNode" },
+    );
   }
 };
 
@@ -142,36 +128,26 @@ export const updateNode = async (
         .json({ success: false, error: "Node not found" });
     }
 
-    const publicMapId = await findPublicMapIdDao(node.mapId);
+    // node.mapId comes back populated (NODE_POPULATE now includes it) since
+    // updateNodeAbl -> updateNodeDao already runs through NODE_POPULATE —
+    // reading the public mapId off it avoids a separate findPublicMapIdDao
+    // round-trip.
+    const publicMapId = (node.mapId as unknown as { mapId?: string } | null)?.mapId ?? null;
     if (publicMapId) broadcastToMap(publicMapId, "node:updated", node);
 
     return res.status(200).json(node);
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof ParentNotFoundError) {
-      return res.status(404).json({ success: false, error: "Parent node not found" });
-    }
-    if (error instanceof CrossMapParentError) {
-      return res.status(400).json({
-        success: false,
-        error: "Parent node must belong to the same map",
-      });
-    }
-    if (error instanceof ParentNotOwnedError) {
-      return res.status(403).json({
-        success: false,
-        error: "You can only branch off nodes you created",
-      });
-    }
-    if (error instanceof SelfParentError) {
-      return res.status(400).json({ success: false, error: "A node can't be its own parent" });
-    }
-    console.error("updateNode error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to update node" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [ParentNotFoundError, 404, "Parent node not found"],
+        [CrossMapParentError, 400, "Parent node must belong to the same map"],
+        [ParentNotOwnedError, 403, "You can only branch off nodes you created"],
+        [SelfParentError, 400, "A node can't be its own parent"],
+      ],
+      { message: "Failed to update node", logLabel: "updateNode" },
+    );
   }
 };
 
@@ -203,46 +179,36 @@ export const attackNode = async (req: Request<nodeIdParams>, res: Response) => {
         .json({ success: false, error: "Node not found" });
     }
 
-    const publicMapId = result.node ? await findPublicMapIdDao(result.node.mapId) : null;
+    const publicMapId = result.node
+      ? ((result.node.mapId as unknown as { mapId?: string } | null)?.mapId ?? null)
+      : null;
     if (publicMapId) broadcastToMap(publicMapId, "node:attacked", result);
 
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof CannotAttackOwnNodeError) {
-      return res
-        .status(400)
-        .json({ success: false, error: "You can't attack your own node" });
-    }
-    if (error instanceof CanOnlyAttackOwnNodeError) {
-      return res.status(400).json({
-        success: false,
-        error: "Discussion mode: you can only attack your own nodes",
-      });
-    }
-    if (error instanceof CannotRetaliateError) {
-      return res.status(403).json({
-        success: false,
-        error: "You can only retaliate against an attack that targeted your own node",
-      });
-    }
-    if (error instanceof NodeAlreadyDefeatedError) {
-      return res.status(400).json({
-        success: false,
-        error: "This node has already been defeated",
-      });
-    }
-    if (error instanceof WeaponOnCooldownError) {
-      return res.status(429).json({
-        success: false,
-        error: "That weapon is still on cooldown",
-        readyAt: new Date(error.readyAt).toISOString(),
-      });
-    }
-    console.error("attackNode error:", error);
-    return res.status(500).json({ success: false, error: "Attack failed" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [CannotAttackOwnNodeError, 400, "You can't attack your own node"],
+        [CanOnlyAttackOwnNodeError, 400, "Discussion mode: you can only attack your own nodes"],
+        [
+          CannotRetaliateError,
+          403,
+          "You can only retaliate against an attack that targeted your own node",
+        ],
+        [NodeAlreadyDefeatedError, 400, "This node has already been defeated"],
+        [
+          WeaponOnCooldownError,
+          429,
+          (e: Error) => ({
+            error: "That weapon is still on cooldown",
+            readyAt: new Date((e as WeaponOnCooldownError).readyAt).toISOString(),
+          }),
+        ],
+      ],
+      { message: "Attack failed", logLabel: "attackNode" },
+    );
   }
 };
 
@@ -263,22 +229,20 @@ export const protectNode = async (req: Request<nodeIdParams>, res: Response) => 
       return res.status(404).json({ success: false, error: "Node not found" });
     }
 
-    const publicMapId = await findPublicMapIdDao(result.protectionNode.mapId);
+    const publicMapId =
+      (result.protectionNode.mapId as unknown as { mapId?: string } | null)?.mapId ?? null;
     if (publicMapId) broadcastToMap(publicMapId, "node:protected", result);
 
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof NotNodeOwnerError) {
-      return res.status(403).json({
-        success: false,
-        error: "Only this node's own owner can add a protection node to it",
-      });
-    }
-    console.error("protectNode error:", error);
-    return res.status(500).json({ success: false, error: "Protect failed" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [NotNodeOwnerError, 403, "Only this node's own owner can add a protection node to it"],
+      ],
+      { message: "Protect failed", logLabel: "protectNode" },
+    );
   }
 };
 
@@ -294,34 +258,28 @@ export const packNode = async (req: Request<nodeIdParams>, res: Response) => {
 
     const result = await packNodesAbl(nodeId, userId, req.body);
 
-    const publicMapId = result.container ? await findPublicMapIdDao(result.container.mapId) : null;
+    const publicMapId = result.container
+      ? ((result.container.mapId as unknown as { mapId?: string } | null)?.mapId ?? null)
+      : null;
     if (publicMapId) broadcastToMap(publicMapId, "node:packed", result);
 
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-    if (error instanceof PackContainerNotFoundError) {
-      return res.status(404).json({ success: false, error: "Container node not found" });
-    }
-    if (error instanceof PackNotOwnedError) {
-      return res.status(403).json({
-        success: false,
-        error: "You can only pack nodes into a container you created",
-      });
-    }
-    if (error instanceof PackMemberNotFoundError) {
-      return res.status(404).json({ success: false, error: "One of the picked nodes was not found" });
-    }
-    if (error instanceof PackMemberNotEligibleError) {
-      return res.status(400).json({
-        success: false,
-        error: "A picked node isn't linked (by branch or Link) to the container",
-      });
-    }
-    console.error("packNode error:", error);
-    return res.status(500).json({ success: false, error: "Pack failed" });
+    return handleAblError(
+      res,
+      error,
+      [
+        [PackContainerNotFoundError, 404, "Container node not found"],
+        [PackNotOwnedError, 403, "You can only pack nodes into a container you created"],
+        [PackMemberNotFoundError, 404, "One of the picked nodes was not found"],
+        [
+          PackMemberNotEligibleError,
+          400,
+          "A picked node isn't linked (by branch or Link) to the container",
+        ],
+      ],
+      { message: "Pack failed", logLabel: "packNode" },
+    );
   }
 };
 
@@ -340,13 +298,12 @@ export const unpackNode = async (req: Request<nodeIdParams>, res: Response) => {
       return res.status(404).json({ success: false, error: "Node not found" });
     }
 
-    const publicMapId = await findPublicMapIdDao(node.mapId);
+    const publicMapId = (node.mapId as unknown as { mapId?: string } | null)?.mapId ?? null;
     if (publicMapId) broadcastToMap(publicMapId, "node:unpacked", { node });
 
     return res.status(200).json({ success: true, node });
   } catch (error) {
-    console.error("unpackNode error:", error);
-    return res.status(500).json({ success: false, error: "Unpack failed" });
+    return handleAblError(res, error, [], { message: "Unpack failed", logLabel: "unpackNode" });
   }
 };
 
@@ -375,10 +332,10 @@ export const getNodeAttackHistory = async (
 
     return res.status(200).json(attacks);
   } catch (error) {
-    console.error("getNodeAttackHistory error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal Server Error" });
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "getNodeAttackHistory",
+    });
   }
 };
 
@@ -412,7 +369,10 @@ export const deleteNode = async (
     // does damagedProtectedNode when this was a protection node with a
     // nonzero blockedDamage — a live health change (possibly a defeat) is
     // worth more than the other, silent cascade effects.
-    const publicMapId = await findPublicMapIdDao(node.mapId);
+    // deleteNodeDao populates node.mapId (after its own cascade queries,
+    // which need it as a raw ObjectId, finish) — read the public mapId
+    // straight off it instead of a separate findPublicMapIdDao round-trip.
+    const publicMapId = (node.mapId as unknown as { mapId?: string } | null)?.mapId ?? null;
     if (publicMapId) {
       broadcastToMap(publicMapId, "node:deleted", { nodeId });
       if (damagedProtectedNode) broadcastToMap(publicMapId, "node:updated", damagedProtectedNode);
@@ -420,8 +380,7 @@ export const deleteNode = async (
 
     return res.status(200).json({ success: true, deletedId: nodeId, damagedProtectedNode });
   } catch (error) {
-    console.error("deleteNode error:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
+    return handleAblError(res, error, [], { message: "Server error", logLabel: "deleteNode" });
   }
 };
 
@@ -446,12 +405,21 @@ export const deleteManyNodes = async (req: Request, res: Response) => {
 
     const results = await deleteManyNodesDao(nodeIds, userId);
 
+    // deleteManyNodesDao's node docs aren't populated (they're about to be
+    // broadcast one at a time, not returned as a batch response), but each
+    // one still carries its own internal mapId — resolve the unique ones
+    // touched by this batch in a single query instead of one
+    // findPublicMapIdDao call per deleted node (O(unique maps), not
+    // O(nodes); a multi-selection is not assumed to be all on one map).
+    const uniqueMapInternalIds = [...new Set(results.map(({ node }) => node.mapId.toString()))];
+    const publicMapIdByInternalId = await findPublicMapIdsDao(uniqueMapInternalIds);
+
     // Same per-node broadcast deleteNode's own controller does above, just
     // for every node this batch actually deleted — grouped implicitly by
     // whichever map each one belongs to, since nothing here assumes a
     // multi-selection is all on the same map.
     for (const { node, damagedProtectedNode } of results) {
-      const publicMapId = await findPublicMapIdDao(node.mapId);
+      const publicMapId = publicMapIdByInternalId[node.mapId.toString()];
       if (!publicMapId) continue;
       broadcastToMap(publicMapId, "node:deleted", { nodeId: node.nodeId });
       if (damagedProtectedNode) broadcastToMap(publicMapId, "node:updated", damagedProtectedNode);
@@ -465,7 +433,6 @@ export const deleteManyNodes = async (req: Request, res: Response) => {
       })),
     });
   } catch (error) {
-    console.error("deleteManyNodes error:", error);
-    return res.status(500).json({ success: false, error: "Server error" });
+    return handleAblError(res, error, [], { message: "Server error", logLabel: "deleteManyNodes" });
   }
 };

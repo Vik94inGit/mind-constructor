@@ -27,4 +27,12 @@ const EdgeSchema = new mongoose.Schema(
   },
 );
 
+// mapId: every map-load query (getEdgesByMapDao, deleteMapDao's cascade, ...)
+// filters on this.
+EdgeSchema.index({ mapId: 1 });
+// fromNodeId/toNodeId: findEdgesByNodeInternalIdDao's $or query (used by
+// packAbl.ts's eligibility check) filters on either.
+EdgeSchema.index({ fromNodeId: 1 });
+EdgeSchema.index({ toNodeId: 1 });
+
 export const Edge = mongoose.model("Edge", EdgeSchema);

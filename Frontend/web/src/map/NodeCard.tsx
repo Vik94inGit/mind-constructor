@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { NODE_TYPE_COLORS, ZONE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
@@ -14,17 +14,19 @@ import {
   DEFAULT_PARTICLE_COLORS,
   WEAPON_PARTICLE_COLORS,
 } from "../utils/particles";
+import { hashSeed } from "../utils/canvasLayout";
 import type { AttackIndicator, NodeDoc, NodeType, SizeTier } from "../types";
 
 // A stable "which direction did this weapon fly in from" per node, derived
 // from its id so it doesn't change across re-renders without needing to be
 // stored anywhere — same trick MapPage's hashOffset uses for weapon-node
-// placement jitter.
+// placement jitter. A thin wrapper around canvasLayout's shared hashSeed
+// primitive now — see its own doc comment for why (this, hashOffset, and
+// seededRandoms below used to each hash a string their own separate way).
 function flightOffset(seed: string): { x: number; y: number } {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 100003;
-  const angle = (h % 360) * (Math.PI / 180);
-  const distance = 140 + (h % 60);
+  const [r1, r2] = hashSeed(seed, 2);
+  const angle = r1 * 2 * Math.PI;
+  const distance = 140 + r2 * 60;
   return { x: Math.cos(angle) * distance, y: Math.sin(angle) * distance };
 }
 
@@ -32,17 +34,13 @@ function flightOffset(seed: string): { x: number; y: number } {
 // stable across re-renders without storing anything — the node's real x/y
 // (what the backend has) never changes for this; only the drawn position
 // wobbles around it, purely via CSS. Same "hash the id" trick as
-// flightOffset/hashOffset elsewhere in this file/MapPage, just needing more
-// than one independent number out of one seed.
+// flightOffset/hashOffset elsewhere in this file/MapPage — this one *is*
+// canvasLayout's shared hashSeed primitive (its own contract was modeled
+// directly on this function, being the most general of the three), kept as
+// its own named export here since every call site in this file already
+// expects `seededRandoms`.
 function seededRandoms(seed: string, count: number): number[] {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 1000003;
-  const out: number[] = [];
-  for (let i = 0; i < count; i++) {
-    const v = Math.sin(h + i * 999.317) * 43758.5453;
-    out.push(v - Math.floor(v)); // fract() — always in [0, 1)
-  }
-  return out;
+  return hashSeed(seed, count);
 }
 
 // OutcomeBadge is just a symbol now (see its own doc comment) — sized
@@ -132,7 +130,7 @@ interface Props {
   onContextMenu?: (e: ReactMouseEvent) => void;
 }
 
-export function NodeCard({
+export const NodeCard = memo(function NodeCard({
   node,
   x,
   y,
@@ -200,12 +198,21 @@ export function NodeCard({
     }
   }, [inlineEditing, node.text, node.type]);
 
+  // A circle's own root/parent (parentCrownSentiment set) always renders at
+  // the biggest size tier, overriding whatever node.sizeTier actually is —
+  // display-only, never persisted (unlike packAbl's own auto-bump on first
+  // pack, this never writes anything back), so it doesn't fight a manual
+  // PATCH the way that persisted auto-bump takes care to avoid clobbering
+  // either. "This is what the circle radiates from" already gets the crown
+  // badge and its own small ring (see below); sizing it up too makes that
+  // reading hold at a glance before either decoration even registers.
+  const isCircleParent = !!parentCrownSentiment;
   // The outer positioning div's own footprint needs to grow with the
   // node's size tier too, not just its visual content (see
   // inverseScaleStyle below) — otherwise a 130% node's wider icon/caption
   // would visually spill out of a hit-target box that never actually grew,
   // leaving the extra 30% unclickable/unhoverable.
-  const sizeMultiplier = SIZE_MULTIPLIERS[node.sizeTier ?? 1];
+  const sizeMultiplier = isCircleParent ? SIZE_MULTIPLIERS[3] : SIZE_MULTIPLIERS[node.sizeTier ?? 1];
   const style: CSSProperties = { left: x, top: y, width: 74 * sizeMultiplier };
 
   // A weapon/attack node carries a real type now (Problem/Problematic
@@ -231,9 +238,20 @@ export function NodeCard({
   // from under the cursor/panel is exactly the annoyance stabilizing a
   // whole circle was already meant to avoid. Weapon nodes never carry a
   // groupSentiment (they're never anyone's parentId child), so this never
-  // applies to one.
+  // applies to one. A circle's own root/parent is excluded outright, chosen
+  // circle or not — "what the circle radiates from" reads as a stable
+  // anchor at a glance, same reasoning as its own size bump above, and
+  // every child already orbits *around* wherever the root currently sits,
+  // so a drifting root would drag the whole zone's own centroid along with
+  // it instead of giving the children something fixed to gather around.
   const chaotic =
-    !!groupSentiment && !node.locked && !dragging && !selected && !multiSelected && !inlineEditing;
+    !!groupSentiment &&
+    !isCircleParent &&
+    !node.locked &&
+    !dragging &&
+    !selected &&
+    !multiSelected &&
+    !inlineEditing;
   const readonly = !canDrag;
   // Captions are hidden by default now — a whole map's worth of text
   // labels competing for attention read as clutter, same reasoning
@@ -242,11 +260,15 @@ export function NodeCard({
   // own root/parent keeps its caption regardless (parentCrownSentiment is
   // only ever set for one), so a map at rest still reads as a set of named
   // clusters radiating from labeled parents, not a field of anonymous
-  // icons. Once a circle becomes the chosen one (inChosenCircle, keyed off
-  // map.selectedCircle), every one of its members shows its caption too —
-  // studying a cluster up close is exactly when every member's own text
-  // actually matters.
-  const showCaption = !!parentCrownSentiment || !!inChosenCircle;
+  // icons. A node with no parentId at all keeps its caption too, circle
+  // root or not — every branch on the map starts from *some* named
+  // top-level node (a Problem, a standalone topic, …), and that's exactly
+  // the thing a map at rest should read as radiating from, same as a
+  // circle's own root. Once a circle becomes the chosen one (inChosenCircle,
+  // keyed off map.selectedCircle), every one of its members shows its
+  // caption too — studying a cluster up close is exactly when every
+  // member's own text actually matters.
+  const showCaption = !!parentCrownSentiment || !!inChosenCircle || !node.parentId;
   // Opacity/cursor each have one property multiple states could set — CSS
   // cascade resolves that per-property, not per-modifier, so it's resolved
   // the same way here: state precedence follows the order these used to be
@@ -700,4 +722,4 @@ export function NodeCard({
       </div>
     </div>
   );
-}
+});
