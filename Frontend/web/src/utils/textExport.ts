@@ -1,6 +1,11 @@
 import { nodeRefId } from "./nodeType";
 import type { NodeDoc } from "../types";
 
+// Numbered steps (Node.order) come first, in step order; everything else keeps
+// its on-canvas position order. A step number also prefixes the node's line.
+export const stepRank = (n: NodeDoc) => n.order ?? Number.MAX_SAFE_INTEGER;
+export const stepPrefix = (n: NodeDoc) => (n.order != null ? `${n.order}. ` : "");
+
 // Walks the map's branch tree (Node.parentId — the same lineage
 // nodeGroups/branch-arrows already read on the canvas, not the separate
 // Link/Edge graph) and formats it as one plain-text/markdown document: one
@@ -49,7 +54,7 @@ export function buildTreeExport(
   function byPosition(a: NodeDoc, b: NodeDoc) {
     const pa = pos(a);
     const pb = pos(b);
-    return pa.y - pb.y || pa.x - pb.x;
+    return stepRank(a) - stepRank(b) || pa.y - pb.y || pa.x - pb.x;
   }
 
   const parents = Array.from(childrenByParent.keys())
@@ -59,9 +64,9 @@ export function buildTreeExport(
   const lines: string[] = [];
   for (const parent of parents) {
     const children = childrenByParent.get(parent.nodeId)!.slice().sort(byPosition);
-    lines.push(`## ${parent.type}: ${parent.text}`);
+    lines.push(`## ${stepPrefix(parent)}${parent.type}: ${parent.text}`);
     for (const child of children) {
-      lines.push(`- ${child.type}: ${child.text}`);
+      lines.push(`- ${stepPrefix(child)}${child.type}: ${child.text}`);
     }
     lines.push("");
   }
@@ -71,7 +76,7 @@ export function buildTreeExport(
   const orphans = nodes.filter((n) => !covered.has(n.nodeId)).sort(byPosition);
   if (orphans.length > 0) {
     lines.push("## Other nodes");
-    for (const n of orphans) lines.push(`- ${n.type}: ${n.text}`);
+    for (const n of orphans) lines.push(`- ${stepPrefix(n)}${n.type}: ${n.text}`);
     lines.push("");
   }
 

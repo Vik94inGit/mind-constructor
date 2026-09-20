@@ -4,6 +4,7 @@ import { NODE_TYPE_COLORS, cycleNodeType } from "../utils/nodeType";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
 import { NodeCrown } from "./NodeCrown";
+import { useI18n } from "../i18n/I18nContext";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import type { NodeType } from "../types";
 
@@ -21,6 +22,7 @@ interface Props {
 // ghost (or the toolbar/double-click/"Create branch" paths) opens one of
 // these instead of a modal, autofocused so typing can start immediately.
 export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
+  const { t } = useI18n();
   const [text, setText] = useState("");
   const [draftType, setDraftType] = useState<NodeType>(type);
   // Same single-resolution-point pattern as NodeCard's inline editor —
@@ -95,7 +97,7 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
             type="button"
             className="flex h-full w-full cursor-pointer items-center justify-center rounded-full overflow-hidden border-2 bg-surface p-0 font-[inherit] shadow-card hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)]"
             style={{ borderColor: NODE_TYPE_COLORS[draftType] }}
-            title="Click to change type"
+            title={t.ui.node.clickToChangeType}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();

@@ -1,4 +1,5 @@
 import { CANVAS_W, CANVAS_H } from "../utils/canvasLayout";
+import { useI18n } from "../i18n/I18nContext";
 import type { NodeGroup } from "../utils/canvasLayout";
 import { nodeRefId, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
@@ -36,6 +37,7 @@ export function CanvasBackdrop({
   pendingLink,
   onCircleClick,
 }: Props) {
+  const { t } = useI18n();
   return (
     <svg
       className="pointer-events-none absolute inset-0 h-full w-full"
@@ -85,8 +87,8 @@ export function CanvasBackdrop({
           >
             <title>
               {isStabilized
-                ? "Stabilized — click it, or click anywhere outside it, to let it drift with the others"
-                : "Click to stabilize this zone and let every other zone drift"}
+                ? t.ui.canvas.stabilized
+                : t.ui.canvas.stabilizeZone}
             </title>
           </polygon>
         );
@@ -250,8 +252,8 @@ export function CanvasBackdrop({
             {group && (
               <title>
                 {isStabilized
-                  ? "Stabilized — click it, or click anywhere outside it, to let it drift with the others"
-                  : "Click to stabilize this circle and let every other circle drift"}
+                  ? t.ui.canvas.stabilized
+                  : t.ui.canvas.stabilizeCircle}
               </title>
             )}
           </line>

@@ -7,6 +7,7 @@ import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { useMapSocket } from "../hooks/useMapSocket";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
+import { stepPrefix, stepRank } from "../utils/textExport";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
@@ -66,7 +67,7 @@ const NEW_NODE_ID = "__new__";
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { t } = useI18n();
 
   const [map, setMap] = useState<MapDoc | null>(null);
@@ -326,7 +327,7 @@ export function MapPage() {
       setEdges(edgeList);
       refreshInsights(mapId);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to load map");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.loadMap);
     } finally {
       setLoading(false);
     }
@@ -736,7 +737,7 @@ export function MapPage() {
     if (!closest) return null;
     const target = closest;
     if (isDescendant(target.nodeId, dragged.nodeId, nodes)) {
-      return { target, valid: false, reason: "Can't drop a node onto its own branch." };
+      return { target, valid: false, reason: t.ui.errors.dropOnOwnBranch };
     }
     return { target, valid: true };
   }
@@ -808,7 +809,7 @@ export function MapPage() {
             }),
           );
         } catch (err) {
-          setActionError(err instanceof ApiRequestError ? err.message : "Failed to move the selected nodes");
+          setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
         }
       }
 
@@ -976,7 +977,7 @@ export function MapPage() {
           // touched during the drag (only dragState was, and that's already
           // cleared above), so simply not persisting anything here is
           // enough to snap it back to where it started.
-          setActionError(found.reason ?? "Can't join that circle.");
+          setActionError(found.reason ?? t.ui.errors.cannotJoin);
           return;
         }
         if (found && found.valid) {
@@ -1001,7 +1002,7 @@ export function MapPage() {
             });
             upsertNode(updated);
           } catch (err) {
-            setActionError(err instanceof ApiRequestError ? err.message : "Failed to join circle");
+            setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.joinCircle);
           }
           return;
         }
@@ -1039,7 +1040,7 @@ export function MapPage() {
           // Leaving would squeeze the circle it's leaving into a sliver.
           // Nothing was persisted (only dragState moved), so simply not
           // saving anything snaps the node back where it started.
-          setActionError("Can't pull it out — the remaining circle would get a corner under 30°.");
+          setActionError(t.ui.errors.pullOut);
           return;
         }
 
@@ -1061,7 +1062,7 @@ export function MapPage() {
             await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y });
           }
         } catch (err) {
-          if (leftCircle) setActionError(err instanceof ApiRequestError ? err.message : "Failed to leave circle");
+          if (leftCircle) setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.leaveCircle);
           // otherwise: position is a courtesy update — a failed persist just means it snaps back on next reload
         }
       } else {
@@ -1139,7 +1140,7 @@ export function MapPage() {
       if (node.nodeId === packContainerId) return; // the anchor can't pack itself
       const eligible = packContainerId ? computeLinkedNeighborIds(packContainerId, nodes, edges) : new Set<string>();
       if (!eligible.has(node.nodeId)) {
-        setPackError("Only nodes linked or branched to the container can be packed.");
+        setPackError(t.ui.pack.onlyLinked);
         return;
       }
       setPackError(null);
@@ -1150,7 +1151,7 @@ export function MapPage() {
       // Same toggle shift+click does, without the key — tapping an already
       // chosen node drops just that one.
       if (!isOwnNode(node)) {
-        setActionError("You can only choose nodes you created.");
+        setActionError(t.ui.errors.chooseOwn);
         return;
       }
       setActionError(null);
@@ -1214,7 +1215,7 @@ export function MapPage() {
       // Editing is done — close the node's panel, same as after Enter in it.
       setSelectedId((cur) => (cur === node.nodeId ? null : cur));
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Update failed");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
     } finally {
       setInlineEditId(null);
     }
@@ -1296,7 +1297,7 @@ export function MapPage() {
       if (selectedId && res.members.some((m) => m.nodeId === selectedId)) setSelectedId(null);
       exitPackMode();
     } catch (err) {
-      setPackError(err instanceof ApiRequestError ? err.message : "Pack failed");
+      setPackError(err instanceof ApiRequestError ? err.message : t.ui.errors.pack);
     }
   }
 
@@ -1407,7 +1408,7 @@ export function MapPage() {
   }
 
   async function handleDeleteNode(node: NodeDoc) {
-    if (!confirm("Delete this node?")) return;
+    if (!confirm(t.ui.node.deleteConfirm)) return;
     try {
       const res = await nodesApi.deleteNode(node.nodeId);
       applyNodeDeleted(node.nodeId);
@@ -1415,7 +1416,7 @@ export function MapPage() {
       // total onto whatever it was defending — see Backend's deleteNodeDao.
       if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Delete failed");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.delete);
     }
   }
 
@@ -1439,7 +1440,7 @@ export function MapPage() {
       await mapsApi.deselectCircle(mapId);
       applyCircleSelection(null);
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to release the stabilized circle");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.releaseCircle);
     }
   }
 
@@ -1472,7 +1473,7 @@ export function MapPage() {
       const selected = await mapsApi.selectCircle(mapId, rootId);
       applyCircleSelection(selected);
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to update the stabilized circle");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.updateCircle);
     }
   }
 
@@ -1520,7 +1521,7 @@ export function MapPage() {
       // finished rather than immediately handing you another panel.
       setSelectedId(null);
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to create node");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
     } finally {
       setPendingCreate(null);
     }
@@ -1577,17 +1578,17 @@ export function MapPage() {
       .sort((a, b) => {
         const pa = positions.get(a.nodeId) ?? { x: a.x ?? 0, y: a.y ?? 0 };
         const pb = positions.get(b.nodeId) ?? { x: b.x ?? 0, y: b.y ?? 0 };
-        return pa.y - pb.y || pa.x - pb.x;
+        return stepRank(a) - stepRank(b) || pa.y - pb.y || pa.x - pb.x;
       });
     if (picked.length === 0) return;
     // See copySelection's own comment above — same reason this reads the
     // returned map instead of `n.text` directly.
     const textById = await ensureNodeText(picked.map((n) => n.nodeId));
-    const text = picked.map((n) => `${n.type}: ${textById[n.nodeId] ?? n.text}`).join("\n");
+    const text = picked.map((n) => `${stepPrefix(n)}${n.type}: ${textById[n.nodeId] ?? n.text}`).join("\n");
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      setActionError("Copy failed — this browser blocked clipboard access.");
+      setActionError(t.ui.errors.clipboard);
     }
   }
 
@@ -1690,7 +1691,7 @@ export function MapPage() {
         setSelectedId(created[0].nodeId);
       }
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to paste");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.paste);
     }
   }
 
@@ -1706,7 +1707,7 @@ export function MapPage() {
   async function deleteSelection() {
     const ids = Array.from(multiSelectIds);
     if (ids.length === 0) return;
-    if (!confirm(`Delete ${ids.length} node${ids.length === 1 ? "" : "s"}?`)) return;
+    if (!confirm(t.ui.selection.deleteConfirm(ids.length))) return;
     setActionError(null);
     try {
       const { deleted } = await nodesApi.deleteManyNodes(ids);
@@ -1725,7 +1726,7 @@ export function MapPage() {
       setMultiSelectIds(new Set());
       if (mapId) refreshInsights(mapId);
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to delete the selected nodes");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.deleteSelected);
     }
   }
 
@@ -1774,15 +1775,39 @@ export function MapPage() {
       });
       const skipped = results.filter((r) => r === null).length;
       if (skipped > 0) {
-        setActionError(
-          `Grouped ${results.length - skipped} of ${others.length} node${others.length === 1 ? "" : "s"} — ${skipped} would have closed a loop and ${skipped === 1 ? "was" : "were"} left alone.`,
-        );
+        setActionError(t.ui.errors.groupPartial(results.length - skipped, others.length, skipped));
       }
       setMultiSelectIds(new Set());
       setSelectedId(root.nodeId);
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to group into a circle");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.groupCircle);
     }
+  }
+
+  // The chosen own nodes, numbered 1, 2, 3… in the order they were chosen (or
+  // with the numbers taken off) — a quick way to label a process's steps.
+  async function numberSelection(clear: boolean) {
+    const picks = Array.from(multiSelectIds)
+      .map((id) => nodes.find((n) => n.nodeId === id))
+      .filter((n): n is NodeDoc => !!n && isOwnNode(n));
+    if (picks.length === 0) return;
+    setActionError(null);
+    try {
+      const updated = await Promise.all(
+        picks.map((n, i) => nodesApi.updateNode(n.nodeId, { order: clear ? null : i + 1 })),
+      );
+      updated.forEach(upsertNode);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.numberNodes);
+    }
+  }
+
+  // Leaves a demo session for the login page — its account and map are
+  // throwaway, so there is no way back to them afterwards. ProtectedRoute
+  // sends a logged-out user to /login on its own.
+  function exitDemo() {
+    if (!confirm(t.ui.demo.exitConfirm)) return;
+    void logout();
   }
 
   // AddMenu's "Create circle" — a root plus 2 children, parented to it, so
@@ -1797,7 +1822,7 @@ export function MapPage() {
     try {
       const rootPos = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
       const root = await nodesApi.createNode(mapId, {
-        text: "New circle",
+        text: t.ui.canvas.newCircleText,
         type: "unknown",
         x: rootPos.x,
         y: rootPos.y,
@@ -1827,7 +1852,7 @@ export function MapPage() {
             // a duller first impression than an actual colored one. Giving
             // both children a real (positive) type up front means "Create
             // circle" shows a leaning, halo-colored circle immediately.
-            text: "New node",
+            text: t.ui.canvas.newNodeText,
             type: "Option",
             x: placed.x,
             y: placed.y,
@@ -1843,7 +1868,7 @@ export function MapPage() {
       setMultiSelectIds(new Set());
       setSelectedId(root.nodeId);
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to create a circle");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createCircle);
     }
   }
 
@@ -1873,12 +1898,12 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   });
 
-  if (loading) return <div className="p-12 text-center text-ink-soft">Loading map…</div>;
+  if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
   if (error || !map) {
     return (
       <div className="mx-auto w-full max-w-[1080px] px-6 pt-8 pb-16">
         <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">
-          {error || "Map not found"}
+          {error || t.ui.errors.mapNotFound}
         </div>
         {/* A demo session has nowhere else to go — see the toolbar's own
             matching omission below, and ProtectedRoute's own redirect,
@@ -1911,7 +1936,7 @@ export function MapPage() {
       const updated = await mapsApi.updateMap(mapId, { discussionMode: !isDiscussionMode });
       setMap(updated);
     } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : "Failed to change map mode");
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.changeMode);
     }
   }
 
@@ -2206,6 +2231,7 @@ export function MapPage() {
             readingMode={readingMode}
             onPickReadingMode={setReadingMode}
             onToggleMapMode={toggleMapMode}
+            onExitDemo={exitDemo}
             onInvite={() => setShowInvite(true)}
             onCreateNode={startCreateNodeInView}
             onCreateCircle={createCircle}
@@ -2245,6 +2271,8 @@ export function MapPage() {
             count={multiSelectIds.size}
             chooseMode={chooseMode}
             onLink={linkSelection}
+            onNumber={() => numberSelection(false)}
+            onClearNumbers={() => numberSelection(true)}
             onCopy={copySelection}
             onCopyText={copySelectionAsText}
             onGroupCircle={groupSelectionIntoCircle}

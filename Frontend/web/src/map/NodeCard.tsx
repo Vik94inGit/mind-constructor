@@ -8,6 +8,7 @@ import { NodeCrown } from "./NodeCrown";
 import { NodeWings } from "./NodeWings";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { CAPTION_WIDTH } from "../utils/canvasLayout";
+import { useI18n } from "../i18n/I18nContext";
 import {
   burstParticles,
   ANGEL_PARTICLE_COLORS,
@@ -174,6 +175,7 @@ export const NodeCard = memo(function NodeCard({
   onDoubleClick,
   onContextMenu,
 }: Props) {
+  const { t } = useI18n();
   const particlesRef = useRef<HTMLDivElement | null>(null);
 
   // Fires once, the instant a freshly-created node mounts — every type gets
@@ -604,6 +606,18 @@ export const NodeCard = memo(function NodeCard({
             {indicator.incomingNegativeEdges}
           </div>
         )}
+        {/* Step number (Node.order) — a small pill on the icon's left edge, for
+            describing a process by labeling nodes 1, 2, 3… The other corners
+            are taken (indicator top-right, crown top-left, pack count
+            bottom-right, shield bottom-left), so this takes the left middle. */}
+        {node.order != null && (
+          <div
+            className="absolute top-1/2 -left-3 z-[6] flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border-2 border-surface bg-accent px-1 text-[0.65rem] leading-none font-bold text-white"
+            title={t.ui.node.orderBadge(node.order)}
+          >
+            {node.order}
+          </div>
+        )}
         {/* Packed-member count — bottom-right corner (the indicator badge
             above already claims top-right) so both can show at once
             without overlapping. bg-accent, not bg-danger: this isn't a
@@ -631,7 +645,7 @@ export const NodeCard = memo(function NodeCard({
             style={{
               filter: `drop-shadow(0 0 1.5px ${ZONE_COLORS[parentCrownSentiment]}) drop-shadow(0 0 1.5px ${ZONE_COLORS[parentCrownSentiment]})`,
             }}
-            title={`Circle parent (${parentCrownSentiment})`}
+            title={t.ui.node.circleParent(t.ui.sentiments[parentCrownSentiment])}
           >
             👑
           </div>
@@ -707,14 +721,14 @@ export const NodeCard = memo(function NodeCard({
         <div
           className={`flex h-full w-full items-center justify-center rounded-full p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
           style={ringStyle}
-          title={showHealth ? undefined : "Select to see health"}
+          title={showHealth ? undefined : t.ui.node.selectToSeeHealth}
         >
           {inlineEditing ? (
             <button
               type="button"
               className={`flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-[var(--node-fill)] p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${circleBorderClass}`}
               style={{ borderColor: circleBorderColor }}
-              title="Click to change type"
+              title={t.ui.node.clickToChangeType}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
@@ -836,7 +850,7 @@ export const NodeCard = memo(function NodeCard({
           className="absolute top-full left-1/2 -translate-x-1/2 text-[0.65rem] font-semibold whitespace-nowrap text-accent"
           style={{ marginTop: !inlineEditing && !selected && showCaption && captionLabel ? "3.4rem" : "0.6rem" }}
         >
-          choose?
+          {t.ui.node.chooseHint}
         </div>
       )}
       </div>

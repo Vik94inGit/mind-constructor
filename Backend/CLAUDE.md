@@ -133,6 +133,11 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `nodeAbl.ts`; an empty string on PATCH clears it). Unlike `text`, it is *not* stripped from
   `GET /:mapId/nodes` — it's small enough to ride along, and it's what lets a frontend caption a node
   without the lazy `text` backfill. The `"demo"` map template seeds a couple of titles.
+- **`Node.order`** — an optional step number (whole number 1..9999, `null` = none) for describing a
+  process by labeling nodes in sequence; a frontend draws it as a small numbered badge on the node.
+  Set via `POST`/`PATCH /api/nodes` (`orderSchema` in `nodeAbl.ts`; explicit `null` on PATCH clears
+  it). A plain label: nothing orders, links or validates against other nodes' numbers, so two nodes
+  may share one. Like `title`, it is *not* stripped from `GET /:mapId/nodes`.
 - **`Node.manualZone`** — a manually-placed zone ring around exactly one node, independent of
   `circleAbl.ts`'s automatic detection above (no 2+-children requirement, and the color — positive/
   negative, `MANUAL_ZONE_COLORS` — is chosen outright rather than computed by majority vote). Plain

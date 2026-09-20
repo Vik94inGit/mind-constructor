@@ -3,6 +3,7 @@ import * as mapsApi from "../api/maps";
 import type { MapSummary } from "../api/maps";
 import { Modal } from "./Modal";
 import { ApiRequestError } from "../api/client";
+import { useI18n } from "../i18n/I18nContext";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { NODE_TYPES } from "../types";
@@ -16,6 +17,7 @@ import type { MapDoc } from "../types";
 // vision. The icon shape + printed count make every row readable with zero
 // color perception at all.
 export function MapSummaryModal({ map, onClose }: { map: MapDoc; onClose: () => void }) {
+  const { t } = useI18n();
   const [summary, setSummary] = useState<MapSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +26,7 @@ export function MapSummaryModal({ map, onClose }: { map: MapDoc; onClose: () => 
     mapsApi
       .getMapSummary(map.mapId)
       .then((s) => !cancelled && setSummary(s))
-      .catch((err) => !cancelled && setError(err instanceof ApiRequestError ? err.message : "Failed to load summary"));
+      .catch((err) => !cancelled && setError(err instanceof ApiRequestError ? err.message : t.ui.errors.loadSummary));
     return () => {
       cancelled = true;
     };
@@ -33,18 +35,18 @@ export function MapSummaryModal({ map, onClose }: { map: MapDoc; onClose: () => 
   const maxCount = summary ? Math.max(1, ...NODE_TYPES.map((t) => summary.nodesByType[t] ?? 0)) : 1;
 
   return (
-    <Modal title={`Summary — "${map.name}"`} onClose={onClose}>
+    <Modal title={t.ui.summary.title(map.name)} onClose={onClose}>
       {error && <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>}
       {!summary && !error ? (
-        <div className="p-12 text-center text-ink-soft">Loading…</div>
+        <div className="p-12 text-center text-ink-soft">{t.ui.common.loading}</div>
       ) : summary ? (
         <>
           <div className="mb-[0.9rem] flex flex-wrap gap-[0.6rem] text-[0.78rem] text-ink-soft">
             <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
-              {summary.nodeCount} node(s)
+              {t.ui.summary.nodes(summary.nodeCount)}
             </span>
             <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
-              {Array.isArray(summary.members) ? summary.members.length : 0} member(s)
+              {t.ui.summary.members(Array.isArray(summary.members) ? summary.members.length : 0)}
             </span>
           </div>
           <div className="flex flex-col gap-2">
@@ -76,7 +78,7 @@ export function MapSummaryModal({ map, onClose }: { map: MapDoc; onClose: () => 
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={onClose}
         >
-          Close
+          {t.ui.common.close}
         </button>
       </div>
     </Modal>

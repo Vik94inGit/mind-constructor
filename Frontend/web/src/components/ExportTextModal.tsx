@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal } from "./Modal";
+import { useI18n } from "../i18n/I18nContext";
 import { buildTreeExport } from "../utils/textExport";
 import type { NodeDoc } from "../types";
 
@@ -16,6 +17,7 @@ interface Props {
 // editing, no persistence, purely a one-off export computed fresh from
 // whatever MapPage already has loaded.
 export function ExportTextModal({ mapName, nodes, positions, onClose }: Props) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const text = buildTreeExport(nodes, positions);
@@ -30,7 +32,7 @@ export function ExportTextModal({ mapName, nodes, positions, onClose }: Props) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      setCopyError("Copy failed — this browser blocked clipboard access.");
+      setCopyError(t.ui.errors.clipboard);
     }
   }
 
@@ -50,7 +52,7 @@ export function ExportTextModal({ mapName, nodes, positions, onClose }: Props) {
   }
 
   return (
-    <Modal title={`Export text — "${mapName}"`} onClose={onClose}>
+    <Modal title={t.ui.exportText.title(mapName)} onClose={onClose}>
       {copyError && (
         <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{copyError}</div>
       )}
@@ -67,21 +69,21 @@ export function ExportTextModal({ mapName, nodes, positions, onClose }: Props) {
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2"
           onClick={handleDownload}
         >
-          Download .md
+          {t.ui.exportText.download}
         </button>
         <button
           type="button"
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2"
           onClick={handleCopy}
         >
-          {copied ? "Copied ✓" : "Copy"}
+          {copied ? t.ui.common.copied : t.ui.common.copy}
         </button>
         <button
           type="button"
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-4 py-[0.55rem] text-[0.88rem] font-semibold text-white transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:opacity-90"
           onClick={onClose}
         >
-          Close
+          {t.ui.common.close}
         </button>
       </div>
     </Modal>

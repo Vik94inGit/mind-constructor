@@ -1,3 +1,4 @@
+import { useI18n } from "../i18n/I18nContext";
 import type { NodeDoc } from "../types";
 
 // Same bottom-sheet look/slot NodePanel uses (the 1/3-desktop/1/2-mobile
@@ -21,16 +22,18 @@ interface Props {
 // Only requires 1+ picks — packing a single linked node into the container is
 // already a complete, meaningful action.
 export function PackPickerPanel({ containerText, picks, error, onRemove, onConfirm, onCancel }: Props) {
+  const { t } = useI18n();
   return (
     <div className={PANEL_CLASS}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="m-0 text-[0.95rem] font-bold text-ink">
-            {picks.length === 0 ? "Pick nodes to pack" : `${picks.length} picked`}
+            {picks.length === 0 ? t.ui.pack.pickToPack : t.ui.pack.picked(picks.length)}
           </p>
           <p className="m-0 mt-[0.15rem] text-[0.78rem] text-ink-soft">
-            Tap a node linked or branched to <strong>{containerText.slice(0, 40)}</strong> to add or
-            remove it — everything picked folds into it and disappears from the canvas.
+            {t.ui.pack.hintBefore}
+            <strong>{containerText.slice(0, 40)}</strong>
+            {t.ui.pack.hintAfter}
           </p>
         </div>
         <button
@@ -56,7 +59,7 @@ export function PackPickerPanel({ containerText, picks, error, onRemove, onConfi
               <button
                 className="inline-flex flex-shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent px-[0.4rem] py-[0.1rem] text-[0.78rem] font-semibold text-ink-soft hover:bg-surface"
                 onClick={() => onRemove(n.nodeId)}
-                title="Remove from this pack"
+                title={t.ui.pack.removeTitle}
               >
                 ✕
               </button>
@@ -71,13 +74,13 @@ export function PackPickerPanel({ containerText, picks, error, onRemove, onConfi
           disabled={picks.length < 1}
           onClick={onConfirm}
         >
-          {picks.length >= 1 ? `Pack ${picks.length} node${picks.length === 1 ? "" : "s"}` : "Pick at least 1 node"}
+          {picks.length >= 1 ? t.ui.pack.packN(picks.length) : t.ui.pack.pickAtLeastOne}
         </button>
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.5rem] text-[0.85rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2"
           onClick={onCancel}
         >
-          Cancel
+          {t.ui.common.cancel}
         </button>
       </div>
     </div>

@@ -26,9 +26,17 @@ export class SelfParentError extends Error {}
 // valid (it's how "no title" is stored, and how an update clears one).
 const titleSchema = z.string().trim().max(80, "title must be at most 80 characters");
 
+// Node.order — a whole step number, 1..9999. null clears it (update only).
+const orderSchema = z
+  .number()
+  .int("order must be a whole number")
+  .min(1, "order must be at least 1")
+  .max(9999, "order must be at most 9999");
+
 const createNodeSchema = z.object({
   text: z.string().min(1, "text is required"),
   title: titleSchema.optional(),
+  order: orderSchema.nullish(),
   type: z.enum(NODE_TYPES, {
     error: () => `type is required and must be one of: ${NODE_TYPES.join(", ")}`,
   }),
@@ -89,6 +97,9 @@ const updateNodeSchema = z
     text: z.string().min(1).optional(),
     // "" clears the title (back to the text's own first words).
     title: titleSchema.optional(),
+    // null clears the step number — same nullish-vs-absent convention as
+    // symbolOverride/manualZone below.
+    order: orderSchema.nullish(),
     type: z.enum(NODE_TYPES, {
       error: () => `type must be one of: ${NODE_TYPES.join(", ")}`,
     }).optional(),
