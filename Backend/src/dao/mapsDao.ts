@@ -1,6 +1,7 @@
 import { Map } from "../models/Map.js";
 import { Node, NODE_TYPES, type NodeType } from "../models/Node.js";
 import { Edge } from "../models/Edge.js";
+import { Line } from "../models/Line.js";
 import { User } from "../models/User.js";
 import { nanoid } from "nanoid";
 
@@ -278,6 +279,7 @@ export const deleteMapDao = async (publicMapId: string, userId: string) => {
   // 2. Delete everything scoped to this map's internal MongoDB _id — edges
   // first, since they reference nodes that are about to disappear too.
   await Edge.deleteMany({ mapId: map._id });
+  await Line.deleteMany({ mapId: map._id });
   await Node.deleteMany({ mapId: map._id });
 
   // 3. Delete the map itself using its internal Mongo _id

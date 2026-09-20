@@ -181,6 +181,23 @@ export interface UiStrings {
     wipe: string;
   };
   loadingMap: string;
+  /** Showing the chosen nodes in their own reading mode, zooming in when their text would overlap. */
+  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string };
+  /** Separator lines drawn between groups of nodes. */
+  lines: {
+    toolbar: string;
+    hintStart: string;
+    crossing: string;
+    hintPoints: (count: number) => string;
+    blocked: string;
+    undo: string;
+    finish: string;
+    exit: string;
+    deleteTitle: string;
+    deleteConfirm: string;
+    createFailed: string;
+    deleteFailed: string;
+  };
   /** Copy/paste of nodes — chosen ones, or a whole map — between maps. */
   clipboard: {
     copyMap: string;
@@ -425,6 +442,26 @@ const en: UiStrings = {
     wipe: "Wipe failed",
   },
   loadingMap: "Loading map…",
+  display: {
+    header: "Show chosen nodes as",
+    followMap: "Same as the map",
+    zoomedToFit: "Zoomed in so the nodes don't overlap.",
+    stillOverlap: "Zoomed in as far as possible — a few nodes still overlap.",
+  },
+  lines: {
+    toolbar: "Draw a separator line",
+    hintStart: "Click empty spots to place the line's points. It can't run over nodes or zones, but it can join other lines.",
+    crossing: "That stretch would run over a node or zone — pick a spot that keeps the line clear.",
+    hintPoints: (n) => `${n} point${n === 1 ? "" : "s"} placed — Enter to finish, Backspace to undo, Esc to clear.`,
+    blocked: "That spot is on a node or zone — pick an empty one.",
+    undo: "Undo",
+    finish: "Finish line",
+    exit: "Exit",
+    deleteTitle: "Click to delete this line",
+    deleteConfirm: "Delete this line?",
+    createFailed: "Failed to draw the line",
+    deleteFailed: "Failed to delete the line",
+  },
   clipboard: {
     copyMap: "Copy map content",
     copied: (n) => `Copied ${n} node${n === 1 ? "" : "s"}. Open a map and paste with Ctrl+V, or + > Paste.`,
@@ -663,6 +700,26 @@ const cs: UiStrings = {
     wipe: "Vymazání se nezdařilo",
   },
   loadingMap: "Načítání mapy…",
+  display: {
+    header: "Zobrazit vybrané uzly jako",
+    followMap: "Stejně jako mapa",
+    zoomedToFit: "Přiblíženo, aby se uzly nepřekrývaly.",
+    stillOverlap: "Přiblíženo na maximum — několik uzlů se stále překrývá.",
+  },
+  lines: {
+    toolbar: "Nakreslit dělicí čáru",
+    hintStart: "Klikejte na volná místa a určete body čáry. Nesmí vést přes uzly ani zóny, ale může navazovat na jiné čáry.",
+    crossing: "Tento úsek by vedl přes uzel nebo zónu — vyberte místo, které nechá čáru volnou.",
+    hintPoints: (n) => `Bodů: ${n} — Enter dokončí, Backspace vrátí zpět, Esc smaže.`,
+    blocked: "Toto místo je na uzlu nebo zóně — vyberte volné.",
+    undo: "Zpět",
+    finish: "Dokončit čáru",
+    exit: "Skončit",
+    deleteTitle: "Kliknutím tuto čáru smažete",
+    deleteConfirm: "Smazat tuto čáru?",
+    createFailed: "Čáru se nepodařilo nakreslit",
+    deleteFailed: "Čáru se nepodařilo smazat",
+  },
   clipboard: {
     copyMap: "Kopírovat obsah mapy",
     copied: (n) => `Zkopírováno: ${csNodes(n)}. Otevřete mapu a vložte přes Ctrl+V nebo + > Vložit.`,
@@ -901,6 +958,26 @@ const uk: UiStrings = {
     wipe: "Не вдалося очистити",
   },
   loadingMap: "Завантаження мапи…",
+  display: {
+    header: "Показати вибрані вузли як",
+    followMap: "Так само, як мапа",
+    zoomedToFit: "Наближено, щоб вузли не перекривалися.",
+    stillOverlap: "Наближено до максимуму — кілька вузлів усе ще перекриваються.",
+  },
+  lines: {
+    toolbar: "Намалювати розділову лінію",
+    hintStart: "Клацайте на вільні місця, щоб задати точки лінії. Вона не може йти через вузли чи зони, але може з’єднуватися з іншими лініями.",
+    crossing: "Ця ділянка пройшла б через вузол або зону — оберіть місце, що залишить лінію вільною.",
+    hintPoints: (n) => `Точок: ${n} — Enter завершує, Backspace скасовує крок, Esc очищає.`,
+    blocked: "Це місце на вузлі або зоні — оберіть вільне.",
+    undo: "Скасувати крок",
+    finish: "Завершити лінію",
+    exit: "Вийти",
+    deleteTitle: "Клацніть, щоб видалити цю лінію",
+    deleteConfirm: "Видалити цю лінію?",
+    createFailed: "Не вдалося намалювати лінію",
+    deleteFailed: "Не вдалося видалити лінію",
+  },
   clipboard: {
     copyMap: "Копіювати вміст мапи",
     copied: (n) => `Скопійовано: ${ukNodes(n)}. Відкрийте мапу й вставте через Ctrl+V або + > Вставити.`,
@@ -1139,6 +1216,26 @@ const ru: UiStrings = {
     wipe: "Не удалось очистить",
   },
   loadingMap: "Загрузка карты…",
+  display: {
+    header: "Показать выбранные узлы как",
+    followMap: "Так же, как карта",
+    zoomedToFit: "Приближено, чтобы узлы не перекрывались.",
+    stillOverlap: "Приближено до максимума — несколько узлов всё ещё перекрываются.",
+  },
+  lines: {
+    toolbar: "Нарисовать разделительную линию",
+    hintStart: "Щёлкайте по свободным местам, чтобы задать точки линии. Она не может проходить через узлы и зоны, но может соединяться с другими линиями.",
+    crossing: "Этот участок прошёл бы через узел или зону — выберите место, которое оставит линию свободной.",
+    hintPoints: (n) => `Точек: ${n} — Enter завершает, Backspace отменяет шаг, Esc очищает.`,
+    blocked: "Это место занято узлом или зоной — выберите свободное.",
+    undo: "Отменить шаг",
+    finish: "Завершить линию",
+    exit: "Выйти",
+    deleteTitle: "Щёлкните, чтобы удалить эту линию",
+    deleteConfirm: "Удалить эту линию?",
+    createFailed: "Не удалось нарисовать линию",
+    deleteFailed: "Не удалось удалить линию",
+  },
   clipboard: {
     copyMap: "Копировать содержимое карты",
     copied: (n) => `Скопировано: ${ruNodes(n)}. Откройте карту и вставьте через Ctrl+V или + > Вставить.`,

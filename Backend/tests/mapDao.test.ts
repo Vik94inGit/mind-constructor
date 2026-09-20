@@ -2,6 +2,7 @@ import { describe, beforeEach, it, expect, vi } from "vitest";
 import { Node } from "../src/models/Node.js";
 import { Map } from "../src/models/Map.js";
 import { Edge } from "../src/models/Edge.js";
+import { Line } from "../src/models/Line.js";
 import { User } from "../src/models/User.js";
 import {
   findMapByPublicIdDao,
@@ -30,6 +31,11 @@ vi.mock("../src/models/Node.js", () => ({
 vi.mock("../src/models/User.js", () => ({
   User: {
     find: vi.fn(),
+  },
+}));
+vi.mock("../src/models/Line.js", () => ({
+  Line: {
+    deleteMany: vi.fn(),
   },
 }));
 vi.mock("../src/models/Edge.js", () => ({
@@ -269,6 +275,7 @@ describe("mapsDao", () => {
     const result = await deleteMapDao("pub123", "user1");
 
     expect(Edge.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
+    expect(Line.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
     expect(Node.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
     expect(Map.findByIdAndDelete).toHaveBeenCalledWith("m1");
     expect(result).toEqual(map);

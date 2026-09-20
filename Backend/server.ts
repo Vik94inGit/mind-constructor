@@ -11,6 +11,7 @@ import authRoutes from "./src/routes/authRoutes.js";
 import mapRoute from "./src/routes/mapRoute.js";
 import nodeRoute from "./src/routes/nodeRoute.js";
 import edgeRoute from "./src/routes/edgeRoute.js";
+import lineRoute from "./src/routes/lineRoute.js";
 import { initRealtime } from "./src/realtime/io.js";
 
 console.log(
@@ -39,6 +40,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/nodes", nodeRoute);
 app.use("/api/edges", edgeRoute);
+app.use("/api/lines", lineRoute);
 app.use("/api", mapRoute);
 
 // Socket.IO attaches to the same HTTP server Express listens on — one

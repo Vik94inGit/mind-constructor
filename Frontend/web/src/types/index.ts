@@ -218,6 +218,15 @@ export interface EdgeDoc {
   userId: NodeUserRef | string;
 }
 
+/** A drawn separator line — a polyline of canvas points (see Backend's Line model). */
+export interface LineDoc {
+  lineId: string;
+  mapId?: string;
+  userId: NodeUserRef | string;
+  points: { x: number; y: number }[];
+  createdAt?: string;
+}
+
 export interface Attack {
   weapon: Weapon;
   damage: number;

@@ -1,7 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
+import { roundedPath, LINE_CORNER_RADIUS } from "../utils/drawLine";
 import type { Sentiment } from "../utils/nodeType";
-import type { EdgeDoc, NodeDoc } from "../types";
+import type { EdgeDoc, LineDoc, NodeDoc } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 
 // Smaller than the original per-node dots (which were 2.2px and colored one
@@ -55,6 +56,10 @@ interface Props {
   // lineage, which this doesn't draw) — same sentiment-colored lines the
   // real canvas draws for these, scaled down.
   edges: EdgeDoc[];
+  // The separator lines drawn on the map (see MapPage's own lines state) —
+  // scaled down and drawn here too, so the way a map has been divided up is
+  // visible from the overview as well, not only once zoomed in on it.
+  lines: LineDoc[];
   positions: Map<string, { x: number; y: number }>;
   // Same circles the main canvas draws a backdrop for (see MapPage's own
   // nodeGroups) — drawn here too, scaled down, so a circle is findable from
@@ -83,6 +88,7 @@ export const MiniMap = memo(function MiniMap({
   wrapRef,
   nodes,
   edges,
+  lines,
   positions,
   groups,
   canvasW,
@@ -312,6 +318,24 @@ export const MiniMap = memo(function MiniMap({
             />
           );
         })}
+        {/* Separator lines — the same plain strokes the real canvas draws,
+            scaled down (a touch heavier than the links above, so a divider
+            still reads as the bigger gesture it is). */}
+        {lines.map((line) => (
+          <path
+            key={line.lineId}
+            d={roundedPath(
+              line.points.map((p) => ({ x: p.x * scaleX, y: p.y * scaleY })),
+              LINE_CORNER_RADIUS * scaleX,
+            )}
+            fill="none"
+            stroke="var(--ink)"
+            strokeWidth={1.25}
+            strokeOpacity={0.7}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
         {/* Per-node dots — colored only by which side of the positive/
             negative split a node's type falls on (same ZONE_COLORS pair the
             zones above use), not a whole palette of per-type colors.

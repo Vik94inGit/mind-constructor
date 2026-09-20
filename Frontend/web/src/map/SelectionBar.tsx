@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { SelectionMenu } from "./SelectionMenu";
+import type { ReadingMode } from "../utils/readingMode";
 
 interface Props {
   count: number;
@@ -8,6 +9,7 @@ interface Props {
   chooseMode: boolean;
   onLink: () => void;
   onNumber: () => void;
+  onDisplay: (mode: ReadingMode | null) => void;
   onClearNumbers: () => void;
   onCopy: () => void;
   onCopyText: () => void;
@@ -27,7 +29,7 @@ const btn =
 // mount for it either way). Move (drag any selected node) plus the Actions
 // dropdown (see SelectionMenu) and Deselect; per-node editing/attacking
 // still needs dropping back to a single selection first.
-export function SelectionBar({ count, chooseMode, onLink, onNumber, onClearNumbers, onCopy, onCopyText, onGroupCircle, onDelete, onDone }: Props) {
+export function SelectionBar({ count, chooseMode, onLink, onNumber, onDisplay, onClearNumbers, onCopy, onCopyText, onGroupCircle, onDelete, onDone }: Props) {
   const { t } = useI18n();
   // The "Actions" dropdown's own open/closed state.
   const [menuOpen, setMenuOpen] = useState(false);
@@ -55,6 +57,7 @@ export function SelectionBar({ count, chooseMode, onLink, onNumber, onClearNumbe
               canLink={count >= 2}
               onLink={then(onLink)}
               onNumber={then(onNumber)}
+              onDisplay={(mode) => then(() => onDisplay(mode))()}
               onClearNumbers={then(onClearNumbers)}
               onClose={close}
               onCopy={then(onCopy)}

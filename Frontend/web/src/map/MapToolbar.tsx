@@ -17,6 +17,9 @@ interface Props {
   onExpand: () => void;
   moveMode: boolean;
   onToggleMove: () => void;
+  /** Drawing a separator line (see DrawLineBar). */
+  drawMode: boolean;
+  onToggleDraw: () => void;
   readingMode: ReadingMode;
   onPickReadingMode: (mode: ReadingMode) => void;
   onToggleMapMode: () => void;
@@ -47,6 +50,8 @@ export function MapToolbar({
   onExpand,
   moveMode,
   onToggleMove,
+  drawMode,
+  onToggleDraw,
   readingMode,
   onPickReadingMode,
   onToggleMapMode,
@@ -112,6 +117,17 @@ export function MapToolbar({
             onClick={onToggleMove}
           >
             ✥
+          </button>
+          {/* Draw a separator line: click empty spots to place its points. */}
+          <button
+            type="button"
+            className={`${iconBtn} ${drawMode ? pressed : idle}`}
+            title={t.ui.lines.toolbar}
+            onClick={onToggleDraw}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+            </svg>
           </button>
           {/* Reading mode — how nodes read on the canvas (classic mind map /
               icons + text / actual). Highlighted whenever it isn't the

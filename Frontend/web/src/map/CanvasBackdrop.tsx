@@ -1,9 +1,10 @@
 import { CANVAS_W, CANVAS_H } from "../utils/canvasLayout";
+import { roundedPath } from "../utils/drawLine";
 import { useI18n } from "../i18n/I18nContext";
 import type { NodeGroup } from "../utils/canvasLayout";
 import { nodeRefId, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
-import type { EdgeDoc, NodeDoc, SelectedCircle } from "../types";
+import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
 
 interface Props {
   nodeGroups: NodeGroup[];
@@ -19,6 +20,14 @@ interface Props {
   /** The nodes a link is being confirmed for — kept ringed while the sentiment modal is open. */
   pendingLink: NodeDoc[] | null;
   onCircleClick: (rootId: string) => void;
+  /** Separator lines drawn on the map. */
+  lines: LineDoc[];
+  canDeleteLine: (line: LineDoc) => boolean;
+  onLineClick: (line: LineDoc) => void;
+  /** False while drawing a line: zones and grouped branches stop taking clicks, so a click on one lands on the canvas as a (refused) point instead of choosing a circle. */
+  interactive: boolean;
+  /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
+  drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
 }
 
 // Everything drawn *behind* the node cards: zone polygons, manual zones and
@@ -36,6 +45,11 @@ export function CanvasBackdrop({
   chosenNodeIds,
   pendingLink,
   onCircleClick,
+  lines,
+  canDeleteLine,
+  onLineClick,
+  interactive,
+  drawing,
 }: Props) {
   const { t } = useI18n();
   return (
@@ -79,7 +93,7 @@ export function CanvasBackdrop({
             // NodeCard div sitting underneath) — a zone is one of
             // the few things in it that's actually meant to be
             // clicked, so it has to explicitly opt back in.
-            style={{ cursor: "pointer", pointerEvents: "auto" }}
+            style={interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
             onClick={(e) => {
               e.stopPropagation();
               onCircleClick(g.rootId);
@@ -239,7 +253,7 @@ export function CanvasBackdrop({
             // clicked (see handleCircleBackdropClick, same handler
             // the old backdrop circle used), so it has to explicitly
             // opt back in; an ungrouped one stays inert.
-            style={group ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
+            style={group && interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
             onClick={
               group
                 ? (e) => {
@@ -319,6 +333,79 @@ export function CanvasBackdrop({
           />
         );
       })}
+      {/* Separator lines: plain strokes drawn to split groups of nodes. The
+          wide transparent stroke on top is the click target for deleting one
+          (only for whoever drew it, or the map's owner — and not while
+          drawing). */}
+      {lines.map((line) => {
+        // Corners rounded a little (see roundedPath) once a line is finished.
+        const d = roundedPath(line.points);
+        const deletable = interactive && canDeleteLine(line);
+        return (
+          <g key={line.lineId}>
+            <path
+              d={d}
+              fill="none"
+              stroke="var(--ink)"
+              strokeOpacity={0.55}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {deletable && (
+              <path
+                d={d}
+                fill="none"
+                stroke="transparent"
+                strokeWidth={18}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ cursor: "pointer", pointerEvents: "stroke" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLineClick(line);
+                }}
+              >
+                <title>{t.ui.lines.deleteTitle}</title>
+              </path>
+            )}
+          </g>
+        );
+      })}
+      {/* The line in progress: dashed, with a marker on each placed point and a
+          ring under the pointer — green over a free spot, red over one a node
+          or zone occupies. */}
+      {drawing && (
+        <g>
+          {drawing.points.length > 0 && (
+            <polyline
+              points={[...drawing.points, ...(drawing.hover && drawing.hoverFree ? [drawing.hover] : [])]
+                .map((p) => `${p.x},${p.y}`)
+                .join(" ")}
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth={3}
+              strokeDasharray="8 6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+          {drawing.points.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r={i === 0 ? 6 : 5} fill="var(--accent)" stroke="var(--surface)" strokeWidth={2} />
+          ))}
+          {drawing.hover && (
+            <circle
+              cx={drawing.hover.x}
+              cy={drawing.hover.y}
+              r={9}
+              fill={drawing.hoverFree ? "var(--success)" : "var(--danger)"}
+              fillOpacity={0.25}
+              stroke={drawing.hoverFree ? "var(--success)" : "var(--danger)"}
+              strokeWidth={2}
+            />
+          )}
+        </g>
+      )}
       {/* The chosen set stays lit while the sentiment modal is open. */}
       {pendingLink?.map((n) => {
         const p = posFor(n);

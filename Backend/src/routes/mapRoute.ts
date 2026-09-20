@@ -16,6 +16,7 @@ import {
   selectMapCircle,
   deselectMapCircle,
 } from "../controllers/mapController.js";
+import { getLinesByMap } from "../controllers/lineController.js";
 import { protect } from "../middleware/auth.js";
 
 const router = Router();
@@ -34,6 +35,7 @@ router.get("/:mapId/summary", protect, getMapSummary);
 router.get("/:mapId/nodes", protect, getNodesByMap);
 router.post("/:mapId/nodes/text", protect, getNodesText);
 router.get("/:mapId/edges", protect, getEdgesByMap);
+router.get("/:mapId/lines", protect, getLinesByMap);
 router.post("/:mapId/circles/select", protect, selectMapCircle);
 router.post("/:mapId/circles/deselect", protect, deselectMapCircle);
 router.get("/:mapId/attack-indicators", protect, getMapAttackIndicators);
