@@ -1927,6 +1927,8 @@ export function MapPage() {
     try {
       const updated = await nodesApi.updateNode(node.nodeId, { text, type });
       upsertNode(updated);
+      // Editing is done — close the node's panel, same as after Enter in it.
+      setSelectedId((cur) => (cur === node.nodeId ? null : cur));
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : "Update failed");
     } finally {

@@ -324,19 +324,23 @@ export function NodePanel({
   // handleSetSymbol already uses, just for `text` instead of
   // `symbolOverride`. A no-op (not an error) on empty/unchanged text, same
   // as the canvas's own inline editor's resolveInlineEdit does.
-  async function handleTextSave() {
+  // Resolves true unless the save failed, so a caller that closes the panel
+  // afterwards (Enter) can leave it open, error showing, when it did.
+  async function handleTextSave(): Promise<boolean> {
     const trimmed = textDraft.trim();
     if (!trimmed || trimmed === node.text) {
       setTextDraft(node.text);
-      return;
+      return true;
     }
     setBusy(true);
     setError(null);
     try {
       const updated = await nodesApi.updateNode(node.nodeId, { text: trimmed });
       onUpdated(updated);
+      return true;
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Failed to update text");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -344,19 +348,21 @@ export function NodePanel({
 
   // Empty is a valid save here (unlike text): it clears the title, sending
   // the canvas back to showing the start of the text. A no-op if unchanged.
-  async function handleTitleSave() {
+  async function handleTitleSave(): Promise<boolean> {
     const trimmed = titleDraft.trim();
     if (trimmed === (node.title ?? "")) {
       setTitleDraft(node.title ?? "");
-      return;
+      return true;
     }
     setBusy(true);
     setError(null);
     try {
       const updated = await nodesApi.updateNode(node.nodeId, { title: trimmed });
       onUpdated(updated);
+      return true;
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Failed to update title");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -617,13 +623,14 @@ export function NodePanel({
                 // its own newline escape hatch.
                 if (e.key === "Enter" && !e.shiftKey && !isMobileViewport()) {
                   e.preventDefault();
-                  handleTextSave();
+                  // Saves, then closes the panel — editing is done.
+                  void handleTextSave().then((ok) => ok && onClose());
                 }
                 // Shift+Enter (desktop), or plain Enter on mobile: no
                 // preventDefault — the textarea's own default behavior
                 // (insert a newline) is exactly what's wanted here.
               }}
-              onBlur={handleTextSave}
+              onBlur={() => void handleTextSave()}
               className={`min-h-[8rem] w-full resize-y rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent ${expanded ? "max-h-none" : "max-h-[40vh]"}`}
             />
           ) : (
@@ -738,12 +745,13 @@ export function NodePanel({
                 disabled={busy}
                 placeholder="Optional — otherwise the first words of the text show"
                 onKeyDown={(e) => {
+                  // Enter saves, then closes the panel — editing is done.
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    e.currentTarget.blur();
+                    void handleTitleSave().then((ok) => ok && onClose());
                   }
                 }}
-                onBlur={handleTitleSave}
+                onBlur={() => void handleTitleSave()}
                 className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>

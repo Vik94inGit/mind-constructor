@@ -58,7 +58,15 @@ export function LoginPage() {
       const mapId = await tryDemo();
       navigate(`/maps/${mapId}`, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.auth.login.genericError);
+      // A bare "Not Found" here means the server answered but has no
+      // /api/auth/demo route at all — a backend older than the demo feature.
+      setError(
+        err instanceof ApiRequestError
+          ? err.status === 404
+            ? t.auth.login.demoUnavailable
+            : err.message
+          : t.auth.login.genericError,
+      );
     } finally {
       setBusy(false);
     }

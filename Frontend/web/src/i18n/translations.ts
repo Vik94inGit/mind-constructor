@@ -28,6 +28,7 @@ export interface Translation {
       genericError: string;
       tryDemo: string;
       tryDemoBusy: string;
+      demoUnavailable: string;
     };
     register: {
       title: string;
@@ -147,6 +148,7 @@ const en: Translation = {
       genericError: "Something went wrong",
       tryDemo: "Try it without an account",
       tryDemoBusy: "Setting up your demo…",
+      demoUnavailable: "The demo isn't available on this server yet — its backend is out of date. Update or restart the backend and try again.",
     },
     register: {
       title: "Create your account",
@@ -258,6 +260,7 @@ const cs: Translation = {
       genericError: "Něco se pokazilo",
       tryDemo: "Vyzkoušet bez účtu",
       tryDemoBusy: "Připravujeme vaše demo…",
+      demoUnavailable: "Demo na tomto serveru zatím není k dispozici — jeho backend je zastaralý. Aktualizujte nebo restartujte backend a zkuste to znovu.",
     },
     register: {
       title: "Vytvořte si účet",
@@ -369,6 +372,7 @@ const uk: Translation = {
       genericError: "Щось пішло не так",
       tryDemo: "Спробувати без реєстрації",
       tryDemoBusy: "Готуємо вашу демо-версію…",
+      demoUnavailable: "Демо на цьому сервері ще недоступне — його бекенд застарів. Оновіть або перезапустіть бекенд і спробуйте ще раз.",
     },
     register: {
       title: "Створіть обліковий запис",
@@ -480,6 +484,7 @@ const ru: Translation = {
       genericError: "Что-то пошло не так",
       tryDemo: "Попробовать без регистрации",
       tryDemoBusy: "Готовим ваше демо…",
+      demoUnavailable: "Демо на этом сервере пока недоступно — его бэкенд устарел. Обновите или перезапустите бэкенд и попробуйте снова.",
     },
     register: {
       title: "Создайте аккаунт",
