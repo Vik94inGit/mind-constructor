@@ -109,6 +109,11 @@ export interface MapDoc {
   // two shapes apart, so both fields stay optional for either caller.
   members?: string[] | { _id: string; username: string }[];
   memberCount?: number;
+  /** Members' usernames, and the owner's — sent with the maps list so the dashboard's owner/members buttons open without a follow-up request. Absent on a single map's full detail. */
+  memberNames?: string[];
+  ownerName?: string | null;
+  /** How many nodes the map has — also sent with the maps list, instead of one summary request per card. */
+  nodeCount?: number;
   memberColors?: MemberColor[];
   color?: string;
   selectedCircle?: SelectedCircle | null;

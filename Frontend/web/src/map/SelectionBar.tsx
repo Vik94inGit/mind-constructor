@@ -43,6 +43,7 @@ export function SelectionBar({ count, chooseMode, onLink, onNumber, onClearNumbe
         <span className="text-[0.88rem] font-semibold text-ink">
           {count === 0 ? t.ui.selection.tapToChoose : chooseMode ? t.ui.selection.chosen(count) : t.ui.selection.selected(count)}
         </span>
+        {chooseMode && <span className="hidden text-[0.72rem] text-ink-soft md:inline">{t.ui.selection.finishHint}</span>}
         <div className="relative">
           <button className={btn} disabled={count === 0} onClick={() => setMenuOpen((v) => !v)}>
             {t.ui.selection.actions}
@@ -64,7 +65,7 @@ export function SelectionBar({ count, chooseMode, onLink, onNumber, onClearNumbe
           )}
         </div>
       </div>
-      <button className={btn} onClick={onDone}>
+      <button className={btn} onClick={onDone} title={chooseMode ? t.ui.selection.finishHint : undefined}>
         {chooseMode ? t.ui.common.done : t.ui.selection.deselect}
       </button>
     </div>

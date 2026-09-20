@@ -1,11 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
+import { nodeClipboardSize } from "../utils/nodeClipboard";
 
 interface Props {
   isOwner: boolean;
   onInvite: () => void;
   onCreateNode: () => void;
   onCreateCircle: () => void;
+  onCopyMap: () => void;
+  onPaste: () => void;
   onExportText: () => void;
   onClose: () => void;
 }
@@ -19,9 +22,11 @@ interface Props {
 // would run the menu off the left edge. Same dismiss-on-outside-click/
 // Escape pattern as NodeContextMenu, just without that one's fixed x/y
 // placement.
-export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onExportText, onClose }: Props) {
+export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onCopyMap, onPaste, onExportText, onClose }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
+  // Read once as the menu opens — it mounts fresh each time, so this is what is on the clipboard right now.
+  const [pasteCount] = useState(nodeClipboardSize);
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -57,6 +62,14 @@ export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onExp
       <button className={item} onClick={onCreateCircle}>
         {t.map.addMenu.createCircle}
       </button>
+      <button className={item} onClick={onCopyMap}>
+        {t.ui.clipboard.copyWholeMap}
+      </button>
+      {pasteCount > 0 && (
+        <button className={item} onClick={onPaste}>
+          {t.ui.clipboard.paste(pasteCount)}
+        </button>
+      )}
       <button className={item} onClick={onExportText}>
         {t.map.addMenu.exportText}
       </button>

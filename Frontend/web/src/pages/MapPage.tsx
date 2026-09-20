@@ -8,6 +8,7 @@ import { ApiRequestError } from "../api/client";
 import { useMapSocket } from "../hooks/useMapSocket";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { stepPrefix, stepRank } from "../utils/textExport";
+import { buildNodeClipboard, nodeClipboardSize, readNodeClipboard, writeNodeClipboard } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
@@ -35,8 +36,6 @@ import {
   CANVAS_H,
   ZOOM_STEP,
   CIRCLE_DROP_RADIUS,
-  nodeClipboard,
-  setNodeClipboard,
   computeLinkedNeighborIds,
   getNodeMinDist,
   pickNonOverlappingPosition,
@@ -122,6 +121,19 @@ export function MapPage() {
   // canvas behind a "map not found"-style screen. This is the one place
   // those land instead — a dismissible banner over the still-live canvas.
   const [actionError, setActionError] = useState<string | null>(null);
+  // The circle whose zone was just clicked, while it is still being chosen and
+  // its members' titles/text are still on their way (two round trips: the
+  // choice itself, then the text). Shows a spinner on the zone so the click
+  // visibly registered instead of the canvas looking frozen.
+  const [circleLoadingRootId, setCircleLoadingRootId] = useState<string | null>(null);
+  // A short confirmation ("Copied 3 nodes…") — auto-dismissed, unlike an error.
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showNotice(message: string) {
+    setNotice(message);
+    if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
+    noticeTimeoutRef.current = setTimeout(() => setNotice(null), 5000);
+  }
 
   // A node not yet created — its text is still being typed into the inline
   // input hovering at (x,y), styled with `type`'s icon. Nothing is sent to
@@ -578,7 +590,11 @@ export function MapPage() {
   // becomes the chosen one, same trigger the centering effect below reacts
   // to.
   useEffect(() => {
-    if (spotlightedNodeIds && spotlightedNodeIds.length > 0) ensureNodeText(spotlightedNodeIds);
+    if (spotlightedNodeIds && spotlightedNodeIds.length > 0) {
+      // The text is what the chosen circle's members' captions need — once it
+      // is in, the zone's loading spinner (if one is showing) can go.
+      void ensureNodeText(spotlightedNodeIds).finally(() => setCircleLoadingRootId(null));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spotlightedNodeIds]);
 
@@ -1467,10 +1483,15 @@ export function MapPage() {
       return;
     }
     setActionError(null);
+    setCircleLoadingRootId(rootId);
     try {
       const selected = await mapsApi.selectCircle(mapId, rootId);
       applyCircleSelection(selected);
+      // Normally the spinner is cleared once the members' text has loaded (see
+      // the spotlightedNodeIds effect) — with no members there is nothing to wait for.
+      if (!selected || selected.nodeIds.length === 0) setCircleLoadingRootId(null);
     } catch (err) {
+      setCircleLoadingRootId(null);
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.updateCircle);
     }
   }
@@ -1525,13 +1546,14 @@ export function MapPage() {
     }
   }
 
-  // Ctrl/Cmd+C / Ctrl/Cmd+V — see the keydown effect below and
-  // nodeClipboard's own module-level doc comment. Copies the currently
-  // selected node(s) (multiSelectIds if any are picked, else the single
-  // selectedId) as plain text+type+position snapshots — nothing structural
-  // (parentId, Edges, health, attacks) carries over, so a paste is always a
-  // set of brand-new, unlinked nodes, never a re-parented copy of the
-  // originals.
+  // Ctrl/Cmd+C / Ctrl/Cmd+V, the selection menu's Copy, the "+" menu's Copy
+  // whole map / Paste, and the canvas menu's Paste here — see
+  // utils/nodeClipboard.ts for what a copy holds and why it survives a
+  // reload and is shared between tabs. Copies the chosen node(s)
+  // (multiSelectIds if any are picked, else the single selectedId) with their
+  // text, look, layout, branch parents and the connections among them — but
+  // not health, attacks or packing, and nothing pointing at a node that
+  // wasn't copied.
   //
   // Fixed offset (not random/growing) so a repeated copy-paste-paste-paste
   // on the *same* map fans pasted copies out along one consistent diagonal
@@ -1540,24 +1562,38 @@ export function MapPage() {
   const PASTE_OFFSET = 40;
 
   async function copySelection() {
-    if (!mapId) return;
     const ids = multiSelectIds.size > 0 ? Array.from(multiSelectIds) : selectedId ? [selectedId] : [];
     if (ids.length === 0) return;
-    const candidates = ids
-      .map((id) => nodes.find((n) => n.nodeId === id))
-      .filter((n): n is NodeDoc => !!n && !n.isWeapon);
-    if (candidates.length === 0) return;
+    await copyNodes(ids);
+  }
+
+  async function copyWholeMap() {
+    await copyNodes(null);
+  }
+
+  // `pickIds` null = every node on the map.
+  async function copyNodes(pickIds: string[] | null) {
+    if (!mapId) return;
     // Awaited, not read straight off `n.text` — a marquee/long-press pick
     // never necessarily opened any of these nodes first, so their real text
     // may not have loaded yet (see ensureNodeText's own doc comment on why
     // its *return value*, not a re-read of `nodes`, is what's safe to use
     // right after awaiting it).
-    const textById = await ensureNodeText(candidates.map((n) => n.nodeId));
-    const copied = candidates.map((n) => {
-      const pos = positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-      return { text: textById[n.nodeId] ?? n.text, type: n.type, x: pos.x, y: pos.y };
+    const wanted = (pickIds ?? visibleNodes.map((n) => n.nodeId)).filter((id) => {
+      const n = nodes.find((x) => x.nodeId === id);
+      return !!n && !n.isWeapon && !n.isProtection;
     });
-    if (copied.length > 0) setNodeClipboard({ sourceMapId: mapId, nodes: copied });
+    const textById = await ensureNodeText(wanted);
+    const clipboard = buildNodeClipboard(mapId, nodes, pickIds, textById, edges);
+    if (!clipboard) {
+      showNotice(t.ui.clipboard.nothingToCopy);
+      return;
+    }
+    if (!writeNodeClipboard(clipboard)) {
+      setActionError(t.ui.clipboard.storeFailed);
+      return;
+    }
+    showNotice(t.ui.clipboard.copied(clipboard.nodes.length));
   }
 
   // SelectionMenu's "Copy as text" — unlike copySelection above (which feeds
@@ -1636,9 +1672,17 @@ export function MapPage() {
     setExtractClusterRootId(rootId);
   }
 
-  async function pasteClipboard() {
-    const clipboard = nodeClipboard;
-    if (!clipboard || !mapId) return;
+  // Pastes what's on the clipboard (see copyNodes) into this map — this one
+  // or a different one — as brand-new nodes, keeping branch parents and the
+  // connections among them. `at` (a canvas point, from the canvas menu's
+  // "Paste here") puts the group's middle there.
+  async function pasteClipboard(at?: { x: number; y: number }) {
+    const clipboard = readNodeClipboard();
+    if (!mapId) return;
+    if (!clipboard) {
+      showNotice(t.ui.clipboard.nothingToPaste);
+      return;
+    }
     setActionError(null);
     // Pasting back into the map it was copied from: keep the originals'
     // own positions as the anchor (PASTE_OFFSET nudges just clear of them).
@@ -1649,33 +1693,72 @@ export function MapPage() {
     // copied nodes' own relative arrangement around that new anchor rather
     // than each one's original absolute position.
     const sameMap = clipboard.sourceMapId === mapId;
-    let anchorDx = 0;
-    let anchorDy = 0;
-    if (!sameMap) {
-      const cx = clipboard.nodes.reduce((s, n) => s + n.x, 0) / clipboard.nodes.length;
-      const cy = clipboard.nodes.reduce((s, n) => s + n.y, 0) / clipboard.nodes.length;
-      const anchor = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
-      anchorDx = anchor.x - cx;
-      anchorDy = anchor.y - cy;
+    let dx = PASTE_OFFSET;
+    let dy = PASTE_OFFSET;
+    if (at || !sameMap) {
+      const cx = clipboard.nodes.reduce((sum, n) => sum + n.x, 0) / clipboard.nodes.length;
+      const cy = clipboard.nodes.reduce((sum, n) => sum + n.y, 0) / clipboard.nodes.length;
+      const anchor = at ?? pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
+      dx = anchor.x - cx;
+      dy = anchor.y - cy;
     }
+    // Each node's spot, nudged clear of what is already on the map and of the
+    // pasted nodes placed before it — decided up front so the group keeps its
+    // shape wherever it can.
+    const existing = [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()];
+    const placedPoints: { x: number; y: number }[] = [];
+    const placement = new Map<string, { x: number; y: number }>();
+    for (const n of clipboard.nodes) {
+      const placed = avoidOverlap({ x: n.x + dx, y: n.y + dy }, [...existing, ...nodeObstacles(placedPoints)], viewportBounds());
+      placement.set(n.id, placed);
+      placedPoints.push(placed);
+    }
+    const created: NodeDoc[] = [];
     try {
-      const created = await Promise.all(
-        clipboard.nodes.map(async ({ text, type, x, y }) => {
-          const desired = sameMap
-            ? { x: x + PASTE_OFFSET, y: y + PASTE_OFFSET }
-            : { x: x + anchorDx, y: y + anchorDy };
-          const placed = avoidOverlap(
-            desired,
-            [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()],
-            viewportBounds(),
-          );
-          return nodesApi.createNode(mapId, { text, type, x: placed.x, y: placed.y, parentId: null });
+      // A node can only be created once the node it branches from exists, so
+      // this goes in waves: everything without a copied parent first, then
+      // their children, and so on. Each wave runs in parallel.
+      const newIdBySource = new Map<string, string>();
+      let pending = clipboard.nodes.slice();
+      while (pending.length > 0) {
+        let ready = pending.filter((n) => !n.parentId || newIdBySource.has(n.parentId));
+        if (ready.length === 0) ready = pending; // a parent loop can't be satisfied — create the rest unlinked
+        const batch = await Promise.all(
+          ready.map((n) => {
+            const spot = placement.get(n.id)!;
+            return nodesApi.createNode(mapId, {
+              text: n.text,
+              title: n.title,
+              type: n.type,
+              x: spot.x,
+              y: spot.y,
+              parentId: n.parentId ? (newIdBySource.get(n.parentId) ?? null) : null,
+              order: n.order,
+              symbolOverride: n.symbolOverride,
+              sizeTier: n.sizeTier,
+              manualZone: n.manualZone,
+            });
+          }),
+        );
+        ready.forEach((n, i) => newIdBySource.set(n.id, batch[i].nodeId));
+        batch.forEach((n) => {
+          upsertNode(n);
+          setCelebrateIds((prev) => new Set(prev).add(n.nodeId));
+        });
+        created.push(...batch);
+        const done = new Set(ready.map((n) => n.id));
+        pending = pending.filter((n) => !done.has(n.id));
+      }
+      // Then the connections among the copied nodes.
+      const newEdges = await Promise.all(
+        clipboard.edges.map((e) => {
+          const from = newIdBySource.get(e.from);
+          const to = newIdBySource.get(e.to);
+          return from && to ? edgesApi.createEdge(mapId, { fromNodeId: from, toNodeId: to, sentiment: e.sentiment }) : null;
         }),
       );
-      created.forEach((n) => {
-        upsertNode(n);
-        setCelebrateIds((prev) => new Set(prev).add(n.nodeId));
-      });
+      newEdges.forEach((e) => e && upsertEdge(e));
+      if (newEdges.some(Boolean)) refreshInsights(mapId);
       // The pasted copies become the new selection — same "what you just
       // did is now selected" convention confirmPendingCreate/group-drag
       // already follow, so it's immediately obvious what paste produced
@@ -1688,6 +1771,7 @@ export function MapPage() {
         setMultiSelectIds(new Set());
         setSelectedId(created[0].nodeId);
       }
+      showNotice(t.ui.clipboard.pasted(created.length));
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.paste);
     }
@@ -1883,7 +1967,21 @@ export function MapPage() {
       return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable;
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (!(e.ctrlKey || e.metaKey) || isEditableTarget(e.target)) return;
+      if (isEditableTarget(e.target)) return;
+      // Enter (or Escape) finishes choosing / a group selection. Skipped when a
+      // button, link, select or menu has focus — there Enter has its own job.
+      if (
+        !e.ctrlKey &&
+        !e.metaKey &&
+        (e.key === "Enter" || e.key === "Escape") &&
+        (chooseMode || multiSelectIds.size > 0)
+      ) {
+        if (e.target instanceof HTMLElement && e.target.closest("button, a, select, [role=menu]")) return;
+        e.preventDefault();
+        exitChooseMode();
+        return;
+      }
+      if (!(e.ctrlKey || e.metaKey)) return;
       if (e.key === "c" || e.key === "C") {
         copySelection();
       } else if (e.key === "v" || e.key === "V") {
@@ -1944,6 +2042,14 @@ export function MapPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {notice && (
+        <div className="mx-4 mt-[0.6rem] flex items-center justify-between gap-3 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">
+          {notice}
+          <button className={btnSmGhost} onClick={() => setNotice(null)}>
+            ✕
+          </button>
+        </div>
+      )}
       {actionError && (
         <div className="mx-4 mt-[0.6rem] flex items-center justify-between gap-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">
           {actionError}
@@ -2052,7 +2158,13 @@ export function MapPage() {
                 suppressNextClick.current = false;
                 return;
               }
-              if (chooseMode || packMode) return;
+              // Tapping empty canvas while choosing finishes it (and closes the
+              // Actions menu with it) — same as Done / Enter.
+              if (chooseMode) {
+                exitChooseMode();
+                return;
+              }
+              if (packMode) return;
               setSelectedId(null);
               setMultiSelectIds(new Set());
               releaseChosenCircleIfOutside();
@@ -2150,6 +2262,29 @@ export function MapPage() {
               );
             })}
 
+            {/* Loading spinner on a zone that was just clicked — see
+                circleLoadingRootId. Sits at the zone's middle, counter-scaled
+                so it stays the same size on screen at any zoom. */}
+            {circleLoadingRootId &&
+              (() => {
+                const group = nodeGroups.find((g) => g.rootId === circleLoadingRootId);
+                if (!group) return null;
+                return (
+                  <div
+                    className="pointer-events-none absolute z-[35]"
+                    style={{
+                      left: group.cx,
+                      top: group.cy,
+                      transform: `translate(-50%, -50%) scale(${1 / zoom})`,
+                    }}
+                    role="status"
+                    aria-label={t.ui.common.loading}
+                    title={t.ui.common.loading}
+                  >
+                    <div className="h-11 w-11 animate-spin rounded-full border-4 border-accent/25 border-t-accent bg-surface/90 shadow-card" />
+                  </div>
+                );
+              })()}
             <WeaponLayer
               visibleNodes={visibleNodes}
               posFor={posFor}
@@ -2233,6 +2368,8 @@ export function MapPage() {
             onInvite={() => setShowInvite(true)}
             onCreateNode={startCreateNodeInView}
             onCreateCircle={createCircle}
+            onCopyMap={copyWholeMap}
+            onPaste={() => pasteClipboard()}
             onExportText={openExportText}
           />
 
@@ -2389,6 +2526,12 @@ export function MapPage() {
           x={canvasContextMenu.screenX}
           y={canvasContextMenu.screenY}
           onClose={() => setCanvasContextMenu(null)}
+          pasteCount={nodeClipboardSize()}
+          onPasteHere={() => {
+            const at = { x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY };
+            setCanvasContextMenu(null);
+            pasteClipboard(at);
+          }}
           onPick={(type) => {
             // Where the user right-clicked — nudged only if it would cover
             // another node (see footprintObstacles), not pushed away from it.

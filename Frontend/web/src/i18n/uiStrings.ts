@@ -25,6 +25,7 @@ export interface UiStrings {
   contextMenu: { createBranch: string; update: string; choose: string; delete: string; attack: string };
   selection: {
     tapToChoose: string;
+    finishHint: string;
     chosen: (count: number) => string;
     selected: (count: number) => string;
     actions: string;
@@ -180,6 +181,30 @@ export interface UiStrings {
     wipe: string;
   };
   loadingMap: string;
+  /** Copy/paste of nodes — chosen ones, or a whole map — between maps. */
+  clipboard: {
+    copyMap: string;
+    copied: (count: number) => string;
+    mapCopied: (count: number, mapName: string) => string;
+    mapEmpty: (mapName: string) => string;
+    nothingToCopy: string;
+    nothingToPaste: string;
+    pasted: (count: number) => string;
+    copyWholeMap: string;
+    paste: (count: number) => string;
+    pasteHere: (count: number) => string;
+    storeFailed: string;
+    copyFailed: string;
+  };
+  /** The dashboard card's members / owner popups. */
+  people: {
+    membersTitle: (mapName: string) => string;
+    ownerTitle: (mapName: string) => string;
+    owner: string;
+    you: string;
+    noMembers: string;
+    unknown: string;
+  };
   /** Leaving a demo session (its account and map are throwaway) to log in or register. */
   demo: { exit: string; exitTitle: string; exitConfirm: string };
   /** Tooltips on the zone/branch shapes that stabilize a circle, and the text of nodes the app creates itself. */
@@ -241,6 +266,7 @@ const en: UiStrings = {
   contextMenu: { createBranch: "Create branch", update: "Update", choose: "Choose…", delete: "Delete", attack: "Attack" },
   selection: {
     tapToChoose: "Tap your nodes to choose them",
+    finishHint: "Tap outside or press Enter when done",
     chosen: (n) => `${n} node${n === 1 ? "" : "s"} chosen`,
     selected: (n) => `${n} node${n === 1 ? "" : "s"} selected`,
     actions: "Actions",
@@ -399,6 +425,28 @@ const en: UiStrings = {
     wipe: "Wipe failed",
   },
   loadingMap: "Loading map…",
+  clipboard: {
+    copyMap: "Copy map content",
+    copied: (n) => `Copied ${n} node${n === 1 ? "" : "s"}. Open a map and paste with Ctrl+V, or + > Paste.`,
+    mapCopied: (n, mapName) => `Copied ${n} node${n === 1 ? "" : "s"} from "${mapName}". Open another map and paste with Ctrl+V, or + > Paste.`,
+    mapEmpty: (mapName) => `"${mapName}" has nothing to copy.`,
+    nothingToCopy: "Nothing to copy.",
+    nothingToPaste: "Nothing to paste — copy some nodes, or a whole map, first.",
+    pasted: (n) => `Pasted ${n} node${n === 1 ? "" : "s"}.`,
+    copyWholeMap: "Copy whole map",
+    paste: (n) => `Paste ${n} node${n === 1 ? "" : "s"}`,
+    pasteHere: (n) => `Paste ${n} node${n === 1 ? "" : "s"} here`,
+    storeFailed: "Couldn't keep the copy — this browser blocked storage.",
+    copyFailed: "Copy failed",
+  },
+  people: {
+    membersTitle: (mapName) => `Members of "${mapName}"`,
+    ownerTitle: (mapName) => `Owner of "${mapName}"`,
+    owner: "owner",
+    you: "you",
+    noMembers: "No members yet.",
+    unknown: "Unknown user",
+  },
   demo: {
     exit: "Exit demo",
     exitTitle: "Leave the demo to log in or register",
@@ -456,6 +504,7 @@ const cs: UiStrings = {
   contextMenu: { createBranch: "Vytvořit větev", update: "Upravit", choose: "Vybrat…", delete: "Smazat", attack: "Napadnout" },
   selection: {
     tapToChoose: "Klepnutím na své uzly je vyberete",
+    finishHint: "Hotovo: klepněte mimo nebo stiskněte Enter",
     chosen: (n) => `Vybráno: ${csNodes(n)}`,
     selected: (n) => `Označeno: ${csNodes(n)}`,
     actions: "Akce",
@@ -614,6 +663,28 @@ const cs: UiStrings = {
     wipe: "Vymazání se nezdařilo",
   },
   loadingMap: "Načítání mapy…",
+  clipboard: {
+    copyMap: "Kopírovat obsah mapy",
+    copied: (n) => `Zkopírováno: ${csNodes(n)}. Otevřete mapu a vložte přes Ctrl+V nebo + > Vložit.`,
+    mapCopied: (n, mapName) => `Zkopírováno z „${mapName}“: ${csNodes(n)}. Otevřete jinou mapu a vložte přes Ctrl+V nebo + > Vložit.`,
+    mapEmpty: (mapName) => `Mapa „${mapName}“ nemá co kopírovat.`,
+    nothingToCopy: "Není co kopírovat.",
+    nothingToPaste: "Není co vložit — nejdřív zkopírujte uzly nebo celou mapu.",
+    pasted: (n) => `Vloženo: ${csNodes(n)}.`,
+    copyWholeMap: "Kopírovat celou mapu",
+    paste: (n) => `Vložit ${csNodes(n)}`,
+    pasteHere: (n) => `Vložit ${csNodes(n)} sem`,
+    storeFailed: "Kopii se nepodařilo uchovat — prohlížeč zablokoval úložiště.",
+    copyFailed: "Kopírování se nezdařilo",
+  },
+  people: {
+    membersTitle: (mapName) => `Členové mapy „${mapName}“`,
+    ownerTitle: (mapName) => `Vlastník mapy „${mapName}“`,
+    owner: "vlastník",
+    you: "vy",
+    noMembers: "Zatím žádní členové.",
+    unknown: "Neznámý uživatel",
+  },
   demo: {
     exit: "Ukončit demo",
     exitTitle: "Opustit demo a přihlásit se nebo zaregistrovat",
@@ -671,6 +742,7 @@ const uk: UiStrings = {
   contextMenu: { createBranch: "Створити гілку", update: "Змінити", choose: "Обрати…", delete: "Видалити", attack: "Атакувати" },
   selection: {
     tapToChoose: "Торкайтеся своїх вузлів, щоб обрати їх",
+    finishHint: "Готово: торкніться поза вузлами або натисніть Enter",
     chosen: (n) => `Обрано: ${ukNodes(n)}`,
     selected: (n) => `Виділено: ${ukNodes(n)}`,
     actions: "Дії",
@@ -829,6 +901,28 @@ const uk: UiStrings = {
     wipe: "Не вдалося очистити",
   },
   loadingMap: "Завантаження мапи…",
+  clipboard: {
+    copyMap: "Копіювати вміст мапи",
+    copied: (n) => `Скопійовано: ${ukNodes(n)}. Відкрийте мапу й вставте через Ctrl+V або + > Вставити.`,
+    mapCopied: (n, mapName) => `Скопійовано з «${mapName}»: ${ukNodes(n)}. Відкрийте іншу мапу й вставте через Ctrl+V або + > Вставити.`,
+    mapEmpty: (mapName) => `У мапі «${mapName}» нічого копіювати.`,
+    nothingToCopy: "Нічого копіювати.",
+    nothingToPaste: "Нічого вставляти — спершу скопіюйте вузли або цілу мапу.",
+    pasted: (n) => `Вставлено: ${ukNodes(n)}.`,
+    copyWholeMap: "Копіювати всю мапу",
+    paste: (n) => `Вставити ${ukNodes(n)}`,
+    pasteHere: (n) => `Вставити ${ukNodes(n)} сюди`,
+    storeFailed: "Не вдалося зберегти копію — браузер заблокував сховище.",
+    copyFailed: "Не вдалося скопіювати",
+  },
+  people: {
+    membersTitle: (mapName) => `Учасники мапи «${mapName}»`,
+    ownerTitle: (mapName) => `Власник мапи «${mapName}»`,
+    owner: "власник",
+    you: "ви",
+    noMembers: "Учасників поки немає.",
+    unknown: "Невідомий користувач",
+  },
   demo: {
     exit: "Вийти з демо",
     exitTitle: "Вийти з демо, щоб увійти або зареєструватися",
@@ -886,6 +980,7 @@ const ru: UiStrings = {
   contextMenu: { createBranch: "Создать ветку", update: "Изменить", choose: "Выбрать…", delete: "Удалить", attack: "Атаковать" },
   selection: {
     tapToChoose: "Касайтесь своих узлов, чтобы выбрать их",
+    finishHint: "Готово: коснитесь вне узлов или нажмите Enter",
     chosen: (n) => `Выбрано: ${ruNodes(n)}`,
     selected: (n) => `Выделено: ${ruNodes(n)}`,
     actions: "Действия",
@@ -1044,6 +1139,28 @@ const ru: UiStrings = {
     wipe: "Не удалось очистить",
   },
   loadingMap: "Загрузка карты…",
+  clipboard: {
+    copyMap: "Копировать содержимое карты",
+    copied: (n) => `Скопировано: ${ruNodes(n)}. Откройте карту и вставьте через Ctrl+V или + > Вставить.`,
+    mapCopied: (n, mapName) => `Скопировано из «${mapName}»: ${ruNodes(n)}. Откройте другую карту и вставьте через Ctrl+V или + > Вставить.`,
+    mapEmpty: (mapName) => `В карте «${mapName}» нечего копировать.`,
+    nothingToCopy: "Нечего копировать.",
+    nothingToPaste: "Нечего вставлять — сначала скопируйте узлы или всю карту.",
+    pasted: (n) => `Вставлено: ${ruNodes(n)}.`,
+    copyWholeMap: "Копировать всю карту",
+    paste: (n) => `Вставить ${ruNodes(n)}`,
+    pasteHere: (n) => `Вставить ${ruNodes(n)} сюда`,
+    storeFailed: "Не удалось сохранить копию — браузер заблокировал хранилище.",
+    copyFailed: "Не удалось скопировать",
+  },
+  people: {
+    membersTitle: (mapName) => `Участники карты «${mapName}»`,
+    ownerTitle: (mapName) => `Владелец карты «${mapName}»`,
+    owner: "владелец",
+    you: "вы",
+    noMembers: "Участников пока нет.",
+    unknown: "Неизвестный пользователь",
+  },
   demo: {
     exit: "Выйти из демо",
     exitTitle: "Выйти из демо, чтобы войти или зарегистрироваться",
