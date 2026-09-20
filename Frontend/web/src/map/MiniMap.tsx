@@ -185,7 +185,7 @@ export const MiniMap = memo(function MiniMap({
       // top-right — out of the way of the toolbar's own top-left "back"
       // link and the map name up there, and clear of the top-of-screen
       // controls generally.
-      // z-[45]: below NodePanel/LinkPickerPanel/the multi-select pill
+      // z-[45]: below NodePanel/PackPickerPanel/the multi-select pill
       // (z-[46] — see NodePanel's own PANEL_CLASS comment) on purpose now —
       // those are full-width bottom sheets, so once one is open it should
       // actually cover the minimap sitting in that same bottom-right
@@ -361,18 +361,17 @@ export const MiniMap = memo(function MiniMap({
             sitting above it) and drawn 1.5x the size a plain dot would be,
             so a circle's root reads as visibly its own kind of marker
             rather than a dot with a tiny afterthought stuck on top. */}
-        {/* Positioned at the group's own cx/cy, not positions.get(rootId):
-            a circle's parent renders at the center of its zone (see
-            MapPage's posFor), so its stored x/y isn't where it actually
-            is on the real canvas. The ring is the same small circle the
-            real canvas draws around every circle parent (see MapPage's
-            "Circle-parent ring"), scaled down and sized to enclose the
-            crown rather than to scale — 34 canvas units would be ~2.5px
-            here, smaller than the crown itself. */}
+        {/* The ring is the same small circle the real canvas draws around
+            every circle parent (see MapPage's "Circle-parent ring"), scaled
+            down and sized to enclose the crown rather than to scale — 34
+            canvas units would be ~2.5px here, smaller than the crown
+            itself. */}
         {groups.map((g) => {
+          const p = positions.get(g.rootId);
+          if (!p) return null;
           const color = ZONE_COLORS[g.sentiment];
-          const cx = g.cx * scaleX;
-          const cy = g.cy * scaleY;
+          const cx = p.x * scaleX;
+          const cy = p.y * scaleY;
           return (
             <g key={`crown-${g.rootId}`}>
               <circle

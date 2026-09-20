@@ -105,7 +105,7 @@ interface Props {
     protector: NodeDoc | null,
   ) => void;
   onDeleteEdge: (edgeId: string) => void;
-  onStartLink: () => void;
+  onStartChoose: () => void;
   onSelectNode: (nodeId: string) => void;
   /** Text/type editing now happens inline on the node's own icon on the canvas — this just asks the canvas to turn it on. No-ops there if editing isn't currently allowed. */
   onEdit: () => void;
@@ -132,7 +132,7 @@ export function NodePanel({
   onUpdated,
   onAttacked,
   onDeleteEdge,
-  onStartLink,
+  onStartChoose,
   onSelectNode,
   onEdit,
   onProtected,
@@ -595,30 +595,9 @@ export function NodePanel({
               own Enter-inserts-a-newline handling below, unchanged);
               anyone else gets a plain read-only, same-sized block —
               reading a node's full text shouldn't require owning it. */}
-          {/* Optional title — what the canvas shows under the node instead
-              of the start of the text. Owner edits it; anyone else just
-              sees it (or nothing, when there isn't one) as a heading. */}
-          {isCreator ? (
-            <input
-              id="node-title"
-              type="text"
-              maxLength={80}
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              disabled={busy}
-              placeholder="Title (optional) — otherwise the first words of the text show"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                }
-              }}
-              onBlur={handleTitleSave}
-              className="mb-2 w-full rounded-lg border border-line bg-surface px-[0.7rem] py-[0.45rem] text-[0.88rem] font-semibold font-[inherit] text-ink placeholder:font-normal placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
-            />
-          ) : (
-            node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>
-          )}
+          {/* The node's title, when it has one — read-only here for
+              everyone; the owner edits it under Modify. */}
+          {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>}
           {isCreator ? (
             <textarea
               id="node-text"
@@ -676,6 +655,15 @@ export function NodePanel({
             >
               {copied ? "Copied ✓" : "Copy"}
             </button>
+            {isCreator && (
+              <button
+                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleDelete}
+                disabled={busy}
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -734,6 +722,33 @@ export function NodePanel({
             </p>
           )}
 
+          {/* Optional title — what the canvas shows under the node instead of
+              the start of the text. Saves on blur/Enter. */}
+          {isCreator && (
+            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
+              <label htmlFor="node-title" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                Title:
+              </label>
+              <input
+                id="node-title"
+                type="text"
+                maxLength={80}
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                disabled={busy}
+                placeholder="Optional — otherwise the first words of the text show"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
+                onBlur={handleTitleSave}
+                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+          )}
+
           {isCreator && (
             <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Type:</span>
@@ -767,13 +782,6 @@ export function NodePanel({
                 title="Fold other linked/branched nodes into this one"
               >
                 Pack…
-              </button>
-              <button
-                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={handleDelete}
-                disabled={busy}
-              >
-                Delete
               </button>
             </div>
           )}
@@ -879,20 +887,17 @@ export function NodePanel({
             </div>
           )}
 
-          <div className="mt-4 border-t border-line pt-4">
-            {isCreator ? (
+          {isCreator && (
+            <div className="mt-4 border-t border-line pt-4">
               <button
                 className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={onStartLink}
+                onClick={onStartChoose}
+                title="Choose this node and others, then link, copy or delete them together"
               >
-                Link from this node
+                Choose nodes…
               </button>
-            ) : (
-              <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                Only {usernameOf(node.userId as any)} can link from this node.
-              </p>
-            )}
-          </div>
+            </div>
+          )}
           {connectedEdges.length === 0 ? (
             <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.5rem" }}>No links yet.</p>
           ) : (

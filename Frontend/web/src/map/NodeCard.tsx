@@ -102,7 +102,8 @@ interface Props {
   /** This node belongs to the currently-chosen circle (MapPage's `map.selectedCircle`, via chosenCircleMemberIds) — shows its caption too, root or not, so a studied cluster reads with every member's text visible at once instead of just its parent's. */
   inChosenCircle?: boolean;
   indicator?: AttackIndicator;
-  linkModeActive: boolean;
+  /** MapPage's choose mode is on — unchosen nodes show a small "choose?" hint under them. */
+  chooseModeActive: boolean;
   /** MapPage's isDiscussionMode (Map.discussionMode !== false) — Personal mode (explicit false) hides the health ring outright, selected or not. Omitted/undefined defaults to true (Discussion), never coerced with `!!`. See showHealth below. */
   discussionMode?: boolean;
   /** True for exactly one render: the moment this node was created in this session. */
@@ -144,7 +145,7 @@ export const NodeCard = memo(function NodeCard({
   parentCrownSentiment,
   inChosenCircle,
   indicator,
-  linkModeActive,
+  chooseModeActive,
   discussionMode,
   celebrate,
   muted,
@@ -765,7 +766,7 @@ export const NodeCard = memo(function NodeCard({
           {captionLabel}
         </div>
       )}
-      {linkModeActive && (
+      {chooseModeActive && !multiSelected && (
         // Absolute like the caption (see the wrapper's own comment) — pushed
         // clear of it when one's showing, since both hang off the icon's
         // bottom edge.
@@ -773,7 +774,7 @@ export const NodeCard = memo(function NodeCard({
           className="absolute top-full left-1/2 -translate-x-1/2 text-[0.65rem] font-semibold whitespace-nowrap text-accent"
           style={{ marginTop: !inlineEditing && !selected && showCaption && captionLabel ? "3.4rem" : "0.6rem" }}
         >
-          link?
+          choose?
         </div>
       )}
       </div>

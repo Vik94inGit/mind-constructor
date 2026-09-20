@@ -1,13 +1,11 @@
 import type { NodeDoc } from "../types";
 
-// Same bottom-sheet look/slot LinkPickerPanel uses (see its own PANEL_CLASS
-// doc comment — the 1/3-desktop/1/2-mobile viewport cap kept in sync with
-// MapPage's panelReserveFrac()) — this takes over that exact slot while
-// pack mode is active, same mutual exclusivity MapPage already gives link
-// mode. Picking works the same way link mode's own picking does: tap
-// eligible nodes on the canvas to toggle them in or out of packSelection
-// (see MapPage's own startPackFrom/eligiblePackIds gating), this panel
-// just lists the current picks and confirms/cancels.
+// Same bottom-sheet look/slot NodePanel uses (the 1/3-desktop/1/2-mobile
+// viewport cap is kept in sync with MapPage's panelReserveFrac()) — this takes
+// over that exact slot while pack mode is active. Tap eligible nodes on the
+// canvas to toggle them in or out of packSelection (see MapPage's own
+// startPackFrom/eligiblePackIds gating); this panel just lists the current
+// picks and confirms/cancels.
 const PANEL_CLASS =
   "fixed inset-x-0 bottom-0 z-[46] max-h-[50dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
@@ -20,8 +18,8 @@ interface Props {
   onCancel: () => void;
 }
 
-// Only requires 1+ picks (not LinkPickerPanel's 2+, since packing a single
-// linked node into the container is already a complete, meaningful action).
+// Only requires 1+ picks — packing a single linked node into the container is
+// already a complete, meaningful action.
 export function PackPickerPanel({ containerText, picks, error, onRemove, onConfirm, onCancel }: Props) {
   return (
     <div className={PANEL_CLASS}>
