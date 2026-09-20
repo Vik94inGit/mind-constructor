@@ -100,6 +100,10 @@ export interface Translation {
       zoomReset: string;
       zoomIn: string;
       expandToolbar: string;
+      readingMode: string;
+      readingClassic: string;
+      readingIconText: string;
+      readingActual: string;
     };
     addMenu: {
       invite: string;
@@ -222,6 +226,10 @@ const en: Translation = {
       zoomReset: "Reset zoom",
       zoomIn: "Zoom in",
       expandToolbar: "Show toolbar",
+      readingMode: "Reading mode",
+      readingClassic: "Classical mind map",
+      readingIconText: "Icons + text",
+      readingActual: "Actual",
     },
     addMenu: {
       invite: "Invite user",
@@ -334,6 +342,10 @@ const cs: Translation = {
       zoomReset: "Obnovit přiblížení",
       zoomIn: "Přiblížit",
       expandToolbar: "Zobrazit panel nástrojů",
+      readingMode: "Režim čtení",
+      readingClassic: "Klasická myšlenková mapa",
+      readingIconText: "Ikony + text",
+      readingActual: "Aktuální",
     },
     addMenu: {
       invite: "Pozvat uživatele",
@@ -446,6 +458,10 @@ const uk: Translation = {
       zoomReset: "Скинути масштаб",
       zoomIn: "Збільшити",
       expandToolbar: "Показати панель інструментів",
+      readingMode: "Режим читання",
+      readingClassic: "Класична ментальна карта",
+      readingIconText: "Іконки + текст",
+      readingActual: "Поточний",
     },
     addMenu: {
       invite: "Запросити користувача",
@@ -558,6 +574,10 @@ const ru: Translation = {
       zoomReset: "Сбросить масштаб",
       zoomIn: "Увеличить",
       expandToolbar: "Показать панель инструментов",
+      readingMode: "Режим чтения",
+      readingClassic: "Классическая ментальная карта",
+      readingIconText: "Иконки + текст",
+      readingActual: "Текущий",
     },
     addMenu: {
       invite: "Пригласить пользователя",

@@ -5,7 +5,9 @@ import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { getSocket, joinMap, leaveMap } from "../api/socket";
+import { useMapSocket } from "../hooks/useMapSocket";
+import { useCanvasViewport } from "../hooks/useCanvasViewport";
+import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
 import { NodeCard } from "../map/NodeCard";
@@ -16,34 +18,27 @@ import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
 import { NodeContextMenu } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
-import { AddMenu } from "../map/AddMenu";
-import { SelectionMenu } from "../map/SelectionMenu";
 import { MiniMap } from "../map/MiniMap";
-import { WeaponMark } from "../map/WeaponMark";
-import { OutcomeBadge, ringKindFor } from "../map/OutcomeBadge";
-import type { OutcomeType } from "../map/OutcomeBadge";
+import { CanvasBackdrop } from "../map/CanvasBackdrop";
+import { WeaponLayer } from "../map/WeaponLayer";
+import { MapToolbar } from "../map/MapToolbar";
+import { ZoomControls } from "../map/ZoomControls";
+import { SelectionBar } from "../map/SelectionBar";
+import { MapLegend } from "../map/MapLegend";
+import { NodeTypesModal } from "../map/NodeTypesModal";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
-import { Modal } from "../components/Modal";
-import { ThemeToggle } from "../components/ThemeToggle";
-import { LanguageSwitcher } from "../components/LanguageSwitcher";
-import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
+import { idOf, nodeRefId } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
 import {
   CANVAS_W,
   CANVAS_H,
-  MIN_ZOOM,
-  MAX_ZOOM,
   ZOOM_STEP,
   CIRCLE_DROP_RADIUS,
-  FULL_CANVAS_BOUNDS,
-  panelReserveFrac,
   nodeClipboard,
   setNodeClipboard,
-  hashOffset,
   computeLinkedNeighborIds,
   getNodeMinDist,
-  isMobileViewport as computeIsMobileViewport,
   pickNonOverlappingPosition,
   nodeObstacles,
   avoidOverlap,
@@ -54,9 +49,9 @@ import {
   computeNodeGroups,
   computeLinkCycles,
 } from "../utils/canvasLayout";
-import type { Obstacle, ViewportBounds } from "../utils/canvasLayout";
-import { NodeTypeIcon } from "../map/NodeTypeIcon";
-import { NODE_TYPES } from "../types";
+import type { Obstacle } from "../utils/canvasLayout";
+import { loadReadingMode, saveReadingMode } from "../utils/readingMode";
+import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, EdgeDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
 
 // A Problem-type node's own child counts as "addressing" it (see
@@ -67,11 +62,6 @@ const ADDRESSES_PROBLEM_TYPES = new Set<NodeType>(["Success", "Option", "Solutio
 // Stand-in id for a node that doesn't exist yet, when checking where it may go
 // (see zoneAngleGuard).
 const NEW_NODE_ID = "__new__";
-
-// The dead zone past each edge of the canvas, as a fraction of the viewport:
-// just enough to scroll an edge node in far enough for its quick-add ghost
-// ring to fit, and no more.
-const SCROLL_MARGIN_FRAC = 0.3;
 
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
@@ -99,6 +89,13 @@ export function MapPage() {
   // already-multi-selected group's own drag — both stay available
   // regardless, since neither one is the "accidental" case this addresses.
   const [moveMode, setMoveMode] = useState(false);
+  // How this viewer reads the map (see utils/readingMode.ts) — remembered per
+  // browser, never shared with the map's other members.
+  const [readingMode, setReadingModeState] = useState<ReadingMode>(loadReadingMode);
+  function setReadingMode(mode: ReadingMode) {
+    setReadingModeState(mode);
+    saveReadingMode(mode);
+  }
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
   // group selection (multiSelectIds — the same one shift+click and the marquee
   // build), instead of opening that node's panel. The group bar then offers
@@ -141,10 +138,8 @@ export function MapPage() {
   } | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   // The old top toolbar (name, member count, Link/Add/Invite/color/
-  // discussion-mode…) is gone — replaced by a small floating "+" menu
-  // stacked with the minimap/zoom-controls cluster (see the JSX below).
-  // showAddMenu/showNodeTypesLegend are that menu's own open/closed state.
-  const [showAddMenu, setShowAddMenu] = useState(false);
+  // discussion-mode…) is gone — replaced by a small floating "+" menu (see
+  // MapToolbar). showNodeTypesLegend is that menu's "Node types" modal.
   // Collapses Back/+/Move down to a single "⋮" button (Discussion/Personal
   // mode stays separately visible either way — see its own comment further
   // down) while the quick-add ghost ring is up (see quickAddActive below) —
@@ -164,9 +159,6 @@ export function MapPage() {
   // (whole map vs. one cluster) never overlap and need different node
   // lists/titles passed into the same ExportTextModal.
   const [extractClusterRootId, setExtractClusterRootId] = useState<string | null>(null);
-  // The multi-select pill's own "Actions" dropdown (see SelectionMenu) —
-  // Copy/Group into circle/Delete for the current multiSelectIds.
-  const [showSelectionMenu, setShowSelectionMenu] = useState(false);
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
   // Which weapon just had its arrows re-fired — set by clicking either end
   // of an attack (see handleNodeClick/triggerWeaponShot below), cleared
@@ -176,43 +168,6 @@ export function MapPage() {
   // about the value would have changed the second time.
   const [shotState, setShotState] = useState<{ id: string; nonce: number } | null>(null);
   const shotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Gates the quick-add ghost ring and the radial neighbor layout (see
-  // quickAddActive/radialPositions below) — false for a beat right after
-  // centerOnNode starts a pan, true once it's actually landed. Without
-  // this, choosing a node fanned its ghosts/neighbors out immediately,
-  // which — while the camera was still smoothly panning to center that
-  // node — read as the whole ring sliding across the screen mid-pan rather
-  // than fanning out around a node that's already settled in the middle.
-  // Starts true: nothing's panning before the first selection ever happens.
-  const [selectionSettled, setSelectionSettled] = useState(true);
-  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // True from the moment centerOnNode kicks off a pan until its own
-  // scroll-position poll (see centerOnNode) notices the camera has
-  // actually stopped moving. Guards against a *stale* poll (one left over
-  // from a pan nobody's waiting on any more, e.g. it got superseded by
-  // picking a different node) flipping selectionSettled back on when
-  // nothing asked it to.
-  const panInFlightRef = useRef(false);
-  // The exact scroll position centerOnNode's most recent pan is (or was)
-  // headed for — set the instant that pan is kicked off, not once it
-  // lands. Waiting for a real device to actually *finish* an animated
-  // smooth-scroll turned out to be the wrong thing to build correctness
-  // on at all: whether that's signaled by `scrollend` or by polling
-  // scrollLeft/scrollTop until they stop moving (both tried here), it's
-  // still at the mercy of whatever that specific browser/device actually
-  // does with the animation, and evidently some real phones either never
-  // settle where expected or settle too late — ghosts kept rendering
-  // against the wrong viewport regardless of which completion signal this
-  // used. This sidesteps the whole question: settledViewportBounds()
-  // below computes the ghost ring's/radial ring's safe zone from *this*
-  // known destination instead of the live (possibly still-animating, or
-  // on some devices seemingly never-finishing) DOM scroll position, so
-  // their geometry is correct independent of whether the pan visually
-  // catches up in any particular amount of time. selectionSettled still
-  // gates *when* they're allowed to appear at all (so they don't pop in
-  // while the camera is still visibly moving) — just no longer where they
-  // end up once they do.
-  const lastPanTargetRef = useRef<{ left: number; top: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
   // Right-click on *empty* canvas (as opposed to a node — see contextMenu
   // above) — opens a small type-picker for creating a new, parent-less
@@ -237,12 +192,6 @@ export function MapPage() {
   // branch-arrow computations further down).
   const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
 
-  // Canvas zoom level — applied to canvasRef as a CSS transform: scale(),
-  // see the JSX below. 1 = the canvas's own native 2400x1600 pixels.
-  // Changed via zoomAt() (double-click, or the zoom control buttons) rather
-  // than set directly, so every change stays clamped to [MIN_ZOOM, MAX_ZOOM]
-  // in one place.
-  const [zoom, setZoom] = useState(1);
 
   const [dragState, setDragState] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   // Group-drag counterpart to dragState above — set instead of (never
@@ -276,126 +225,32 @@ export function MapPage() {
   // set at the top of onUp, consumed (and reset) by the very next click,
   // which — same task, same interaction — is always that trailing one.
   const suppressNextClick = useRef(false);
-  const canvasRef = useRef<HTMLDivElement | null>(null);
-  // The scrollable ancestor of canvasRef — canvasRef itself is the full
-  // 2400x1600 canvas, this is the clipped, scrolled window onto it a user
-  // is actually looking at, which viewportBounds() below reads from.
-  const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  // centerOnNode's own settle-detection (see its doc comment) polls via
-  // this instead of a fixed guessed duration — the id of the in-flight
-  // requestAnimationFrame loop, so a newer pan (picking a different node
-  // before the previous one even finished) can cancel the stale one
-  // instead of two polls racing to declare "settled" for the wrong node.
-  const settlePollRef = useRef<number | null>(null);
-
-  // Keeps lastPanTargetRef from going stale if the user manually pans the
-  // canvas (drag/pinch/wheel) after selecting a node but before deselecting
-  // it — without this, quick-add ghosts/the radial ring would keep clamping
-  // into whatever rectangle centerOnNode last aimed for, ignoring wherever
-  // the view has since actually moved to. Guarded on `!panInFlightRef.current`
-  // so this doesn't fight the *programmatic* scroll events centerOnNode's
-  // own animation fires while a pan is genuinely still in flight — those
-  // are intermediate positions, not a real destination, and overwriting
-  // the target with one would reintroduce exactly the mid-pan race this
-  // whole ref exists to avoid. A manual scroll can only ever happen once
-  // nothing is animating, so this check alone is enough to tell them apart.
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    function onScroll() {
-      if (panInFlightRef.current) return;
-      lastPanTargetRef.current = { left: wrap!.scrollLeft, top: wrap!.scrollTop };
-    }
-    wrap.addEventListener("scroll", onScroll);
-    return () => wrap.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // How far (in canvas units) the *real* 0..CANVAS_W/CANVAS_H content sits
-  // inset from every edge of the actual scrollable area — canvasRef itself
-  // is rendered CANVAS_W+hScrollMargin*2 wide (CANVAS_H+vScrollMargin*2
-  // tall), with the real content positioned at (hScrollMargin,
-  // vScrollMargin) inside it (see its own JSX below). Without this, wrap
-  // can never scroll any node closer to center than "the canvas's own edge
-  // is at the edge of the viewport" — fine for a node in the middle of the
-  // map, but one sitting at/near the real 0/CANVAS_W/CANVAS_H edge has
-  // nowhere left to scroll to: centerOnNode's target gets clamped back to
-  // 0 or maxLeft/maxTop, landing the node pinned near the edge of the
-  // screen instead of centered — and, worse, outside the safe zone
-  // QuickAddGhosts/the radial neighbor ring clamp themselves into (see
-  // their own doc comments), so their ring visibly detached from the node
-  // instead of surrounding it. This margin exists on all four sides so a
-  // node near *any* edge — not just the bottom, which used to be the only
-  // side this was ever added for — can still be scrolled into that safe
-  // zone. SCROLL_MARGIN_FRAC (30%) of a clientWidth/clientHeight (divided
-  // back out of screen pixels into canvas units, same *zoom reasoning every
-  // other screen<->canvas conversion here uses): enough room for an edge
-  // node's ghost ring, without being able to center it dead-on — anything
-  // more is just empty blind zone to scroll through. It used to be a full
-  // viewport's worth, then half, which still left a lot of nothing past
-  // every border; the
-  // margin itself is drawn dimmed and hatched (see the padded wrapper's own
-  // JSX) so it reads as "outside the map", with the real canvas framed as
-  // the active space.
-  // Recomputed on resize (ResizeObserver, same pattern MiniMap's own
-  // viewport tracking already uses) and whenever zoom changes, since both
-  // change how many canvas units one screen pixel is worth.
-  const [hScrollMargin, setHScrollMargin] = useState(0);
-  const [vScrollMargin, setVScrollMargin] = useState(0);
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    function update() {
-      setHScrollMargin(Math.ceil((wrap!.clientWidth / zoom) * SCROLL_MARGIN_FRAC));
-      setVScrollMargin(Math.ceil((wrap!.clientHeight / zoom) * SCROLL_MARGIN_FRAC));
-    }
-    update();
-    const resizeObserver = new ResizeObserver(update);
-    resizeObserver.observe(wrap);
-    return () => resizeObserver.disconnect();
-    // `loading` (not just `zoom`): this component's hooks all run
-    // unconditionally from the very first render, well before the `if
-    // (loading) return ...` gate further down ever lets the real canvas
-    // (and wrapRef) mount — so the very first time this effect ran,
-    // wrapRef.current was always still null, it bailed out immediately
-    // above, and with only `zoom` in the dependency list (which doesn't
-    // change on its own) it would then never run again once the canvas
-    // actually appeared. MiniMap's own near-identical effect doesn't need
-    // this — MiniMap itself isn't rendered at all until after that same
-    // gate, so its first run only ever happens once wrapRef is already
-    // live. Re-running when `loading` flips to false is what actually
-    // attaches this the moment wrapRef has something to observe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom, loading]);
-
-  // A trackpad's two-finger swipe reaching this canvas's own left/right
-  // scroll edge otherwise reads to the browser as "nothing left to scroll,
-  // treat this as swipe-to-navigate-back/forward" — unmounting the whole
-  // page and discarding whatever was in progress. index.css's own
-  // `overscroll-behavior-x: none` (both on <body> and this same wrap
-  // element) handles that for Chrome, but Safari's swipe-navigation is a
-  // native browser-chrome gesture that CSS overscroll-behavior doesn't
-  // suppress at all — the only thing that reliably stops it there is
-  // actually calling preventDefault() on the wheel event that would have
-  // driven it. React's own onWheel can't do that (it's attached passively
-  // by default since React 17, so preventDefault silently no-ops) — hence
-  // a real addEventListener with { passive: false } here instead. Only
-  // preventDefault right at the boundary (scrolled all the way left/right
-  // already, still trying to go further that way) — anywhere else, this
-  // lets the browser's own native scroll happen exactly as before, so
-  // trackpad-panning the canvas isn't affected.
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    function onWheel(e: WheelEvent) {
-      if (e.deltaX === 0) return;
-      const atLeftEdge = e.deltaX < 0 && wrap!.scrollLeft <= 0;
-      const atRightEdge = e.deltaX > 0 && wrap!.scrollLeft >= wrap!.scrollWidth - wrap!.clientWidth;
-      if (atLeftEdge || atRightEdge) e.preventDefault();
-    }
-    wrap.addEventListener("wheel", onWheel, { passive: false });
-    return () => wrap.removeEventListener("wheel", onWheel);
-  }, []);
+  // Where every node sits, the node the panel is showing, and the scrolling/
+  // zooming viewport onto the canvas — all derived before anything below
+  // reads them.
+  const positions = useMemo(() => computeBasePositions(nodes), [nodes]);
+  const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
+  // NodePanel/PackPickerPanel's bottom sheet physically covers the bottom
+  // third (half on mobile) of the screen while it's open. Skipped for the
+  // group-selection footer (multiSelectIds), which is a slim bar, not a tall
+  // sheet.
+  const sheetOpen = chooseMode || packMode || (!!selectedNode && multiSelectIds.size === 0);
+  const {
+    canvasRef,
+    wrapRef,
+    zoom,
+    hScrollMargin,
+    vScrollMargin,
+    selectionSettled,
+    screenToCanvas,
+    zoomAt,
+    zoomFromCenter,
+    viewportBounds,
+    settledViewportBounds,
+    centerOnNode,
+    centerOnPoint,
+  } = useCanvasViewport({ mapId, loading, sheetOpen, positions });
 
   // Every insertion into `nodes`/`edges` goes through these, not a blind
   // [...prev, x] append — the server broadcasts an action's own result
@@ -461,6 +316,12 @@ export function MapPage() {
       // "text not loaded yet" sentinel ensureNodeText below checks for,
       // which is safe precisely because a real node's text is never
       // actually empty (backend validation requires non-blank text).
+      // This list replaces every node with a text-less copy, so anything
+      // ensureNodeText already fetched is gone from state too — forget that
+      // it was fetched, or the ids stay marked "have" while their text is
+      // blank (two overlapping loads, as React StrictMode makes in dev, or a
+      // reload after a socket reconnect, otherwise wiped captions for good).
+      fetchedTextIds.current.clear();
       setNodes(nodeList.map((n) => ({ ...n, text: n.text ?? "" })));
       setEdges(edgeList);
       refreshInsights(mapId);
@@ -526,121 +387,20 @@ export function MapPage() {
     loadAll();
   }, [loadAll]);
 
-  // Live sync: join this map's room once the initial REST snapshot has
-  // landed (guarded on `loading` so an event can't arrive mid-fetch and
-  // then get clobbered when loadAll's own, slightly-stale snapshot lands
-  // right after it), then keep nodes/edges in step with every other open
-  // tab — including the actor's own other tabs, and this same tab's own
-  // action echoed back. Every handler below is an upsert/remove keyed by
-  // id, specifically so replaying an update this tab already applied
-  // optimistically is a harmless no-op instead of a duplicate.
-  useEffect(() => {
-    if (!mapId || loading) return;
+  useMapSocket({
+    mapId,
+    loading,
+    setNodes,
+    setEdges,
+    setMap,
+    setSelectedId,
+    setCelebrateIds,
+    upsertNode,
+    upsertEdge,
+    applyCircleSelection,
+    refreshInsights,
+  });
 
-    const socket = getSocket();
-    joinMap(mapId);
-
-    const onNodeCreated = (node: NodeDoc) => upsertNode(node);
-    const onNodeUpdated = (node: NodeDoc) => upsertNode(node);
-    const onNodeDeleted = ({ nodeId: deletedId }: { nodeId: string }) => {
-      setNodes((prev) => prev.filter((n) => n.nodeId !== deletedId));
-      setEdges((prev) =>
-        prev.filter((e) => nodeRefId(e.fromNodeId) !== deletedId && nodeRefId(e.toNodeId) !== deletedId),
-      );
-    };
-    const onNodeAttacked = ({
-      node,
-      weaponNode,
-      healedParent,
-      protector,
-    }: {
-      node: NodeDoc;
-      weaponNode: NodeDoc;
-      // Set only when this attack was a retaliation that landed — see
-      // attackAbl.ts's own healedParent doc comment. null on an ordinary
-      // attack, so every other map member's canvas picks up the heal too,
-      // not just the retaliator's own tab.
-      healedParent: NodeDoc | null;
-      // Set only when this attack was blocked — the protection node that
-      // blocked it, with its own blockedDamage bumped (see attackAbl.ts's
-      // own comment). Every other tab needs this too, not just the
-      // attacker's own, so NodePanel's own "blocked N damage so far" line
-      // and the weapon-mark loop's own "redirect arrows to the shield"
-      // lookup both stay in sync everywhere.
-      protector: NodeDoc | null;
-    }) => {
-      upsertNode(node);
-      upsertNode(weaponNode);
-      if (healedParent) upsertNode(healedParent);
-      if (protector) upsertNode(protector);
-      setCelebrateIds((prev) => new Set(prev).add(weaponNode.nodeId));
-      refreshInsights(mapId);
-    };
-    const onEdgeCreated = (edge: EdgeDoc) => {
-      upsertEdge(edge);
-      refreshInsights(mapId);
-    };
-    const onEdgeDeleted = ({ edgeId: deletedId }: { edgeId: string }) => {
-      setEdges((prev) => prev.filter((e) => e.edgeId !== deletedId));
-      refreshInsights(mapId);
-    };
-    const onCircleSelected = ({ selectedCircle }: { selectedCircle: SelectedCircle | null }) =>
-      applyCircleSelection(selectedCircle);
-    const onCircleDeselected = () => applyCircleSelection(null);
-    const onNodeProtected = ({ protectionNode, healedNode }: { protectionNode: NodeDoc; healedNode: NodeDoc }) => {
-      upsertNode(protectionNode);
-      upsertNode(healedNode);
-    };
-    const onNodePacked = ({ container, members }: { container: NodeDoc; members: NodeDoc[] }) => {
-      upsertNode(container);
-      members.forEach(upsertNode);
-      // A packed member just vanished from the canvas (see visibleNodes) —
-      // its panel can't stay open for a node nobody can see any more, same
-      // defensive clear onNodeDeleted already applies for an outright
-      // deletion.
-      setSelectedId((prev) => (prev && members.some((m) => m.nodeId === prev) ? null : prev));
-    };
-    const onNodeUnpacked = ({ node }: { node: NodeDoc }) => upsertNode(node);
-    // Someone (the owner — see updateMapAbl's own ownerId check) flipped a
-    // map-wide setting, most commonly the Discussion/Personal mode toggle
-    // (see isPersonalMode/toggleMapMode below) — merge just the changed
-    // fields in rather than replacing `map` outright, so this can't
-    // clobber a selectedCircle/color update this client applied locally in
-    // between this broadcast being sent and received.
-    const onMapUpdated = ({ map: updated }: { map: MapDoc }) =>
-      setMap((prev) => (prev ? { ...prev, ...updated } : updated));
-
-    socket.on("node:created", onNodeCreated);
-    socket.on("node:updated", onNodeUpdated);
-    socket.on("node:deleted", onNodeDeleted);
-    socket.on("node:attacked", onNodeAttacked);
-    socket.on("edge:created", onEdgeCreated);
-    socket.on("edge:deleted", onEdgeDeleted);
-    socket.on("circle:selected", onCircleSelected);
-    socket.on("circle:deselected", onCircleDeselected);
-    socket.on("node:protected", onNodeProtected);
-    socket.on("node:packed", onNodePacked);
-    socket.on("node:unpacked", onNodeUnpacked);
-    socket.on("map:updated", onMapUpdated);
-
-    return () => {
-      socket.off("node:created", onNodeCreated);
-      socket.off("node:updated", onNodeUpdated);
-      socket.off("node:deleted", onNodeDeleted);
-      socket.off("node:attacked", onNodeAttacked);
-      socket.off("edge:created", onEdgeCreated);
-      socket.off("edge:deleted", onEdgeDeleted);
-      socket.off("circle:selected", onCircleSelected);
-      socket.off("circle:deselected", onCircleDeselected);
-      socket.off("node:protected", onNodeProtected);
-      socket.off("map:updated", onMapUpdated);
-      socket.off("node:packed", onNodePacked);
-      socket.off("node:unpacked", onNodeUnpacked);
-      leaveMap(mapId);
-    };
-  }, [mapId, loading, upsertNode, upsertEdge, applyCircleSelection]);
-
-  const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
   // Any node "chosen" on the map right now — a multi-select takes priority
   // (it's the more specific state), falling back to the plain single
   // selection. Null when nothing at all is chosen, the one case edges/
@@ -696,132 +456,7 @@ export function MapPage() {
     return attackers.length > 0 ? new Set([selected.nodeId, ...attackers.map((a) => a.nodeId)]) : null;
   }, [selectedId, nodes]);
 
-  // ----- positions -----
-  const positions = useMemo(() => {
-    const map = new Map<string, { x: number; y: number }>();
-    // Protection nodes get the exact same "anchored near its own creator,
-    // fanned by hash" treatment weapon nodes already do (see the shared
-    // placeCompanionNode helper below) — neither one is "regular" for the
-    // spiral/index-based fallback placement further down.
-    const regular = nodes.filter((n) => !n.isWeapon && !n.isProtection);
-    const weapons = nodes.filter((n) => n.isWeapon);
-    const protections = nodes.filter((n) => n.isProtection);
 
-    // Shared by both weapons.forEach and protections.forEach below —
-    // anchors a companion node (n) near whichever of its own creator's
-    // *other* regular nodes sits closest to refPos (the thing it's aimed
-    // at/defending), fanned out by a per-node hash angle so several
-    // companions anchored at the same spot don't stack. Falls back to
-    // refPos itself if the creator has no other node left to anchor near.
-    function placeCompanionNode(n: NodeDoc, refPos: { x: number; y: number }) {
-      const creatorId = idOf(n.userId);
-      let base = refPos;
-      let closestDist = Infinity;
-      for (const own of regular) {
-        if (own.nodeId === n.nodeId || idOf(own.userId) !== creatorId) continue;
-        const p = map.get(own.nodeId);
-        if (!p) continue;
-        const d = Math.hypot(p.x - refPos.x, p.y - refPos.y);
-        if (d < closestDist) {
-          closestDist = d;
-          base = p;
-        }
-      }
-      const angle = hashOffset(n.nodeId, 180) * (Math.PI / 180);
-      const radius = getNodeMinDist();
-      const desired = { x: base.x + radius * Math.cos(angle), y: base.y + radius * Math.sin(angle) };
-      return avoidOverlap(desired, nodeObstacles(Array.from(map.values())));
-    }
-
-    regular.forEach((n, i) => {
-      if (typeof n.x === "number" && typeof n.y === "number") {
-        map.set(n.nodeId, { x: n.x, y: n.y });
-      } else {
-        // A sunflower (golden-angle) spiral for nodes with no stored x/y
-        // (everything a template map seeds): radius grows with sqrt(i),
-        // which keeps every node's nearest neighbor ~1.9x `spacing` away no
-        // matter how many there are. Spacing is derived from
-        // getNodeMinDist() so the base layout gets the room placement
-        // elsewhere already enforces.
-        const angle = i * 137.508 * (Math.PI / 180);
-        const radius = (getNodeMinDist() / 1.9) * Math.sqrt(i + 0.5);
-        map.set(n.nodeId, { x: CANVAS_W / 2 + radius * Math.cos(angle), y: CANVAS_H / 2 + radius * Math.sin(angle) });
-      }
-    });
-    weapons.forEach((n) => {
-      if (typeof n.x === "number" && typeof n.y === "number") {
-        map.set(n.nodeId, { x: n.x, y: n.y });
-        return;
-      }
-      // targetNodeId comes back populated as { nodeId, text, type } now, not
-      // a bare string — this was still checking the pre-populate shape, so
-      // it never matched and every weapon node fell back to canvas-center
-      // placement regardless of what it was aimed at.
-      const targetId = nodeRefId(n.targetNodeId);
-      const target = targetId ? nodes.find((t) => t.nodeId === targetId) : undefined;
-      const targetPos = (target && map.get(target.nodeId)) || { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-      // Anchored next to the attacker's own closest node to the target, not
-      // the target itself — the bow (WeaponMark draws it at this weapon
-      // node's own position) then reads as "shot from over there" across
-      // the canvas, rather than camping right beside the node it hit. Falls
-      // back to the target's own position — the old anchor — if the
-      // attacker has no other node left on this map to anchor near (every
-      // other one of theirs got deleted since, say); a self-attack in
-      // discussion mode lands here too, since the target *is* one of the
-      // attacker's own nodes and so is trivially its own closest match.
-      // Fanning by angle alone doesn't guarantee two attacks (or an attack
-      // and some unrelated node) don't land on each other — placeCompanionNode's
-      // own avoidOverlap nudges clear of anything already placed, same
-      // spacing rule every other node uses. Big-group backdrops aren't
-      // checked here: nodeGroups itself is derived from these positions, so
-      // consulting it back inside this same memo would be circular. Weapon
-      // nodes fan out from an explicit anchor and land far enough out
-      // (getNodeMinDist() radius) that this is a rare miss in practice, not
-      // a gap worth breaking the memo for.
-      map.set(n.nodeId, placeCompanionNode(n, targetPos));
-    });
-    protections.forEach((n) => {
-      if (typeof n.x === "number" && typeof n.y === "number") {
-        map.set(n.nodeId, { x: n.x, y: n.y });
-        return;
-      }
-      const protectedId = nodeRefId(n.protectsNodeId);
-      const protectedNode = protectedId ? nodes.find((t) => t.nodeId === protectedId) : undefined;
-      const protectedPos = (protectedNode && map.get(protectedNode.nodeId)) || { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-
-      // Whoever most recently attacked the node this shield defends (same
-      // "nodes come back in creation order, last match is most recent"
-      // convention handleNodeClick's own weapon-replay already relies on) —
-      // when one exists, the shield belongs literally between the two:
-      // positioned at their midpoint, reading as "standing in the way"
-      // rather than floating near its own creator's other nodes (also what
-      // the weapon-mark loop's own arrow-redirect lookup uses to find where
-      // to stop). No active attacker at all: this is just an ordinary
-      // companion node (placeCompanionNode, same as a weapon node with
-      // nothing target-specific to react to) — a shield badge on the node
-      // itself (NodeCard) is all that marks it as one.
-      const attackers = weapons.filter((w) => nodeRefId(w.targetNodeId) === protectedId);
-      const latestAttackerId = attackers[attackers.length - 1]?.nodeId;
-      const attackerPos = latestAttackerId ? map.get(latestAttackerId) : undefined;
-
-      if (attackerPos) {
-        // Deliberately *not* run through avoidOverlap here, unlike every
-        // other placement in this memo — a weapon node is anchored only
-        // getNodeMinDist() away from its own target (close enough that the
-        // bow reads as "right next to the attacker"), which puts their own
-        // midpoint well inside *both* nodes' minDist zones every time.
-        // avoidOverlap's own job is exactly to push out of a zone like
-        // that, which here would walk the shield away from the midpoint by
-        // more than the attacker-target distance itself — the opposite of
-        // "on the arrows path." A literal on-the-line position, slightly
-        // overlapping either endpoint's own footprint, is the actual ask.
-        map.set(n.nodeId, { x: (attackerPos.x + protectedPos.x) / 2, y: (attackerPos.y + protectedPos.y) / 2 });
-      } else {
-        map.set(n.nodeId, placeCompanionNode(n, protectedPos));
-      }
-    });
-    return map;
-  }, [nodes]);
 
   // Radial focus layout: while exactly one node is selected (not a group
   // selection — see multiSelectIds), its directly-connected neighbors
@@ -839,49 +474,6 @@ export function MapPage() {
   // past the cap just keeps its stored position. Waits on selectionSettled
   // too, same reasoning as quickAddActive — neighbors shouldn't jump into
   // their ring while the camera's still panning toward the chosen node.
-  // Shrunk on a phone-width viewport, same isMobile threshold
-  // getNodeMinDist() already uses — the fixed 190px radius left several of
-  // a 10-neighbor ring's members past the horizontal edges of a ~375px-wide
-  // screen (center ± 190 overshoots a 375px width on either side once the
-  // node's own ~37px half-width is added in), physically unreachable to
-  // tap. This is exactly what made picking pack-eligible neighbors "not
-  // work" on mobile — the picker opened, but some of the very nodes it
-  // needed you to tap were off-screen. 110px keeps a full-diameter ring
-  // (220px) comfortably inside even a narrow phone width.
-  // Open a map looking at its nodes. The scroll area starts at its own
-  // top-left corner — the empty blind-zone margin, since the canvas is far
-  // bigger than any screen and nodes cluster near its middle — so without
-  // this a fresh load shows nothing and the map has to be hunted for. Once
-  // per map, the first time both the nodes and the scroll margins exist.
-  const didInitialFitRef = useRef<string | null>(null);
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    if (loading || !wrap || !mapId || didInitialFitRef.current === mapId) return;
-    if (hScrollMargin === 0 || vScrollMargin === 0 || positions.size === 0) return;
-    didInitialFitRef.current = mapId;
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const p of positions.values()) {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x);
-      maxY = Math.max(maxY, p.y);
-    }
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    wrap.scrollTo({
-      left: (cx + hScrollMargin) * zoom - wrap.clientWidth / 2,
-      top: (cy + vScrollMargin) * zoom - wrap.clientHeight / 2,
-    });
-    // zoom is read once, at fit time — a later zoom must not re-center.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, mapId, hScrollMargin, vScrollMargin, positions]);
-
-  const isMobileViewport = computeIsMobileViewport();
-  const RADIAL_NEIGHBOR_RADIUS = isMobileViewport ? 110 : 190;
-  const RADIAL_MAX_NEIGHBORS = 10;
   const radialPositions = useMemo(() => {
     if (multiSelectIds.size > 1 || !selectedId || !selectionSettled) return null;
     // Both rings are centered on the selected node, and the neighbor ring
@@ -901,56 +493,7 @@ export function MapPage() {
     if (neighborIds.size === 0) return null;
 
     const neighbors = Array.from(neighborIds).slice(0, RADIAL_MAX_NEIGHBORS);
-    // Same fix as QuickAddGhosts' own ring-centering (see its doc comment)
-    // — this ring used to have no bounds awareness at all, just `center +
-    // radius`, trusting centerOnNode to have already put `center` in the
-    // middle of the screen. A node close enough to the actual edge of the
-    // whole 2400x1600 canvas (nothing left to scroll into) never gets
-    // truly centered, and on a narrow phone viewport that's routine, not
-    // rare — so members on the far side of the ring rendered clear off the
-    // visible screen, unreachable to tap (the exact "picking pack-eligible
-    // neighbors doesn't work" symptom this radius was already shrunk for
-    // once before). Nudging the ring's own center into a safe zone inside
-    // the current viewport keeps the whole ring on-screen and evenly
-    // spaced regardless of where the selected node itself landed.
-    const bounds = settledViewportBounds();
-    const halfSpan = RADIAL_NEIGHBOR_RADIUS + 40;
-    const spanX = bounds.maxX - bounds.minX;
-    const spanY = bounds.maxY - bounds.minY;
-    // See QuickAddGhosts' own matching doc comment — same fallback fix.
-    // panelReserveFrac's 1/2 mobile reserve leaves less vertical room than
-    // halfSpan*2 for essentially every mobile selection, so this fallback
-    // isn't a rare "tiny window" case — falling back to bounds' own plain
-    // midpoint instead of anchoring on `center` used to strand the ring
-    // floating mid-screen, detached from a node sitting pinned near a real
-    // canvas edge (the one case centerOnNode can't actually center it).
-    // Anchoring on `center` here too (still clamped into `bounds`, just
-    // without the halfSpan inset) keeps neighbors visibly attached to the
-    // selected node even when the full safe-zone clamp doesn't fit.
-    const ringCenter =
-      spanX >= halfSpan * 2 && spanY >= halfSpan * 2
-        ? {
-            x: Math.min(bounds.maxX - halfSpan, Math.max(bounds.minX + halfSpan, center.x)),
-            y: Math.min(bounds.maxY - halfSpan, Math.max(bounds.minY + halfSpan, center.y)),
-          }
-        : {
-            x: Math.min(bounds.maxX, Math.max(bounds.minX, center.x)),
-            y: Math.min(bounds.maxY, Math.max(bounds.minY, center.y)),
-          };
-    const map = new Map<string, { x: number; y: number }>();
-    neighbors.forEach((id, i) => {
-      const angle = (i / neighbors.length) * Math.PI * 2 - Math.PI / 2;
-      // Final per-point safety clamp — see QuickAddGhosts' own matching
-      // comment. No-op whenever the full ring already fit inside the
-      // halfSpan-inset safe zone; only trims the fallback branch's
-      // outermost members back into `bounds` so a neighbor can't scroll
-      // off-screen entirely just because RADIAL_NEIGHBOR_RADIUS didn't fit.
-      map.set(id, {
-        x: Math.min(bounds.maxX, Math.max(bounds.minX, ringCenter.x + RADIAL_NEIGHBOR_RADIUS * Math.cos(angle))),
-        y: Math.min(bounds.maxY, Math.max(bounds.minY, ringCenter.y + RADIAL_NEIGHBOR_RADIUS * Math.sin(angle))),
-      });
-    });
-    return map;
+    return computeRadialPositions(center, neighbors, settledViewportBounds());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, multiSelectIds, nodes, edges, positions, selectionSettled, chooseMode, packMode]);
 
@@ -971,274 +514,6 @@ export function MapPage() {
     return visibleNodes
       .filter((n) => !exclude?.has(n.nodeId))
       .map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-  }
-
-  // screenToCanvas: converts a screen point (e.g. clientX/clientY) into
-  // canvas-coordinate space (the same 0..CANVAS_W/0..CANVAS_H units every
-  // node's x/y, `positions`, and dragState are already in). Needed because
-  // canvasRef is now visually zoomed via a CSS transform (see the zoom
-  // state below) — its rendered size no longer matches CANVAS_W/CANVAS_H
-  // 1:1, so any screen-pixel distance has to be divided by the current
-  // zoom before it means anything in canvas coordinates. wrap's own
-  // scroll position + bounding rect (not canvasRef's) is the anchor: the
-  // canvas's transform-origin is its own (0,0), which sits at wrap's
-  // scrolled (0,0) content position.
-  function screenToCanvas(clientX: number, clientY: number): { x: number; y: number } {
-    const wrap = wrapRef.current;
-    if (!wrap) return { x: clientX, y: clientY };
-    const rect = wrap.getBoundingClientRect();
-    // - hScrollMargin/vScrollMargin: wrap's own scroll metrics are screen
-    // pixels within the *padded* canvasRef (see its own doc comment) — the
-    // real 0..CANVAS_W/CANVAS_H content sits inset by that margin inside
-    // it, so converting back to a real canvas coordinate has to subtract
-    // it back out.
-    return {
-      x: (wrap.scrollLeft + (clientX - rect.left)) / zoom - hScrollMargin,
-      y: (wrap.scrollTop + (clientY - rect.top)) / zoom - vScrollMargin,
-    };
-  }
-
-  // Adjusts zoom by `delta` (or snaps straight to `to` if given) while
-  // keeping the canvas point under (clientX, clientY) visually stationary —
-  // the usual "zoom toward the cursor" behavior in a map/image viewer, so
-  // zooming in on a spot doesn't also yank the view away from it.
-  function zoomAt(clientX: number, clientY: number, delta: number, to?: number) {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const nextZoom = Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, to ?? zoom + delta)) * 100) / 100;
-    if (nextZoom === zoom) return;
-    const rect = wrap.getBoundingClientRect();
-    // Same -hScrollMargin/-vScrollMargin conversion as screenToCanvas above.
-    const canvasX = (wrap.scrollLeft + (clientX - rect.left)) / zoom - hScrollMargin;
-    const canvasY = (wrap.scrollTop + (clientY - rect.top)) / zoom - vScrollMargin;
-    setZoom(nextZoom);
-    // Deferred a frame: scrollLeft/scrollTop set synchronously here would
-    // still be measured against the *old* scaled scrollWidth/scrollHeight,
-    // since canvasRef hasn't actually re-rendered at its new scale yet —
-    // the browser would clamp against stale bounds and this would land in
-    // the wrong place.
-    requestAnimationFrame(() => {
-      // + margin: back from a real canvas coordinate to padded-canvasRef
-      // screen pixels, same convention centerOnNode's own targetLeft/Top
-      // use.
-      wrap.scrollLeft = (canvasX + hScrollMargin) * nextZoom - (clientX - rect.left);
-      wrap.scrollTop = (canvasY + vScrollMargin) * nextZoom - (clientY - rect.top);
-    });
-  }
-
-  // The currently-visible rectangle of the canvas, in canvas coordinates —
-  // read live off the scroll container rather than tracked in state, since
-  // it's only ever needed at the instant of a create/drop action, not on
-  // every render. `pad` keeps a node's full icon+caption footprint inside
-  // the edge, not just its center point. Falls back to the whole canvas
-  // before the wrap has mounted. Divided by `zoom` throughout — wrap's own
-  // scroll metrics are in screen pixels of the *rendered* (scaled) canvas,
-  // same reasoning as screenToCanvas above.
-  function viewportBounds(): ViewportBounds {
-    const wrap = wrapRef.current;
-    if (!wrap) return FULL_CANVAS_BOUNDS;
-    const pad = 70;
-    // NodePanel/PackPickerPanel's bottom sheet (see panelReserveFrac's own
-    // doc comment) physically covers the bottom third (half on mobile) of
-    // the screen while it's open — shrink the placeable
-    // rectangle by the same amount so a freshly-created node (or a
-    // quick-add ghost, which reads this via MapPage's own bounds prop)
-    // never lands underneath it. Skipped for the group-selection footer
-    // (multiSelectIds), which is a slim bar, not a tall sheet.
-    const sheetOpen = chooseMode || packMode || (!!selectedNode && multiSelectIds.size === 0);
-    const reserve = sheetOpen ? wrap.clientHeight * panelReserveFrac(isMobileViewport) : 0;
-    // - hScrollMargin/-vScrollMargin: same padded-canvasRef -> real-canvas
-    // conversion screenToCanvas uses.
-    return {
-      minX: wrap.scrollLeft / zoom + pad - hScrollMargin,
-      minY: wrap.scrollTop / zoom + pad - vScrollMargin,
-      maxX: (wrap.scrollLeft + wrap.clientWidth) / zoom - pad - hScrollMargin,
-      maxY: (wrap.scrollTop + wrap.clientHeight - reserve) / zoom - pad - vScrollMargin,
-    };
-  }
-
-  // Same as viewportBounds(), except it substitutes centerOnNode's own
-  // known destination (lastPanTargetRef — see its own doc comment) for
-  // wrap.scrollLeft/scrollTop wherever a pan is/was heading somewhere in
-  // particular. Quick-add ghosts and the radial neighbor ring both read
-  // this instead of plain viewportBounds() specifically because they're
-  // the two things that have to line up with *where the selected node
-  // ends up*, not with whatever the scroll container happens to read at
-  // the moment they're computed — and that's exactly the value a real
-  // device's own animation timing can't be trusted to have caught up to
-  // yet (or, evidently, ever quite catch up to on some phones). Every
-  // other caller of viewportBounds() (placing a brand new node, clamping a
-  // drag, etc.) is unrelated to any in-flight pan and should keep reading
-  // the real, current scroll position, so this stays a separate function
-  // rather than changing viewportBounds() itself.
-  function settledViewportBounds(): ViewportBounds {
-    const wrap = wrapRef.current;
-    if (!wrap) return FULL_CANVAS_BOUNDS;
-    const target = lastPanTargetRef.current;
-    if (!target) return viewportBounds();
-    const pad = 70;
-    const sheetOpen = chooseMode || packMode || (!!selectedNode && multiSelectIds.size === 0);
-    const reserve = sheetOpen ? wrap.clientHeight * panelReserveFrac(isMobileViewport) : 0;
-    // - hScrollMargin/-vScrollMargin: same padded-canvasRef -> real-canvas
-    // conversion screenToCanvas uses.
-    return {
-      minX: target.left / zoom + pad - hScrollMargin,
-      minY: target.top / zoom + pad - vScrollMargin,
-      maxX: (target.left + wrap.clientWidth) / zoom - pad - hScrollMargin,
-      maxY: (target.top + wrap.clientHeight - reserve) / zoom - pad - vScrollMargin,
-    };
-  }
-
-  // Pans the canvas so the given node's position lands in the middle of the
-  // current viewport, unconditionally — the chosen node (whatever was just
-  // clicked/selected) always ends up centered, not just nudged into view.
-  // Selecting a node always brings up NodePanel too, and that panel is now a
-  // bottom sheet *overlaying* the canvas at every screen size (see its own
-  // PANEL_CLASS) rather than a sidebar the canvas shrinks to make room for —
-  // so wrap.clientHeight's own full height is no longer what's actually
-  // visible above it. panelReserveFrac() (see its own doc comment) is a
-  // deliberate approximation (there's no reliable, synchronously-correct
-  // measurement of the panel's real height here — it hasn't mounted yet for
-  // a first selection, and its content, and so its height, varies by node
-  // and tab anyway) — but it's the *same* fraction viewportBounds()
-  // reserves and PANEL_CLASS caps the sheet at, so the chosen node (and the
-  // quick-add ghosts fanned around it, clamped to that same
-  // viewportBounds) land in the space actually left on screen rather than
-  // drifting out of sync with how tall the sheet is actually allowed to
-  // grow.
-  function centerOnNode(nodeId: string) {
-    const wrap = wrapRef.current;
-    const node = nodes.find((n) => n.nodeId === nodeId);
-    if (!wrap || !node) return;
-    // positions.get, not posFor(node): this runs inside the same click
-    // handler as the setSelectedId call that's choosing this node, so
-    // React hasn't re-run radialPositions against the *new* selection yet
-    // — posFor would still read last render's radial ring (keyed off the
-    // *previous* selectedId), which places every one of that node's own
-    // neighbors on a ring around it. Selecting one of those neighbors hit
-    // this exactly: the camera panned to wherever that neighbor was
-    // sitting in the old node's ring, not to its own resting spot — and
-    // the very next render then snaps that neighbor (now the selection)
-    // back to its real position, off in whatever direction the ring had
-    // placed it, since a selected node is never a ring member of its own
-    // view. The node the user just tapped would end up centered on empty
-    // canvas while the thing they actually chose jumped off-screen —
-    // reads as "picking a different node doesn't work" on a phone, where
-    // there's no cursor hovering the real node to notice it moved.
-    // positions (unlike posFor) never carries a radial override at all,
-    // so it's always that node's own real, settled spot regardless of
-    // what was selected a moment ago.
-    const pos = positions.get(nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const visibleH = Math.max(150, wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport)));
-    // *zoom throughout: pos.x/y are canvas-space, but scrollTo/scrollWidth
-    // deal in screen pixels of the rendered (scaled) canvas — same
-    // conversion as screenToCanvas/zoomAt above, just the other direction.
-    // (CANVAS_W + hScrollMargin*2)/(CANVAS_H + vScrollMargin*2): canvasRef's
-    // own real rendered size now (see its own doc comment/JSX) — the margin
-    // on every side is what lets this clamp actually reach 0 or maxLeft/
-    // maxTop for a node sitting right at the real 0/CANVAS_W/CANVAS_H edge
-    // instead of leaving it pinned there with nowhere left to scroll to.
-    const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
-    const maxTop = Math.max(0, (CANVAS_H + vScrollMargin * 2) * zoom - wrap.clientHeight);
-    // + hScrollMargin/+ vScrollMargin: pos.x/y are real canvas coordinates;
-    // scrollTo deals in screen pixels within the *padded* canvasRef (see
-    // screenToCanvas's own doc comment) — same conversion, just the other
-    // direction.
-    const targetLeft = Math.min(maxLeft, Math.max(0, (pos.x + hScrollMargin) * zoom - wrap.clientWidth / 2));
-    const targetTop = Math.min(maxTop, Math.max(0, (pos.y + vScrollMargin) * zoom - visibleH / 2));
-    // See its own doc comment — recorded regardless of which branch below
-    // actually runs, since settledViewportBounds() should always reflect
-    // the most recent centerOnNode call, not just the ones that had to
-    // scroll somewhere new.
-    lastPanTargetRef.current = { left: targetLeft, top: targetTop };
-
-    // Cancel whatever a previous call left running — a newer pan (picking
-    // a different node before the last one even settled) fully supersedes
-    // it, and letting the old poll/timeout keep going could flip
-    // selectionSettled back on for the wrong node's ghosts.
-    if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
-    if (settlePollRef.current) cancelAnimationFrame(settlePollRef.current);
-
-    // Already there (the just-selected node was already sitting dead
-    // center, or re-clicking the same one) — scrollTo wouldn't actually
-    // move anything, so there's no pan to wait on at all.
-    if (Math.hypot(targetLeft - wrap.scrollLeft, targetTop - wrap.scrollTop) < 1) {
-      panInFlightRef.current = false;
-      setSelectionSettled(true);
-      return;
-    }
-
-    wrap.scrollTo({ left: targetLeft, top: targetTop, behavior: "smooth" });
-    setSelectionSettled(false);
-    panInFlightRef.current = true;
-
-    // See selectionSettled's own doc comment — quick-add ghosts/the radial
-    // ring stay hidden until this pan actually lands. Used to guess *when*
-    // that was with one fixed duration (350ms, then a scrollend listener
-    // with a 900ms fallback) — both still amount to a guess: a `scrollend`
-    // that never fires on some real browser/device, or a real pan that
-    // (a big canvas, a slower phone actually rendering the animation
-    // rather than this environment's own sandboxed panes, which don't
-    // always tick it forward at all) genuinely takes longer than any fixed
-    // number picked here, leaves ghosts fanning out against whatever the
-    // viewport still was at that guessed moment — not where the node
-    // actually ends up — which is exactly what read as "ghosts floating in
-    // a curvy row, disconnected from the node" on a real phone. Polling
-    // the actual scroll position every frame until it stops moving is
-    // correct regardless of distance, device speed, or scrollend support:
-    // however long the real pan takes, this notices the moment it's
-    // actually done. 3 consecutive unchanged frames (not just one, which
-    // could land between two ticks that happened to round to the same
-    // pixel) before declaring it settled; an outer 3s timeout is a last-
-    // resort safety net for the pathological case where scrolling somehow
-    // never stabilizes at all, so ghosts can never end up permanently
-    // stuck hidden.
-    let lastLeft = wrap.scrollLeft;
-    let lastTop = wrap.scrollTop;
-    let stableFrames = 0;
-    const finish = () => {
-      panInFlightRef.current = false;
-      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
-      if (settlePollRef.current) cancelAnimationFrame(settlePollRef.current);
-      setSelectionSettled(true);
-    };
-    const poll = () => {
-      if (!panInFlightRef.current) return; // superseded by a newer pan, or already finished
-      const nowLeft = wrap.scrollLeft;
-      const nowTop = wrap.scrollTop;
-      if (Math.abs(nowLeft - lastLeft) < 0.5 && Math.abs(nowTop - lastTop) < 0.5) {
-        stableFrames++;
-      } else {
-        stableFrames = 0;
-        lastLeft = nowLeft;
-        lastTop = nowTop;
-      }
-      if (stableFrames >= 3) {
-        finish();
-        return;
-      }
-      settlePollRef.current = requestAnimationFrame(poll);
-    };
-    settlePollRef.current = requestAnimationFrame(poll);
-    settleTimeoutRef.current = setTimeout(finish, 3000);
-  }
-
-  // Pans to a fixed canvas point rather than any one node's own position —
-  // used below to center a circle/cluster the moment it becomes the chosen
-  // one, which has no single "the node" the way an ordinary selection does.
-  // Same target-rectangle math centerOnNode uses, just without any of its
-  // settle-detection/quick-add-ghost machinery: nothing here needs to know
-  // the instant this pan actually lands, since a chosen cluster has no
-  // ghosts fanning off it the way a selected node does.
-  function centerOnPoint(x: number, y: number) {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const visibleH = Math.max(150, wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport)));
-    const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
-    const maxTop = Math.max(0, (CANVAS_H + vScrollMargin * 2) * zoom - wrap.clientHeight);
-    const targetLeft = Math.min(maxLeft, Math.max(0, (x + hScrollMargin) * zoom - wrap.clientWidth / 2));
-    const targetTop = Math.min(maxTop, Math.max(0, (y + vScrollMargin) * zoom - visibleH / 2));
-    wrap.scrollTo({ left: targetLeft, top: targetTop, behavior: "smooth" });
   }
 
   // Replays a weapon's arrow flight (see WeaponMark) — alongside
@@ -1334,6 +609,15 @@ export function MapPage() {
     if (selectedId) ensureNodeText([selectedId]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
+
+  // The two text-heavy reading modes draw every node's text, so all of it is
+  // needed up front (one bulk request for whatever hasn't loaded yet).
+  useEffect(() => {
+    if (readingMode === "actual") return;
+    const ids = visibleNodes.map((n) => n.nodeId);
+    if (ids.length > 0) ensureNodeText(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readingMode, visibleNodes]);
 
   // Every circle member's sentiment, keyed by node id — what NodeCard reads
   // to decide its dashed outline and whether it's eligible to chaotic-drift
@@ -2605,6 +1889,13 @@ export function MapPage() {
   }
 
   const isOwner = map.ownerId === user?._id;
+
+  // "+" menu > Create node: a blank node input at a free spot in view.
+  function startCreateNodeInView() {
+    const pos = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
+    setInlineEditId(null);
+    setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: null });
+  }
   // Map.discussionMode's real meaning now — see Backend/CLAUDE.md's own
   // updated doc comment. Undefined/true is "Discussion" (the default: full
   // combat controls visible, current/historical behavior), explicit false
@@ -2624,13 +1915,7 @@ export function MapPage() {
     }
   }
 
-  // Reused across this toolbar's several same-styled buttons — kept local
-  // (not shared across files) so every className stays one look-here-and-
-  // you-see-it string, same as everywhere else in this migration.
-  const btnSm =
-    "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50";
-  const btnSmPrimary =
-    "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-white transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
+  // The error banner's dismiss button.
   const btnSmGhost =
     "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -2752,312 +2037,18 @@ export function MapPage() {
             onPointerDown={onCanvasPointerDown}
             onContextMenu={onCanvasContextMenu}
           >
-            <svg
-              className="pointer-events-none absolute inset-0 h-full w-full"
-              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-            >
-              {/*
-                Zones: the outline polygon traced through every member of a group (root + its 2+
-                direct parentId-children — see nodeGroups) — a triangle at the 3-member minimum,
-                growing to a quad/pentagon/hexagon/… as the group grows, colored by the group's
-                own majority sentiment (positive-majority halo-gold, negative-majority horns-red,
-                a tied/all-"unknown" group neutral gray — see circleSentiment's own doc comment).
-                Deepest layer on the canvas, under even the link figures below — every member
-                stays a real, individually clickable node; this is purely a backdrop. Shape
-                actually reflects the tree's own spread now instead of one fixed bounding circle
-                either overlapping unrelated nodes or leaving a lot of empty space, and it visibly
-                deforms live as members get dragged around — nodeGroups recomputes `outline` from
-                current positions (including mid-drag) on every render, nothing here is a
-                snapshot. Same "click to stabilize" control the old plain-circle backdrop had.
-              */}
-              {nodeGroups.map((g) => {
-                const color = ZONE_COLORS[g.sentiment];
-                // Same "chosen one stays fuller-opacity, every other zone
-                // dims" spotlight the branch-arrow lines below (and the
-                // minimap's own zones) use — one shared signal for which
-                // group, if any, is currently stabilized.
-                const isStabilized = map?.selectedCircle?.rootId === g.rootId;
-                const dimmed = !!map?.selectedCircle && !isStabilized;
-                return (
-                  <polygon
-                    key={`zone-${g.rootId}`}
-                    points={g.outline.map((p) => `${p.x},${p.y}`).join(" ")}
-                    fill={color}
-                    fillOpacity={dimmed ? 0.06 : 0.14}
-                    stroke={color}
-                    strokeOpacity={dimmed ? 0.25 : 0.5}
-                    strokeWidth={2.5}
-                    // The whole overlay SVG is pointer-events-none (so its
-                    // decorative shapes never steal a drag/click from a
-                    // NodeCard div sitting underneath) — a zone is one of
-                    // the few things in it that's actually meant to be
-                    // clicked, so it has to explicitly opt back in.
-                    style={{ cursor: "pointer", pointerEvents: "auto" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCircleBackdropClick(g.rootId);
-                    }}
-                  >
-                    <title>
-                      {isStabilized
-                        ? "Stabilized — click it, or click anywhere outside it, to let it drift with the others"
-                        : "Click to stabilize this zone and let every other zone drift"}
-                    </title>
-                  </polygon>
-                );
-              })}
-              {/*
-                Manual zones: a single node's own owner-chosen zone ring (node.manualZone —
-                see NodePanel's Info tab), independent of the automatic parentId-group zones
-                above — no 2+-children requirement, color picked outright rather than voted.
-                Fixed-radius circle (there's no multi-member outline to trace, unlike the
-                polygon zones) around just that one node's own position. Drawn alongside an
-                automatic zone if a node happens to be in both at once — these are separate
-                layers, not mutually exclusive.
-              */}
-              {visibleNodes
-                .filter((n) => n.manualZone)
-                .map((n) => {
-                  const p = posFor(n);
-                  const color = n.manualZone === "positive" ? ZONE_COLORS.positive : ZONE_COLORS.negative;
-                  return (
-                    <circle
-                      key={`manual-zone-${n.nodeId}`}
-                      cx={p.x}
-                      cy={p.y}
-                      r={55}
-                      fill={color}
-                      fillOpacity={0.14}
-                      stroke={color}
-                      strokeOpacity={0.5}
-                      strokeWidth={2.5}
-                    />
-                  );
-                })}
-              {/*
-                Circle-parent ring: a small automatic version of the manual zone circle just
-                above, drawn around every circle root/parent (circleRootSentimentByNode — same
-                nodes NodeCard's own crown badge marks), colored the same way its zone backdrop
-                already is (majority pos/neg/neutral vote). Same fixed-radius-circle shape as a
-                manual zone, just tighter (close around the node itself, not a wide zone) and
-                never owner-chosen — this one exists for every circle root automatically,
-                alongside the crown badge rather than instead of it.
-              */}
-              {visibleNodes
-                .filter((n) => circleRootSentimentByNode.has(n.nodeId))
-                .map((n) => {
-                  const p = posFor(n);
-                  const color = ZONE_COLORS[circleRootSentimentByNode.get(n.nodeId)!];
-                  return (
-                    <circle
-                      key={`circle-parent-ring-${n.nodeId}`}
-                      cx={p.x}
-                      cy={p.y}
-                      r={34}
-                      fill={color}
-                      fillOpacity={0.16}
-                      stroke={color}
-                      strokeOpacity={0.6}
-                      strokeWidth={2}
-                    />
-                  );
-                })}
-              {/*
-                Figures: any closed loop in the Link graph — colored fill as a backdrop, under
-                everything else. A plain two-node link is a line and can never close, so it never
-                shows up here; this is what "except line" means in practice, not a special case.
-              */}
-              {linkCycles.map((cycle) => {
-                // visibleNodes, not nodes — a member folded into a pack
-                // drops out of the shape entirely (same as the plain Edge
-                // lines below), rather than a figure still tracing a vertex
-                // at a node nobody can see any more.
-                const pts = cycle
-                  .map((id) => visibleNodes.find((n) => n.nodeId === id))
-                  .filter((n): n is NodeDoc => !!n)
-                  .map((n) => posFor(n));
-                if (pts.length < 3) return null;
-                return (
-                  <polygon
-                    key={`figure-${cycle.slice().sort().join("-")}`}
-                    points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
-                    fill="var(--accent)"
-                    fillOpacity={0.1}
-                    stroke="var(--accent)"
-                    strokeOpacity={0.4}
-                    strokeWidth={1.5}
-                  />
-                );
-              })}
-              {/*
-                Branch arrows: tree lineage (node.parentId), set when a node is created via
-                the quick-add ghosts off an existing node — drawn over the zone polygon above, so
-                the direction/depth of who-branched-off-whom stays visible inside its own zone. A
-                branch that's part of a "circle" (its parent has 2+ such children — see
-                nodeGroups) is colored by the group's own majority sentiment (positive-majority
-                halo-gold, negative-majority horns-red, neutral gray on a tie), same as the zone
-                it's inside, and doubles
-                as that circle's stabilize/release control too — one more place to click it,
-                alongside the zone shape itself. A lone branch (its parent has just this one
-                child, no group at all — nothing for a zone to enclose) keeps the plain,
-                unclickable accent dash.
-              */}
-              {visibleNodes.map((node) => {
-                const parentId = nodeRefId(node.parentId);
-                if (!parentId) return null;
-                const parentNode = visibleNodes.find((n) => n.nodeId === parentId);
-                if (!parentNode) return null;
-                const a = posFor(parentNode);
-                const b = posFor(node);
-                const group = nodeGroups.find((g) => g.rootId === parentId);
-                const color = group ? ZONE_COLORS[group.sentiment] : "var(--accent)";
-                // Same "chosen one stays full-opacity, every other circle
-                // dims" spotlight the old backdrop drew — see its own
-                // removed comment for why. Ungrouped branches never dim for
-                // *that* reason; they were never part of the spotlight to
-                // begin with. A 2+-node group selection dims independently
-                // of all that — any branch with neither end selected fades,
-                // grouped or not, so the selection's own neighborhood reads
-                // clearly against everything else (see NodeCard's matching
-                // `muted` computation and the plain-Edge dimming just below).
-                const isStabilized = !!group && map?.selectedCircle?.rootId === group.rootId;
-                const circleDimmed = !!group && !!map?.selectedCircle && !isStabilized;
-                const chosenDimmed =
-                  !!chosenNodeIds && !chosenNodeIds.has(parentId) && !chosenNodeIds.has(node.nodeId);
-                const dimmed = circleDimmed || chosenDimmed;
-                // The flip side of chosenDimmed — this branch touches the
-                // chosen node itself, not just "isn't dimmed" (which also
-                // covers the plain default state, nothing chosen at all).
-                // Boosted brighter than the normal baseline, not just left
-                // alone, so the chosen node's own connections actually pop
-                // against the dimmed rest instead of only avoiding the fade.
-                const chosenHighlighted =
-                  !!chosenNodeIds && (chosenNodeIds.has(parentId) || chosenNodeIds.has(node.nodeId));
-                return (
-                  <line
-                    key={`branch-${node.nodeId}`}
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke={color}
-                    strokeOpacity={dimmed ? 0.12 : chosenHighlighted ? (group ? 0.95 : 0.6) : group ? 0.65 : 0.35}
-                    strokeWidth={group ? 1.75 : 1.5}
-                    strokeDasharray={group ? undefined : "5 4"}
-                    markerEnd="url(#branch-arrow)"
-                    // The whole overlay SVG is pointer-events-none (so its
-                    // decorative edges/arrows never steal a drag/click from
-                    // a NodeCard div sitting underneath) — a grouped branch
-                    // is the one case here that's actually meant to be
-                    // clicked (see handleCircleBackdropClick, same handler
-                    // the old backdrop circle used), so it has to explicitly
-                    // opt back in; an ungrouped one stays inert.
-                    style={group ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
-                    onClick={
-                      group
-                        ? (e) => {
-                            e.stopPropagation();
-                            handleCircleBackdropClick(group.rootId);
-                          }
-                        : undefined
-                    }
-                  >
-                    {group && (
-                      <title>
-                        {isStabilized
-                          ? "Stabilized — click it, or click anywhere outside it, to let it drift with the others"
-                          : "Click to stabilize this circle and let every other circle drift"}
-                      </title>
-                    )}
-                  </line>
-                );
-              })}
-              {/* Plain lines, no arrowhead — Edges are an undirected "these
-                  two are linked, and here's how they feel about each
-                  other" relationship (the sentiment color is the actual
-                  payload), not a directed one the way a branch arrow or a
-                  weapon's bow is, so an arrowhead here was implying a
-                  direction this doesn't actually have. */}
-              {edges.map((edge) => {
-                // fromNodeId/toNodeId come back null (not a string, not a
-                // populated ref) when the node they pointed at was deleted
-                // out from under the edge — skip rendering rather than
-                // crash on `.nodeId` of null.
-                const fromId = nodeRefId(edge.fromNodeId);
-                const toId = nodeRefId(edge.toNodeId);
-                if (!fromId || !toId) return null;
-                // visibleNodes, not nodes — a packed-away endpoint hides
-                // this edge along with it (same relationship as a branch
-                // arrow into a packed node, which already goes through
-                // visibleNodes below); unpacking either end brings the edge
-                // right back since this re-resolves on every render.
-                const fromNode = visibleNodes.find((n) => n.nodeId === fromId);
-                const toNode = visibleNodes.find((n) => n.nodeId === toId);
-                if (!fromNode || !toNode) return null;
-                const a = posFor(fromNode);
-                const b = posFor(toNode);
-                const color =
-                  edge.sentiment === "negative"
-                    ? "var(--danger)"
-                    : edge.sentiment === "positive"
-                      ? "var(--success)"
-                      : "var(--ink-soft)";
-                // Same chosen-node dimming the branch arrows above apply —
-                // an edge with neither end chosen (selected or
-                // multi-selected) fades, so the selected node's own
-                // connections read clearly against the rest.
-                const dimmed = !!chosenNodeIds && !chosenNodeIds.has(fromId) && !chosenNodeIds.has(toId);
-                // The flip side of `dimmed` — this edge touches the chosen
-                // node itself. Boosted brighter than the plain default
-                // (0.55, used when nothing at all is chosen), not just left
-                // there, so the chosen node's own edges actually pop against
-                // the dimmed rest instead of only avoiding the fade.
-                const highlighted = !!chosenNodeIds && (chosenNodeIds.has(fromId) || chosenNodeIds.has(toId));
-                // Full opacity against var(--danger)/var(--success)'s own
-                // already-saturated colors read as glaring, especially with
-                // several edges overlapping near a busy node — toned down
-                // to 0.55 normally (dimmed keeps roughly the same ratio to
-                // it, not just to the old 1); highlighted goes brighter
-                // still, close to full.
-                return (
-                  <line
-                    key={edge.edgeId}
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke={color}
-                    strokeWidth={2}
-                    strokeOpacity={dimmed ? 0.06 : highlighted ? 0.9 : 0.55}
-                  />
-                );
-              })}
-              {/* The chosen set stays lit while the sentiment modal is open. */}
-              {pendingLink?.map((n) => {
-                const p = posFor(n);
-                return (
-                  <circle
-                    key={`pending-${n.nodeId}`}
-                    cx={p.x}
-                    cy={p.y}
-                    r={18}
-                    fill="none"
-                    stroke="var(--accent)"
-                    strokeWidth={3}
-                  />
-                );
-              })}
-              <defs>
-                {/* fill="context-stroke": picks up whichever line is
-                    actually using this marker's own `stroke` (plain accent
-                    for an ungrouped branch, the group's gold/red sentiment
-                    color for a grouped one — see the branch-arrows map
-                    above) instead of one fixed color for every branch. */}
-                <marker id="branch-arrow" markerWidth="4.5" markerHeight="4.5" refX="4" refY="2.25" orient="auto">
-                  <path d="M0,0 L4.5,2.25 L0,4.5 Z" fill="context-stroke" opacity="0.75" />
-                </marker>
-              </defs>
-            </svg>
+            <CanvasBackdrop
+              nodeGroups={nodeGroups}
+              selectedCircle={map?.selectedCircle}
+              visibleNodes={visibleNodes}
+              edges={edges}
+              posFor={posFor}
+              circleRootSentimentByNode={circleRootSentimentByNode}
+              linkCycles={linkCycles}
+              chosenNodeIds={chosenNodeIds}
+              pendingLink={pendingLink}
+              onCircleClick={handleCircleBackdropClick}
+            />
 
             {visibleNodes.map((node) => {
               const pos = posFor(node);
@@ -3108,6 +2099,7 @@ export function MapPage() {
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
+                  readingMode={readingMode}
                   discussionMode={isDiscussionMode}
                   celebrate={celebrateIds.has(node.nodeId)}
                   flightVector={flightVector}
@@ -3135,71 +2127,12 @@ export function MapPage() {
               );
             })}
 
-            {/*
-              Weapon marks get their own SVG layer, painted after every NodeCard above rather
-              than inside the first (backdrop) SVG — that one sits *behind* the node icons the
-              same way the group backdrops and branch arrows need to, but a bow drawn at that
-              layer landed centered right under its own attack node's opaque circular icon.
-              z-[34] (not just "a later DOM sibling"): NodeCard itself carries an explicit
-              z-31/z-32 now (see its own zIndexClass, added so nodes/ghosts/the pending-create
-              input stay above MapPage's NodePanel backdrop) — a sibling with an explicit
-              positive z-index always paints over a z-index:auto one regardless of DOM order, so
-              once NodeCard stopped being auto-stacked, being "merely later in the DOM" here
-              stopped being enough to draw on top of it; this SVG rendered its bow/arrows
-              completely hidden behind every node from that point on. The explicit z-[34] is
-              what actually keeps this on top now, DOM order is incidental. Every attack now
-              spawns a real node carrying the attacker's objection (see attackAbl.ts) — this is
-              the permanent bow facing whatever it targeted, plus the volley of transient arrows
-              (see WeaponMark) that fires once when the attack lands and again on demand when
-              either end gets clicked.
-            */}
-            <svg
-              className="pointer-events-none absolute inset-0 z-[34] h-full w-full"
-              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-            >
-              {visibleNodes
-                .filter((n) => n.isWeapon)
-                .map((weaponNode) => {
-                  const targetId = nodeRefId(weaponNode.targetNodeId);
-                  if (!targetId) return null;
-                  const targetNode = visibleNodes.find((n) => n.nodeId === targetId);
-                  if (!targetNode) return null;
-                  const a = posFor(weaponNode);
-                  // An active shield on the target intercepts the arrows —
-                  // they fly to (and stop at) the shield's own position
-                  // instead of reaching the target, reading as "blocked
-                  // here," not "landed." Any one active protector is enough
-                  // to redirect every one of the target's own attackers,
-                  // same "just needs to exist" gate attackAbl.ts's own
-                  // findActiveProtectorDao check already uses server-side.
-                  const activeProtector = visibleNodes.find(
-                    (n) => n.isProtection && !n.defeated && nodeRefId(n.protectsNodeId) === targetId,
-                  );
-                  const b = posFor(activeProtector ?? targetNode);
-                  // A weapon node can carry any outcome type now, not just
-                  // the negative-framed ones (see Backend's attackAbl.ts —
-                  // retaliation especially is naturally a positive claim,
-                  // "my defense holds") — var(--danger) red for every bow
-                  // read oddly on one of those, so a halo-classified
-                  // weapon (ringKindFor, same classification the badge's
-                  // own halo/horns crown uses) draws its bow in
-                  // var(--n-option) blue instead.
-                  const bowColor = ringKindFor(weaponNode.type) === "halo" ? "var(--n-option)" : "var(--danger)";
-                  return (
-                    <WeaponMark
-                      key={`weapon-${weaponNode.nodeId}`}
-                      x={a.x}
-                      y={a.y}
-                      targetX={b.x}
-                      targetY={b.y}
-                      weaponIcon={weaponNode.weaponIcon}
-                      color={bowColor}
-                      celebrate={celebrateIds.has(weaponNode.nodeId)}
-                      replayNonce={shotState?.id === weaponNode.nodeId ? shotState.nonce : 0}
-                    />
-                  );
-                })}
-            </svg>
+            <WeaponLayer
+              visibleNodes={visibleNodes}
+              posFor={posFor}
+              celebrateIds={celebrateIds}
+              shotState={shotState}
+            />
 
             {/* No separate ShieldMark overlay any more — a protection node
                 already sits exactly on the arrows path between attacker and
@@ -3262,194 +2195,30 @@ export function MapPage() {
             vScrollMargin={vScrollMargin}
           />
 
-          {/* The whole top toolbar collapses to this one compact floating
-              cluster — Back + a single "+" menu (Invite/Create/Node types)
-              — pinned top-left instead of a separate full-width bar. Same
-              z-[45] reasoning as the minimap/zoom-controls cluster below
-              (which stays put, bottom-right, on its own): above
-              canvas/panel, below a real modal. */}
-          <div className="absolute top-3 left-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
-            {!quickAddActive || forceShowToolbar ? (
-            <>
-            {/* Omitted outright for a demo session — see ProtectedRoute's
-                own redirect, which sends "/" straight back here anyway;
-                a demo account has exactly the one map it was seeded with,
-                nowhere else to go back to. */}
-            {!user?.isDemo && (
-            <Link
-              to="/"
-              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
-              title={t.map.toolbar.back}
-            >
-              &larr;
-            </Link>
-            )}
-            <div className="relative">
-              <button
-                type="button"
-                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[1.05rem] font-semibold text-ink hover:bg-surface-2"
-                title={t.map.toolbar.add}
-                onClick={() => setShowAddMenu((v) => !v)}
-              >
-                +
-              </button>
-              {showAddMenu && (
-                <AddMenu
-                  isOwner={isOwner}
-                  onClose={() => setShowAddMenu(false)}
-                  onInvite={() => {
-                    setShowAddMenu(false);
-                    setShowInvite(true);
-                  }}
-                  onCreateNode={() => {
-                    setShowAddMenu(false);
-                    const pos = pickNonOverlappingPosition(
-                      obstaclePoints(),
-                      bigNodeObstacles(),
-                      viewportBounds(),
-                    );
-                    setInlineEditId(null);
-                    setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: null });
-                  }}
-                  onCreateCircle={() => {
-                    setShowAddMenu(false);
-                    createCircle();
-                  }}
-                  onNodeTypes={() => {
-                    setShowAddMenu(false);
-                    setShowNodeTypesLegend(true);
-                  }}
-                  onExportText={() => {
-                    setShowAddMenu(false);
-                    openExportText();
-                  }}
-                />
-              )}
-            </div>
-            {/* Off by default — see moveMode's own doc comment for why
-                (dragging used to arm from a bare pointerdown, which read
-                as accidental relocation on any touch imprecision). Pressed
-                state mirrors tabBtn's own active look elsewhere in the
-                app, just inline here since this cluster has no shared
-                button style of its own to draw from. */}
-            <button
-              type="button"
-              className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border text-[0.95rem] font-semibold hover:bg-surface-2 ${
-                moveMode ? "border-accent bg-accent-soft text-accent-ink" : "border-transparent bg-transparent text-ink"
-              }`}
-              title={moveMode ? t.map.toolbar.moveOn : t.map.toolbar.moveOff}
-              onClick={() => setMoveMode((v) => !v)}
-            >
-              ✥
-            </button>
-            {/* Global Navbar (which normally hosts these) is hidden on the
-                map route — see App.tsx's onMapPage check — so this is the
-                only place a map-page user can reach them. */}
-            <div className="ml-1 flex items-center gap-1 border-l border-line pl-1">
-              <LanguageSwitcher />
-              <ThemeToggle />
-            </div>
-            </>
-            ) : (
-              // Collapsed while a node's own quick-add ring is up — see
-              // forceShowToolbar's own doc comment. Expands the full
-              // cluster back (without waiting for quick-add to end) rather
-              // than opening some separate menu of its own — everything it
-              // would show is already right here, just one click further.
-              <button
-                type="button"
-                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
-                title={t.map.toolbar.expandToolbar}
-                onClick={() => setForceShowToolbar(true)}
-              >
-                ⋮
-              </button>
-            )}
-            {/* Owner-only — updateMapDao's own ownerId filter would reject
-                this from anyone else anyway, so the button just doesn't
-                offer what the server would refuse. Discussion (the
-                default) shows every combat control below; Personal hides
-                them — see isDiscussionMode's own doc comment. Exempted from
-                the collapse above (unlike Back/+/Move) — toggling combat
-                visibility is something you're just as likely to want while
-                a node's own quick-add ring is up as any other time, so
-                collapsing it away behind "⋮" too would bury a control
-                that's actually in more, not less, demand right then. */}
-            {isOwner && (
-              <button
-                type="button"
-                className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border text-[0.95rem] font-semibold hover:bg-surface-2 ${
-                  isDiscussionMode
-                    ? "border-transparent bg-transparent text-ink"
-                    : "border-accent bg-accent-soft text-accent-ink"
-                }`}
-                title={
-                  isDiscussionMode
-                    ? t.map.toolbar.discussionTooltip
-                    : t.map.toolbar.personalTooltip
-                }
-                onClick={toggleMapMode}
-              >
-                {/* Plain text-presentation glyphs (no emoji variation
-                    selector), not the colorful ⚔️/🧠 emoji this used to be —
-                    matches the rest of this cluster's own monochrome
-                    icons (✥ above, +/← beside it) instead of standing out
-                    as the one brightly-colored button among them. */}
-                {isDiscussionMode ? "⚔" : "✎"}
-              </button>
-            )}
-          </div>
+          <MapToolbar
+            isDemo={!!user?.isDemo}
+            isOwner={isOwner}
+            isDiscussionMode={isDiscussionMode}
+            expanded={!quickAddActive || forceShowToolbar}
+            onExpand={() => setForceShowToolbar(true)}
+            moveMode={moveMode}
+            onToggleMove={() => setMoveMode((v) => !v)}
+            readingMode={readingMode}
+            onPickReadingMode={setReadingMode}
+            onToggleMapMode={toggleMapMode}
+            onInvite={() => setShowInvite(true)}
+            onCreateNode={startCreateNodeInView}
+            onCreateCircle={createCircle}
+            onNodeTypes={() => setShowNodeTypesLegend(true)}
+            onExportText={openExportText}
+          />
 
-          {/* Zoom controls — stacked directly above the minimap in the same
-              bottom-right corner (used to sit bottom-left; moved to keep
-              both of the canvas's floating controls in one place instead
-              of split across the screen). bottom-[150px]: minimap's own
-              bottom-3 (12px) plus its ~122px rendered height (120px
-              MINIMAP_H + its 1px border each side) plus a small gap, so
-              this sits just above it rather than touching. Same z-[45]
-              reasoning as the minimap: above the canvas/panel, below a
-              real modal. */}
-          <div className="absolute bottom-[150px] right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
-            <button
-              type="button"
-              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={zoom <= MIN_ZOOM}
-              title={t.map.toolbar.zoomOut}
-              onClick={() => {
-                const r = wrapRef.current?.getBoundingClientRect();
-                if (!r) return;
-                zoomAt(r.left + r.width / 2, r.top + r.height / 2, -ZOOM_STEP);
-              }}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-7 min-w-[3.2rem] cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent px-1 text-[0.72rem] font-semibold text-ink-soft hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={zoom === 1}
-              title={t.map.toolbar.zoomReset}
-              onClick={() => {
-                const r = wrapRef.current?.getBoundingClientRect();
-                if (!r) return;
-                zoomAt(r.left + r.width / 2, r.top + r.height / 2, 0, 1);
-              }}
-            >
-              {Math.round(zoom * 100)}%
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={zoom >= MAX_ZOOM}
-              title={t.map.toolbar.zoomIn}
-              onClick={() => {
-                const r = wrapRef.current?.getBoundingClientRect();
-                if (!r) return;
-                zoomAt(r.left + r.width / 2, r.top + r.height / 2, ZOOM_STEP);
-              }}
-            >
-              +
-            </button>
-          </div>
+          <ZoomControls
+            zoom={zoom}
+            onZoomOut={() => zoomFromCenter(-ZOOM_STEP)}
+            onZoomIn={() => zoomFromCenter(ZOOM_STEP)}
+            onReset={() => zoomFromCenter(0, 1)}
+          />
         </div>
 
         {/* The pack picker and the group bar each take over this bottom-sheet
@@ -3472,65 +2241,16 @@ export function MapPage() {
             onCancel={exitPackMode}
           />
         ) : chooseMode || multiSelectIds.size > 0 ? (
-          // Group selection takes over this same bottom-sheet slot instead
-          // of NodePanel — a single node's panel doesn't make sense once
-          // this mode is active (even with just one node caught by a small
-          // marquee — see onCanvasPointerDown's onUp, which always clears
-          // `selectedId` once a marquee resolves, size 1 or more, so
-          // NodePanel would never mount for it either way). Move (drag any
-          // selected node) plus the Actions dropdown (Copy/Group into
-          // circle/Delete — see SelectionMenu) and Deselect; per-node
-          // editing/attacking still needs dropping back to a single
-          // selection first.
-          <div className="fixed inset-x-0 bottom-0 z-[46] flex items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
-            <div className="flex items-center gap-3">
-              <span className="text-[0.88rem] font-semibold text-ink">
-                {multiSelectIds.size === 0
-                  ? "Tap your nodes to choose them"
-                  : `${multiSelectIds.size} node${multiSelectIds.size === 1 ? "" : "s"} ${chooseMode ? "chosen" : "selected"}`}
-              </span>
-              <div className="relative">
-                <button
-                  className={btnSm}
-                  disabled={multiSelectIds.size === 0}
-                  onClick={() => setShowSelectionMenu((v) => !v)}
-                >
-                  Actions
-                </button>
-                {showSelectionMenu && (
-                  <SelectionMenu
-                    count={multiSelectIds.size}
-                    canGroupCircle={multiSelectIds.size >= 2}
-                    canLink={multiSelectIds.size >= 2}
-                    onLink={() => {
-                      setShowSelectionMenu(false);
-                      linkSelection();
-                    }}
-                    onClose={() => setShowSelectionMenu(false)}
-                    onCopy={() => {
-                      setShowSelectionMenu(false);
-                      copySelection();
-                    }}
-                    onCopyText={() => {
-                      setShowSelectionMenu(false);
-                      copySelectionAsText();
-                    }}
-                    onGroupCircle={() => {
-                      setShowSelectionMenu(false);
-                      groupSelectionIntoCircle();
-                    }}
-                    onDelete={() => {
-                      setShowSelectionMenu(false);
-                      deleteSelection();
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-            <button className={btnSm} onClick={exitChooseMode}>
-              {chooseMode ? "Done" : "Deselect"}
-            </button>
-          </div>
+          <SelectionBar
+            count={multiSelectIds.size}
+            chooseMode={chooseMode}
+            onLink={linkSelection}
+            onCopy={copySelection}
+            onCopyText={copySelectionAsText}
+            onGroupCircle={groupSelectionIntoCircle}
+            onDelete={deleteSelection}
+            onDone={exitChooseMode}
+          />
         ) : (
           selectedNode &&
           user && (
@@ -3659,51 +2379,7 @@ export function MapPage() {
         />
       )}
 
-      {/* whitespace-nowrap on every item: without it, a long label
-          ("Problematic option", "negative circle / under fire") had
-          nothing stopping it from wrapping *inside* its own flex item on a
-          narrow screen — text breaking mid-phrase while the icon/dot sat
-          oddly on its own line above it — instead of flex-wrap doing its
-          actual job of moving the *whole* item down to the next row.
-          Tighter gap/padding/font too, so more items fit per row before
-          any wrapping is needed at all. */}
-      <div className="flex flex-wrap gap-[0.3rem] border-t border-line bg-surface px-3 py-[0.45rem]">
-        {/* nt, not t — this file's own translation object is already
-            destructured as `t` (useI18n) at the top of the component; a
-            per-item loop variable of the same name would shadow it within
-            this callback instead of colliding outright, which still works
-            but reads as a landmine for the next edit in here. */}
-        {NODE_TYPES.map((nt) => (
-          <span key={nt} className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
-            {/* Same symbol a real node of this type actually renders
-                (OutcomeBadge), not NodeTypeIcon's own separate glyph set —
-                this legend used to teach a different symbol than the one
-                you'd actually see on the map. "unknown" alone has no
-                outcome symbol, so it keeps its own plain NodeTypeIcon
-                glyph, same as a real "unknown" node does. */}
-            {ringKindFor(nt) ? (
-              <OutcomeBadge type={nt as OutcomeType} size={13} />
-            ) : (
-              <NodeTypeIcon type={nt} size={13} />
-            )}
-            {nt}
-          </span>
-        ))}
-        <span className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
-          <span
-            className="mr-[0.3rem] inline-block h-2 w-2 flex-shrink-0 rounded-full"
-            style={{ background: "var(--success)" }}
-          />
-          {t.map.legend.positiveCircle}
-        </span>
-        <span className="flex items-center gap-[0.25rem] whitespace-nowrap text-[0.68rem] text-ink-soft">
-          <span
-            className="mr-[0.3rem] inline-block h-2 w-2 flex-shrink-0 rounded-full"
-            style={{ background: "var(--danger)" }}
-          />
-          {t.map.legend.negativeCircle}
-        </span>
-      </div>
+      <MapLegend />
 
       {pendingLink && mapId && (
         <CreateEdgeModal
@@ -3722,25 +2398,7 @@ export function MapPage() {
         <InviteMemberModal map={map} onClose={() => setShowInvite(false)} onInvited={setMap} />
       )}
 
-      {showNodeTypesLegend && (
-        <Modal title={t.map.addMenu.nodeTypes} onClose={() => setShowNodeTypesLegend(false)}>
-          <div className="flex flex-col gap-[0.6rem]">
-            {/* nt, not t — see the bottom legend bar's own matching comment. */}
-            {NODE_TYPES.map((nt) => (
-              <div key={nt} className="flex items-center gap-[0.6rem] text-[0.88rem] text-ink">
-                {/* Same symbol a real node of this type actually renders —
-                    see the bottom legend bar's own matching comment. */}
-                {ringKindFor(nt) ? (
-                  <OutcomeBadge type={nt as OutcomeType} size={20} />
-                ) : (
-                  <NodeTypeIcon type={nt} size={20} />
-                )}
-                {nt}
-              </div>
-            ))}
-          </div>
-        </Modal>
-      )}
+      {showNodeTypesLegend && <NodeTypesModal onClose={() => setShowNodeTypesLegend(false)} />}
 
       {showExportText && map && (
         <ExportTextModal
