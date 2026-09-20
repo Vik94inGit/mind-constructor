@@ -4,6 +4,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
+import * as linesApi from "../api/lines";
 import { ApiRequestError } from "../api/client";
 import { useMapSocket } from "../hooks/useMapSocket";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
@@ -22,6 +23,10 @@ import { NodeContextMenu } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
+import { DrawLineBar } from "../map/DrawLineBar";
+import { isPointFree, isSegmentFree, snapToLines } from "../utils/drawLine";
+import { loadNodeDisplay, saveNodeDisplay, nodeFootprint, zoomToSeparate } from "../utils/nodeDisplay";
+import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
 import { MapToolbar } from "../map/MapToolbar";
 import { ZoomControls } from "../map/ZoomControls";
@@ -35,6 +40,7 @@ import {
   CANVAS_W,
   CANVAS_H,
   ZOOM_STEP,
+  MAX_ZOOM,
   CIRCLE_DROP_RADIUS,
   computeLinkedNeighborIds,
   getNodeMinDist,
@@ -51,7 +57,7 @@ import {
 import type { Obstacle } from "../utils/canvasLayout";
 import { loadReadingMode, saveReadingMode } from "../utils/readingMode";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, EdgeDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
+import type { AttackIndicator, EdgeDoc, LineDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
 
 // A Problem-type node's own child counts as "addressing" it (see
 // unsolvedProblemIds below) only if it's one of these — a plain Problem or
@@ -71,6 +77,18 @@ export function MapPage() {
   const [map, setMap] = useState<MapDoc | null>(null);
   const [nodes, setNodes] = useState<NodeDoc[]>([]);
   const [edges, setEdges] = useState<EdgeDoc[]>([]);
+  // Separator lines drawn on the map (see utils/drawLine.ts and the backend's
+  // Line model), and the state of drawing a new one: on/off, the points placed
+  // so far, where the pointer is, and whether the last click was refused
+  // because it landed on a node or zone.
+  const [lines, setLines] = useState<LineDoc[]>([]);
+  const [drawMode, setDrawMode] = useState(false);
+  const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
+  const [drawHover, setDrawHover] = useState<{ x: number; y: number } | null>(null);
+  const [drawBlocked, setDrawBlocked] = useState<"spot" | "crossing" | null>(null);
+  const [drawSaving, setDrawSaving] = useState(false);
+  const drawBlockedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawHoverFrameRef = useRef<number | null>(null);
   const [indicators, setIndicators] = useState<AttackIndicator[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +112,12 @@ export function MapPage() {
   function setReadingMode(mode: ReadingMode) {
     setReadingModeState(mode);
     saveReadingMode(mode);
+    if (mode !== "actual") fitZoomForDisplay(nodeDisplay, mode);
   }
+  // Nodes shown in their own reading mode instead of the map's (a chosen group
+  // as a classical mind map, say) — per browser and per map, see
+  // utils/nodeDisplay.ts.
+  const [nodeDisplay, setNodeDisplay] = useState<NodeDisplay>(() => loadNodeDisplay(mapId));
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
   // group selection (multiSelectIds — the same one shift+click and the marquee
   // build), instead of opening that node's panel. The group bar then offers
@@ -282,6 +305,18 @@ export function MapPage() {
     [],
   );
 
+  const upsertLine = useCallback(
+    (incoming: LineDoc) =>
+      setLines((prev) => {
+        const idx = prev.findIndex((l) => l.lineId === incoming.lineId);
+        if (idx === -1) return [...prev, incoming];
+        const next = prev.slice();
+        next[idx] = incoming;
+        return next;
+      }),
+    [],
+  );
+
   const upsertEdge = useCallback(
     (incoming: EdgeDoc) =>
       setEdges((prev) => {
@@ -313,10 +348,12 @@ export function MapPage() {
     setLoading(true);
     setError(null);
     try {
-      const [mapDoc, nodeList, edgeList] = await Promise.all([
+      const [mapDoc, nodeList, edgeList, lineList] = await Promise.all([
         mapsApi.getMap(mapId),
         nodesApi.listNodes(mapId),
         edgesApi.listEdges(mapId),
+        // Lines are decoration — a backend without them yet mustn't stop the map loading.
+        linesApi.listLines(mapId).catch(() => [] as LineDoc[]),
       ]);
       setMap(mapDoc);
       // Backend's listNodes deliberately omits each node's own `text` (see
@@ -335,6 +372,7 @@ export function MapPage() {
       fetchedTextIds.current.clear();
       setNodes(nodeList.map((n) => ({ ...n, text: n.text ?? "" })));
       setEdges(edgeList);
+      setLines(lineList);
       refreshInsights(mapId);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.errors.loadMap);
@@ -403,11 +441,13 @@ export function MapPage() {
     loading,
     setNodes,
     setEdges,
+    setLines,
     setMap,
     setSelectedId,
     setCelebrateIds,
     upsertNode,
     upsertEdge,
+    upsertLine,
     applyCircleSelection,
     refreshInsights,
   });
@@ -628,11 +668,10 @@ export function MapPage() {
   // The two text-heavy reading modes draw every node's text, so all of it is
   // needed up front (one bulk request for whatever hasn't loaded yet).
   useEffect(() => {
-    if (readingMode === "actual") return;
-    const ids = visibleNodes.map((n) => n.nodeId);
+    const ids = visibleNodes.filter((n) => (nodeDisplay[n.nodeId] ?? readingMode) !== "actual").map((n) => n.nodeId);
     if (ids.length > 0) ensureNodeText(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readingMode, visibleNodes]);
+  }, [readingMode, nodeDisplay, visibleNodes]);
 
   // Every circle member's sentiment, keyed by node id — what NodeCard reads
   // to decide its dashed outline and whether it's eligible to chaotic-drift
@@ -757,7 +796,7 @@ export function MapPage() {
   }
 
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
-    if (chooseMode || packMode) return;
+    if (chooseMode || packMode || drawMode) return;
     if (!isOwnNode(node)) return;
 
     // Group drag: the pointer-downed node is itself a member of a 2+-node
@@ -1140,6 +1179,9 @@ export function MapPage() {
 
   function handleNodeClick(node: NodeDoc, shiftKey = false) {
     setContextMenu(null);
+    // While drawing a line a node is just something in the way (a click on it
+    // can't place a point) — it isn't selected.
+    if (drawMode) return;
     if (packMode) {
       // Same toggle-in/out-freely behavior link mode's own picking uses —
       // clicking an already-picked node just removes that one pick.
@@ -1325,6 +1367,11 @@ export function MapPage() {
   // reaches this handler.
   function onCanvasContextMenu(e: ReactMouseEvent<HTMLDivElement>) {
     e.preventDefault();
+    // While drawing, a right-click takes back the last point.
+    if (drawMode) {
+      undoDrawPoint();
+      return;
+    }
     setSelectedId(null);
     setContextMenu(null);
     setMultiSelectIds(new Set());
@@ -1351,7 +1398,7 @@ export function MapPage() {
     // to-edit are unaffected either way — those go through NodeCard's own
     // onClick/onDoubleClick, not this handler, which only ever fires for
     // empty canvas.
-    if (chooseMode || packMode || e.button !== 0 || e.pointerType === "touch") return;
+    if (chooseMode || packMode || drawMode || e.button !== 0 || e.pointerType === "touch") return;
     const start = screenToCanvas(e.clientX, e.clientY);
     let moved = false;
     // Read directly off the raw pointer event in onUp, same as
@@ -1543,6 +1590,172 @@ export function MapPage() {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
     } finally {
       setPendingCreate(null);
+    }
+  }
+
+  // ---- Display of chosen nodes ----
+  // Nodes in a text mode (icons + text, classic mind map) take far more room
+  // than an icon does, and overlap their neighbors at the current spacing. A node
+  // draws at a constant size on screen whatever the zoom is, so zooming in
+  // spreads the positions apart without changing anything else — the view
+  // "extends" until the expanded nodes clear each other (or as far as the zoom
+  // allows). Only ever zooms in; nothing is moved.
+  function fitZoomForDisplay(display: NodeDisplay, globalMode: ReadingMode, centerOn?: { x: number; y: number }) {
+    const items = visibleNodes.flatMap((n) => {
+      const pos = positions.get(n.nodeId);
+      if (!pos) return [];
+      const mode = display[n.nodeId] ?? globalMode;
+      const tier = circleRootSentimentByNode.has(n.nodeId) ? 3 : (n.sizeTier ?? 1);
+      const multiplier = tier === 3 ? 1.3 : tier === 2 ? 1.15 : 1;
+      return [{ x: pos.x, y: pos.y, ...nodeFootprint(n, mode, multiplier), expanded: mode !== "actual" }];
+    });
+    const needed = zoomToSeparate(items);
+    if (needed <= zoom + 0.005) return;
+    const target = Math.min(MAX_ZOOM, needed * 1.03);
+    zoomFromCenter(0, target);
+    showNotice(needed > MAX_ZOOM ? t.ui.display.stillOverlap : t.ui.display.zoomedToFit);
+    // Zooming keeps the middle of the screen fixed; bring the nodes that just
+    // changed back into it.
+    if (centerOn) setTimeout(() => centerOnPoint(centerOn.x, centerOn.y), 250);
+  }
+
+  // The group bar's "Show as": the chosen nodes take this reading mode (null =
+  // back to following the map's), then the view zooms in if they'd overlap.
+  function setDisplayForChosen(mode: ReadingMode | null) {
+    const ids = Array.from(multiSelectIds);
+    if (ids.length === 0) return;
+    const next: NodeDisplay = { ...nodeDisplay };
+    for (const id of ids) {
+      if (mode === null) delete next[id];
+      else next[id] = mode;
+    }
+    setNodeDisplay(next);
+    saveNodeDisplay(mapId, next);
+    const chosen = ids.map((id) => positions.get(id)).filter((p): p is { x: number; y: number } => !!p);
+    const middle = chosen.length
+      ? { x: chosen.reduce((sum, p) => sum + p.x, 0) / chosen.length, y: chosen.reduce((sum, p) => sum + p.y, 0) / chosen.length }
+      : undefined;
+    fitZoomForDisplay(next, readingMode, middle);
+  }
+
+  // ---- Separator lines ----
+  // Drawing takes over the canvas clicks and the bottom sheet, so anything
+  // else in progress steps aside first.
+  function toggleDrawMode() {
+    if (drawMode) {
+      exitDrawMode();
+      return;
+    }
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    setChooseMode(false);
+    setPackMode(false);
+    setPackContainerId(null);
+    setPackSelection(new Set());
+    setContextMenu(null);
+    setCanvasContextMenu(null);
+    setPendingCreate(null);
+    setDrawPoints([]);
+    setDrawMode(true);
+  }
+
+  function exitDrawMode() {
+    setDrawMode(false);
+    setDrawPoints([]);
+    setDrawHover(null);
+    setDrawBlocked(null);
+  }
+
+  // A point may go anywhere no node and no zone covers, and so may the stretch
+  // leading to it — see utils/drawLine.ts. Other lines are not obstacles: lines
+  // may cross and join each other.
+  function drawObstacles() {
+    return {
+      nodes: visibleNodes.map((n) => posFor(n)),
+      polygons: [
+        ...nodeGroups.map((g) => g.outline),
+        ...linkCycles.map((cycle) =>
+          cycle
+            .map((id) => visibleNodes.find((n) => n.nodeId === id))
+            .filter((n): n is NodeDoc => !!n)
+            .map((n) => posFor(n)),
+        ),
+      ],
+      circles: visibleNodes.filter((n) => n.manualZone).map((n) => posFor(n)),
+      classic: readingMode === "classic",
+    };
+  }
+
+  // Why `p` can't be the next point of the line in progress, or null when it can.
+  function drawRefusal(p: { x: number; y: number }): "spot" | "crossing" | null {
+    const obstacles = drawObstacles();
+    if (!isPointFree(p, obstacles)) return "spot";
+    const last = drawPoints[drawPoints.length - 1];
+    if (last && !isSegmentFree(last, p, obstacles)) return "crossing";
+    return null;
+  }
+
+  function addDrawPoint(raw: { x: number; y: number }) {
+    if (drawSaving) return;
+    // A click near an existing line joins it — on its corner, or on the spot
+    // along it nearest to the click.
+    const p = snapToLines(raw, lines);
+    const refusal = drawRefusal(p);
+    if (refusal) {
+      setDrawBlocked(refusal);
+      if (drawBlockedTimeoutRef.current) clearTimeout(drawBlockedTimeoutRef.current);
+      drawBlockedTimeoutRef.current = setTimeout(() => setDrawBlocked(null), 2200);
+      return;
+    }
+    setDrawBlocked(null);
+    // A double-click lands two clicks on the same spot — one point is enough.
+    const last = drawPoints[drawPoints.length - 1];
+    if (last && Math.hypot(p.x - last.x, p.y - last.y) < 8) return;
+    if (drawPoints.length >= 200) return; // the backend's own limit per line
+    setDrawPoints((prev) => [...prev, p]);
+  }
+
+  function undoDrawPoint() {
+    setDrawPoints((prev) => prev.slice(0, -1));
+  }
+
+  // Follows the pointer with the free/blocked ring — at most once per frame.
+  function onDrawPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "touch") return;
+    const p = snapToLines(screenToCanvas(e.clientX, e.clientY), lines);
+    if (drawHoverFrameRef.current !== null) cancelAnimationFrame(drawHoverFrameRef.current);
+    drawHoverFrameRef.current = requestAnimationFrame(() => setDrawHover(p));
+  }
+
+  async function finishLine() {
+    if (!mapId || drawPoints.length < 2 || drawSaving) return;
+    setDrawSaving(true);
+    setActionError(null);
+    try {
+      const line = await linesApi.createLine(mapId, drawPoints);
+      upsertLine(line);
+      setDrawPoints([]);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.lines.createFailed);
+    } finally {
+      setDrawSaving(false);
+    }
+  }
+
+  // Whoever drew a line may delete it, and so may the map's owner.
+  function canDeleteLine(line: LineDoc) {
+    return idOf(line.userId as any) === user?._id || map?.ownerId === user?._id;
+  }
+
+  async function handleLineClick(line: LineDoc) {
+    if (!canDeleteLine(line)) return;
+    if (!confirm(t.ui.lines.deleteConfirm)) return;
+    setActionError(null);
+    try {
+      await linesApi.deleteLine(line.lineId);
+      setLines((prev) => prev.filter((l) => l.lineId !== line.lineId));
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.lines.deleteFailed);
     }
   }
 
@@ -1968,6 +2181,35 @@ export function MapPage() {
     }
     function onKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
+      // Drawing a line: Enter finishes it, Backspace / Ctrl+Z takes back the
+      // last point, Escape clears the line (or leaves drawing when nothing is
+      // placed). A focused button keeps its own Enter.
+      if (drawMode) {
+        const onControl = e.target instanceof HTMLElement && !!e.target.closest("button, a, select, [role=menu]");
+        if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) {
+          e.preventDefault();
+          undoDrawPoint();
+          return;
+        }
+        if (!e.ctrlKey && !e.metaKey && !onControl) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void finishLine();
+            return;
+          }
+          if (e.key === "Backspace") {
+            e.preventDefault();
+            undoDrawPoint();
+            return;
+          }
+        }
+        if (!e.ctrlKey && !e.metaKey && e.key === "Escape") {
+          e.preventDefault();
+          if (drawPoints.length > 0) setDrawPoints([]);
+          else exitDrawMode();
+          return;
+        }
+      }
       // Enter (or Escape) finishes choosing / a group selection. Skipped when a
       // button, link, select or menu has focus — there Enter has its own job.
       if (
@@ -2149,13 +2391,18 @@ export function MapPage() {
               // space every node position is expressed in.
               outline: "3px solid color-mix(in srgb, var(--ink) 55%, transparent)",
             }}
-            onClick={() => {
+            onClick={(e) => {
               // See onCanvasPointerDown's own onUp comment — the trailing
               // native click a completed marquee drag leaves behind on this
               // same element would otherwise immediately clear the
               // selection that drag just computed.
               if (suppressNextClick.current) {
                 suppressNextClick.current = false;
+                return;
+              }
+              // Drawing a line: a click places a point (if the spot is free).
+              if (drawMode) {
+                addDrawPoint(screenToCanvas(e.clientX, e.clientY));
                 return;
               }
               // Tapping empty canvas while choosing finishes it (and closes the
@@ -2170,6 +2417,7 @@ export function MapPage() {
               releaseChosenCircleIfOutside();
             }}
             onPointerDown={onCanvasPointerDown}
+            onPointerMove={drawMode ? onDrawPointerMove : undefined}
             onContextMenu={onCanvasContextMenu}
           >
             <CanvasBackdrop
@@ -2183,6 +2431,19 @@ export function MapPage() {
               chosenNodeIds={chosenNodeIds}
               pendingLink={pendingLink}
               onCircleClick={handleCircleBackdropClick}
+              lines={lines}
+              canDeleteLine={canDeleteLine}
+              onLineClick={handleLineClick}
+              interactive={!drawMode}
+              drawing={
+                drawMode
+                  ? {
+                      points: drawPoints,
+                      hover: drawHover,
+                      hoverFree: drawHover ? drawRefusal(drawHover) === null : true,
+                    }
+                  : null
+              }
             />
 
             {visibleNodes.map((node) => {
@@ -2234,7 +2495,7 @@ export function MapPage() {
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
-                  readingMode={readingMode}
+                  readingMode={nodeDisplay[node.nodeId] ?? readingMode}
                   discussionMode={isDiscussionMode}
                   celebrate={celebrateIds.has(node.nodeId)}
                   flightVector={flightVector}
@@ -2344,6 +2605,7 @@ export function MapPage() {
             wrapRef={wrapRef}
             nodes={visibleNodes}
             edges={edges}
+            lines={lines}
             positions={positions}
             groups={nodeGroups}
             canvasW={CANVAS_W}
@@ -2361,6 +2623,8 @@ export function MapPage() {
             onExpand={() => setForceShowToolbar(true)}
             moveMode={moveMode}
             onToggleMove={() => setMoveMode((v) => !v)}
+            drawMode={drawMode}
+            onToggleDraw={toggleDrawMode}
             readingMode={readingMode}
             onPickReadingMode={setReadingMode}
             onToggleMapMode={toggleMapMode}
@@ -2385,7 +2649,16 @@ export function MapPage() {
             slot from NodePanel while they're active, so the two never try to
             render at once (choosing a node from its panel drops the single
             selection — see startChooseFrom). */}
-        {packMode && packContainer ? (
+        {drawMode ? (
+          <DrawLineBar
+            pointCount={drawPoints.length}
+            blocked={drawBlocked}
+            saving={drawSaving}
+            onUndo={undoDrawPoint}
+            onFinish={finishLine}
+            onExit={exitDrawMode}
+          />
+        ) : packMode && packContainer ? (
           <PackPickerPanel
             containerText={packContainer.text}
             picks={packPicks}
@@ -2406,6 +2679,7 @@ export function MapPage() {
             chooseMode={chooseMode}
             onLink={linkSelection}
             onNumber={() => numberSelection(false)}
+            onDisplay={setDisplayForChosen}
             onClearNumbers={() => numberSelection(true)}
             onCopy={copySelection}
             onCopyText={copySelectionAsText}

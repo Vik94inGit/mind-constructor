@@ -55,11 +55,11 @@ MongoDB, so `npm run test:run` doesn't need `MONGO_URI` to pass.
 
 Strict layering, one direction only: **routes → controllers → abl → dao → models**.
 
-- **`src/routes/*.ts`** (`authRoutes.ts`, `mapRoute.ts`, `nodeRoute.ts`, `edgeRoute.ts`) — wires
+- **`src/routes/*.ts`** (`authRoutes.ts`, `mapRoute.ts`, `nodeRoute.ts`, `edgeRoute.ts`, `lineRoute.ts`) — wires
   URLs to controller functions, applies `protect` (and `requireAdmin` where needed) from
   `src/middleware/auth.ts`. No logic here. Mounted in [server.ts](server.ts) as `/api/auth`,
-  `/api/nodes`, `/api/edges`, and `/api` (map routes — note the mount point itself has no `/maps`
-  segment, so these resolve as `/api/{mapId}/{nodes,edges,circles/select,circles/deselect,
+  `/api/nodes`, `/api/edges`, `/api/lines`, and `/api` (map routes — note the mount point itself has no `/maps`
+  segment, so these resolve as `/api/{mapId}/{nodes,edges,lines,circles/select,circles/deselect,
 attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (body: `{ nodeIds }`)
   is the bulk counterpart of `DELETE /api/nodes/:nodeId` — one request for a multi-select delete
   instead of N parallel single-node ones; same per-node ownership check, silently skipping any id
@@ -78,11 +78,11 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (
   `ValidationError`), authorization checks (map membership, node ownership), and orchestrating DAO
   calls. Each module defines its own domain-specific error classes (e.g. `MapNotFoundError`,
   `ParentNotOwnedError`, `WeaponOnCooldownError`) that the matching controller knows how to map to
-  a status code. Modules: `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `attackAbl`,
-  `attackIndicatorAbl`, `circleAbl`, `packAbl`.
-- **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `attackDao`) — the only layer
+  a status code. Modules: `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `lineAbl`,
+  `attackAbl`, `attackIndicatorAbl`, `circleAbl`, `packAbl`.
+- **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`) — the only layer
   that touches Mongoose models directly.
-- **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Attack`) — schemas. Each one strips
+- **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Line`, `Attack`) — schemas. Each one strips
   `_id`/`__v` in its `toJSON` transform and exposes only a public id instead (`nodeId`, `mapId`,
   `edgeId` — nanoids, not Mongo ObjectIds). **This public/internal id split is load-bearing
   everywhere**: DAOs take a public id in, resolve it to an internal `ObjectId` to query with;
@@ -128,6 +128,14 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   "cluster" detector: this app's maps are normally trees radiating from a Problem/Option node, and
   a tree's k-core for any `minDegree >= 2` is always empty (a forest has no cycles), so that
   approach could never actually fire on a real map.
+- **`Line`** (`models/Line.ts`, `lineAbl.ts`, `lineDao.ts`) — a separator line a member draws on a map: a
+  polyline of 2..200 canvas points (`{ x, y }`, within ±10000), meant to split groups of nodes apart
+  visually. Purely a drawing — nothing about nodes, zones or edges reads it, and the backend does not
+  police where its points sit (the frontend only offers spots that no node or zone covers). Any member
+  may draw one (`POST /api/lines/:mapId`, body `{ points }`); `GET /api/:mapId/lines` lists a map's
+  lines (members only); `DELETE /api/lines/:lineId` is allowed for whoever drew it or the map's owner
+  (`NotLineDeleterError` otherwise). Broadcast to the map's room as `line:created` / `line:deleted`, and
+  removed with the map (`deleteMapDao`'s cascade).
 - **`Node.title`** — an optional short label (max 80 chars, `""` = none) a frontend shows under a node
   in place of the start of its `text`. Set via `POST`/`PATCH /api/nodes` (`titleSchema` in
   `nodeAbl.ts`; an empty string on PATCH clears it). Unlike `text`, it is *not* stripped from

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { getSocket, joinMap, leaveMap } from "../api/socket";
 import { nodeRefId } from "../utils/nodeType";
-import type { EdgeDoc, MapDoc, NodeDoc, SelectedCircle } from "../types";
+import type { EdgeDoc, LineDoc, MapDoc, NodeDoc, SelectedCircle } from "../types";
 
 interface Params {
   mapId: string | undefined;
@@ -10,11 +10,13 @@ interface Params {
   loading: boolean;
   setNodes: Dispatch<SetStateAction<NodeDoc[]>>;
   setEdges: Dispatch<SetStateAction<EdgeDoc[]>>;
+  setLines: Dispatch<SetStateAction<LineDoc[]>>;
   setMap: Dispatch<SetStateAction<MapDoc | null>>;
   setSelectedId: Dispatch<SetStateAction<string | null>>;
   setCelebrateIds: Dispatch<SetStateAction<Set<string>>>;
   upsertNode: (node: NodeDoc) => void;
   upsertEdge: (edge: EdgeDoc) => void;
+  upsertLine: (line: LineDoc) => void;
   applyCircleSelection: (selectedCircle: SelectedCircle | null) => void;
   refreshInsights: (mapId: string) => void;
 }
@@ -24,11 +26,13 @@ export function useMapSocket({
   loading,
   setNodes,
   setEdges,
+  setLines,
   setMap,
   setSelectedId,
   setCelebrateIds,
   upsertNode,
   upsertEdge,
+  upsertLine,
   applyCircleSelection,
   refreshInsights,
 }: Params) {
@@ -120,7 +124,13 @@ export function useMapSocket({
     socket.on("node:updated", onNodeUpdated);
     socket.on("node:deleted", onNodeDeleted);
     socket.on("node:attacked", onNodeAttacked);
+    const onLineCreated = (line: LineDoc) => upsertLine(line);
+    const onLineDeleted = ({ lineId }: { lineId: string }) =>
+      setLines((prev) => prev.filter((l) => l.lineId !== lineId));
+
     socket.on("edge:created", onEdgeCreated);
+    socket.on("line:created", onLineCreated);
+    socket.on("line:deleted", onLineDeleted);
     socket.on("edge:deleted", onEdgeDeleted);
     socket.on("circle:selected", onCircleSelected);
     socket.on("circle:deselected", onCircleDeselected);
@@ -135,6 +145,8 @@ export function useMapSocket({
       socket.off("node:deleted", onNodeDeleted);
       socket.off("node:attacked", onNodeAttacked);
       socket.off("edge:created", onEdgeCreated);
+      socket.off("line:created", onLineCreated);
+      socket.off("line:deleted", onLineDeleted);
       socket.off("edge:deleted", onEdgeDeleted);
       socket.off("circle:selected", onCircleSelected);
       socket.off("circle:deselected", onCircleDeselected);
@@ -147,5 +159,5 @@ export function useMapSocket({
     // refreshInsights is a fresh closure every render but only ever calls a
     // state setter, so it is deliberately left out of the dependency list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapId, loading, upsertNode, upsertEdge, applyCircleSelection]);
+  }, [mapId, loading, upsertNode, upsertEdge, upsertLine, applyCircleSelection]);
 }

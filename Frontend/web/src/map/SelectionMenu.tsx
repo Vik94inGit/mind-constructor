@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n/I18nContext";
+import type { ReadingMode } from "../utils/readingMode";
 
 interface Props {
   count: number;
@@ -7,6 +8,8 @@ interface Props {
   canLink: boolean;
   onLink: () => void;
   onNumber: () => void;
+  /** Show the chosen nodes in this reading mode; null = the same as the map. */
+  onDisplay: (mode: ReadingMode | null) => void;
   onClearNumbers: () => void;
   onDelete: () => void;
   onCopy: () => void;
@@ -26,7 +29,7 @@ interface Props {
 // would run straight under/behind them. Same dismiss-on-outside-click/
 // Escape pattern as every other menu in this app (NodeContextMenu,
 // CanvasContextMenu, AddMenu).
-export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onNumber, onClearNumbers, onDelete, onCopy, onCopyText, onGroupCircle, onClose }: Props) {
+export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onNumber, onDisplay, onClearNumbers, onDelete, onCopy, onCopyText, onGroupCircle, onClose }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -69,6 +72,23 @@ export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onNumber
       <button className={item} onClick={onClearNumbers}>
         {t.ui.selection.clearNumbers}
       </button>
+      {/* How the chosen nodes read — independent of the map-wide reading mode. */}
+      <div className="mt-[0.15rem] border-t border-line px-[0.7rem] pt-[0.4rem] pb-[0.1rem] text-[0.68rem] font-semibold tracking-[0.04em] text-ink-soft uppercase">
+        {t.ui.display.header}
+      </div>
+      <button className={item} onClick={() => onDisplay("actual")}>
+        {t.map.toolbar.readingActual}
+      </button>
+      <button className={item} onClick={() => onDisplay("iconText")}>
+        {t.map.toolbar.readingIconText}
+      </button>
+      <button className={item} onClick={() => onDisplay("classic")}>
+        {t.map.toolbar.readingClassic}
+      </button>
+      <button className={item} onClick={() => onDisplay(null)}>
+        {t.ui.display.followMap}
+      </button>
+      <div className="mb-[0.15rem] border-t border-line" />
       <button className={item} onClick={onCopy}>
         {t.ui.selection.copy}
       </button>
