@@ -2,6 +2,7 @@ import { describe, beforeEach, it, expect, vi } from "vitest";
 import { Node } from "../src/models/Node.js";
 import { Map } from "../src/models/Map.js";
 import { Edge } from "../src/models/Edge.js";
+import { User } from "../src/models/User.js";
 import {
   findMapByPublicIdDao,
   getMapsDao,
@@ -25,6 +26,11 @@ vi.mock("../src/models/Node.js", () => ({
     aggregate: vi.fn(),
   },
   NODE_TYPES: ["Problem", "Problematic option", "Solution", "Option", "Success", "Fail", "unknown"],
+}));
+vi.mock("../src/models/User.js", () => ({
+  User: {
+    find: vi.fn(),
+  },
 }));
 vi.mock("../src/models/Edge.js", () => ({
   Edge: {
@@ -91,7 +97,7 @@ describe("mapsDao", () => {
     expect(Map.find).toHaveBeenCalledWith({ $or: [{ members: "user1" }] });
   });
 
-  it("getMapsDao - strips _id/__v and internal-only fields, keeps memberCount", async () => {
+  it("getMapsDao - strips _id/__v and internal-only fields, keeps memberCount, adds names and node count", async () => {
     vi.mocked(Map.find).mockReturnValue(
       leanFind([
         {
@@ -109,6 +115,17 @@ describe("mapsDao", () => {
       ]),
     );
 
+    // One query for every name on the page, one aggregation for every count.
+    vi.mocked(User.find).mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue([
+          { _id: "user1", username: "alice" },
+          { _id: "user2", username: "bob" },
+        ]),
+      }),
+    } as never);
+    vi.mocked(Node.aggregate).mockResolvedValue([{ _id: "m1", count: 5 }] as never);
+
     const result = await getMapsDao("user1");
 
     expect(result).toEqual([
@@ -118,6 +135,9 @@ describe("mapsDao", () => {
         color: "#fff",
         ownerId: "user1",
         memberCount: 2,
+        memberNames: ["alice", "bob"],
+        ownerName: "alice",
+        nodeCount: 5,
       },
     ]);
   });

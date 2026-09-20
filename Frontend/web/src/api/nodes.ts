@@ -12,7 +12,19 @@ export async function getNode(nodeId: string): Promise<NodeDoc> {
 
 export async function createNode(
   mapId: string,
-  input: { text: string; title?: string; type: NodeType; x?: number; y?: number; color?: string; parentId?: string | null },
+  input: {
+    text: string;
+    title?: string;
+    order?: number | null;
+    type: NodeType;
+    x?: number;
+    y?: number;
+    color?: string;
+    parentId?: string | null;
+    symbolOverride?: NodeDoc["symbolOverride"];
+    sizeTier?: NodeDoc["sizeTier"];
+    manualZone?: NodeDoc["manualZone"];
+  },
 ): Promise<NodeDoc> {
   return apiRequest<NodeDoc>(`/api/nodes/${mapId}`, { method: "POST", body: input });
 }

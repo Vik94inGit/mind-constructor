@@ -54,25 +54,6 @@ export function panelReserveFrac(isMobile: boolean) {
   return isMobile ? 1 / 2 : 1 / 3;
 }
 
-// Node copy/paste clipboard (see MapPage's own copySelection/pasteClipboard)
-// — deliberately module-level, not component state/a ref inside MapPage.
-// Navigating from one map to another is a client-side route change
-// (`/maps/:mapId`) that fully unmounts and remounts MapPage, which would
-// wipe out anything held in that component's own state/refs — copying on
-// one map and pasting on another needs this to survive exactly that.
-// Lost on a real page reload (this module gets re-evaluated then), which
-// is fine — it's a live editing convenience for the current tab session,
-// not data anything needs to persist beyond it. sourceMapId records which
-// map the copy was made on, so pasteClipboard can tell a same-map paste
-// (anchor near the originals) from a cross-map one (the originals' own
-// x/y don't mean anything on a different map — anchor in the current
-// viewport instead; see pasteClipboard's own comment).
-export let nodeClipboard: { sourceMapId: string; nodes: { text: string; type: NodeType; x: number; y: number }[] } | null =
-  null;
-export function setNodeClipboard(value: typeof nodeClipboard) {
-  nodeClipboard = value;
-}
-
 // Low-level seeded-hash primitive shared by this file's own hashOffset,
 // NodeCard's flightOffset, and NodeCard's seededRandoms — three independent
 // "hash a string into pseudo-random number(s)" implementations used to live

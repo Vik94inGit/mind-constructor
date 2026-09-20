@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useI18n } from "../i18n/I18nContext";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NodeTypeIcon } from "./NodeTypeIcon";
@@ -9,6 +10,9 @@ interface Props {
   x: number;
   y: number;
   onPick: (type: NodeType) => void;
+  /** How many nodes are on the clipboard right now — 0 hides "Paste here". */
+  pasteCount: number;
+  onPasteHere: () => void;
   onClose: () => void;
 }
 
@@ -20,7 +24,8 @@ interface Props {
 // create anything itself — see MapPage's onCanvasContextMenu/onPick wiring,
 // which opens the usual PendingNodeCard at this same spot, same as every
 // other node-creation path (toolbar, quick-add ghosts, "Create branch").
-export function CanvasContextMenu({ x, y, onPick, onClose }: Props) {
+export function CanvasContextMenu({ x, y, onPick, pasteCount, onPasteHere, onClose }: Props) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -42,7 +47,7 @@ export function CanvasContextMenu({ x, y, onPick, onClose }: Props) {
   // visible even when the click landed near a screen edge.
   const MENU_W = 190;
   const ITEM_H = 34;
-  const MENU_H = NODE_TYPES.length * ITEM_H + 10;
+  const MENU_H = (NODE_TYPES.length + (pasteCount > 0 ? 1 : 0)) * ITEM_H + 10;
   const left = Math.min(x, window.innerWidth - MENU_W - 8);
   const top = Math.min(y, window.innerHeight - MENU_H - 8);
 
@@ -56,6 +61,11 @@ export function CanvasContextMenu({ x, y, onPick, onClose }: Props) {
       style={{ left, top }}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {pasteCount > 0 && (
+        <button className={`${item} font-semibold`} onClick={onPasteHere}>
+          {t.ui.clipboard.pasteHere(pasteCount)}
+        </button>
+      )}
       {NODE_TYPES.map((type) => (
         <button key={type} className={item} onClick={() => onPick(type)}>
           {/* Same symbol the real node will actually render once created

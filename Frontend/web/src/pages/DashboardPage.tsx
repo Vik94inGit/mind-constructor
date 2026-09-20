@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import * as mapsApi from "../api/maps";
+import * as nodesApi from "../api/nodes";
+import * as edgesApi from "../api/edges";
+import { buildNodeClipboard, writeNodeClipboard } from "../utils/nodeClipboard";
 import { useAuth } from "../context/AuthContext";
 import { Modal } from "../components/Modal";
 import { ColorPicker } from "../components/ColorPicker";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { MapSummaryModal } from "../components/MapSummaryModal";
+import { MapPeopleModal } from "../components/MapPeopleModal";
 import { CardMenu } from "../components/CardMenu";
 import { ApiRequestError } from "../api/client";
 import type { MapDoc, MapTemplate } from "../types";
@@ -36,14 +40,16 @@ export function DashboardPage() {
   const [maps, setMaps] = useState<MapDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // A confirmation (e.g. "Copied 12 nodes…") — shown until the next action.
+  const [notice, setNotice] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [inviteMap, setInviteMap] = useState<MapDoc | null>(null);
   const [editMap, setEditMap] = useState<MapDoc | null>(null);
   const [summaryMap, setSummaryMap] = useState<MapDoc | null>(null);
-  // mapId -> node count, from GET /:mapId/summary. Fetched per-card after the
-  // list loads rather than blocking the initial render on it — listMaps()
-  // itself doesn't carry a node count, only the summary endpoint does.
-  const [nodeCounts, setNodeCounts] = useState<Record<string, number>>({});
+  // Which card's Members / Owner button was pressed. Both popups read what
+  // the maps list already carries (see the backend's getMapsDao), so they open
+  // instantly — nothing is fetched on click.
+  const [people, setPeople] = useState<{ map: MapDoc; view: "members" | "owner" } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -51,7 +57,6 @@ export function DashboardPage() {
     try {
       const loaded = await mapsApi.listMaps(filter);
       setMaps(loaded);
-      loadNodeCounts(loaded);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.dashboard.loadError);
     } finally {
@@ -59,31 +64,43 @@ export function DashboardPage() {
     }
   }
 
-  // Best-effort, one request per map, each independent — one map's summary
-  // failing (e.g. it was deleted a moment ago) shouldn't blank out every
-  // other card's count.
-  async function loadNodeCounts(forMaps: MapDoc[]) {
-    const results = await Promise.all(
-      forMaps.map(async (m) => {
-        try {
-          const summary = await mapsApi.getMapSummary(m.mapId);
-          return [m.mapId, summary.nodeCount] as const;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    setNodeCounts((prev) => {
-      const next = { ...prev };
-      for (const r of results) if (r) next[r[0]] = r[1];
-      return next;
-    });
-  }
-
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
+
+  // "Copy map content": puts every node of the map (with the connections among
+  // them) on the app's clipboard — open another map and paste it there.
+  async function handleCopyMap(map: MapDoc) {
+    setError(null);
+    setNotice(null);
+    try {
+      const [mapNodes, mapEdges] = await Promise.all([nodesApi.listNodes(map.mapId), edgesApi.listEdges(map.mapId)]);
+      if (mapNodes.length === 0) {
+        setNotice(t.ui.clipboard.mapEmpty(map.name));
+        return;
+      }
+      // The node list leaves each node's own text out (see the backend's
+      // getNodesByMapDao); one bulk request fills it in.
+      const textById = await mapsApi.getNodesText(map.mapId, mapNodes.map((n) => n.nodeId));
+      const clipboard = buildNodeClipboard(
+        map.mapId,
+        mapNodes.map((n) => ({ ...n, text: n.text ?? "" })),
+        null,
+        textById,
+        mapEdges,
+      );
+      if (!clipboard) {
+        setNotice(t.ui.clipboard.mapEmpty(map.name));
+      } else if (!writeNodeClipboard(clipboard)) {
+        setError(t.ui.clipboard.storeFailed);
+      } else {
+        setNotice(t.ui.clipboard.mapCopied(clipboard.nodes.length, map.name));
+      }
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.clipboard.copyFailed);
+    }
+  }
 
   async function handleDelete(map: MapDoc) {
     if (!confirm(t.dashboard.deleteConfirm(map.name))) return;
@@ -129,6 +146,9 @@ export function DashboardPage() {
       {error && (
         <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
       )}
+      {notice && (
+        <div className="mb-4 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">{notice}</div>
+      )}
 
       {loading ? (
         <div className="p-12 text-center text-ink-soft">{t.dashboard.loading}</div>
@@ -152,17 +172,32 @@ export function DashboardPage() {
                 />
                 <h3 className="m-0 pr-[1.9rem] text-[1.05rem] font-bold">{map.name}</h3>
                 <div className="flex flex-wrap gap-[0.6rem] text-[0.78rem] text-ink-soft">
-                  <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
+                  {/* Members / Owner: buttons, not badges — each opens who's on
+                      this map. They stop the click so the card doesn't also
+                      navigate into the map. */}
+                  <button
+                    type="button"
+                    className={chipBtn}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPeople({ map, view: "members" });
+                    }}
+                  >
                     {t.dashboard.card.members(map.memberCount ?? 0)}
-                  </span>
-                  {map.mapId in nodeCounts && (
+                  </button>
+                  <button
+                    type="button"
+                    className={`${chipBtn} ${isOwner ? "border-accent bg-accent-soft text-accent-ink" : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPeople({ map, view: "owner" });
+                    }}
+                  >
+                    {t.dashboard.card.owner}
+                  </button>
+                  {map.nodeCount !== undefined && (
                     <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
-                      {t.dashboard.card.nodes(nodeCounts[map.mapId])}
-                    </span>
-                  )}
-                  {isOwner && (
-                    <span className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft">
-                      {t.dashboard.card.owner}
+                      {t.dashboard.card.nodes(map.nodeCount)}
                     </span>
                   )}
                 </div>
@@ -170,6 +205,7 @@ export function DashboardPage() {
                   <CardMenu
                     items={[
                       { label: t.dashboard.menu.summary, onClick: () => setSummaryMap(map) },
+                      { label: t.ui.clipboard.copyMap, onClick: () => handleCopyMap(map) },
                       ...(isOwner
                         ? [
                             { label: t.dashboard.menu.edit, onClick: () => setEditMap(map) },
@@ -210,7 +246,15 @@ export function DashboardPage() {
                     // list shape (see MapDoc's own doc comment) — derive
                     // memberCount here so the card's own badge doesn't
                     // read back as 0 until the next reload.
-                    { ...updated, memberCount: Array.isArray(updated.members) ? updated.members.length : m.memberCount }
+                    {
+                      ...m,
+                      ...updated,
+                      memberCount: Array.isArray(updated.members) ? updated.members.length : m.memberCount,
+                      // Only a populated member list carries usernames; a bare id list doesn't.
+                      memberNames: Array.isArray(updated.members)
+                        ? updated.members.flatMap((mem) => (typeof mem === "string" ? [] : [mem.username]))
+                        : m.memberNames,
+                    }
                   : m,
               ),
             )
@@ -223,16 +267,26 @@ export function DashboardPage() {
           map={editMap}
           onClose={() => setEditMap(null)}
           onSaved={(updated) => {
-            setMaps((prev) => prev.map((m) => (m.mapId === updated.mapId ? updated : m)));
+            // Merged over the card, not swapped for it: the update response is
+            // a map's full detail and carries none of the list-only fields
+            // (owner/member names, node count).
+            setMaps((prev) => prev.map((m) => (m.mapId === updated.mapId ? { ...m, ...updated } : m)));
             setEditMap(null);
           }}
         />
       )}
 
       {summaryMap && <MapSummaryModal map={summaryMap} onClose={() => setSummaryMap(null)} />}
+
+      {people && (
+        <MapPeopleModal map={people.map} view={people.view} currentUserId={user?._id} onClose={() => setPeople(null)} />
+      )}
     </div>
   );
 }
+
+const chipBtn =
+  "inline-flex cursor-pointer items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] font-semibold text-ink-soft transition-[background-color,border-color] duration-[120ms] hover:border-accent hover:text-ink";
 
 function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated: (map: MapDoc) => void }) {
   const { t } = useI18n();

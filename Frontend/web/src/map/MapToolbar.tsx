@@ -25,6 +25,8 @@ interface Props {
   onInvite: () => void;
   onCreateNode: () => void;
   onCreateCircle: () => void;
+  onCopyMap: () => void;
+  onPaste: () => void;
   onExportText: () => void;
 }
 
@@ -52,6 +54,8 @@ export function MapToolbar({
   onInvite,
   onCreateNode,
   onCreateCircle,
+  onCopyMap,
+  onPaste,
   onExportText,
 }: Props) {
   const { t } = useI18n();
@@ -93,6 +97,8 @@ export function MapToolbar({
                 onInvite={closeAddThen(onInvite)}
                 onCreateNode={closeAddThen(onCreateNode)}
                 onCreateCircle={closeAddThen(onCreateCircle)}
+                onCopyMap={closeAddThen(onCopyMap)}
+                onPaste={closeAddThen(onPaste)}
                 onExportText={closeAddThen(onExportText)}
               />
             )}

@@ -1,6 +1,7 @@
 import { Map } from "../models/Map.js";
 import { Node, NODE_TYPES, type NodeType } from "../models/Node.js";
 import { Edge } from "../models/Edge.js";
+import { User } from "../models/User.js";
 import { nanoid } from "nanoid";
 
 export const findMapByPublicIdDao = async (publicMapId: string) => {
@@ -22,6 +23,7 @@ export const getMapsDao = async (
   // transform (which normally strips _id/__v), so those are stripped by
   // hand below instead, same as m.toJSON() used to do.
   const maps = await Map.find(query).lean();
+  if (maps.length === 0) return [];
   // A dashboard card only ever needs enough to render itself
   // (name/color/ownerId) plus how many members there are — memberColors/
   // pendingInvites/selectedCircle used to ride along on every card in this
@@ -31,9 +33,42 @@ export const getMapsDao = async (
   // getMapByIdDao/InviteMemberModal's own on-demand fetch). `members`
   // itself is dropped the same way here, replaced by its own length —
   // never sent as the raw id array on this list endpoint.
+  //
+  // What a card *does* show — who owns the map, who the members are (just
+  // their usernames), and how many nodes it has — comes back in this same
+  // response instead of the dashboard asking for it afterwards: the owner and
+  // member buttons and the node count then open/appear the instant the list
+  // does, rather than after a follow-up request per map. Two extra queries
+  // for the whole list, not per card.
+  const userIds = new Set<string>();
+  for (const m of maps as any[]) {
+    userIds.add(String(m.ownerId));
+    for (const id of m.members ?? []) userIds.add(String(id));
+  }
+  const [users, nodeCounts] = await Promise.all([
+    User.find({ _id: { $in: Array.from(userIds) } })
+      .select("username")
+      .lean<{ _id: unknown; username: string }[]>(),
+    Node.aggregate<{ _id: unknown; count: number }>([
+      { $match: { mapId: { $in: maps.map((m) => m._id) } } },
+      { $group: { _id: "$mapId", count: { $sum: 1 } } },
+    ]),
+  ]);
+  const usernameById: Record<string, string> = {};
+  for (const u of users) usernameById[String(u._id)] = u.username;
+  const nodeCountByMap: Record<string, number> = {};
+  for (const row of nodeCounts) nodeCountByMap[String(row._id)] = row.count;
+
   return maps.map((m) => {
     const { memberColors, pendingInvites, selectedCircle, members, _id, __v, ...rest } = m as any;
-    return { ...rest, memberCount: Array.isArray(members) ? members.length : 0 };
+    const memberList: unknown[] = Array.isArray(members) ? members : [];
+    return {
+      ...rest,
+      memberCount: memberList.length,
+      memberNames: memberList.map((id) => usernameById[String(id)]).filter((n): n is string => !!n),
+      ownerName: usernameById[String(rest.ownerId)] ?? null,
+      nodeCount: nodeCountByMap[String(_id)] ?? 0,
+    };
   });
 };
 
