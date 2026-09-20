@@ -66,14 +66,15 @@ interface Props {
 }
 
 // Half-visible "ghost" previews fanned out around the selected node, one per
-// node type. Clicking a ghost creates a real node of that type at the ghost's
-// spot and auto-links it to the anchor — branching an argument tree becomes a
-// single click instead of toolbar button -> modal -> manual placement.
+// node type. Clicking a ghost names its type; clicking it again creates a real
+// node of that type at the ghost's spot and auto-links it to the anchor —
+// branching an argument tree becomes two clicks instead of toolbar button ->
+// modal -> manual placement.
 export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
-  // Which ghost a single click has picked out — its type name shows only
-  // once picked. A click no longer creates anything (that used to be one
-  // tap, easy to trigger by accident on a phone and impossible to preview);
-  // it just tells you which type this is, and a double-click creates it.
+  // Which ghost a click has picked out — its type name shows only once
+  // picked. The first click only tells you which type this is (a one-tap
+  // create was easy to trigger by accident on a phone and impossible to
+  // preview); a second click on that same ghost creates it.
   const [armedType, setArmedType] = useState<NodeType | null>(null);
   // Read live, every render — see the doc comment above RADIUS/EDGE_MARGIN's
   // old module-level home for why this can't be hoisted back out to module
@@ -207,17 +208,14 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
             className={`absolute z-[33] flex -translate-x-1/2 -translate-y-1/2 cursor-pointer flex-col items-center border-0 bg-transparent p-0 transition-[opacity,transform] duration-[150ms] ease-[ease] hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.1] hover:opacity-100 focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.1] focus-visible:opacity-100 ${
               armedType === type ? "scale-[1.1] opacity-100" : "opacity-75"
             }`}
-            // touchAction: manipulation — lets a double-tap reach onDoubleClick
-            // on a phone instead of the browser claiming it as double-tap-to-zoom.
+            // touchAction: manipulation — stops a quick second tap being
+            // claimed by the browser as double-tap-to-zoom on a phone.
             style={{ left: x, top: y, touchAction: "manipulation" }}
-            title={`${type} — double-click to add`}
+            title={armedType === type ? `${type} — click again to add` : type}
             onClick={(e) => {
               e.stopPropagation();
-              setArmedType(type);
-            }}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              onPick(type, { x, y });
+              if (armedType === type) onPick(type, { x, y });
+              else setArmedType(type);
             }}
           >
             <div
@@ -260,7 +258,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
             {armedType === type && (
               <div className="mt-[0.3rem] flex flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card">
                 <span className="text-[0.66rem] font-semibold">{type}</span>
-                <span className="text-[0.55rem] text-ink-soft">double-click to add</span>
+                <span className="text-[0.55rem] text-ink-soft">click again to add</span>
               </div>
             )}
           </button>

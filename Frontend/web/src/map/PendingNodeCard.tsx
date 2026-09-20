@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { NODE_TYPE_COLORS, cycleNodeType } from "../utils/nodeType";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
@@ -26,6 +26,15 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
   // Same single-resolution-point pattern as NodeCard's inline editor —
   // Escape blurs and defers to this flag instead of racing a separate path.
   const cancelingRef = useRef(false);
+  const fieldRef = useRef<HTMLTextAreaElement | null>(null);
+  // Grow with the text — a row per line (Shift+Enter) or wrap — instead of
+  // scrolling inside a one-line box.
+  useLayoutEffect(() => {
+    const el = fieldRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
 
   const ring = ringKindFor(draftType);
   const isOutcome = !!ring;
@@ -97,8 +106,10 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
           </button>
         </div>
       </div>
-      <input
-        className="mt-[0.35rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+      <textarea
+        ref={fieldRef}
+        rows={1}
+        className="mt-[0.35rem] block w-full resize-none overflow-hidden rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
         autoFocus
         value={text}
         placeholder={draftType}
@@ -106,7 +117,8 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          // Enter confirms; Shift+Enter is left to the textarea, which adds a row.
+          if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             e.currentTarget.blur();
           } else if (e.key === "Escape") {

@@ -17,6 +17,7 @@ import {
 } from "../utils/particles";
 import { hashSeed } from "../utils/canvasLayout";
 import type { AttackIndicator, NodeDoc, NodeType, SizeTier } from "../types";
+import type { ReadingMode } from "../utils/readingMode";
 
 // A stable "which direction did this weapon fly in from" per node, derived
 // from its id so it doesn't change across re-renders without needing to be
@@ -57,6 +58,15 @@ const OUTCOME_BADGE_SIZE = 26;
 // tier renders at. `node.sizeTier ?? 1` (never a bare `node.sizeTier`) is
 // the one correct way to read this anywhere in this component.
 const SIZE_MULTIPLIERS: Record<SizeTier, number> = { 1: 1, 2: 1.15, 3: 1.3 };
+
+// Reading modes (see utils/readingMode.ts). A classic-mode text box is as wide
+// as its text wants up to this — far past the 148px caption chip, since the
+// point of the mode is reading whole nodes — and only a selected node
+// (whose ghost ring and panel already surround it) is held to the compact one.
+const CLASSIC_MAX_WIDTH = 240;
+const CLASSIC_SELECTED_MAX_WIDTH = 180;
+// iconText captions: a little wider and taller than the default chip.
+const ICON_TEXT_CAPTION_WIDTH = 176;
 
 // CSS custom properties driving the .chaotic keyframes below: three small
 // waypoints plus a randomized duration/negative-delay, so several drifting
@@ -104,6 +114,8 @@ interface Props {
   indicator?: AttackIndicator;
   /** MapPage's choose mode is on — unchosen nodes show a small "choose?" hint under them. */
   chooseModeActive: boolean;
+  /** How this viewer reads the map — see utils/readingMode.ts. Omitted means "actual" (the default look). */
+  readingMode?: ReadingMode;
   /** MapPage's isDiscussionMode (Map.discussionMode !== false) — Personal mode (explicit false) hides the health ring outright, selected or not. Omitted/undefined defaults to true (Discussion), never coerced with `!!`. See showHealth below. */
   discussionMode?: boolean;
   /** True for exactly one render: the moment this node was created in this session. */
@@ -146,6 +158,7 @@ export const NodeCard = memo(function NodeCard({
   inChosenCircle,
   indicator,
   chooseModeActive,
+  readingMode = "actual",
   discussionMode,
   celebrate,
   muted,
@@ -270,11 +283,18 @@ export const NodeCard = memo(function NodeCard({
   // becomes the chosen one (inChosenCircle, keyed off map.selectedCircle),
   // every one of its members shows its caption too — studying a cluster up
   // close is exactly when every member's own text actually matters.
-  const showCaption = !groupSentiment || !!parentCrownSentiment || !!inChosenCircle;
+  // Reading modes override that: "icons + text" shows every node's text; the
+  // classic mind map has no caption at all, the text box *is* the node. A
+  // node mid-edit falls back to the icon + input either way (see `classic`).
+  const classic = readingMode === "classic" && !inlineEditing;
+  const iconText = readingMode === "iconText";
+  const showCaption = classic ? false : iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle;
   // What the caption says: the node's own title if it has one, otherwise the
   // start of its text (the line-clamp on the chip is what cuts it off, so
   // "first words" needs no separate truncation here).
   const captionLabel = node.title?.trim() || node.text;
+  const trimmedTitle = node.title?.trim() ?? "";
+  const healthPct = Math.max(0, Math.min(100, node.health));
   // Opacity/cursor each have one property multiple states could set — CSS
   // cascade resolves that per-property, not per-modifier, so it's resolved
   // the same way here: state precedence follows the order these used to be
@@ -578,7 +598,7 @@ export const NodeCard = memo(function NodeCard({
           pointer (the outer div is pointer-events-none — see its class
           list). Handlers all live on that outer div and reach it by
           bubbling from here. */}
-      <div className="pointer-events-auto relative h-[48px] w-[48px]">
+      <div className={`pointer-events-auto relative ${classic ? "" : "h-[48px] w-[48px]"}`}>
         {indicator && (
           <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
             {indicator.incomingNegativeEdges}
@@ -633,14 +653,14 @@ export const NodeCard = memo(function NodeCard({
         {/* Halo/horns — see NodeCrown's own doc comment; shared with
             QuickAddGhosts so a ghost previews this too, not just the bare
             symbol. */}
-        <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />
+        {!classic && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
         {/* Wings — see NodeWings's own doc comment for why this is a
             separate, never-resized overlay rather than living inside
             OutcomeBadge. Placed before the bordered circle below in DOM
             order (both z-index:auto) so the circle paints over the
             wings' own base, same "flanking the head, not stamped on top
             of it" look the wings always had. */}
-        <NodeWings type={displayType} show={selected} symbolOverride={node.symbolOverride} />
+        {!classic && <NodeWings type={displayType} show={selected} symbolOverride={node.symbolOverride} />}
         {/* No more weapon-type badge here — which weapon landed used to
             show as a little corner label on the objection node itself.
             That's dropped in favor of the pointer MapPage draws between
@@ -649,6 +669,41 @@ export const NodeCard = memo(function NodeCard({
             its type, and the pointer alone carries "this is an attack,
             aimed at that". */}
         <div className="pointer-events-none absolute inset-0 z-[5] overflow-visible" ref={particlesRef} />
+        {classic ? (
+          // Classical mind map: no icon — a text box with the node's whole
+          // text (and title), bordered in its type's color with a heavier
+          // left edge. A thin health bar shows for the selected node in place
+          // of the round health ring.
+          <div
+            className={`relative box-border rounded-lg border-2 bg-[var(--node-fill)] px-[0.7rem] py-[0.5rem] text-left ${ringStateClass || "shadow-card"}`}
+            style={{
+              borderColor: circleBorderColor,
+              borderLeftWidth: 6,
+              width: "max-content",
+              minWidth: 96,
+              maxWidth: selected ? CLASSIC_SELECTED_MAX_WIDTH : CLASSIC_MAX_WIDTH,
+              outline: ringStyle.outline,
+              outlineOffset: 2,
+            }}
+          >
+            {trimmedTitle && (
+              <div className="text-[0.78rem] leading-[1.3] font-semibold break-words text-ink">{trimmedTitle}</div>
+            )}
+            <div
+              className={`text-[0.72rem] leading-[1.35] break-words whitespace-pre-wrap text-ink ${selected ? "line-clamp-3" : ""}`}
+            >
+              {node.text || (trimmedTitle ? "" : "…")}
+            </div>
+            {showHealth && (
+              <div className="mt-[0.35rem] h-[3px] overflow-hidden rounded-[2px] bg-surface-2">
+                <div
+                  className="h-full"
+                  style={{ width: `${healthPct}%`, background: node.defeated ? "var(--danger)" : "var(--success)" }}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
         <div
           className={`flex h-full w-full items-center justify-center rounded-full p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
           style={ringStyle}
@@ -704,6 +759,7 @@ export const NodeCard = memo(function NodeCard({
             </div>
           )}
         </div>
+        )}
       </div>
       {inlineEditing ? (
         <input
@@ -753,9 +809,9 @@ export const NodeCard = memo(function NodeCard({
           // than the spacing getNodeMinDist() budgets for (CAPTION_WIDTH),
           // and wide enough to run into its own children. The chip stays
           // CAPTION_WIDTH on screen at every size.
-          className="absolute top-full left-1/2 mt-[0.6rem] line-clamp-2 rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink"
+          className={`absolute top-full left-1/2 mt-[0.6rem] rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink ${iconText ? "line-clamp-4" : "line-clamp-2"}`}
           style={{
-            width: CAPTION_WIDTH,
+            width: iconText ? ICON_TEXT_CAPTION_WIDTH : CAPTION_WIDTH,
             // translateX(-50%) centers it under the icon (left-1/2 puts its
             // left edge there); scale undoes the size tier, about its top
             // center so it doesn't drift sideways or up into the icon.
@@ -763,7 +819,13 @@ export const NodeCard = memo(function NodeCard({
             transformOrigin: "50% 0",
           }}
         >
-          {captionLabel}
+          {iconText && trimmedTitle && node.text ? (
+            <>
+              <span className="font-semibold">{trimmedTitle}</span> {node.text}
+            </>
+          ) : (
+            captionLabel
+          )}
         </div>
       )}
       {chooseModeActive && !multiSelected && (
