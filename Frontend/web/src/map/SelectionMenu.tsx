@@ -3,6 +3,8 @@ import { useEffect, useRef } from "react";
 interface Props {
   count: number;
   canGroupCircle: boolean;
+  canLink: boolean;
+  onLink: () => void;
   onDelete: () => void;
   onCopy: () => void;
   onCopyText: () => void;
@@ -11,7 +13,7 @@ interface Props {
 }
 
 // The multi-select pill's own "Actions" dropdown (see MapPage's group-
-// selection bottom sheet) — Delete/Copy/Copy as text/Group into circle for
+// selection bottom sheet) — Link/Copy/Copy as text/Group into circle/Delete for
 // the current multiSelectIds. Positioned by its parent (a `relative` wrapper
 // around the trigger button), opening *upward* since the pill itself lives
 // at the very bottom of the screen — the trigger sits on the *left* side of
@@ -21,7 +23,7 @@ interface Props {
 // would run straight under/behind them. Same dismiss-on-outside-click/
 // Escape pattern as every other menu in this app (NodeContextMenu,
 // CanvasContextMenu, AddMenu).
-export function SelectionMenu({ count, canGroupCircle, onDelete, onCopy, onCopyText, onGroupCircle, onClose }: Props) {
+export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onDelete, onCopy, onCopyText, onGroupCircle, onClose }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -49,6 +51,14 @@ export function SelectionMenu({ count, canGroupCircle, onDelete, onCopy, onCopyT
       ref={ref}
       className="absolute left-0 bottom-[calc(100%+0.4rem)] z-[60] flex min-w-[190px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
     >
+      <button
+        className={item}
+        onClick={onLink}
+        disabled={!canLink}
+        title={canLink ? undefined : "Choose at least 2 nodes to link them"}
+      >
+        Link
+      </button>
       <button className={item} onClick={onCopy}>
         Copy
       </button>

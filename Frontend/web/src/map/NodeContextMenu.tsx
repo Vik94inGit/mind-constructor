@@ -4,7 +4,7 @@ interface Props {
   x: number;
   y: number;
   /**
-   * Owner sees Create/Update/Delete/Link. canAttack already folds ownership
+   * Owner sees Create/Update/Choose/Delete. canAttack already folds ownership
    * in on its own (see MapPage's canAttackNode, which mirrors attackAbl.ts's
    * own-node rule — an attack always lands on your own node) — so isOwner
    * and canAttack are true together on your own node, showing Attack
@@ -15,7 +15,7 @@ interface Props {
   onCreate: () => void;
   onUpdate: () => void;
   onDelete: () => void;
-  onLink: () => void;
+  onChoose: () => void;
   onAttack: () => void;
   onClose: () => void;
 }
@@ -23,7 +23,7 @@ interface Props {
 // Fixed to the viewport (not the canvas) at the click point, like a native
 // context menu — the canvas scrolls independently, so canvas-relative
 // coordinates would drift away from the cursor as soon as anyone scrolled.
-export function NodeContextMenu({ x, y, isOwner, canAttack, onCreate, onUpdate, onDelete, onLink, onAttack, onClose }: Props) {
+export function NodeContextMenu({ x, y, isOwner, canAttack, onCreate, onUpdate, onDelete, onChoose, onAttack, onClose }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -73,8 +73,8 @@ export function NodeContextMenu({ x, y, isOwner, canAttack, onCreate, onUpdate, 
           <button className={item} onClick={onUpdate}>
             Update
           </button>
-          <button className={item} onClick={onLink}>
-            Link from here
+          <button className={item} onClick={onChoose}>
+            Choose…
           </button>
           <button className={itemDanger} onClick={onDelete}>
             Delete

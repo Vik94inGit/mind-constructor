@@ -138,7 +138,10 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   // `bounds` (handled by the final per-point clamp below, same as ever)
   // reads far better than that: a few extreme points sit right at the edge
   // instead of every point bunching together in the middle.
-  const MIN_RADIUS = 83;
+  // Raised from 83: a circle parent draws at 130%, so its wings reach ~80px
+  // out — at 83 the side ghosts (a ghost's own half-width is ~20px) sat right
+  // on the wingtips whenever a cramped viewport forced R down to this floor.
+  const MIN_RADIUS = 100;
   const availLeft = ringCenter.x - bounds.minX;
   const availRight = bounds.maxX - ringCenter.x;
   // + UP_SLACK: `bounds`' own pad (baked in by MapPage's viewportBounds/

@@ -19,7 +19,7 @@ export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 2.5;
 export const ZOOM_STEP = 0.35;
 
-// How much of the screen's height NodePanel/LinkPickerPanel's bottom sheet
+// How much of the screen's height NodePanel/PackPickerPanel's bottom sheet
 // is allowed to cover — kept in one function so centerOnNode (which
 // reserves this much space when parking the chosen node) and
 // viewportBounds (which reserves the same strip when clamping where a new
@@ -217,37 +217,40 @@ export function pickNonOverlappingPosition(
   return anywhere.clear ? anywhere.point : inView.point;
 }
 
-// One obstacle to stay clear of — a regular node (minDist ~= its icon
-// footprint) or a big group backdrop (minDist ~= its own radius plus a
-// node's footprint), so the same nudging loop below handles both.
+// One obstacle to stay clear of. Two kinds, told apart by `footprint`:
+//
+//  - Spacing (no footprint): a circle of radius `minDist` — how far apart
+//    things are *placed* on purpose (getNodeMinDist() for a node, or a
+//    zone's own radius plus some). Comfortably more than the drawn size, so
+//    a new node has breathing room. For placements the app chooses itself.
+//  - Footprint: a box (`w` x `h`) centered on x/y — what a node really draws,
+//    its icon plus a two-row title. For placements the *user* chose (a drop,
+//    a quick-add ghost's slot, a right-click): the node should land where
+//    they pointed, and only move if it would visibly cover another node — and
+//    then only by the little needed to clear it. Holding those to the wide
+//    spacing circle instead sent a drop up to a full node-spacing away from
+//    the pointer, which read as "I can't tell where my node will end up".
 export interface Obstacle {
   x: number;
   y: number;
   minDist: number;
-  // What a node actually draws — its icon plus title, a box centered on x/y.
-  // Set for regular nodes only (a zone backdrop is a circle: just minDist).
-  // minDist is a *spacing policy* for placing something new (comfortably
-  // more than the drawn footprint); findFreeShift, which moves things that
-  // already exist, measures real overlap against this instead.
   footprint?: { w: number; h: number };
 }
 
 // Icon (48) + gap + a two-row title, roughly — and CAPTION_WIDTH wide.
 const NODE_FOOTPRINT = { w: CAPTION_WIDTH, h: 90 };
 
-// Deliberately still one flat minDist for every point, not per-node-size
-// aware — every call site today only ever has bare {x,y} points in hand
-// (positions.values(), stripped of which node each one came from), not the
-// NodeDoc each position belongs to. Making this size-tier-aware for real
-// would mean threading node objects (not just positions) through all ~8
-// call sites of this function, several of them in already-dense
-// paste/group-creation code paths — a real but purely cosmetic refinement
-// (a 130% node could in principle still land slightly closer to another
-// node than its bigger visual footprint would ideally want), not a
-// functional bug, so it's left as a known simplification rather than a
-// wider refactor.
+// Spacing obstacles, one per point — see Obstacle. Deliberately one flat
+// minDist for every point, not per-node-size aware — every call site only
+// has bare {x,y} points in hand (stripped of which node each one came from),
+// and the caption width, not the icon, is already the limiting footprint.
 export function nodeObstacles(points: { x: number; y: number }[], minDist = getNodeMinDist()): Obstacle[] {
-  return points.map((p) => ({ x: p.x, y: p.y, minDist, footprint: NODE_FOOTPRINT }));
+  return points.map((p) => ({ x: p.x, y: p.y, minDist }));
+}
+
+// Footprint obstacles, one per point — see Obstacle.
+export function footprintObstacles(points: { x: number; y: number }[]): Obstacle[] {
+  return points.map((p) => ({ x: p.x, y: p.y, minDist: 0, footprint: NODE_FOOTPRINT }));
 }
 
 // Same min/max-pair clamp pickNonOverlappingPosition uses: a too-small
@@ -264,15 +267,108 @@ function clampIntoBounds(
   return { x: Math.min(maxX, Math.max(minX, p.x)), y: Math.min(maxY, Math.max(minY, p.y)) };
 }
 
-function isClearOf(p: { x: number; y: number }, obstacles: Obstacle[]): boolean {
-  return obstacles.every((o) => Math.hypot(o.x - p.x, o.y - p.y) >= o.minDist);
+// How deep `p` is into obstacle `o`: positive means overlapping, and it's
+// the distance you'd have to move to get out along the shortest way.
+function depthInto(o: Obstacle, p: { x: number; y: number }): number {
+  return o.footprint
+    ? Math.min(o.footprint.w - Math.abs(o.x - p.x), o.footprint.h - Math.abs(o.y - p.y))
+    : o.minDist - Math.hypot(o.x - p.x, o.y - p.y);
 }
 
-// Distance to spare past the nearest obstacle's required clearance —
-// negative while overlapping, Infinity with nothing in the way.
+function isClearOf(p: { x: number; y: number }, obstacles: Obstacle[]): boolean {
+  return obstacles.every((o) => depthInto(o, p) <= 0);
+}
+
+// A zone's corners are its members, so a member placed almost in line with
+// two others pinches one of them into a sliver. No corner of a zone may be
+// tighter than this.
+export const MIN_ZONE_ANGLE = 30;
+
+type Pt = { x: number; y: number };
+
+// Sharpest corner (in degrees) of the zone polygon through `points` — the
+// same outline computeNodeGroups draws: members sorted by angle around their
+// centroid. Only convex corners can be sharp (a reflex corner's interior
+// angle is past 180), so those are the ones measured. Infinity below 3 points.
+export function minZoneCorner(points: Pt[]): number {
+  if (points.length < 3) return Infinity;
+  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+  const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+  const ring = points.slice().sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+  // Shoelace sign = winding direction, to tell convex corners from reflex ones.
+  let area2 = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    area2 += a.x * b.y - b.x * a.y;
+  }
+  let min = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const prev = ring[(i + ring.length - 1) % ring.length];
+    const v = ring[i];
+    const next = ring[(i + 1) % ring.length];
+    const ax = prev.x - v.x;
+    const ay = prev.y - v.y;
+    const bx = next.x - v.x;
+    const by = next.y - v.y;
+    const lenProduct = Math.hypot(ax, ay) * Math.hypot(bx, by);
+    if (lenProduct === 0) continue;
+    const turn = (v.x - prev.x) * (next.y - v.y) - (v.y - prev.y) * (next.x - v.x);
+    if (turn * area2 < 0) continue; // reflex corner
+    const angle = (Math.acos(Math.min(1, Math.max(-1, (ax * bx + ay * by) / lenProduct))) * 180) / Math.PI;
+    min = Math.min(min, angle);
+  }
+  return min;
+}
+
+// Would `parentId`'s zone be left with a corner tighter than MIN_ZONE_ANGLE if
+// `leavingId` stopped being one of its members? A zone that was already that
+// tight is only refused further pinching, so a node can still leave a zone
+// that was cramped before it did anything.
+export function leavingPinchesZone(
+  leavingId: string,
+  parentId: string,
+  visibleNodes: NodeDoc[],
+  positions: Map<string, Pt>,
+): boolean {
+  const at = (id: string) => positions.get(id) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+  const all = visibleNodes.filter((n) => nodeRefId(n.parentId) === parentId);
+  const rest = all.filter((n) => n.nodeId !== leavingId);
+  if (rest.length < 2) return false; // no zone left to pinch
+  const corner = (kids: NodeDoc[]) => minZoneCorner([at(parentId), ...kids.map((n) => at(n.nodeId))]);
+  const after = corner(rest);
+  return after < MIN_ZONE_ANGLE && after < corner(all);
+}
+
+// Does putting node `nodeId` at a candidate spot keep every zone it belongs to
+// at MIN_ZONE_ANGLE or wider? `parentId` is the parent it will have after the
+// move (null for none) — a zone forms around that parent once the node is its
+// second child — and the node is also the root of its own zone if it has 2+
+// children. `nodeId` need not exist yet (a node about to be created). Returns
+// undefined when no zone is involved, so there is nothing to check.
+export function zoneAngleGuard(
+  nodeId: string,
+  parentId: string | null,
+  visibleNodes: NodeDoc[],
+  positions: Map<string, Pt>,
+): ((p: Pt) => boolean) | undefined {
+  const at = (id: string) => positions.get(id) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+  const zones: Pt[][] = [];
+  if (parentId) {
+    const siblings = visibleNodes.filter((n) => n.nodeId !== nodeId && nodeRefId(n.parentId) === parentId);
+    if (siblings.length >= 1) zones.push([at(parentId), ...siblings.map((n) => at(n.nodeId))]);
+  }
+  const kids = visibleNodes.filter((n) => n.nodeId !== nodeId && nodeRefId(n.parentId) === nodeId);
+  if (kids.length >= 2) zones.push(kids.map((n) => at(n.nodeId)));
+  if (zones.length === 0) return undefined;
+  return (p) => zones.every((fixed) => minZoneCorner([p, ...fixed]) >= MIN_ZONE_ANGLE);
+}
+
+// Distance to spare past the nearest obstacle — negative while overlapping,
+// Infinity with nothing in the way.
 function clearanceOf(p: { x: number; y: number }, obstacles: Obstacle[]): number {
   let c = Infinity;
-  for (const o of obstacles) c = Math.min(c, Math.hypot(o.x - p.x, o.y - p.y) - o.minDist);
+  for (const o of obstacles) c = Math.min(c, -depthInto(o, p));
   return c;
 }
 
@@ -290,15 +386,11 @@ function nearestClearSpot(
   obstacles: Obstacle[],
   bounds: ViewportBounds,
   margin: number,
-  accept?: (p: { x: number; y: number }) => boolean,
-  step = SEARCH_STEP,
-  radiusCap = Infinity,
+  accept?: (p: Pt) => boolean,
 ): { point: { x: number; y: number }; clear: boolean } {
-  // A spot only counts as clear if it also passes `accept` (a caller's own
-  // extra rule — see avoidOverlap).
-  const isClear = (p: { x: number; y: number }) => isClearOf(p, obstacles) && (!accept || accept(p));
+  const ok = (p: Pt) => isClearOf(p, obstacles) && (!accept || accept(p));
   const first = clampIntoBounds(desired, bounds, margin);
-  if (isClear(first)) return { point: first, clear: true };
+  if (ok(first)) return { point: first, clear: true };
   let best = { point: first, clearance: clearanceOf(first, obstacles) };
   // Rings past the farthest corner of the search area only ever re-visit
   // clamped edge points — nothing new to find.
@@ -310,14 +402,14 @@ function nearestClearSpot(
       Math.hypot(desired.x - hi.x, desired.y - lo.y),
       Math.hypot(desired.x - lo.x, desired.y - hi.y),
       Math.hypot(desired.x - hi.x, desired.y - hi.y),
-    ) + step;
-  for (let r = step; r <= Math.min(maxR, radiusCap); r += step) {
-    const steps = Math.max(16, Math.ceil((2 * Math.PI * r) / step));
+    ) + SEARCH_STEP;
+  for (let r = SEARCH_STEP; r <= maxR; r += SEARCH_STEP) {
+    const steps = Math.max(16, Math.ceil((2 * Math.PI * r) / SEARCH_STEP));
     let nearest: { p: { x: number; y: number }; d: number } | null = null;
     for (let k = 0; k < steps; k++) {
       const a = (k / steps) * Math.PI * 2;
       const p = clampIntoBounds({ x: desired.x + r * Math.cos(a), y: desired.y + r * Math.sin(a) }, bounds, margin);
-      if (isClear(p)) {
+      if (ok(p)) {
         const d = Math.hypot(p.x - desired.x, p.y - desired.y);
         if (!nearest || d < nearest.d) nearest = { p, d };
       } else {
@@ -334,282 +426,31 @@ function nearestClearSpot(
 // anything — for placements anchored to something specific (a drag's drop
 // point, a quick-add ghost's slot, a weapon node's spot near its target)
 // where a random relocation would lose the "why is it here" relationship
-// pickNonOverlappingPosition doesn't need to preserve. Obstacles carry
-// their own required clearance — a big group backdrop needs far more room
-// than a regular node does. Prefers a spot inside `bounds` (the visible
-// part of the canvas, so the result is somewhere the user can see); only
-// if that's completely full does it look across the whole canvas, because
-// landing off-screen is better than landing on top of another node.
+// pickNonOverlappingPosition doesn't need to preserve. Which kind of
+// obstacle it's handed (see Obstacle) decides how far that can be: footprint
+// obstacles only ever move a spot a little, spacing ones can move it further.
+// Prefers a spot inside `bounds` (the visible part of the canvas, so the
+// result is somewhere the user can see); only if that's completely full does
+// it look across the whole canvas, because landing off-screen is better than
+// landing on top of another node.
 //
-// `accept` is an optional extra rule a spot must also satisfy (see
-// siblingsClearOfCenter) — for constraints that depend on the layout
-// *after* the node lands, which static obstacles can't express. It's tried
-// everywhere (in view, then across the canvas) before being given up on:
-// a spot that's merely clear of every obstacle but breaks `accept` is still
-// better than nothing, but not better than a farther one that satisfies it.
+// `accept` adds a condition on the spot itself (see zoneAngleGuard). It is
+// held to as long as any spot satisfies it; if none does, it's dropped rather
+// than leaving the node with nowhere to go.
 export function avoidOverlap(
   desired: { x: number; y: number },
   obstacles: Obstacle[],
   bounds: ViewportBounds = FULL_CANVAS_BOUNDS,
-  accept?: (p: { x: number; y: number }) => boolean,
+  accept?: (p: Pt) => boolean,
 ): { x: number; y: number } {
   const margin = 40;
-  let fallback: { x: number; y: number } | null = null;
-  for (const rule of accept ? [accept, undefined] : [undefined]) {
-    const inView = nearestClearSpot(desired, obstacles, bounds, margin, rule);
-    if (inView.clear) return inView.point;
-    fallback ??= inView.point;
-    const anywhere = nearestClearSpot(desired, obstacles, FULL_CANVAS_BOUNDS, margin, rule);
-    if (anywhere.clear) return anywhere.point;
-    // A rule can leave only a thin sliver of acceptable ground, narrower
-    // than the coarse rings above step over — look again, much finer, but
-    // only near where the node wanted to be (this is the rare case, so the
-    // extra cost doesn't matter, and far-off slivers aren't worth chasing).
-    if (rule) {
-      const fine = nearestClearSpot(desired, obstacles, FULL_CANVAS_BOUNDS, margin, rule, 5, 450);
-      if (fine.clear) return fine.point;
-    }
-  }
-  return fallback!;
+  const inView = nearestClearSpot(desired, obstacles, bounds, margin, accept);
+  if (inView.clear) return inView.point;
+  const anywhere = nearestClearSpot(desired, obstacles, FULL_CANVAS_BOUNDS, margin, accept);
+  if (anywhere.clear) return anywhere.point;
+  return accept ? avoidOverlap(desired, obstacles, bounds) : inView.point;
 }
 
-// A circle's parent is drawn at the center of its children (see
-// groupCenter/computeNodeGroups), so adding or moving a child moves the
-// parent too — and can drag it right on top of a child that was fine a
-// moment ago, if the children pile up on one side. Distance from the parent
-// to a child has to leave room for both their icons and their titles (a
-// title is CAPTION_WIDTH wide, and the parent's own is the same width, so
-// the two only clear each other with more than that between them). It was
-// exactly CAPTION_WIDTH; that left the parent and its children visibly
-// crowded, so it's a comfortable margin past it now.
-export const PARENT_CHILD_MIN_DIST = CAPTION_WIDTH + 55;
-
-// True if, with a child at `p` alongside `siblings` (the parent's other
-// children), no child would sit within PARENT_CHILD_MIN_DIST of the circle's
-// center — i.e. where the parent would be drawn. With fewer than two
-// children there's no circle yet, so nothing to keep clear of.
-export function siblingsClearOfCenter(
-  siblings: { x: number; y: number }[],
-  p: { x: number; y: number },
-): boolean {
-  const pts = [...siblings, p];
-  if (pts.length < 2) return true;
-  const c = groupCenter(pts);
-  return pts.every((q) => Math.hypot(q.x - c.x, q.y - c.y) >= PARENT_CHILD_MIN_DIST);
-}
-
-// The default layout for nodes with no stored x/y — every node a template
-// map seeds (see Backend's MAP_TEMPLATES), which deliberately leaves
-// geometry to the frontend. `placed` holds every node that already has a
-// position (stored x/y); the result adds one for each that doesn't.
-//
-// Roots (no parent among these nodes) go on a spiral from the canvas center.
-// Everything else is laid out from its parent outward: a parent's unplaced
-// children sit on an evenly spaced ring around it, so a circle comes out
-// with its parent at the actual center (the ring's center is where the
-// parent is drawn — see groupCenter) and every child the same distance from
-// it. The ring is wide enough for both requirements at once: children at
-// least PARENT_CHILD_MIN_DIST from the parent (room for both their titles),
-// and neighbors on the ring at least getNodeMinDist() from each other. The
-// old default was a sunflower spiral over *all* nodes by index, which put a
-// parent's two children ~220px apart with the parent halfway between them —
-// about 110px from each, well inside each other's titles.
-//
-// Each spot is still nudged clear of everything already placed (avoidOverlap),
-// so a crowded canvas degrades to a slightly irregular ring rather than an
-// overlap. Order is breadth-first, so a parent is always placed before its
-// children and a ring always knows which way "outward" is.
-export function layoutUnpositioned(
-  nodes: NodeDoc[],
-  placed: Map<string, { x: number; y: number }>,
-): Map<string, { x: number; y: number }> {
-  const result = new Map(placed);
-  const ids = new Set(nodes.map((n) => n.nodeId));
-  const parentOf = (n: NodeDoc) => {
-    const id = nodeRefId(n.parentId);
-    return id && ids.has(id) ? id : undefined;
-  };
-  const kids = new Map<string, NodeDoc[]>();
-  for (const n of nodes) {
-    const p = parentOf(n);
-    if (!p) continue;
-    if (!kids.has(p)) kids.set(p, []);
-    kids.get(p)!.push(n);
-  }
-  const minDist = getNodeMinDist();
-  const obstacles = () => nodeObstacles(Array.from(result.values()));
-  const center = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-
-  // Roots first, on a sunflower spiral (nearest neighbor ~ minDist apart).
-  let rootIndex = 0;
-  for (const n of nodes) {
-    if (result.has(n.nodeId) || parentOf(n)) continue;
-    const angle = rootIndex * 137.508 * (Math.PI / 180);
-    const radius = (minDist / 1.9) * Math.sqrt(rootIndex + 0.5);
-    rootIndex++;
-    result.set(
-      n.nodeId,
-      avoidOverlap({ x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) }, obstacles()),
-    );
-  }
-
-  // Then outward from every node that has a position, breadth-first.
-  const queue = nodes.filter((n) => result.has(n.nodeId));
-  for (let qi = 0; qi < queue.length; qi++) {
-    const parent = queue[qi];
-    const todo = (kids.get(parent.nodeId) ?? []).filter((c) => !result.has(c.nodeId));
-    if (todo.length === 0) continue;
-    const base = result.get(parent.nodeId)!;
-    const grandId = parentOf(parent);
-    const gp = grandId ? result.get(grandId) : undefined;
-    // "Outward" = away from the grandparent, so a ring never opens back onto
-    // it; a root has no such direction and opens upward.
-    const out = gp ? Math.atan2(base.y - gp.y, base.x - gp.x) : -Math.PI / 2;
-    const k = todo.length;
-    // Even counts are offset half a step so no child points straight back at
-    // the grandparent (odd counts already miss it).
-    const start = out + (k % 2 === 0 ? Math.PI / k : 0);
-    const radius =
-      k === 1
-        ? minDist * 1.15
-        : Math.max(PARENT_CHILD_MIN_DIST * 1.15, minDist / (2 * Math.sin(Math.PI / k)));
-
-    // Prefer a ring that's clean as a whole — rotated and/or widened until
-    // *every* child clears everything already placed — over nudging children
-    // one at a time. A whole ring keeps its shape, so its center stays exactly
-    // on the parent (which is where the parent is drawn); a ring with
-    // individually shoved children has a shifted center, which drags the
-    // parent's drawn position toward whatever it was crowding.
-    const obs = obstacles();
-    const usable = (p: { x: number; y: number }) =>
-      p.x >= 40 && p.x <= CANVAS_W - 40 && p.y >= 40 && p.y <= CANVAS_H - 40 && isClearOf(p, obs);
-    let ring: { x: number; y: number }[] | null = null;
-    if (k === 1) {
-      const turns = [0, 25, -25, 50, -50, 75, -75, 100, -100].map((d) => (d * Math.PI) / 180);
-      search1: for (const m of [1, 1.25, 1.5, 1.85]) {
-        for (const t of turns) {
-          const p = { x: base.x + radius * m * Math.cos(out + t), y: base.y + radius * m * Math.sin(out + t) };
-          if (usable(p)) {
-            ring = [p];
-            break search1;
-          }
-        }
-      }
-    } else {
-      const unit = (Math.PI * 2) / k / 12;
-      search: for (const m of [1, 1.15, 1.3, 1.5, 1.75, 2]) {
-        for (let i = 0; i < 12; i++) {
-          const a0 = start + (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * unit;
-          const pts = todo.map((_, j) => {
-            const a = a0 + (j / k) * Math.PI * 2;
-            return { x: base.x + radius * m * Math.cos(a), y: base.y + radius * m * Math.sin(a) };
-          });
-          if (pts.every(usable)) {
-            ring = pts;
-            break search;
-          }
-        }
-      }
-    }
-    // No clean ring anywhere in range (a crowded canvas): fall back to
-    // nudging each child clear of what's there, accepting a lopsided ring.
-    todo.forEach((child, j) => {
-      const a = k === 1 ? out : start + (j / k) * Math.PI * 2;
-      result.set(
-        child.nodeId,
-        ring
-          ? ring[j]
-          : avoidOverlap({ x: base.x + radius * Math.cos(a), y: base.y + radius * Math.sin(a) }, obstacles()),
-      );
-      queue.push(child);
-    });
-  }
-
-  // Anything still unplaced hangs off a parent chain that never resolved (a
-  // cycle, say) — treat it as a root rather than leave it without a position.
-  for (const n of nodes) {
-    if (result.has(n.nodeId)) continue;
-    const angle = rootIndex * 137.508 * (Math.PI / 180);
-    const radius = (minDist / 1.9) * Math.sqrt(rootIndex + 0.5);
-    rootIndex++;
-    result.set(
-      n.nodeId,
-      avoidOverlap({ x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) }, obstacles()),
-    );
-  }
-  return result;
-}
-
-// Moves a whole set of points by the same amount (a dragged circle: its
-// parent plus the children carried along, or a multi-selection), choosing
-// the shift nearest `desired` that neither leaves the canvas nor makes any
-// mover overlap an obstacle *more than it already did*. That last part
-// matters: a big circle usually has unrelated nodes already sitting inside
-// its area, closer than the minimum spacing before the drag even starts —
-// demanding full clearance from those would refuse every nearby shift and
-// fling the circle far from the pointer. So an obstacle a mover was already
-// too close to is only required not to get any closer; one it was clear of
-// has to stay clear. `movers` and `obstacles` must be disjoint — the things
-// moving aren't in the way of themselves. When the drop can't be honored
-// as-is the group stops as close to it as it can get without making
-// anything worse — in the limit, it stays where it was.
-export function findFreeShift(
-  movers: { x: number; y: number }[],
-  desired: { dx: number; dy: number },
-  obstacles: Obstacle[],
-): { dx: number; dy: number } {
-  const margin = 40;
-  // How deep `p` is into obstacle `o`: positive means overlapping. A node is
-  // measured by what it really draws (its footprint box), a zone by its
-  // circle — see Obstacle.footprint for why it isn't minDist here.
-  const depth = (o: Obstacle, px: number, py: number) =>
-    o.footprint
-      ? Math.min(o.footprint.w - Math.abs(o.x - px), o.footprint.h - Math.abs(o.y - py))
-      : o.minDist - Math.hypot(o.x - px, o.y - py);
-  // How deep each mover starts inside each obstacle — what "no worse" is
-  // measured against. Computed once, not per candidate shift.
-  const startDepth = movers.map((m) => obstacles.map((o) => depth(o, m.x, m.y)));
-  const fits = (dx: number, dy: number) =>
-    movers.every((m, i) => {
-      const px = m.x + dx;
-      const py = m.y + dy;
-      if (px < margin || px > CANVAS_W - margin || py < margin || py > CANVAS_H - margin) return false;
-      // Not overlapping to begin with -> must stay exactly that (touching is
-      // fine). Already overlapping -> may not get deeper (0.5px of slack
-      // only there, for rounding).
-      return obstacles.every((o, j) => depth(o, px, py) <= (startDepth[i][j] > 0 ? startDepth[i][j] + 0.5 : 0));
-    });
-  if (fits(desired.dx, desired.dy)) return desired;
-  // Slide back along the drag toward "didn't move": the farthest point on
-  // the way that fits — the group goes as far as the pointer took it and
-  // stops before it would run into something. Not moving at all always fits
-  // (nothing gets closer to anything), so this always finds an answer.
-  const len = Math.hypot(desired.dx, desired.dy);
-  let best = { dx: 0, dy: 0, d: len };
-  for (let i = 1; i <= 24; i++) {
-    const t = 1 - i / 24;
-    const dx = desired.dx * t;
-    const dy = desired.dy * t;
-    if (fits(dx, dy)) {
-      best = { dx, dy, d: (1 - t) * len };
-      break;
-    }
-  }
-  // A shift *beside* the drag (around an obstacle rather than short of it)
-  // can land nearer the pointer than stopping short does — look for one, but
-  // only closer to desired than what the slide already found.
-  const step = 30;
-  for (let r = step; r < Math.min(900, best.d); r += step) {
-    const steps = Math.max(16, Math.ceil((2 * Math.PI * r) / step));
-    for (let k = 0; k < steps; k++) {
-      const a = (k / steps) * Math.PI * 2;
-      const dx = desired.dx + r * Math.cos(a);
-      const dy = desired.dy + r * Math.sin(a);
-      if (fits(dx, dy)) return { dx, dy };
-    }
-  }
-  return { dx: best.dx, dy: best.dy };
-}
 
 // sentimentOf (imported from utils/nodeType.ts) — matches ringKindFor's own
 // halo/horns split exactly (see OutcomeBadge.tsx's OUTCOME_CONFIG), so
@@ -673,70 +514,6 @@ export interface NodeGroup {
   outline: { x: number; y: number }[];
 }
 
-// The smallest a zone is allowed to get, measured from its center. A tight
-// cluster (nodes are normally placed >= getNodeMinDist() apart, so this is
-// rare) would otherwise make a zone that sits almost entirely under its own
-// nodes, leaving nothing to click.
-const ZONE_MIN_RADIUS = 120;
-// How many segments approximate the circular zone (see computeNodeGroups).
-// Enough that the stroke reads as smooth, not as a polygon with corners.
-const ZONE_CIRCLE_STEPS = 48;
-
-// Andrew's monotone chain — returns the hull in order around its boundary,
-// which is exactly what a polygon's `points` needs (no separate angle sort).
-function convexHull(points: { x: number; y: number }[]): { x: number; y: number }[] {
-  const pts = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
-  if (pts.length <= 2) return pts;
-  const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
-    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-  const lower: { x: number; y: number }[] = [];
-  for (const p of pts) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
-    lower.push(p);
-  }
-  const upper: { x: number; y: number }[] = [];
-  for (let i = pts.length - 1; i >= 0; i--) {
-    const p = pts[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
-    upper.push(p);
-  }
-  upper.pop();
-  lower.pop();
-  return lower.concat(upper);
-}
-
-// The point a circle's parent is drawn at: the center of the zone around its
-// children, as it *looks* — the area centroid of the polygon they form, not
-// the plain average of their positions. The average is pulled toward
-// wherever children happen to bunch up (a cluster on one side, or children
-// sitting inside the polygon rather than on its border), which left the
-// parent visibly off to one side of its own zone; the area centroid only
-// depends on the shape, so it lands in the middle of what's drawn. Two
-// children (a line), or anything too degenerate to have an area, fall back
-// to the average — for two children, their midpoint.
-export function groupCenter(points: { x: number; y: number }[]): { x: number; y: number } {
-  const mean = () => ({
-    x: points.reduce((s, p) => s + p.x, 0) / points.length,
-    y: points.reduce((s, p) => s + p.y, 0) / points.length,
-  });
-  if (points.length < 3) return mean();
-  const hull = convexHull(points);
-  if (hull.length < 3) return mean();
-  let area2 = 0; // twice the signed area
-  let cx = 0;
-  let cy = 0;
-  for (let i = 0; i < hull.length; i++) {
-    const a = hull[i];
-    const b = hull[(i + 1) % hull.length];
-    const cross = a.x * b.y - b.x * a.y;
-    area2 += cross;
-    cx += (a.x + b.x) * cross;
-    cy += (a.y + b.y) * cross;
-  }
-  if (Math.abs(area2) < 1) return mean();
-  return { x: cx / (3 * area2), y: cy / (3 * area2) };
-}
-
 // Any node with 2+ direct parentId-children reads as a group ("circle") —
 // general on purpose, same as computeLinkCycles below: this fires whether
 // the star came from dragging one node onto another or just from branching
@@ -746,19 +523,12 @@ export function groupCenter(points: { x: number; y: number }[]): { x: number; y:
 // list — a root can be visible via its children even if something unusual
 // hid the root node itself.
 //
-// The zone is built around the *children*, with the root as its center: cx/
-// cy is groupCenter of the children (MapPage's posFor renders the root
-// there, regardless of its own stored x/y), and the children are measured
-// where they're drawn — a child that's itself a circle's root sits at its
-// own zone's center, not its stored x/y. With 3+ children the outline is
-// the convex hull of the children themselves — they sit on the zone's
-// border, as its corners, and every corner is a node (never a corner with
-// nothing at it). Anything that can't be a polygon of nodes — two children
-// (or a collinear set) make a line, and a cluster tighter than
-// ZONE_MIN_RADIUS would be a sliver under its own nodes — is a circle
-// around the center instead: no corners at all, so none can be empty.
-// Members still include the root (for the sentiment vote and callers that
-// treat it as part of the group), it just doesn't shape the outline.
+// The zone is the polygon through every member — the root and each child at
+// its own stored position, sorted by angle around their centroid so
+// connecting them in order traces a simple (non-self-crossing) outline: a
+// triangle at the 3-member minimum, growing to a quad/pentagon/… as the
+// group grows. Every corner is a member, and nothing is derived or moved:
+// each node is drawn exactly where it is, root included.
 export function computeNodeGroups(
   visibleNodes: NodeDoc[],
   allNodes: NodeDoc[],
@@ -771,61 +541,29 @@ export function computeNodeGroups(
     if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
     childrenByParent.get(parentId)!.push(n);
   }
-  // Every circle root, with its children — the nodes whose drawn position is
-  // *derived* (the center of their own zone) rather than their stored x/y.
-  const circleChildren = new Map<string, NodeDoc[]>();
-  for (const [rootId, children] of childrenByParent) {
-    if (children.length >= 2 && allNodes.some((n) => n.nodeId === rootId)) circleChildren.set(rootId, children);
-  }
-  // Where a node is actually drawn. A child can itself be the root of a
-  // circle, and then it's drawn at *its* zone's center — so its parent's
-  // zone has to run through that point, not the child's stored x/y, or the
-  // corner it draws would have no node at it. Resolved from the leaves up
-  // (memoized; `resolving` guards the impossible parent cycle).
-  const centers = new Map<string, { x: number; y: number }>();
-  const resolving = new Set<string>();
-  const storedPos = (id: string) => positions.get(id) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-  const drawnPos = (id: string): { x: number; y: number } => {
-    if (!circleChildren.has(id)) return storedPos(id);
-    const known = centers.get(id);
-    if (known) return known;
-    if (resolving.has(id)) return storedPos(id);
-    resolving.add(id);
-    const center = groupCenter(circleChildren.get(id)!.map((c) => drawnPos(c.nodeId)));
-    resolving.delete(id);
-    centers.set(id, center);
-    return center;
-  };
   const groups: NodeGroup[] = [];
-  for (const [rootId, children] of circleChildren) {
-    const root = allNodes.find((n) => n.nodeId === rootId)!;
+  for (const [rootId, children] of childrenByParent) {
+    if (children.length < 2) continue;
+    const root = allNodes.find((n) => n.nodeId === rootId);
+    if (!root) continue;
     const members = [root, ...children];
     const sentiment = circleSentiment(members);
-    const childPts = children.map((n) => drawnPos(n.nodeId));
-    const { x: cx, y: cy } = drawnPos(rootId);
-    const reach = Math.max(...childPts.map((p) => Math.hypot(p.x - cx, p.y - cy)));
-    const hull = convexHull(childPts);
-    let outline: { x: number; y: number }[];
-    if (hull.length >= 3 && reach >= ZONE_MIN_RADIUS) {
-      outline = hull;
-    } else {
-      // Radius = how far the children actually reach (so with two children
-      // they sit right on the circle), never below the minimum size.
-      const radius = Math.max(reach, ZONE_MIN_RADIUS);
-      outline = Array.from({ length: ZONE_CIRCLE_STEPS }, (_, k) => {
-        const a = (k / ZONE_CIRCLE_STEPS) * Math.PI * 2;
-        return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
-      });
-    }
-    // +70: the outline runs through the children's own centers, so this is
-    // the clearance past them (a node's own footprint, plus some) that
-    // callers — obstacle avoidance, "dragged clear of its circle" — treat
-    // as still being part of the zone.
-    const r = Math.max(...outline.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
+    const pts = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    // +70: the outline runs through the members' own centers, so this is the
+    // clearance past them (a node's own footprint, plus some) that callers —
+    // obstacle avoidance, "dragged clear of its circle" — treat as still
+    // being part of the zone.
+    const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
+    const outline = pts
+      .slice()
+      .sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
     groups.push({ rootId, members, sentiment, cx, cy, r, outline });
   }
   return groups;
 }
+
 
 // Any closed loop in the Link graph (not branch-arrows, not weapon marks —
 // specifically Edge documents "Link nodes" creates) reads as a "figure" and
