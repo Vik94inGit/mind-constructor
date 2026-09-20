@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useI18n } from "../i18n/I18nContext";
 
 interface Props {
   x: number;
@@ -24,6 +25,7 @@ interface Props {
 // context menu — the canvas scrolls independently, so canvas-relative
 // coordinates would drift away from the cursor as soon as anyone scrolled.
 export function NodeContextMenu({ x, y, isOwner, canAttack, onCreate, onUpdate, onDelete, onChoose, onAttack, onClose }: Props) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -68,22 +70,22 @@ export function NodeContextMenu({ x, y, isOwner, canAttack, onCreate, onUpdate, 
       {isOwner && (
         <>
           <button className={item} onClick={onCreate}>
-            Create branch
+            {t.ui.contextMenu.createBranch}
           </button>
           <button className={item} onClick={onUpdate}>
-            Update
+            {t.ui.contextMenu.update}
           </button>
           <button className={item} onClick={onChoose}>
-            Choose…
+            {t.ui.contextMenu.choose}
           </button>
           <button className={itemDanger} onClick={onDelete}>
-            Delete
+            {t.ui.contextMenu.delete}
           </button>
         </>
       )}
       {canAttack && (
         <button className={itemDanger} onClick={onAttack}>
-          Attack
+          {t.ui.contextMenu.attack}
         </button>
       )}
     </div>

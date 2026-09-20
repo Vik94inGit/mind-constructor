@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, NodeDoc } from "../types";
+import { useI18n } from "../i18n/I18nContext";
 
 // Smaller than the original per-node dots (which were 2.2px and colored one
 // per NodeType) — this brings dots back per the user's own ask, but paired
@@ -90,6 +91,7 @@ export const MiniMap = memo(function MiniMap({
   hScrollMargin,
   vScrollMargin,
 }: Props) {
+  const { t } = useI18n();
   const svgRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
   const [viewport, setViewport] = useState({
@@ -200,7 +202,7 @@ export const MiniMap = memo(function MiniMap({
       // the minimap floating on top of an open modal instead of properly
       // covered by it.)
       className="absolute bottom-3 right-3 z-45 overflow-hidden rounded-card border border-line bg-surface shadow-card"
-      title="Minimap — click or drag to jump around the map"
+      title={t.ui.minimapTitle}
     >
       <svg
         ref={svgRef}

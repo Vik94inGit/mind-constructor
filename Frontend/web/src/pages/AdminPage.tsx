@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import * as authApi from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 import { ApiRequestError } from "../api/client";
+import { useI18n } from "../i18n/I18nContext";
 import type { User } from "../types";
 
 export function AdminPage() {
   const { user: me } = useAuth();
+  const { t } = useI18n();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +19,7 @@ export function AdminPage() {
     try {
       setUsers(await authApi.listUsers());
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to load users");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.loadUsers);
     } finally {
       setLoading(false);
     }
@@ -34,35 +36,35 @@ export function AdminPage() {
       const updated = u.isBlocked ? await authApi.unblockUser(u._id) : await authApi.blockUser(u._id);
       setUsers((prev) => prev.map((x) => (x._id === u._id ? updated : x)));
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Action failed");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.action);
     } finally {
       setBusyId(null);
     }
   }
 
   async function remove(u: User) {
-    if (!confirm(`Delete ${u.username}? This deletes every map they own.`)) return;
+    if (!confirm(t.ui.admin.deleteConfirm(u.username))) return;
     setBusyId(u._id);
     setError(null);
     try {
       await authApi.deleteUser(u._id);
       setUsers((prev) => prev.filter((x) => x._id !== u._id));
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Action failed");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.action);
     } finally {
       setBusyId(null);
     }
   }
 
   async function wipe() {
-    if (!confirm("Wipe the ENTIRE database — all users, maps and nodes? This cannot be undone.")) return;
-    if (!confirm("Are you absolutely sure? Type-of-no-return confirmation #2.")) return;
+    if (!confirm(t.ui.admin.wipeConfirm)) return;
+    if (!confirm(t.ui.admin.wipeConfirmAgain)) return;
     setError(null);
     try {
       await authApi.wipeDatabase();
       await load();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Wipe failed");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.wipe);
     }
   }
 
@@ -70,14 +72,14 @@ export function AdminPage() {
     <div className="mx-auto w-full max-w-[1080px] px-6 pt-8 pb-16">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="m-0 text-2xl font-bold">Admin</h1>
-          <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">Manage every registered user.</p>
+          <h1 className="m-0 text-2xl font-bold">{t.ui.admin.title}</h1>
+          <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">{t.ui.admin.subtitle}</p>
         </div>
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-4 py-[0.55rem] text-[0.88rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={wipe}
         >
-          Wipe database
+          {t.ui.admin.wipe}
         </button>
       </div>
 
@@ -86,23 +88,23 @@ export function AdminPage() {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-ink-soft">Loading users…</div>
+        <div className="p-12 text-center text-ink-soft">{t.ui.admin.loading}</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table className="w-full overflow-hidden rounded-card border border-line bg-surface" style={{ borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase">
-                  Username
+                  {t.ui.admin.username}
                 </th>
                 <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase">
-                  Email
+                  {t.ui.admin.email}
                 </th>
                 <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase">
-                  Role
+                  {t.ui.admin.role}
                 </th>
                 <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase">
-                  Status
+                  {t.ui.admin.status}
                 </th>
                 <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase"></th>
               </tr>
@@ -119,18 +121,18 @@ export function AdminPage() {
                     <td className={cell}>
                       {u.role === "admin" && (
                         <span className="rounded-[5px] bg-accent-soft px-2 py-[0.15rem] text-[0.7rem] font-bold text-accent-ink">
-                          admin
+                          {t.ui.admin.admin}
                         </span>
                       )}
                     </td>
                     <td className={cell}>
                       {u.isBlocked ? (
                         <span className="rounded-[5px] bg-danger-bg px-2 py-[0.15rem] text-[0.7rem] font-bold text-danger">
-                          blocked
+                          {t.ui.admin.blocked}
                         </span>
                       ) : (
                         <span className="rounded-[5px] bg-success-bg px-2 py-[0.15rem] text-[0.7rem] font-bold text-success">
-                          active
+                          {t.ui.admin.active}
                         </span>
                       )}
                     </td>
@@ -141,14 +143,14 @@ export function AdminPage() {
                           disabled={isSelf || busyId === u._id}
                           onClick={() => toggleBlock(u)}
                         >
-                          {u.isBlocked ? "Unblock" : "Block"}
+                          {u.isBlocked ? t.ui.admin.unblock : t.ui.admin.block}
                         </button>
                         <button
                           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                           disabled={isSelf || busyId === u._id}
                           onClick={() => remove(u)}
                         >
-                          Delete
+                          {t.ui.admin.delete}
                         </button>
                       </div>
                     </td>

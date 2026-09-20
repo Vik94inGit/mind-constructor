@@ -1,13 +1,16 @@
 // Core-chrome translations — the screens/controls you touch just to get
 // around and use the app (auth, dashboard, navbar, the map screen's own
-// toolbar/panel/tab labels). Deliberately *not* every string in the app:
-// MapPage's deep combat/help copy (Attack/Protect tab body text, node-type
-// names themselves, etc.) stays English-only for now — see this file's own
-// scope note in CLAUDE.md-adjacent history. Interpolated strings are plain
+// toolbar/tab labels). The deeper copy — node panel tabs, menus, modals, and
+// error messages — lives in uiStrings.ts (reached as `t.ui`). Node type
+// names themselves (Problem, Option, …) stay English on purpose: they are
+// stored values, not labels. Interpolated strings are plain
 // functions (not a runtime "{{token}}" template parser) so every language
 // is checked against the exact same shape by TypeScript itself — a missing
 // or mistyped key is a compile error, not a silent fallback to English at
 // runtime.
+import { UI_STRINGS } from "./uiStrings";
+import type { UiStrings } from "./uiStrings";
+
 export interface Translation {
   nav: {
     maps: string;
@@ -109,7 +112,6 @@ export interface Translation {
       invite: string;
       createNode: string;
       createCircle: string;
-      nodeTypes: string;
       exportText: string;
     };
     panelTabs: {
@@ -124,6 +126,7 @@ export interface Translation {
   };
   theme: { toggleToLight: string; toggleToDark: string };
   language: { label: string };
+  ui: UiStrings;
 }
 
 export const LANGUAGES = ["en", "cs", "uk", "ru"] as const;
@@ -235,7 +238,6 @@ const en: Translation = {
       invite: "Invite user",
       createNode: "Create new node",
       createCircle: "Create circle",
-      nodeTypes: "Node types",
       exportText: "Export text",
     },
     panelTabs: {
@@ -250,6 +252,7 @@ const en: Translation = {
   },
   theme: { toggleToLight: "Switch to light mode", toggleToDark: "Switch to dark mode" },
   language: { label: "Language" },
+  ui: UI_STRINGS.en,
 };
 
 const cs: Translation = {
@@ -351,7 +354,6 @@ const cs: Translation = {
       invite: "Pozvat uživatele",
       createNode: "Vytvořit nový uzel",
       createCircle: "Vytvořit kruh",
-      nodeTypes: "Typy uzlů",
       exportText: "Exportovat text",
     },
     panelTabs: {
@@ -366,6 +368,7 @@ const cs: Translation = {
   },
   theme: { toggleToLight: "Přepnout na světlý režim", toggleToDark: "Přepnout na tmavý režim" },
   language: { label: "Jazyk" },
+  ui: UI_STRINGS.cs,
 };
 
 const uk: Translation = {
@@ -467,7 +470,6 @@ const uk: Translation = {
       invite: "Запросити користувача",
       createNode: "Створити новий вузол",
       createCircle: "Створити коло",
-      nodeTypes: "Типи вузлів",
       exportText: "Експортувати текст",
     },
     panelTabs: {
@@ -482,6 +484,7 @@ const uk: Translation = {
   },
   theme: { toggleToLight: "Перемкнути на світлий режим", toggleToDark: "Перемкнути на темний режим" },
   language: { label: "Мова" },
+  ui: UI_STRINGS.uk,
 };
 
 const ru: Translation = {
@@ -583,7 +586,6 @@ const ru: Translation = {
       invite: "Пригласить пользователя",
       createNode: "Создать новый узел",
       createCircle: "Создать круг",
-      nodeTypes: "Типы узлов",
       exportText: "Экспортировать текст",
     },
     panelTabs: {
@@ -598,6 +600,7 @@ const ru: Translation = {
   },
   theme: { toggleToLight: "Переключить на светлую тему", toggleToDark: "Переключить на тёмную тему" },
   language: { label: "Язык" },
+  ui: UI_STRINGS.ru,
 };
 
 export const TRANSLATIONS: Record<Language, Translation> = { en, cs, uk, ru };

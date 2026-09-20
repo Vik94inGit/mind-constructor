@@ -1,11 +1,13 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getDemoMapId } from "../api/client";
+import { useI18n } from "../i18n/I18nContext";
 
 export function ProtectedRoute() {
   const { user, loading } = useAuth();
+  const { t } = useI18n();
   const location = useLocation();
-  if (loading) return <div className="p-12 text-center text-ink-soft">Loading…</div>;
+  if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.common.loading}</div>;
   if (!user) return <Navigate to="/login" replace />;
   // A demo session (see api/auth.ts's tryDemo) only ever has the one map it
   // was seeded with — no dashboard, no "Maps" home, nothing else to browse
@@ -25,7 +27,8 @@ export function ProtectedRoute() {
 
 export function AdminRoute() {
   const { isAdmin, loading, user } = useAuth();
-  if (loading) return <div className="p-12 text-center text-ink-soft">Loading…</div>;
+  const { t } = useI18n();
+  if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.common.loading}</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/" replace />;
   return <Outlet />;

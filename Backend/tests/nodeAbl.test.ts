@@ -40,6 +40,13 @@ describe("nodeAbl", () => {
       expect(getMapByIdDao).not.toHaveBeenCalled();
     });
 
+    it("rejects an invalid order at creation too", async () => {
+      await expect(
+        createNodeAbl({ text: "Step", type: "Option", order: 0 }, "pub123", "user1"),
+      ).rejects.toThrow(ValidationError);
+      expect(getMapByIdDao).not.toHaveBeenCalled();
+    });
+
     it("rejects a missing or invalid type — mandatory on purpose", async () => {
       await expect(
         createNodeAbl({ text: "Ship it" }, "pub123", "user1"),
@@ -189,6 +196,23 @@ describe("nodeAbl", () => {
       await updateNodeAbl("node1", "user1", { symbolOverride: null });
 
       expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { symbolOverride: null });
+    });
+
+    it("rejects an order that isn't a whole number from 1 to 9999", async () => {
+      for (const order of [0, -1, 1.5, 10000, "3"]) {
+        await expect(updateNodeAbl("node1", "user1", { order })).rejects.toThrow(ValidationError);
+      }
+      expect(updateNodeDao).not.toHaveBeenCalled();
+    });
+
+    it("passes a valid order through, and explicit null to clear it", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      await updateNodeAbl("node1", "user1", { order: 3 });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { order: 3 });
+
+      await updateNodeAbl("node1", "user1", { order: null });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { order: null });
     });
 
     it("passes only the provided fields through to the DAO", async () => {

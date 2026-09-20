@@ -167,6 +167,9 @@ export function NodePanel({
   // field above the text, saved on Enter/blur the same way the text is.
   // Unlike text it's never lazy-loaded, so there's no backfill to wait for.
   const [titleDraft, setTitleDraft] = useState(node.title ?? "");
+  // The optional step number, as typed — a string so the field can be empty
+  // or half-typed; parsed on save.
+  const [orderDraft, setOrderDraft] = useState(node.order != null ? String(node.order) : "");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Transient "Copied!" confirmation on the Info tab's own Copy button —
   // auto-clears, same pattern the mobile-focused parts of this file already
@@ -279,6 +282,7 @@ export function NodePanel({
     setProtectType("Solution");
     setTextDraft(node.text);
     setTitleDraft(node.title ?? "");
+    setOrderDraft(node.order != null ? String(node.order) : "");
     setExpanded(false);
     setTab("info");
     nodesApi
@@ -314,7 +318,7 @@ export function NodePanel({
       const updated = await nodesApi.updateNode(node.nodeId, { symbolOverride });
       onUpdated(updated);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to update symbol");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.symbol);
     } finally {
       setBusy(false);
     }
@@ -339,7 +343,7 @@ export function NodePanel({
       onUpdated(updated);
       return true;
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to update text");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.text);
       return false;
     } finally {
       setBusy(false);
@@ -361,7 +365,33 @@ export function NodePanel({
       onUpdated(updated);
       return true;
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to update title");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.title);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // A blank field clears the step number; anything else has to be a whole
+  // number from 1 to 9999 (the backend's own bounds). No-op if unchanged.
+  async function handleOrderSave(): Promise<boolean> {
+    const trimmed = orderDraft.trim();
+    const current = node.order ?? null;
+    const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && (!Number.isInteger(next) || next < 1 || next > 9999)) {
+      setError(t.ui.errors.order);
+      setOrderDraft(current !== null ? String(current) : "");
+      return false;
+    }
+    if (next === current) return true;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { order: next });
+      onUpdated(updated);
+      return true;
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.order);
       return false;
     } finally {
       setBusy(false);
@@ -378,12 +408,12 @@ export function NodePanel({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      setError("Copy failed — this browser blocked clipboard access.");
+      setError(t.ui.errors.clipboard);
     }
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this node?")) return;
+    if (!confirm(t.ui.node.deleteConfirm)) return;
     setBusy(true);
     try {
       const res = await nodesApi.deleteNode(node.nodeId);
@@ -394,7 +424,7 @@ export function NodePanel({
       // other panel-triggered change does.
       if (res.damagedProtectedNode) onUpdated(res.damagedProtectedNode);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Delete failed");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.delete);
     } finally {
       setBusy(false);
     }
@@ -414,7 +444,7 @@ export function NodePanel({
       // sitting open on whatever was just acted on.
       onClose();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Attack failed");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.attack);
     } finally {
       setBusy(false);
     }
@@ -432,7 +462,7 @@ export function NodePanel({
       // Same "close after creating a node" reasoning as handleAttack above.
       onClose();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Protect failed");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.protect);
     } finally {
       setBusy(false);
     }
@@ -448,7 +478,7 @@ export function NodePanel({
       const res = await nodesApi.unpackNode(memberId);
       onUnpacked(res.node);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Unpack failed");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.unpack);
     } finally {
       setBusy(false);
     }
@@ -466,7 +496,7 @@ export function NodePanel({
       const updated = await nodesApi.updateNode(node.nodeId, { sizeTier: tier });
       onUpdated(updated);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to update size");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.size);
     } finally {
       setBusy(false);
     }
@@ -487,7 +517,7 @@ export function NodePanel({
       const updated = await nodesApi.updateNode(node.nodeId, { type });
       onUpdated(updated);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to update type");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.type);
     } finally {
       setBusy(false);
     }
@@ -504,7 +534,7 @@ export function NodePanel({
       const updated = await nodesApi.updateNode(node.nodeId, { manualZone });
       onUpdated(updated);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to update zone");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.zone);
     } finally {
       setBusy(false);
     }
@@ -515,7 +545,7 @@ export function NodePanel({
       await edgesApi.deleteEdge(edgeId);
       onDeleteEdge(edgeId);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Failed to remove link");
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.removeLink);
     }
   }
 
@@ -564,8 +594,9 @@ export function NodePanel({
                 still readable in the Info tab below (scrollable, full
                 text), just not repeated as a header up here. */}
             <p className="m-0 text-[0.72rem] whitespace-nowrap text-ink-soft">
-              {node.isWeapon ? "🏹 " : ""}by {usernameOf(node.userId as any)}
-              {node.isFirstNode ? " · root" : ""}
+              {node.isWeapon ? "🏹 " : ""}
+              {t.ui.node.byUser(usernameOf(node.userId as any))}
+              {node.isFirstNode ? ` · ${t.ui.node.root}` : ""}
             </p>
           </div>
           {tabs.length > 1 && (
@@ -644,23 +675,23 @@ export function NodePanel({
             <button
               className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => setExpanded((v) => !v)}
-              title={expanded ? "Collapse back to a scrollable box" : "Expand to show the whole text, no inner scrollbar"}
+              title={expanded ? t.ui.node.collapseTitle : t.ui.node.expandTitle}
             >
-              {expanded ? "Collapse" : "Expand"}
+              {expanded ? t.ui.node.collapse : t.ui.node.expand}
             </button>
             {isCreator && (
               <button
                 className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => textareaRef.current?.focus()}
               >
-                Edit
+                {t.ui.common.edit}
               </button>
             )}
             <button
               className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={handleCopyText}
             >
-              {copied ? "Copied ✓" : "Copy"}
+              {copied ? t.ui.common.copied : t.ui.common.copy}
             </button>
             {isCreator && (
               <button
@@ -668,7 +699,7 @@ export function NodePanel({
                 onClick={handleDelete}
                 disabled={busy}
               >
-                Delete
+                {t.ui.common.delete}
               </button>
             )}
           </div>
@@ -687,12 +718,12 @@ export function NodePanel({
             />
           </div>
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-            {node.health}/100 health{node.defeated ? " · defeated" : ""}
+            {t.ui.node.healthLine(node.health, node.defeated)}
           </p>
 
           {node.isWeapon && target && (
             <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
-              Points at{" "}
+              {t.ui.node.pointsAt}{" "}
               <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(target.nodeId)}>
                 {target.text.slice(0, 40)}
               </a>
@@ -701,7 +732,7 @@ export function NodePanel({
 
           {node.isProtection && protectedTarget && (
             <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
-              🛡️ Protects{" "}
+              🛡️ {t.ui.node.protects}{" "}
               <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(protectedTarget.nodeId)}>
                 {protectedTarget.text.slice(0, 40)}
               </a>
@@ -710,14 +741,13 @@ export function NodePanel({
 
           {node.isProtection && !!node.blockedDamage && (
             <p style={{ fontSize: "0.78rem", marginTop: "0.3rem", color: "var(--ink-soft)" }}>
-              Blocked {node.blockedDamage} damage so far — deleting this shield returns all of it to{" "}
-              {protectedTarget ? protectedTarget.text.slice(0, 30) : "the node it defends"} at once.
+              {t.ui.node.blocked(node.blockedDamage, protectedTarget ? protectedTarget.text.slice(0, 30) : null)}
             </p>
           )}
 
           {protectors.length > 0 && (
             <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
-              🛡️ Protected by{" "}
+              🛡️ {t.ui.node.protectedBy}{" "}
               {protectors.map((p, i) => (
                 <span key={p.nodeId}>
                   {i > 0 && ", "}
@@ -734,7 +764,7 @@ export function NodePanel({
           {isCreator && (
             <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
               <label htmlFor="node-title" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                Title:
+                {t.ui.node.title}
               </label>
               <input
                 id="node-title"
@@ -743,7 +773,7 @@ export function NodePanel({
                 value={titleDraft}
                 onChange={(e) => setTitleDraft(e.target.value)}
                 disabled={busy}
-                placeholder="Optional — otherwise the first words of the text show"
+                placeholder={t.ui.node.titlePlaceholder}
                 onKeyDown={(e) => {
                   // Enter saves, then closes the panel — editing is done.
                   if (e.key === "Enter") {
@@ -757,9 +787,41 @@ export function NodePanel({
             </div>
           )}
 
+          {/* Optional step number — a badge on the node, for describing a
+              process by labeling nodes 1, 2, 3… Blank clears it. */}
+          {isCreator && (
+            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
+              <label htmlFor="node-order" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                {t.ui.node.order}
+              </label>
+              <input
+                id="node-order"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={9999}
+                step={1}
+                value={orderDraft}
+                onChange={(e) => setOrderDraft(e.target.value)}
+                disabled={busy}
+                placeholder={t.ui.node.orderPlaceholder}
+                title={t.ui.node.orderTitle}
+                onKeyDown={(e) => {
+                  // Enter saves, then closes the panel — same as the title.
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleOrderSave().then((ok) => ok && onClose());
+                  }
+                }}
+                onBlur={() => void handleOrderSave()}
+                className="w-24 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+          )}
+
           {isCreator && (
             <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Type:</span>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.type}</span>
               <select
                 value={node.type}
                 onChange={(e) => handleSetType(e.target.value as NodeType)}
@@ -780,23 +842,23 @@ export function NodePanel({
               <button
                 className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onEdit}
-                title="Open the canvas's own inline editor (text + type)"
+                title={t.ui.node.editTitle}
               >
-                Edit
+                {t.ui.node.edit}
               </button>
               <button
                 className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onStartPack}
-                title="Fold other linked/branched nodes into this one"
+                title={t.ui.node.packTitle}
               >
-                Pack…
+                {t.ui.node.pack}
               </button>
             </div>
           )}
 
           {isCreator && (
             <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Size:</span>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.size}</span>
               {SIZE_TIERS.map((tier) => (
                 <button
                   key={tier}
@@ -816,7 +878,7 @@ export function NodePanel({
 
           {isCreator && (
             <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Zone:</span>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.zone}</span>
               {MANUAL_ZONE_COLORS.map((z) => (
                 <button
                   key={z}
@@ -837,9 +899,9 @@ export function NodePanel({
                   }
                   onClick={() => handleSetZone(z)}
                   disabled={busy}
-                  title={`Draw a ${z} zone ring around just this node`}
+                  title={t.ui.node.zoneTitle(z)}
                 >
-                  {z}
+                  {t.ui.sentiments[z]}
                 </button>
               ))}
               {node.manualZone && (
@@ -847,9 +909,9 @@ export function NodePanel({
                   className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent px-[0.55rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink-soft transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => handleSetZone(null)}
                   disabled={busy}
-                  title="Remove this manual zone ring"
+                  title={t.ui.node.zoneRemoveTitle}
                 >
-                  Reset
+                  {t.ui.node.reset}
                 </button>
               )}
             </div>
@@ -857,7 +919,7 @@ export function NodePanel({
 
           {isCreator && isOutcome && (
             <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>Symbol:</span>
+              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.symbol}</span>
               <button
                 className={`inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.85rem] font-semibold transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 ${
                   node.symbolOverride === "check"
@@ -866,7 +928,7 @@ export function NodePanel({
                 }`}
                 onClick={() => handleSetSymbol("check")}
                 disabled={busy}
-                title="Force a check mark, regardless of type"
+                title={t.ui.node.symbolCheckTitle}
               >
                 ✓
               </button>
@@ -878,7 +940,7 @@ export function NodePanel({
                 }`}
                 onClick={() => handleSetSymbol("cross")}
                 disabled={busy}
-                title="Force a cross, regardless of type"
+                title={t.ui.node.symbolCrossTitle}
               >
                 ✗
               </button>
@@ -887,9 +949,9 @@ export function NodePanel({
                   className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent px-[0.55rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink-soft transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => handleSetSymbol(null)}
                   disabled={busy}
-                  title="Use this type's own default symbol"
+                  title={t.ui.node.symbolResetTitle}
                 >
-                  Reset
+                  {t.ui.node.reset}
                 </button>
               )}
             </div>
@@ -900,14 +962,14 @@ export function NodePanel({
               <button
                 className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onStartChoose}
-                title="Choose this node and others, then link, copy or delete them together"
+                title={t.ui.node.chooseNodesTitle}
               >
-                Choose nodes…
+                {t.ui.node.chooseNodes}
               </button>
             </div>
           )}
           {connectedEdges.length === 0 ? (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.5rem" }}>No links yet.</p>
+            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.5rem" }}>{t.ui.node.noLinks}</p>
           ) : (
             <div style={{ marginTop: "0.5rem" }}>
               {connectedEdges.map((e) => {
@@ -930,7 +992,7 @@ export function NodePanel({
                                 : "var(--ink-soft)",
                         }}
                       >
-                        {e.sentiment}
+                        {t.ui.sentiments[e.sentiment]}
                       </span>{" "}
                       {dir} {other ? other.text.slice(0, 24) : "…"}
                     </span>
@@ -951,9 +1013,9 @@ export function NodePanel({
               <button
                 className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={onExtractText}
-                title="Export this node's own cluster's text — plus any cluster rooted at one of its children, recursively. The whole map's own text export moved to the + toolbar menu."
+                title={t.ui.node.extractTextTitle}
               >
-                Extract text…
+                {t.ui.node.extractText}
               </button>
             </div>
           )}
@@ -963,27 +1025,26 @@ export function NodePanel({
       {tab === "attack" && canAttack && (
         <div className="mt-4">
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-            Landing an attack creates a real node with your objection, linked to this one by a
-            weapon arrow.
-            {node.isWeapon && " Landing this heals its own target's parent."}
-            {protectors.length > 0 && " This node is currently shielded — attacks will be blocked."}
+            {t.ui.attack.intro}
+            {node.isWeapon && t.ui.attack.introWeapon}
+            {protectors.length > 0 && t.ui.attack.introShielded}
           </p>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="attack-text" className="text-[0.8rem] font-semibold text-ink-soft">
-              Your objection
+              {t.ui.attack.objection}
             </label>
             <textarea
               id="attack-text"
               rows={2}
               value={attackText}
               onChange={(e) => setAttackText(e.target.value)}
-              placeholder="Why does this fail?"
+              placeholder={t.ui.attack.placeholder}
               className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
             />
           </div>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="attack-type" className="text-[0.8rem] font-semibold text-ink-soft">
-              As a
+              {t.ui.attack.as}
             </label>
             <select
               id="attack-type"
@@ -1000,7 +1061,7 @@ export function NodePanel({
           </div>
           {!attackText.trim() && (
             <p style={{ fontSize: "0.78rem", color: "var(--accent)", fontWeight: 600 }}>
-              Write your objection above to pick a weapon.
+              {t.ui.attack.writeObjection}
             </p>
           )}
           <div className="flex flex-col gap-2">
@@ -1012,11 +1073,11 @@ export function NodePanel({
                   key={w}
                   className="inline-flex w-full cursor-pointer items-center justify-between gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={busy || needsText}
-                  title={needsText ? "Write your objection first" : undefined}
+                  title={needsText ? t.ui.attack.writeFirst : undefined}
                   onClick={() => handleAttack(w)}
                 >
                   <span>
-                    {info.label} (-{info.damage})
+                    {t.ui.attack.weapons[w]} (-{info.damage})
                   </span>
                 </button>
               );
@@ -1030,25 +1091,24 @@ export function NodePanel({
           {isCreator ? (
             <>
               <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                A protection node fully blocks every future attack on this node while it stays
-                undefeated — no limit, no cooldown.
+                {t.ui.protect.intro}
               </p>
               <div className="mb-4 flex flex-col gap-[0.35rem]">
                 <label htmlFor="protect-text" className="text-[0.8rem] font-semibold text-ink-soft">
-                  Why it's defended
+                  {t.ui.protect.why}
                 </label>
                 <textarea
                   id="protect-text"
                   rows={2}
                   value={protectText}
                   onChange={(e) => setProtectText(e.target.value)}
-                  placeholder="Why does this hold up?"
+                  placeholder={t.ui.protect.placeholder}
                   className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
                 />
               </div>
               <div className="mb-4 flex flex-col gap-[0.35rem]">
                 <label htmlFor="protect-type" className="text-[0.8rem] font-semibold text-ink-soft">
-                  As a
+                  {t.ui.protect.as}
                 </label>
                 <select
                   id="protect-type"
@@ -1066,15 +1126,15 @@ export function NodePanel({
               <button
                 className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-[0.65rem] py-[0.55rem] text-[0.88rem] font-semibold text-white transition-opacity duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={busy || !protectText.trim()}
-                title={!protectText.trim() ? "Write why it's defended first" : undefined}
+                title={!protectText.trim() ? t.ui.protect.writeFirst : undefined}
                 onClick={handleProtect}
               >
-                🛡️ Add protection
+                🛡️ {t.ui.protect.add}
               </button>
             </>
           ) : (
             <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-              Only {usernameOf(node.userId as any)} can add a protection node to this one.
+              {t.ui.protect.onlyOwner(usernameOf(node.userId as any))}
             </p>
           )}
         </div>
@@ -1083,7 +1143,7 @@ export function NodePanel({
       {tab === "pack" && (
         <div className="mt-4">
           {packedMembers.length === 0 ? (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>Nothing packed in here.</p>
+            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>{t.ui.packed.empty}</p>
           ) : (
             <div style={{ marginTop: "0.5rem" }}>
               {packedMembers.map((m) => (
@@ -1094,7 +1154,7 @@ export function NodePanel({
                     onClick={() => handleUnpack(m.nodeId)}
                     disabled={busy}
                   >
-                    Unpack
+                    {t.ui.packed.unpack}
                   </button>
                 </div>
               ))}
@@ -1106,14 +1166,14 @@ export function NodePanel({
       {tab === "history" && (
         <div className="mt-4">
           {history === null ? (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>Loading…</p>
+            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>{t.ui.history.loading}</p>
           ) : history.length === 0 ? (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>No attacks yet.</p>
+            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>{t.ui.history.none}</p>
           ) : (
             history.map((a, i) => (
               <div className="flex justify-between border-b border-line py-[0.4rem] text-[0.8rem] last:border-b-0" key={i}>
                 <span>
-                  {usernameOf(a.attackerId as any)} · {a.weapon}
+                  {usernameOf(a.attackerId as any)} · {t.ui.attack.weapons[a.weapon]}
                 </span>
                 <span>-{a.damage}</span>
               </div>

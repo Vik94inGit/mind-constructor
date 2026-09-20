@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useI18n } from "../i18n/I18nContext";
 
 export interface CardMenuItem {
   label: string;
@@ -23,6 +24,7 @@ export interface CardMenuItem {
 // sidesteps both: the menu is never a descendant of anything that could
 // transform it.
 export function CardMenu({ items }: { items: CardMenuItem[] }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -63,7 +65,7 @@ export function CardMenu({ items }: { items: CardMenuItem[] }) {
         ref={triggerRef}
         type="button"
         className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.6rem] py-[0.25rem] text-[1.1rem] leading-none font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-        aria-label="Map menu"
+        aria-label={t.ui.cardMenuLabel}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={toggle}

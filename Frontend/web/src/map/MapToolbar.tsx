@@ -20,10 +20,11 @@ interface Props {
   readingMode: ReadingMode;
   onPickReadingMode: (mode: ReadingMode) => void;
   onToggleMapMode: () => void;
+  /** Demo sessions only: leave the demo (log out) to log in or register. */
+  onExitDemo: () => void;
   onInvite: () => void;
   onCreateNode: () => void;
   onCreateCircle: () => void;
-  onNodeTypes: () => void;
   onExportText: () => void;
 }
 
@@ -47,10 +48,10 @@ export function MapToolbar({
   readingMode,
   onPickReadingMode,
   onToggleMapMode,
+  onExitDemo,
   onInvite,
   onCreateNode,
   onCreateCircle,
-  onNodeTypes,
   onExportText,
 }: Props) {
   const { t } = useI18n();
@@ -92,7 +93,6 @@ export function MapToolbar({
                 onInvite={closeAddThen(onInvite)}
                 onCreateNode={closeAddThen(onCreateNode)}
                 onCreateCircle={closeAddThen(onCreateCircle)}
-                onNodeTypes={closeAddThen(onNodeTypes)}
                 onExportText={closeAddThen(onExportText)}
               />
             )}
@@ -168,6 +168,19 @@ export function MapToolbar({
               the colorful emoji this used to be — matches the rest of this
               cluster's monochrome icons. */}
           {isDiscussionMode ? "⚔" : "✎"}
+        </button>
+      )}
+      {/* A demo session has no dashboard to go back to (see ProtectedRoute) and
+          the global Navbar is hidden here, so this is its only way out to the
+          login page. Kept outside the collapse, like the mode toggle. */}
+      {isDemo && (
+        <button
+          type="button"
+          className="ml-1 inline-flex h-7 cursor-pointer items-center justify-center rounded-md border border-line bg-transparent px-2 text-[0.72rem] font-semibold whitespace-nowrap text-ink hover:bg-surface-2"
+          title={t.ui.demo.exitTitle}
+          onClick={onExitDemo}
+        >
+          {t.ui.demo.exit}
         </button>
       )}
     </div>

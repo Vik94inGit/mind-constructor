@@ -7,6 +7,7 @@ import { NodeTypeIcon } from "./NodeTypeIcon";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
 import { NodeCrown } from "./NodeCrown";
+import { useI18n } from "../i18n/I18nContext";
 
 // Same 60px reference circle NodeCard's own icon uses (NodeCrown assumes
 // it) — a ghost is a preview of what the real node is about to look like,
@@ -71,6 +72,7 @@ interface Props {
 // branching an argument tree becomes two clicks instead of toolbar button ->
 // modal -> manual placement.
 export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
+  const { t } = useI18n();
   // Which ghost a click has picked out — its type name shows only once
   // picked. The first click only tells you which type this is (a one-tap
   // create was easy to trigger by accident on a phone and impossible to
@@ -211,7 +213,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
             // touchAction: manipulation — stops a quick second tap being
             // claimed by the browser as double-tap-to-zoom on a phone.
             style={{ left: x, top: y, touchAction: "manipulation" }}
-            title={armedType === type ? `${type} — click again to add` : type}
+            title={armedType === type ? `${type} — ${t.ui.node.ghostAgain}` : type}
             onClick={(e) => {
               e.stopPropagation();
               if (armedType === type) onPick(type, { x, y });
@@ -258,7 +260,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
             {armedType === type && (
               <div className="mt-[0.3rem] flex flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card">
                 <span className="text-[0.66rem] font-semibold">{type}</span>
-                <span className="text-[0.55rem] text-ink-soft">click again to add</span>
+                <span className="text-[0.55rem] text-ink-soft">{t.ui.node.ghostAgain}</span>
               </div>
             )}
           </button>

@@ -61,6 +61,19 @@ export const NodeSchema = new mongoose.Schema(
     // it's capped small enough that a whole map's titles are a rounding
     // error next to what stripping `text` saved.
     title: { type: String, default: "", trim: true, maxlength: 80 },
+    // An optional step number (1, 2, 3, …) for describing a process by
+    // labeling nodes in sequence — a frontend draws it as a small badge on the
+    // node. Purely a label: nothing orders, links or validates against other
+    // nodes' numbers, so two nodes can share one (parallel steps). null (the
+    // default) means "not numbered". Rides along on the initial node list like
+    // `title` — a bare integer is nothing next to the text it sits beside.
+    order: {
+      type: Number,
+      default: null,
+      min: 1,
+      max: 9999,
+      validate: { validator: (v: number | null) => v === null || Number.isInteger(v), message: "order must be a whole number" },
+    },
     type: { type: String, enum: NODE_TYPES, required: true }, // mandatory: forces the author to categorize every node
     x: Number, // Coordinates for the UI
     y: Number,

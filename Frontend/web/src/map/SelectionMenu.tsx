@@ -1,10 +1,13 @@
 import { useEffect, useRef } from "react";
+import { useI18n } from "../i18n/I18nContext";
 
 interface Props {
   count: number;
   canGroupCircle: boolean;
   canLink: boolean;
   onLink: () => void;
+  onNumber: () => void;
+  onClearNumbers: () => void;
   onDelete: () => void;
   onCopy: () => void;
   onCopyText: () => void;
@@ -23,7 +26,8 @@ interface Props {
 // would run straight under/behind them. Same dismiss-on-outside-click/
 // Escape pattern as every other menu in this app (NodeContextMenu,
 // CanvasContextMenu, AddMenu).
-export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onDelete, onCopy, onCopyText, onGroupCircle, onClose }: Props) {
+export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onNumber, onClearNumbers, onDelete, onCopy, onCopyText, onGroupCircle, onClose }: Props) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -55,26 +59,32 @@ export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onDelete
         className={item}
         onClick={onLink}
         disabled={!canLink}
-        title={canLink ? undefined : "Choose at least 2 nodes to link them"}
+        title={canLink ? undefined : t.ui.selection.needTwoToLink}
       >
-        Link
+        {t.ui.selection.link}
+      </button>
+      <button className={item} onClick={onNumber} title={t.ui.selection.numberTitle}>
+        {t.ui.selection.number}
+      </button>
+      <button className={item} onClick={onClearNumbers}>
+        {t.ui.selection.clearNumbers}
       </button>
       <button className={item} onClick={onCopy}>
-        Copy
+        {t.ui.selection.copy}
       </button>
       <button className={item} onClick={onCopyText}>
-        Copy as text
+        {t.ui.selection.copyText}
       </button>
       <button
         className={item}
         onClick={onGroupCircle}
         disabled={!canGroupCircle}
-        title={canGroupCircle ? undefined : "Select at least 2 nodes to group them"}
+        title={canGroupCircle ? undefined : t.ui.selection.needTwoToGroup}
       >
-        Group into circle
+        {t.ui.selection.groupCircle}
       </button>
       <button className={itemDanger} onClick={onDelete}>
-        Delete {count} node{count === 1 ? "" : "s"}
+        {t.ui.selection.deleteN(count)}
       </button>
     </div>
   );
