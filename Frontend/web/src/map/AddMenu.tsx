@@ -6,7 +6,6 @@ interface Props {
   onInvite: () => void;
   onCreateNode: () => void;
   onCreateCircle: () => void;
-  onNodeTypes: () => void;
   onExportText: () => void;
   onClose: () => void;
 }
@@ -20,7 +19,7 @@ interface Props {
 // would run the menu off the left edge. Same dismiss-on-outside-click/
 // Escape pattern as NodeContextMenu, just without that one's fixed x/y
 // placement.
-export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onNodeTypes, onExportText, onClose }: Props) {
+export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onExportText, onClose }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -57,9 +56,6 @@ export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onNod
       </button>
       <button className={item} onClick={onCreateCircle}>
         {t.map.addMenu.createCircle}
-      </button>
-      <button className={item} onClick={onNodeTypes}>
-        {t.map.addMenu.nodeTypes}
       </button>
       <button className={item} onClick={onExportText}>
         {t.map.addMenu.exportText}

@@ -26,7 +26,6 @@ import { MapToolbar } from "../map/MapToolbar";
 import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
 import { MapLegend } from "../map/MapLegend";
-import { NodeTypesModal } from "../map/NodeTypesModal";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId } from "../utils/nodeType";
@@ -140,7 +139,7 @@ export function MapPage() {
   const [showInvite, setShowInvite] = useState(false);
   // The old top toolbar (name, member count, Link/Add/Invite/color/
   // discussion-mode…) is gone — replaced by a small floating "+" menu (see
-  // MapToolbar). showNodeTypesLegend is that menu's "Node types" modal.
+  // MapToolbar).
   // Collapses Back/+/Move down to a single "⋮" button (Discussion/Personal
   // mode stays separately visible either way — see its own comment further
   // down) while the quick-add ghost ring is up (see quickAddActive below) —
@@ -152,7 +151,6 @@ export function MapPage() {
   // quick-add to end) and reset back to false the next time quick-add
   // activates fresh — see the effect below.
   const [forceShowToolbar, setForceShowToolbar] = useState(false);
-  const [showNodeTypesLegend, setShowNodeTypesLegend] = useState(false);
   const [showExportText, setShowExportText] = useState(false);
   // Set to a circle-parent's own rootId while its cluster-scoped "Extract
   // text" modal (extractClusterText/collectClusterSubtree) is open — null
@@ -2235,7 +2233,6 @@ export function MapPage() {
             onInvite={() => setShowInvite(true)}
             onCreateNode={startCreateNodeInView}
             onCreateCircle={createCircle}
-            onNodeTypes={() => setShowNodeTypesLegend(true)}
             onExportText={openExportText}
           />
 
@@ -2425,8 +2422,6 @@ export function MapPage() {
       {showInvite && map && (
         <InviteMemberModal map={map} onClose={() => setShowInvite(false)} onInvited={setMap} />
       )}
-
-      {showNodeTypesLegend && <NodeTypesModal onClose={() => setShowNodeTypesLegend(false)} />}
 
       {showExportText && map && (
         <ExportTextModal

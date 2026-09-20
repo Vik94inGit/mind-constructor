@@ -112,7 +112,6 @@ export interface Translation {
       invite: string;
       createNode: string;
       createCircle: string;
-      nodeTypes: string;
       exportText: string;
     };
     panelTabs: {
@@ -239,7 +238,6 @@ const en: Translation = {
       invite: "Invite user",
       createNode: "Create new node",
       createCircle: "Create circle",
-      nodeTypes: "Node types",
       exportText: "Export text",
     },
     panelTabs: {
@@ -356,7 +354,6 @@ const cs: Translation = {
       invite: "Pozvat uživatele",
       createNode: "Vytvořit nový uzel",
       createCircle: "Vytvořit kruh",
-      nodeTypes: "Typy uzlů",
       exportText: "Exportovat text",
     },
     panelTabs: {
@@ -473,7 +470,6 @@ const uk: Translation = {
       invite: "Запросити користувача",
       createNode: "Створити новий вузол",
       createCircle: "Створити коло",
-      nodeTypes: "Типи вузлів",
       exportText: "Експортувати текст",
     },
     panelTabs: {
@@ -590,7 +586,6 @@ const ru: Translation = {
       invite: "Пригласить пользователя",
       createNode: "Создать новый узел",
       createCircle: "Создать круг",
-      nodeTypes: "Типы узлов",
       exportText: "Экспортировать текст",
     },
     panelTabs: {
