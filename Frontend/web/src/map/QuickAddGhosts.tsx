@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
@@ -21,8 +21,8 @@ import { useI18n } from "../i18n/I18nContext";
 // className below) and the reduced opacity are ghost-specific beyond
 // that, marking it as "not real yet."
 const ICON_SIZE = 48;
-// Bumped up from 0.65 — a ghost used to read as a noticeably smaller,
-// harder-to-tap preview than the real node it's standing in for; bigger
+// 0.85, not smaller — a smaller scale reads as a noticeably smaller,
+// harder-to-tap preview than the real node it's standing in for; this size
 // makes it easier to see and tap, and to actually recognize which type's
 // icon it's previewing at a glance.
 const GHOST_SCALE = 0.85;
@@ -39,10 +39,10 @@ const GHOST_SCALE = 0.85;
 //
 // The floor both numbers have to clear now: NodeWings (only drawn on this
 // same selected node — see NodeCard) spreads a full ~124px wide, ~62px on
-// each side of the node's own center, wider than the bare 48px icon this
-// ring used to be sized against. A radius that only cleared the icon left
-// the two side-ish ghosts landing right on top of the wingtips — the
-// node reading as "half covered by its own ghosts" the instant it was
+// each side of the node's own center, wider than the bare 48px icon alone.
+// A radius that only cleared the icon would leave the two side-ish ghosts
+// landing right on top of the wingtips — the node reading as "half covered
+// by its own ghosts" the instant it was
 // selected, wings and all. RADIUS here has to clear that 62px wing
 // half-width *plus* a ghost's own half-width (ICON_SIZE*GHOST_SCALE/2 —
 // 20.4px at the scale above) with real margin to spare, on both mobile
@@ -64,15 +64,33 @@ interface Props {
   /** The currently-visible rectangle of the canvas, in canvas coordinates — keeps ghosts from fanning out past the edge of the screen. */
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
   onPick: (type: NodeType, pos: { x: number; y: number }) => void;
+  /** An empty map's hint: the ghosts draw in one at a time — icon, then its name — instead of all being there at once. */
+  intro?: boolean;
 }
+
+// One step of the ghosts' sequence. In the intro each ghost takes two steps
+// (icon, then its name); afterwards, and whenever a node is chosen, every
+// icon is up and the name moves from one ghost to the next, one per step.
+const STEP_MS = 1000;
 
 // Half-visible "ghost" previews fanned out around the selected node, one per
 // node type. Clicking a ghost names its type; clicking it again creates a real
 // node of that type at the ghost's spot and auto-links it to the anchor —
 // branching an argument tree becomes two clicks instead of toolbar button ->
 // modal -> manual placement.
-export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick }: Props) {
+export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick, intro = false }: Props) {
   const { t } = useI18n();
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setStep((s) => s + 1), STEP_MS);
+    return () => clearInterval(id);
+  }, []);
+  const count = NODE_TYPES.length;
+  const introSteps = intro ? count * 2 : 0;
+  const shownCount = step < introSteps ? Math.floor(step / 2) + 1 : count;
+  // Which ghost's name is showing right now, -1 for none.
+  const labelIndex =
+    step < introSteps ? (step % 2 === 1 ? Math.floor(step / 2) : -1) : (step - introSteps) % count;
   // Which ghost a click has picked out — its type name shows only once
   // picked. The first click only tells you which type this is (a one-tap
   // create was easy to trigger by accident on a phone and impossible to
@@ -84,25 +102,25 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   const mobile = isMobileViewport();
   const RADIUS = mobile ? 104 : 126;
   const EDGE_MARGIN = mobile ? 38 : 58;
-  // The anchor itself used to be the ring's center, with each of the 7
-  // points *independently* clamped into bounds afterward — fine when the
-  // anchor sits well clear of every edge, but a node close enough to one
-  // (a phone's own narrow/short visible strip makes "close enough" the
+  // If the anchor were simply the ring's center, with each of the 7 points
+  // *independently* clamped into bounds afterward, that would be fine when
+  // the anchor sits well clear of every edge — but a node close enough to
+  // one (a phone's own narrow/short visible strip makes "close enough" the
   // common case, not a rare one, and centerOnNode can only scroll a node
   // so close to the actual edge of the whole 2400x1600 canvas to begin
-  // with — there's nothing further to scroll into) clamped every point
-  // that would've landed past that edge to the *same* boundary value,
+  // with — there's nothing further to scroll into) would have every point
+  // that lands past that edge clamped to the *same* boundary value,
   // collapsing several ghosts on top of each other into a squashed line
   // instead of a ring.
   //
   // ringCenter itself stays dead simple — just the anchor, clamped into
   // bounds — because the actual "does it fit" question is answered below by
-  // R instead. An earlier version (a fixed halfSpan inset) pushed the whole
-  // ring away from the node whenever it didn't fully fit; a *naive* plain
-  // circular radius with only a final per-point clamp did worse — clamping
-  // each point independently flattened the cramped axis into a near-straight
-  // line, several ghosts landing at the exact same clamped coordinate
-  // instead of a curve. R below avoids that: it's pre-shrunk to whatever
+  // R instead. A fixed halfSpan inset that pushes the whole ring away from
+  // the node whenever it doesn't fully fit doesn't solve this either: a
+  // *naive* plain circular radius with only a final per-point clamp still
+  // flattens the cramped axis into a near-straight line, several ghosts
+  // landing at the exact same clamped coordinate instead of a curve. R
+  // below avoids that: it's pre-shrunk to whatever
   // `bounds` actually has (down to a real floor — see MIN_RADIUS's own
   // comment — rather than shrinking all the way to zero) *before* any
   // point is placed, so the final per-point clamp only ever has to nudge
@@ -166,6 +184,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   return (
     <>
       {NODE_TYPES.map((type, i) => {
+        if (i >= shownCount) return null;
         // Back to a full 360° ring — the node's own caption is hidden
         // outright while it's selected now (see NodeCard), which was the
         // actual thing a half-circle was working around (ghosts overlapping
@@ -207,13 +226,13 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
             // panel (and the ghost ring with it) rather than picking a
             // type. See NodeCard's own zIndexClass for the rest of this
             // scheme (nodes at z-31/32, the pending-create card at z-33 too).
-            className={`absolute z-[33] flex -translate-x-1/2 -translate-y-1/2 cursor-pointer flex-col items-center border-0 bg-transparent p-0 transition-[opacity,transform] duration-[150ms] ease-[ease] hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.1] hover:opacity-100 focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.1] focus-visible:opacity-100 ${
+            className={`absolute z-[33] flex -translate-x-1/2 -translate-y-1/2 cursor-pointer animate-ghost-in flex-col items-center border-0 bg-transparent p-0 transition-[opacity,transform] duration-[150ms] ease-[ease] hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.1] hover:opacity-100 focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.1] focus-visible:opacity-100 ${
               armedType === type ? "scale-[1.1] opacity-100" : "opacity-75"
             }`}
             // touchAction: manipulation — stops a quick second tap being
             // claimed by the browser as double-tap-to-zoom on a phone.
             style={{ left: x, top: y, touchAction: "manipulation" }}
-            title={armedType === type ? `${type} — ${t.ui.node.ghostAgain}` : type}
+            title={armedType === type ? `${t.ui.types[type]} — ${t.ui.node.ghostAgain}` : t.ui.types[type]}
             onClick={(e) => {
               e.stopPropagation();
               if (armedType === type) onPick(type, { x, y });
@@ -247,22 +266,26 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
                 )}
               </div>
             </div>
-            {/* Shown only for the ghost a click has picked out (see
-                armedType) — a hover tooltip never shows at all on a touch
-                device, which is exactly where a bare icon is hardest to
-                identify, so the click itself is what reveals the type.
-                Same small-chip-over-clutter styling NodeCard's own caption
-                uses, so it reads clearly against the canvas behind it.
-                whitespace-nowrap: these sit close enough together around
-                the ring that a wrapped two-line label would start
+            {/* Always mounted and faded (not added/removed) so the names
+                cross-fade instead of popping, and absolutely placed under the
+                icon so showing one never shifts the icon itself. Shows for
+                the ghost a click has picked out (with the "click again"
+                hint), otherwise for whichever ghost the sequence has reached — a hover tooltip never shows at all on
+                a touch device, which is exactly where a bare icon is hardest
+                to identify. Same small-chip-over-clutter styling NodeCard's
+                own caption uses, so it reads clearly against the canvas
+                behind it. whitespace-nowrap: these sit close enough together
+                around the ring that a wrapped two-line label would start
                 overlapping its neighbors', worse than one line running a
                 little wide. */}
-            {armedType === type && (
-              <div className="mt-[0.3rem] flex flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card">
-                <span className="text-[0.66rem] font-semibold">{type}</span>
-                <span className="text-[0.55rem] text-ink-soft">{t.ui.node.ghostAgain}</span>
-              </div>
-            )}
+            <div
+              className={`pointer-events-none absolute left-1/2 top-full mt-[0.3rem] flex -translate-x-1/2 flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card transition-opacity duration-500 ease-in-out ${
+                armedType === type || labelIndex === i ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              <span className="text-[0.66rem] font-semibold">{t.ui.types[type]}</span>
+              {armedType === type && <span className="text-[0.55rem] text-ink-soft">{t.ui.node.ghostAgain}</span>}
+            </div>
           </button>
         );
       })}

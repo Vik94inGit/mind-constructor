@@ -222,9 +222,9 @@ const en: Translation = {
       moveOn: "Move nodes: on — tap Done to go back to just selecting",
       moveOff: "Move nodes: off — turn on to drag nodes around",
       discussionTooltip:
-        "Discussion mode: on — combat (attack/protect) is visible. Click to switch to Personal mode.",
+        "Battle mode: on — attacks do damage, and members other than the owner are limited in what they can attack with. Click to switch to Creating mode.",
       personalTooltip:
-        "Personal mode: on — combat (attack/protect) is hidden for solo organizing. Click to switch back to Discussion mode.",
+        "Creating mode: on — attacks are decoration only and do no damage; no shields. Click to switch back to Battle mode.",
       zoomOut: "Zoom out",
       zoomReset: "Reset zoom",
       zoomIn: "Zoom in",
@@ -338,9 +338,9 @@ const cs: Translation = {
       moveOn: "Přesouvání uzlů: zapnuto — klepnutím na Hotovo se vrátíte jen k výběru",
       moveOff: "Přesouvání uzlů: vypnuto — zapněte pro přetahování uzlů",
       discussionTooltip:
-        "Diskuzní režim: zapnuto — souboj (útok/ochrana) je viditelný. Klepnutím přepnete do osobního režimu.",
+        "Bojový režim: zapnuto — útoky způsobují poškození a členové kromě vlastníka jsou omezeni v tom, čím mohou útočit. Klepnutím přepnete do tvůrčího režimu.",
       personalTooltip:
-        "Osobní režim: zapnuto — souboj (útok/ochrana) je skrytý pro samostatnou organizaci. Klepnutím přepnete zpět do diskuzního režimu.",
+        "Tvůrčí režim: zapnuto — útoky jsou jen dekorace a nezpůsobují poškození; bez štítů. Klepnutím přepnete zpět do bojového režimu.",
       zoomOut: "Oddálit",
       zoomReset: "Obnovit přiblížení",
       zoomIn: "Přiblížit",
@@ -454,9 +454,9 @@ const uk: Translation = {
       moveOn: "Переміщення вузлів: увімкнено — натисніть «Готово», щоб повернутися до вибору",
       moveOff: "Переміщення вузлів: вимкнено — увімкніть, щоб перетягувати вузли",
       discussionTooltip:
-        "Режим обговорення: увімкнено — бій (атака/захист) видимий. Натисніть, щоб перейти в особистий режим.",
+        "Бойовий режим: увімкнено — атаки завдають шкоди, а учасники, крім власника, обмежені в тому, чим можуть атакувати. Натисніть, щоб перейти в творчий режим.",
       personalTooltip:
-        "Особистий режим: увімкнено — бій (атака/захист) прихований для самостійної роботи. Натисніть, щоб повернутися в режим обговорення.",
+        "Творчий режим: увімкнено — атаки лише декорація й не завдають шкоди; без щитів. Натисніть, щоб повернутися в бойовий режим.",
       zoomOut: "Зменшити",
       zoomReset: "Скинути масштаб",
       zoomIn: "Збільшити",
@@ -570,9 +570,9 @@ const ru: Translation = {
       moveOn: "Перемещение узлов: включено — нажмите «Готово», чтобы вернуться к выбору",
       moveOff: "Перемещение узлов: выключено — включите, чтобы перетаскивать узлы",
       discussionTooltip:
-        "Режим обсуждения: включён — бой (атака/защита) виден. Нажмите, чтобы переключиться в личный режим.",
+        "Боевой режим: включён — атаки наносят урон, а участники, кроме владельца, ограничены в том, чем могут атаковать. Нажмите, чтобы переключиться в творческий режим.",
       personalTooltip:
-        "Личный режим: включён — бой (атака/защита) скрыт для самостоятельной работы. Нажмите, чтобы вернуться в режим обсуждения.",
+        "Творческий режим: включён — атаки лишь декорация и не наносят урона; без щитов. Нажмите, чтобы вернуться в боевой режим.",
       zoomOut: "Уменьшить",
       zoomReset: "Сбросить масштаб",
       zoomIn: "Увеличить",

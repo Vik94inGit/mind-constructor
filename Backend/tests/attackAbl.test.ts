@@ -9,7 +9,14 @@ import {
 } from "../src/dao/nodeDao.js";
 import { isMapMemberDao, getMapByInternalIdDao } from "../src/dao/mapsDao.js";
 import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../src/dao/attackDao.js";
-import { attackNodeAbl, getAttackHistoryAbl, protectNodeAbl, NotNodeOwnerError } from "../src/abl/attackAbl.js";
+import {
+  attackNodeAbl,
+  getAttackHistoryAbl,
+  protectNodeAbl,
+  NotNodeOwnerError,
+  AttackTypeNotAllowedError,
+  allowedAttackTypes,
+} from "../src/abl/attackAbl.js";
 import { ValidationError } from "../src/abl/errors.js";
 
 // An attack always carries the attacker's real objection now — every
@@ -21,7 +28,9 @@ const validContent = { type: "Problem" as const, text: "This has a real issue" }
 // getMapByInternalIdDao fetch — this is the "both attacker1 and victim1
 // are members" default every test below starts from unless it's
 // specifically testing membership.
-const normalMap = { members: ["attacker1", "victim1"] };
+// The attacker owns it, so the owner's "any type on anything" rule applies and
+// the tests that aren't about type rules don't have to care.
+const normalMap = { ownerId: "attacker1", members: ["attacker1", "victim1"] };
 
 vi.mock("../src/dao/nodeDao.js", () => ({
   findNodeByPublicIdDao: vi.fn(),
@@ -149,6 +158,7 @@ describe("attackAbl", () => {
       // this attacker ("someoneElse", a map member but neither w1's owner
       // nor n2's owner) still lands the hit and still heals n2's parent.
       vi.mocked(getMapByInternalIdDao).mockResolvedValue({
+        ownerId: "attacker1",
         members: ["attacker1", "victim1", "someoneElse"],
       } as never);
       vi.mocked(findNodeByInternalIdDao).mockResolvedValue({
@@ -256,9 +266,6 @@ describe("attackAbl", () => {
       expect(applyDamageDao).toHaveBeenCalledWith("n1", 0, true);
     });
 
-    // No cooldown check left at all — landing the same weapon twice in a
-    // row (previously blocked, WeaponOnCooldownError) now just lands
-    // twice.
     it("allows the same weapon to land twice in a row, with no cooldown in between", async () => {
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
         _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
@@ -283,14 +290,9 @@ describe("attackAbl", () => {
       expect(findNodeByPublicIdDao).not.toHaveBeenCalled();
     });
 
-    // Every outcome type is a valid attack-node type now (retaliation is
-    // naturally a positive claim — see ATTACK_NODE_TYPES's own doc
-    // comment), "unknown" alone stays excluded: it draws no ring/framing
-    // at all, so it never reads as an attack's own claim one way or the
-    // other.
-    it("rejects 'unknown' as an attack-node type", async () => {
+    it("rejects a type that isn't a node type at all", async () => {
       await expect(
-        attackNodeAbl("node1", "attacker1", "nitpick", { type: "unknown", text: "Nice try" }),
+        attackNodeAbl("node1", "attacker1", "nitpick", { type: "banana", text: "Nice try" }),
       ).rejects.toThrow(ValidationError);
       expect(findNodeByPublicIdDao).not.toHaveBeenCalled();
     });
@@ -431,6 +433,65 @@ describe("attackAbl", () => {
 
       expect(getAttackHistoryByNodeDao).toHaveBeenCalledWith("n1");
       expect(result).toEqual([{ weapon: "nitpick" }]);
+    });
+  });
+
+  describe("allowedAttackTypes — Discussion-mode type rules", () => {
+    it("lets the map owner use every type, question included, on anything", () => {
+      expect(allowedAttackTypes(true, "Problem")).toContain("unknown");
+      expect(allowedAttackTypes(true, "Success")).toHaveLength(7);
+    });
+
+    it("answers a negative target with positive types only, for a non-owner", () => {
+      for (const target of ["Problem", "Problematic option", "Fail"]) {
+        expect([...allowedAttackTypes(false, target)].sort()).toEqual(["Option", "Solution", "Success"]);
+      }
+    });
+
+    it("answers a positive or unknown target with a question or a negative problem/option, for a non-owner", () => {
+      for (const target of ["Solution", "Option", "Success", "unknown"]) {
+        expect([...allowedAttackTypes(false, target)].sort()).toEqual(["Problem", "Problematic option", "unknown"]);
+      }
+    });
+  });
+
+  describe("attackNodeAbl — battle vs creating mode", () => {
+    const target = { _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100, type: "Problem" };
+    const attackNode = (node: Record<string, unknown>, type: string, opts?: { asOwner?: boolean; discussionMode?: boolean }) => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({ ...node, populate: vi.fn().mockResolvedValue(node) } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue({
+        ownerId: opts?.asOwner ? "attacker1" : "victim1",
+        discussionMode: opts?.discussionMode,
+        members: ["attacker1", "victim1"],
+      } as never);
+      vi.mocked(findActiveProtectorDao).mockResolvedValue(null as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ ...node, health: 90 } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
+      return attackNodeAbl("node1", "attacker1", "nitpick", { type, text: "because" });
+    };
+
+    it("rejects a non-owner's attack whose type isn't allowed against the target, before any damage", async () => {
+      await expect(attackNode(target, "Problem")).rejects.toBeInstanceOf(AttackTypeNotAllowedError);
+      expect(applyDamageDao).not.toHaveBeenCalled();
+      expect(createWeaponNodeMutationDao).not.toHaveBeenCalled();
+    });
+
+    it("lets a non-owner answer a negative target with a positive node", async () => {
+      const result = await attackNode(target, "Solution");
+      expect(result?.weaponNode).toEqual({ nodeId: "w1" });
+      expect(applyDamageDao).toHaveBeenCalled();
+    });
+
+    it("lets the owner attack with any type", async () => {
+      await expect(attackNode(target, "unknown", { asOwner: true })).resolves.toBeTruthy();
+    });
+
+    it("in Personal mode ignores the type rules and does no damage, but still spawns the objection node", async () => {
+      const result = await attackNode(target, "Problem", { discussionMode: false });
+      expect(applyDamageDao).not.toHaveBeenCalled();
+      expect(healNodeDao).not.toHaveBeenCalled();
+      expect(logAttackDao).toHaveBeenCalledWith(expect.objectContaining({ damage: 0 }));
+      expect(result?.weaponNode).toEqual({ nodeId: "w1" });
     });
   });
 });

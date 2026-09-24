@@ -75,8 +75,8 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
       onClick={(e) => e.stopPropagation()}
       // Without this, double-clicking to select a word while typing here
       // (or double-tapping the icon by mistake) bubbles a dblclick up to
-      // the canvas — harmless today (the canvas no longer does anything on
-      // double-click), but stays stopped so a stray double-click in here
+      // the canvas — harmless today (the canvas has no double-click handler
+      // of its own), but stays stopped so a stray double-click in here
       // never risks landing on whatever's underneath.
       onDoubleClick={(e) => e.stopPropagation()}
     >

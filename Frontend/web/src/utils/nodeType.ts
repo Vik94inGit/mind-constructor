@@ -107,3 +107,14 @@ export function cycleAttackNodeType(current: NodeType): NodeType {
   const i = ATTACK_NODE_TYPES.indexOf(current as (typeof ATTACK_NODE_TYPES)[number]);
   return ATTACK_NODE_TYPES[(i + 1) % ATTACK_NODE_TYPES.length];
 }
+
+// Which node types an attack may carry in Discussion (battle) mode — mirrors
+// Backend attackAbl.ts's allowedAttackTypes, which is what actually enforces
+// it. The map's owner may use anything; any other member answers a negative
+// node with positive ones, and a positive (or unknown) node with a question
+// or a negative problem/option. Personal mode has no such limit.
+export function allowedAttackTypes(isMapOwner: boolean, targetType: NodeType): NodeType[] {
+  if (isMapOwner) return [...NODE_TYPES];
+  if (sentimentOf(targetType) === "negative") return ["Solution", "Option", "Success"];
+  return ["unknown", "Problem", "Problematic option"];
+}

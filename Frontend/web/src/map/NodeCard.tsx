@@ -24,8 +24,8 @@ import type { ReadingMode } from "../utils/readingMode";
 // from its id so it doesn't change across re-renders without needing to be
 // stored anywhere — same trick MapPage's hashOffset uses for weapon-node
 // placement jitter. A thin wrapper around canvasLayout's shared hashSeed
-// primitive now — see its own doc comment for why (this, hashOffset, and
-// seededRandoms below used to each hash a string their own separate way).
+// primitive — see its own doc comment for why; hashOffset and seededRandoms
+// below share it too, instead of each hashing a string their own way.
 function flightOffset(seed: string): { x: number; y: number } {
   const [r1, r2] = hashSeed(seed, 2);
   const angle = r1 * 2 * Math.PI;
@@ -140,7 +140,7 @@ interface Props {
   onPointerDown?: (e: ReactPointerEvent) => void;
   /** Receives the raw click event (not just fired) so callers can read modifier keys — a Shift+click toggles group selection instead of the normal single-select/center behavior. See MapPage's handleNodeClick. */
   onClick: (e: ReactMouseEvent) => void;
-  /** Double-click/double-tap — starts inline text/type editing (see MapPage's startInlineEdit). Double-click used to be a canvas-level zoom gesture instead; that's gone now, so this is the only thing double-clicking a node does. */
+  /** Double-click/double-tap — starts inline text/type editing (see MapPage's startInlineEdit); the only thing double-clicking a node does. */
   onDoubleClick?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
 }
@@ -299,8 +299,8 @@ export const NodeCard = memo(function NodeCard({
   const healthPct = Math.max(0, Math.min(100, node.health));
   // Opacity/cursor each have one property multiple states could set — CSS
   // cascade resolves that per-property, not per-modifier, so it's resolved
-  // the same way here: state precedence follows the order these used to be
-  // declared in the stylesheet (later declaration wins when more than one
+  // the same way here: state precedence follows the order these would be
+  // declared in a stylesheet (later declaration wins when more than one
   // state applies at once), not which condition happens to be checked
   // first. defeated > dragging > muted for opacity; readonly > dragging for
   // cursor. Filter (grayscale) is muted's alone — nothing else ever touched
@@ -369,12 +369,12 @@ export const NodeCard = memo(function NodeCard({
     // opts this element out of that native gesture so the pointermove
     // handler in MapPage's onNodePointerDown gets every event instead.
     // pointer-events-none: this box is 74px wide and as tall as icon +
-    // caption, and used to take every click inside it — with nodes (and
-    // their wide captions) packed around a circle's parent, that meant the
-    // zone drawn *underneath* them was covered almost end to end and
-    // effectively unclickable. Only the icon circle takes the pointer now
-    // (pointer-events-auto on it below); the handlers stay on this div and
-    // still fire, by bubbling up from that circle.
+    // caption. If it took every click inside it, with nodes (and their wide
+    // captions) packed around a circle's parent, the zone drawn *underneath*
+    // them would be covered almost end to end and effectively unclickable.
+    // Only the icon circle takes the pointer (pointer-events-auto on it
+    // below); the handlers stay on this div and still fire, by bubbling up
+    // from that circle.
     "group pointer-events-none absolute flex w-[74px] touch-none [transform:translate(-50%,-50%)] select-none flex-col items-center",
     zIndexClass,
     transitionClass,
@@ -399,7 +399,7 @@ export const NodeCard = memo(function NodeCard({
     // Same stopPropagation reasoning as click/contextmenu — a double-click
     // is preceded by two ordinary clicks (already handled above), so this
     // only needs to keep the *dblclick* event itself from reaching the
-    // canvas, which no longer does anything with it but shouldn't need to.
+    // canvas, which has no use for it anyway.
     e.stopPropagation();
     onDoubleClick?.();
   };
@@ -469,13 +469,13 @@ export const NodeCard = memo(function NodeCard({
   // it only on hover. The two custom properties stay inline either way — a
   // class-based rule can still read them via var(), cascade only decides
   // who wins for the *background* property itself.
-  // transparent, not var(--surface-2) — the "used up" portion of this ring
-  // (past the health-colored arc) used to fill gray, which on a damaged
-  // node read as a distinct gray zone sitting between the badge's own dark
-  // fill and its colored outline. Leaving it transparent instead means the
-  // ring only ever shows the *actual* health-colored arc; the "missing"
-  // health is communicated by that arc simply being shorter, not by a
-  // second, separately-colored fill for what isn't there any more.
+  // transparent, not var(--surface-2) — filling the "used up" portion of
+  // this ring (past the health-colored arc) with gray would read as a
+  // distinct gray zone sitting between the badge's own dark fill and its
+  // colored outline. Transparent instead means the ring only ever shows
+  // the *actual* health-colored arc; the "missing" health is communicated
+  // by that arc simply being shorter, not by a second, separately-colored
+  // fill for what isn't there.
   const healthGradient =
     "conic-gradient(var(--ring-color, var(--success)) calc(var(--health, 100) * 3.6deg), transparent 0deg)";
   const ringStyle: CSSProperties = {
@@ -494,21 +494,21 @@ export const NodeCard = memo(function NodeCard({
     outline: selected ? "2px solid var(--accent)" : multiSelected ? "2px dashed var(--accent)" : undefined,
     outlineOffset: 2,
   } as CSSProperties;
-  // Invisible until selected, then a plain fade-in — no more hover reveal:
-  // that let every node's health show one at a time on hover, which was
-  // still a whole map's worth of rings competing for attention as the
-  // cursor passed over them. Selecting a node is already the map's one
-  // "I'm looking at this one specifically" signal (see the outline above),
-  // so health rides along with that instead of its own separate trigger.
-  // This used to fall back to a flat bg-surface-2 fill instead of nothing,
-  // which read as a plain gray circle sitting around every node's icon
-  // rather than "nothing to see here, select it if you want it".
+  // Invisible until selected, then a plain fade-in — no hover reveal: that
+  // would let every node's health show one at a time on hover, still a
+  // whole map's worth of rings competing for attention as the cursor
+  // passed over them. Selecting a node is already the map's one "I'm
+  // looking at this one specifically" signal (see the outline above), so
+  // health rides along with that instead of its own separate trigger.
+  // Falling back to a flat bg-surface-2 fill instead of nothing would read
+  // as a plain gray circle sitting around every node's icon rather than
+  // "nothing to see here, select it if you want it".
   const healthVisibilityClass = "bg-transparent transition-[background] duration-150 ease-[ease]";
 
   const chaosCss = chaotic ? chaosStyle(node.nodeId) : undefined;
 
   // One glow effect wins when more than one could apply at once — same
-  // precedence the old stylesheet gave them by declaration order: a
+  // precedence a stylesheet would give them by declaration order: a
   // drag-drop highlight (valid/invalid) beats the plain inline-editing glow,
   // which in turn beats the persistent unsolved-problem pulse — both of
   // those are transient, in-the-moment states, so they should visibly take
@@ -532,12 +532,12 @@ export const NodeCard = memo(function NodeCard({
   // entirely" to have been protecting.
   const circleBorderClass = "overflow-hidden border-2 shadow-card";
   // under-fire (indicator) wins over the type's own color when both could
-  // apply. This used to be a Tailwind class (border-danger) instead, which
-  // an *unconditional* inline `borderColor` a few lines down silently
-  // overrode every single time — an inline style always beats a class for
-  // the same CSS property, so that red under-fire border could never
-  // actually render, indicator or not. Deciding the color in JS instead,
-  // so whichever one applies is really what gets set.
+  // apply, decided in JS rather than CSS: a Tailwind class (border-danger)
+  // here would lose to the *unconditional* inline `borderColor` a few
+  // lines down every time — an inline style always beats a class for the
+  // same CSS property, so a class-based red under-fire border could never
+  // actually render, indicator or not. Deciding the color in JS instead
+  // means whichever one applies is really what gets set.
   const circleBorderColor = indicator
     ? "var(--danger)"
     : node.symbolOverride === "check"
@@ -654,11 +654,11 @@ export const NodeCard = memo(function NodeCard({
             not — the user's own "if attacking node absent, protect is just
             a usual node but with shield" case. Bottom-left corner: the
             indicator badge claims top-right, the pack-count badge claims
-            bottom-right. The only shield decoration now — a separate
-            bow-and-emblem overlay used to draw on top of an actively
-            defending protection node too, but that read as redundant
-            clutter once the node itself already sits right on the attack's
-            own arrow path (see MapPage's positions memo) — removed. */}
+            bottom-right. The only shield decoration: a separate
+            bow-and-emblem overlay on top of an actively defending
+            protection node would be redundant clutter, since the node
+            itself already sits right on the attack's own arrow path (see
+            MapPage's positions memo). */}
         {node.isProtection && (
           <div className="absolute -bottom-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-surface text-[0.7rem]">
             🛡️
@@ -675,13 +675,11 @@ export const NodeCard = memo(function NodeCard({
             wings' own base, same "flanking the head, not stamped on top
             of it" look the wings always had. */}
         {!classic && <NodeWings type={displayType} show={selected} symbolOverride={node.symbolOverride} />}
-        {/* No more weapon-type badge here — which weapon landed used to
-            show as a little corner label on the objection node itself.
-            That's dropped in favor of the pointer MapPage draws between
-            this node and its target (see the weapon-mark <g> there): an
-            attack node otherwise renders exactly like any other node of
-            its type, and the pointer alone carries "this is an attack,
-            aimed at that". */}
+        {/* No weapon-type badge here — which weapon landed shows via the
+            pointer MapPage draws between this node and its target (see
+            the weapon-mark <g> there), not a corner label: an attack node
+            otherwise renders exactly like any other node of its type, and
+            the pointer alone carries "this is an attack, aimed at that". */}
         <div className="pointer-events-none absolute inset-0 z-[5] overflow-visible" ref={particlesRef} />
         {classic ? (
           // Classical mind map: no icon — a text box with the node's whole
@@ -798,16 +796,16 @@ export const NodeCard = memo(function NodeCard({
         />
       ) : selected || !showCaption || !captionLabel ? null : (
         <div
-          // bg-surface + rounded + a touch of horizontal padding: an edge
-          // line, another node's chaotic drift, a zone polygon — anything
-          // rendered behind this caption (this whole overlay SVG sits below
-          // NodeCard in z-index, so it's always something behind, never in
-          // front) used to show straight through the plain transparent text
-          // block, visually cutting through the caption and making it
-          // harder to read wherever it happened to cross. An opaque chip
-          // behind the text stops that regardless of what's actually back
-          // there, rather than trying to keep every other layer clear of
-          // wherever captions might land.
+          // bg-surface + rounded + a touch of horizontal padding: without
+          // it, an edge line, another node's chaotic drift, a zone polygon
+          // — anything rendered behind this caption (this whole overlay
+          // SVG sits below NodeCard in z-index, so it's always something
+          // behind, never in front) would show straight through a plain
+          // transparent text block, visually cutting through the caption
+          // and making it harder to read wherever it happened to cross. An
+          // opaque chip behind the text stops that regardless of what's
+          // actually back there, rather than trying to keep every other
+          // layer clear of wherever captions might land.
           //
           // CAPTION_WIDTH wide (twice the node's own 74px), still two rows —
           // roughly twice as much of the title fits as before. items-center

@@ -1,18 +1,15 @@
-// Shared by every controller's catch block. Each action in this codebase
-// used to repeat the same shape by hand: check ValidationError first (always
-// 400, from abl/errors.ts), then walk its own list of domain-specific error
-// classes imported from its own ABL module, then fall back to
-// console.error(...) + 500. This is a mechanical extraction of that shape —
-// not a behavior change — so every controller still imports its own error
-// classes from its own ABL module and passes them in via `mappings`.
+// Shared by every controller's catch block, so no action has to repeat this
+// shape by hand: check ValidationError first (always 400, from abl/errors.ts),
+// then walk the caller's own list of domain-specific error classes, then fall
+// back to console.error(...) + 500. Every controller still imports its own
+// error classes from its own ABL module and passes them in via `mappings`.
 import type { Response } from "express";
 import { ValidationError } from "../abl/errors.js";
 
 // The JSON body an error mapping produces — always includes `success: false`
 // (added by handleAblError itself), so a mapping only ever supplies the rest.
 // A plain string is the common case (a fixed error message); a function lets
-// a handler pull extra fields off the error itself (e.g. WeaponOnCooldownError's
-// own `readyAt`).
+// a handler pull extra fields off the error itself.
 type ErrorBody<E> = string | ((error: E) => Record<string, unknown>);
 
 export type ErrorMapping<E extends Error = Error> = [

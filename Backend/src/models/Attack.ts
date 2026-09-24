@@ -3,9 +3,9 @@ import mongoose from "mongoose";
 // The weapon catalog. Damage is snapshotted onto each Attack document, so
 // rebalancing a weapon later doesn't rewrite history.
 export const WEAPONS = {
-  nitpick: { label: "Nitpick", damage: 10, cooldownMs: 0 },
-  counterpoint: { label: "Counterpoint", damage: 25, cooldownMs: 5 * 60 * 1000 },
-  fatalFlaw: { label: "Fatal Flaw", damage: 50, cooldownMs: 30 * 60 * 1000 },
+  nitpick: { label: "Nitpick", damage: 10 },
+  counterpoint: { label: "Counterpoint", damage: 25 },
+  fatalFlaw: { label: "Fatal Flaw", damage: 50 },
 } as const;
 
 export type WeaponKey = keyof typeof WEAPONS;

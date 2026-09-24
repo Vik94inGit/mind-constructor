@@ -11,9 +11,14 @@ import {
 import type { ViewportBounds } from "../utils/canvasLayout";
 
 // The dead zone past each edge of the canvas, as a fraction of the viewport:
-// just enough to scroll an edge node in far enough for its quick-add ghost
-// ring to fit, and no more.
-const SCROLL_MARGIN_FRAC = 0.3;
+// enough to scroll a node sitting right on any edge all the way to where a
+// chosen node is centered, so its quick-add ghost ring can fan out fully into
+// the dead zone. Horizontally that is half the viewport width. Vertically the
+// chosen node is centered in the part of the screen the bottom sheet leaves
+// free, so the bottom margin has to cover the sheet's share as well — see
+// vScrollMarginFrac.
+const H_SCROLL_MARGIN_FRAC = 0.5;
+const vScrollMarginFrac = () => (1 + panelReserveFrac(isMobileViewport())) / 2;
 
 interface Params {
   mapId: string | undefined;
@@ -122,15 +127,12 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   // QuickAddGhosts/the radial neighbor ring clamp themselves into (see
   // their own doc comments), so their ring visibly detached from the node
   // instead of surrounding it. This margin exists on all four sides so a
-  // node near *any* edge — not just the bottom, which used to be the only
-  // side this was ever added for — can still be scrolled into that safe
-  // zone. SCROLL_MARGIN_FRAC (30%) of a clientWidth/clientHeight (divided
-  // back out of screen pixels into canvas units, same *zoom reasoning every
-  // other screen<->canvas conversion here uses): enough room for an edge
-  // node's ghost ring, without being able to center it dead-on — anything
-  // more is just empty blind zone to scroll through. It used to be a full
-  // viewport's worth, then half, which still left a lot of nothing past
-  // every border; the
+  // node near *any* edge can still be scrolled into that safe zone.
+  // H_SCROLL_MARGIN_FRAC / vScrollMarginFrac() of a clientWidth/clientHeight
+  // (divided back out of screen pixels into canvas units, same *zoom
+  // reasoning every other screen<->canvas conversion here uses): enough to
+  // center an edge node dead-on, with its ghost ring free to fan out over the
+  // dead zone; the
   // margin itself is drawn dimmed and hatched (see the padded wrapper's own
   // JSX) so it reads as "outside the map", with the real canvas framed as
   // the active space.
@@ -143,8 +145,8 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     const wrap = wrapRef.current;
     if (!wrap) return;
     function update() {
-      setHScrollMargin(Math.ceil((wrap!.clientWidth / zoom) * SCROLL_MARGIN_FRAC));
-      setVScrollMargin(Math.ceil((wrap!.clientHeight / zoom) * SCROLL_MARGIN_FRAC));
+      setHScrollMargin(Math.ceil((wrap!.clientWidth / zoom) * H_SCROLL_MARGIN_FRAC));
+      setVScrollMargin(Math.ceil((wrap!.clientHeight / zoom) * vScrollMarginFrac()));
     }
     update();
     const resizeObserver = new ResizeObserver(update);
@@ -197,9 +199,9 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   // screenToCanvas: converts a screen point (e.g. clientX/clientY) into
   // canvas-coordinate space (the same 0..CANVAS_W/0..CANVAS_H units every
   // node's x/y, `positions`, and dragState are already in). Needed because
-  // canvasRef is now visually zoomed via a CSS transform (see the zoom
-  // state below) — its rendered size no longer matches CANVAS_W/CANVAS_H
-  // 1:1, so any screen-pixel distance has to be divided by the current
+  // canvasRef is visually zoomed via a CSS transform (see the zoom
+  // state below), so its rendered size doesn't match CANVAS_W/CANVAS_H
+  // 1:1, and any screen-pixel distance has to be divided by the current
   // zoom before it means anything in canvas coordinates. wrap's own
   // scroll position + bounding rect (not canvasRef's) is the anchor: the
   // canvas's transform-origin is its own (0,0), which sits at wrap's
@@ -318,11 +320,11 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   // Pans the canvas so the given node's position lands in the middle of the
   // current viewport, unconditionally — the chosen node (whatever was just
   // clicked/selected) always ends up centered, not just nudged into view.
-  // Selecting a node always brings up NodePanel too, and that panel is now a
-  // bottom sheet *overlaying* the canvas at every screen size (see its own
-  // PANEL_CLASS) rather than a sidebar the canvas shrinks to make room for —
-  // so wrap.clientHeight's own full height is no longer what's actually
-  // visible above it. panelReserveFrac() (see its own doc comment) is a
+  // Selecting a node always brings up NodePanel too, which overlays the
+  // canvas as a bottom sheet at every screen size (see its own PANEL_CLASS)
+  // instead of reserving space as a sidebar would — so wrap.clientHeight's
+  // own full height isn't what's actually visible above it.
+  // panelReserveFrac() (see its own doc comment) is a
   // deliberate approximation (there's no reliable, synchronously-correct
   // measurement of the panel's real height here — it hasn't mounted yet for
   // a first selection, and its content, and so its height, varies by node
@@ -476,20 +478,26 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   useEffect(() => {
     const wrap = wrapRef.current;
     if (loading || !wrap || !mapId || didInitialFitRef.current === mapId) return;
-    if (hScrollMargin === 0 || vScrollMargin === 0 || positions.size === 0) return;
+    if (hScrollMargin === 0 || vScrollMargin === 0) return;
     didInitialFitRef.current = mapId;
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const p of positions.values()) {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x);
-      maxY = Math.max(maxY, p.y);
+    // An empty map opens on the middle of the canvas, where its first
+    // node-type ghosts are drawn (see MapPage's empty-map QuickAddGhosts).
+    let cx = CANVAS_W / 2;
+    let cy = CANVAS_H / 2;
+    if (positions.size > 0) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const p of positions.values()) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+      cx = (minX + maxX) / 2;
+      cy = (minY + maxY) / 2;
     }
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
     wrap.scrollTo({
       left: (cx + hScrollMargin) * zoom - wrap.clientWidth / 2,
       top: (cy + vScrollMargin) * zoom - wrap.clientHeight / 2,

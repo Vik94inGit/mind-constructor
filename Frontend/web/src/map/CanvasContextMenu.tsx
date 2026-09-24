@@ -70,9 +70,10 @@ export function CanvasContextMenu({ x, y, onPick, pasteCount, onPasteHere, onClo
         <button key={type} className={item} onClick={() => onPick(type)}>
           {/* Same symbol the real node will actually render once created
               (OutcomeBadge, not NodeTypeIcon's own separate glyph set) —
-              this picker used to show a different icon per type than the
-              node it created ended up with, reading as "wait, that's not
-              what I picked" the moment the real one appeared. "unknown"
+              NodeTypeIcon's glyph set here instead would give this picker a
+              different icon per type than the node it creates ends up with,
+              reading as "wait, that's not what I picked" the moment the
+              real one appeared. "unknown"
               alone has no outcome symbol to match, so it keeps its own
               plain NodeTypeIcon glyph, same as the real node does. */}
           {ringKindFor(type) ? (
@@ -80,7 +81,7 @@ export function CanvasContextMenu({ x, y, onPick, pasteCount, onPasteHere, onClo
           ) : (
             <NodeTypeIcon type={type} size={16} />
           )}
-          {type}
+          {t.ui.types[type]}
         </button>
       ))}
     </div>

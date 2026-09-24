@@ -8,6 +8,9 @@ import * as linesApi from "../api/lines";
 import { ApiRequestError } from "../api/client";
 import { useMapSocket } from "../hooks/useMapSocket";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
+import { useCanvasMode } from "../hooks/useCanvasMode";
+import { useWeaponReplay } from "../hooks/useWeaponReplay";
+import { useNotice } from "../hooks/useNotice";
 import { stepPrefix, stepRank } from "../utils/textExport";
 import { buildNodeClipboard, nodeClipboardSize, readNodeClipboard, writeNodeClipboard } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
@@ -35,6 +38,8 @@ import { MapLegend } from "../map/MapLegend";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId } from "../utils/nodeType";
+import { layoutTemplate } from "../utils/templates";
+import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import type { Sentiment } from "../utils/nodeType";
 import {
   CANVAS_W,
@@ -68,6 +73,14 @@ const ADDRESSES_PROBLEM_TYPES = new Set<NodeType>(["Success", "Option", "Solutio
 // (see zoneAngleGuard).
 const NEW_NODE_ID = "__new__";
 
+// Stable empty fallbacks for reading a canvas-mode field that only exists in
+// one of the mode's variants (see useCanvasMode) — a plain literal instead
+// would still work, just as a fresh, unnecessary object every render. Never
+// mutated — every write goes through dispatchMode, which replaces the whole
+// field rather than touching one of these in place.
+const EMPTY_STRING_SET: Set<string> = new Set();
+const EMPTY_POINTS: { x: number; y: number }[] = [];
+
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
@@ -77,16 +90,27 @@ export function MapPage() {
   const [map, setMap] = useState<MapDoc | null>(null);
   const [nodes, setNodes] = useState<NodeDoc[]>([]);
   const [edges, setEdges] = useState<EdgeDoc[]>([]);
-  // Separator lines drawn on the map (see utils/drawLine.ts and the backend's
-  // Line model), and the state of drawing a new one: on/off, the points placed
-  // so far, where the pointer is, and whether the last click was refused
-  // because it landed on a node or zone.
+  // Separator lines drawn on the map — see utils/drawLine.ts and the backend's
+  // Line model.
   const [lines, setLines] = useState<LineDoc[]>([]);
-  const [drawMode, setDrawMode] = useState(false);
-  const [drawPoints, setDrawPoints] = useState<{ x: number; y: number }[]>([]);
-  const [drawHover, setDrawHover] = useState<{ x: number; y: number } | null>(null);
-  const [drawBlocked, setDrawBlocked] = useState<"spot" | "crossing" | null>(null);
-  const [drawSaving, setDrawSaving] = useState(false);
+  // The canvas's own interaction mode — at most one of choosing nodes,
+  // packing nodes into a container, or drawing a separator line, each with
+  // its own data (see useCanvasMode's own doc comment for why this is one
+  // reducer rather than nine separate booleans/values). `chooseMode`/
+  // `packMode`/`drawMode` and each mode's own fields below are derived from
+  // it fresh every render — plain reads, not additional state — so the rest
+  // of this file reads exactly as it did with separate flags.
+  const [mode, dispatchMode] = useCanvasMode();
+  const chooseMode = mode.kind === "choose";
+  const packMode = mode.kind === "pack";
+  const packContainerId = mode.kind === "pack" ? mode.containerId : null;
+  const packSelection = mode.kind === "pack" ? mode.picks : EMPTY_STRING_SET;
+  const packError = mode.kind === "pack" ? mode.error : null;
+  const drawMode = mode.kind === "draw";
+  const drawPoints = mode.kind === "draw" ? mode.points : EMPTY_POINTS;
+  const drawHover = mode.kind === "draw" ? mode.hover : null;
+  const drawBlocked = mode.kind === "draw" ? mode.blocked : null;
+  const drawSaving = mode.kind === "draw" ? mode.saving : false;
   const drawBlockedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawHoverFrameRef = useRef<number | null>(null);
   const [indicators, setIndicators] = useState<AttackIndicator[]>([]);
@@ -96,11 +120,11 @@ export function MapPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
-  // gated behind it (see its own comment). Root cause this fixes: dragging
-  // used to arm from the very first pointerdown on any node, so lightly
-  // grazing one while trying to tap it (a phone's own touch imprecision,
-  // mainly) read as "drag this node," relocating or even re-parenting it
-  // by accident. Turning it on is a deliberate, explicit act (the
+  // gated behind it (see its own comment). Arming a drag straight from the
+  // first pointerdown on any node would read lightly grazing one while just
+  // trying to tap it (a phone's own touch imprecision, mainly) as "drag this
+  // node," relocating or even re-parenting it by accident. Turning it on is
+  // a deliberate, explicit act (the
   // toolbar's own Move toggle) instead of the app's default stance.
   // Doesn't touch double-click-to-edit (startInlineEdit) or an
   // already-multi-selected group's own drag — both stay available
@@ -121,42 +145,29 @@ export function MapPage() {
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
   // group selection (multiSelectIds — the same one shift+click and the marquee
   // build), instead of opening that node's panel. The group bar then offers
-  // what to do with the chosen nodes: link, copy or delete them.
-  const [chooseMode, setChooseMode] = useState(false);
+  // what to do with the chosen nodes: link, copy or delete them. (See `mode`
+  // above for chooseMode/packMode/packContainerId/packSelection/packError
+  // themselves — declared once, together, up there.)
+  //
   // The chosen nodes, in the order they were chosen, waiting on the sentiment
   // modal to finish linking them — 2 nodes finish as a single edge (a line);
   // 3+ finish as a closed loop (every consecutive pair plus one closing the
   // last node back to the first), which is what the cycle detector below then
   // colors as a figure.
   const [pendingLink, setPendingLink] = useState<NodeDoc[] | null>(null);
-  // Pack mode: same shape as link mode above, just for "which linked/
-  // branched nodes should fold into packContainerId" instead of "which
-  // nodes should this edge connect." packContainerId is fixed for the
-  // whole pick (unlike link mode, which has no anchor), so this doesn't
-  // need its own ordered-list-of-endpoints reasoning — just a Set of picks.
-  const [packMode, setPackMode] = useState(false);
-  const [packContainerId, setPackContainerId] = useState<string | null>(null);
-  const [packSelection, setPackSelection] = useState<Set<string>>(new Set());
-  const [packError, setPackError] = useState<string | null>(null);
   // Same reasoning, generalized: every other per-action failure (a failed
-  // update/delete/create/circle-join) used to call setError too,
-  // which meant so much as a rejected drag-to-join-circle nuked the whole
-  // canvas behind a "map not found"-style screen. This is the one place
-  // those land instead — a dismissible banner over the still-live canvas.
+  // update/delete/create/circle-join) routes here rather than through
+  // setError, which drives the full-page failure view — a rejected
+  // drag-to-join-circle shouldn't nuke the whole canvas behind a "map not
+  // found"-style screen. This is a dismissible banner over the still-live
+  // canvas instead.
   const [actionError, setActionError] = useState<string | null>(null);
   // The circle whose zone was just clicked, while it is still being chosen and
   // its members' titles/text are still on their way (two round trips: the
   // choice itself, then the text). Shows a spinner on the zone so the click
   // visibly registered instead of the canvas looking frozen.
   const [circleLoadingRootId, setCircleLoadingRootId] = useState<string | null>(null);
-  // A short confirmation ("Copied 3 nodes…") — auto-dismissed, unlike an error.
-  const [notice, setNotice] = useState<string | null>(null);
-  const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function showNotice(message: string) {
-    setNotice(message);
-    if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
-    noticeTimeoutRef.current = setTimeout(() => setNotice(null), 5000);
-  }
+  const { notice, showNotice, dismissNotice } = useNotice();
 
   // A node not yet created — its text is still being typed into the inline
   // input hovering at (x,y), styled with `type`'s icon. Nothing is sent to
@@ -194,14 +205,7 @@ export function MapPage() {
   // lists/titles passed into the same ExportTextModal.
   const [extractClusterRootId, setExtractClusterRootId] = useState<string | null>(null);
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
-  // Which weapon just had its arrows re-fired — set by clicking either end
-  // of an attack (see handleNodeClick/triggerWeaponShot below), cleared
-  // once the flight's had time to finish. `nonce` is what actually reaches
-  // WeaponMark as replayNonce: a plain boolean/id wouldn't force a second
-  // flight if you click the same weapon twice in a row, since nothing
-  // about the value would have changed the second time.
-  const [shotState, setShotState] = useState<{ id: string; nonce: number } | null>(null);
-  const shotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { shotState, triggerWeaponShot } = useWeaponReplay();
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
   // Right-click on *empty* canvas (as opposed to a node — see contextMenu
   // above) — opens a small type-picker for creating a new, parent-less
@@ -239,8 +243,8 @@ export function MapPage() {
   // pointer isn't over anything droppable. Drives NodeCard's highlight ring.
   const [dropTarget, setDropTarget] = useState<{ nodeId: string; valid: boolean } | null>(null);
   // Rubber-band select: a plain left-button drag started on empty canvas
-  // (previously unused — panning is native scroll/trackpad, not a click-
-  // drag) sweeps this rectangle (canvas coordinates) and, on release,
+  // (free to claim — panning is native scroll/trackpad, not a click-drag)
+  // sweeps this rectangle (canvas coordinates) and, on release,
   // replaces multiSelectIds with every own node whose position falls
   // inside it. null outside of an active marquee drag.
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
@@ -456,10 +460,10 @@ export function MapPage() {
   // (it's the more specific state), falling back to the plain single
   // selection. Null when nothing at all is chosen, the one case edges/
   // branch-arrows stay fully lit. Feeds the same dimming both the branch
-  // arrows and plain Edges apply below — previously that only kicked in
-  // for a multi-select, leaving every edge full-opacity while a single
-  // node was selected even though that's already the map's "I'm focused on
-  // this one" state everywhere else (NodeCard's own outline/health/wings).
+  // arrows and plain Edges apply below, for a single selection too, not
+  // just a multi-select — a lone selected node is already the map's "I'm
+  // focused on this one" state everywhere else (NodeCard's own outline/
+  // health/wings), so its edges should read that way too.
   const chosenNodeIds = multiSelectIds.size > 0 ? multiSelectIds : selectedId ? new Set([selectedId]) : null;
   // Same condition that gates the quick-add ghost ring below — reused here
   // so every other node dims while it's showing, putting the focus on the
@@ -559,34 +563,24 @@ export function MapPage() {
 
   // The points a new or moved node has to stay clear of: every *visible*
   // node's position, minus `exclude` (the thing being placed). Only visible
-  // ones — a node packed out of sight still has an entry in `positions`, and
-  // used to push new placements away from a spot that looked empty.
+  // ones — a node packed out of sight still has an entry in `positions`;
+  // counting it here would push new placements away from a spot that looks
+  // empty to the user.
   function obstaclePoints(exclude?: Set<string>) {
     return visibleNodes
       .filter((n) => !exclude?.has(n.nodeId))
       .map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
   }
 
-  // Replays a weapon's arrow flight (see WeaponMark) — alongside
-  // centerOnNode's camera pan, so clicking either end of an attack reads as
-  // "watch it land on that" rather than just an instant jump. The nonce
-  // (not just the id) is what actually reaches WeaponMark as replayNonce,
-  // so clicking the same weapon twice in a row still fires a second flight.
-  function triggerWeaponShot(weaponId: string) {
-    if (shotTimeoutRef.current) clearTimeout(shotTimeoutRef.current);
-    setShotState({ id: weaponId, nonce: Date.now() });
-    shotTimeoutRef.current = setTimeout(() => setShotState(null), 700);
-  }
 
   // Filters packed-away members out of every canvas rendering loop. Packing
   // (packAbl.ts) still exists as a relationship regardless — a container's
   // own count badge, and its "Packed (N)" unpack list in NodePanel, both
   // still work off Node.packedIntoNodeId either way — but a packed member
-  // itself is hidden from the canvas again (this filter briefly went away
-  // per an earlier "no packed are hidden" ask; reinstated per a later,
-  // final call reverting that). NodePanel still receives plain `nodes`
-  // (not this), since it has to show a packed member in its container's own
-  // unpack list even though the canvas itself no longer renders it.
+  // itself is hidden from the canvas. NodePanel still receives plain
+  // `nodes` (not this), since it has to show a packed member in its
+  // container's own unpack list even though the canvas itself doesn't
+  // render it.
   const visibleNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
 
   // How many nodes are currently packed into each container — NodeCard's
@@ -880,8 +874,8 @@ export function MapPage() {
     // drop nodes": dragging has to be turned on first (the toolbar's own
     // Move toggle) instead of arming from the very first pointerdown on
     // any node, so a phone's own touch imprecision while just trying to
-    // tap a node can no longer relocate — or even re-parent — it by
-    // accident. node.locked takes the same path even with Move on — a
+    // tap a node can't relocate — or even re-parent — it by accident.
+    // node.locked takes the same path even with Move on — a
     // chosen circle's own members hold their position for good (see the
     // group-drag branch's own comment above), so Move toggled on never
     // re-arms a reposition for one of them either; touch long-press-to-
@@ -1143,13 +1137,10 @@ export function MapPage() {
     return isOwnNode(node);
   }
 
-  // Mirrors attackAbl.ts exactly: combat is fully open now — no own-node
-  // rule, no weapon-node exclusion, no already-defeated block. Any node
-  // (yours, someone else's, a weapon node, already at 0 health) is a valid
-  // attack target for any map member. Kept as its own function (rather than
-  // inlining `true` at each call site) purely so every place that used to
-  // ask "can this be attacked" still reads the same way and stays easy to
-  // re-tighten later if these rules ever come back.
+  // Any node (yours, someone else's, a weapon node, already at 0 health) is a
+  // valid attack target for any map member. What varies is which node types
+  // the attack may carry (NodePanel's allowedAttackTypes, enforced by
+  // attackAbl.ts), not which nodes may be attacked.
   function canAttackNode(_node: NodeDoc) {
     return true;
   }
@@ -1186,35 +1177,32 @@ export function MapPage() {
       // Same toggle-in/out-freely behavior link mode's own picking uses —
       // clicking an already-picked node just removes that one pick.
       if (packSelection.has(node.nodeId)) {
-        setPackSelection((prev) => {
-          const next = new Set(prev);
-          next.delete(node.nodeId);
-          return next;
-        });
+        dispatchMode({ type: "packToggle", nodeId: node.nodeId });
         return;
       }
       if (node.nodeId === packContainerId) return; // the anchor can't pack itself
       const eligible = packContainerId ? computeLinkedNeighborIds(packContainerId, nodes, edges) : new Set<string>();
       if (!eligible.has(node.nodeId)) {
-        setPackError(t.ui.pack.onlyLinked);
+        dispatchMode({ type: "packSetError", error: t.ui.pack.onlyLinked });
         return;
       }
-      setPackError(null);
-      setPackSelection((prev) => new Set(prev).add(node.nodeId));
+      dispatchMode({ type: "packToggle", nodeId: node.nodeId });
       return;
     }
     if (chooseMode) {
-      // Same toggle shift+click does, without the key — tapping an already
-      // chosen node drops just that one.
+      // Tapping a node chooses it together with its whole branch (see
+      // branchIds); tapping one that is already chosen drops it and its branch
+      // again. Shift+tap acts on just that one node.
       if (!isOwnNode(node)) {
         setActionError(t.ui.errors.chooseOwn);
         return;
       }
       setActionError(null);
+      const affected = shiftKey ? [node.nodeId] : [node.nodeId, ...branchIds(node.nodeId)];
       setMultiSelectIds((prev) => {
         const next = new Set(prev);
-        if (next.has(node.nodeId)) next.delete(node.nodeId);
-        else next.add(node.nodeId);
+        if (next.has(node.nodeId)) affected.forEach((id) => next.delete(id));
+        else affected.forEach((id) => next.add(id));
         return next;
       });
       return;
@@ -1281,19 +1269,47 @@ export function MapPage() {
   // "Choose…" (its panel or right-click menu). Drops the single selection: the
   // group bar takes over the bottom sheet, and NodePanel can't share it.
   function startChooseFrom(nodeId: string) {
-    setPackMode(false);
-    setPackContainerId(null);
-    setPackSelection(new Set());
     setSelectedId(null);
-    setChooseMode(true);
-    setMultiSelectIds(new Set([nodeId]));
+    dispatchMode({ type: "chooseStart" });
+    setMultiSelectIds(new Set([nodeId, ...branchIds(nodeId)]));
+  }
+
+  // Every node below `rootId` in the branch tree (parentId) — its children, their
+  // children, and so on — that you can choose: your own, on the canvas, and not
+  // an attack or shield node (those hang off a node by parentId too, but they
+  // aren't part of the argument). In the order a reader would follow it, level
+  // by level from the top, which is also the order "Number in order" numbers
+  // them in.
+  function branchIds(rootId: string): string[] {
+    const childrenOf = new Map<string, NodeDoc[]>();
+    for (const n of visibleNodes) {
+      const parent = nodeRefId(n.parentId);
+      if (!parent) continue;
+      if (!childrenOf.has(parent)) childrenOf.set(parent, []);
+      childrenOf.get(parent)!.push(n);
+    }
+    const found: string[] = [];
+    const seen = new Set<string>([rootId]);
+    const queue = [rootId];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      for (const child of childrenOf.get(current) ?? []) {
+        if (seen.has(child.nodeId)) continue;
+        seen.add(child.nodeId);
+        // Not chosen itself if it's someone else's, an attack or a shield — but
+        // its own children are still reached through it.
+        if (isOwnNode(child) && !child.isWeapon && !child.isProtection) found.push(child.nodeId);
+        queue.push(child.nodeId);
+      }
+    }
+    return found;
   }
 
   // Leaves choose mode and drops the whole group selection — shared by the
   // group bar's own Deselect and every action that finishes with the chosen
   // nodes, so they can't drift apart on what "done choosing" means.
   function exitChooseMode() {
-    setChooseMode(false);
+    dispatchMode({ type: "reset" });
     setMultiSelectIds(new Set());
   }
 
@@ -1309,24 +1325,21 @@ export function MapPage() {
   }
 
   // Opens the pack picker for containerNode — keyed by one fixed anchor
-  // (packContainerId) instead of a growing list of choices. Exits choose mode
-  // first if it was somehow active (the two share the same bottom-sheet slot —
-  // see the JSX below — so only one can really be "active" at once).
+  // (packContainerId) instead of a growing list of choices. dispatchMode's
+  // "packStart" replaces whatever mode was active before (choose or draw
+  // included — the three share this same bottom-sheet slot, so only one can
+  // really be "active" at once), but doesn't touch the group selection, which
+  // choose mode also used — clear that explicitly, same as exitChooseMode
+  // would have.
   function startPackFrom(containerNodeId: string) {
-    exitChooseMode();
-    setPackMode(true);
-    setPackContainerId(containerNodeId);
-    setPackSelection(new Set());
-    setPackError(null);
+    setMultiSelectIds(new Set());
+    dispatchMode({ type: "packStart", containerId: containerNodeId });
   }
 
   // Backs out of pack mode without packing anything — shared by the picker's
   // own ✕/Cancel and anything else abandoning a pick in progress.
   function exitPackMode() {
-    setPackMode(false);
-    setPackContainerId(null);
-    setPackSelection(new Set());
-    setPackError(null);
+    dispatchMode({ type: "reset" });
   }
 
   const packContainer = packContainerId ? nodes.find((n) => n.nodeId === packContainerId) : undefined;
@@ -1353,7 +1366,7 @@ export function MapPage() {
       if (selectedId && res.members.some((m) => m.nodeId === selectedId)) setSelectedId(null);
       exitPackMode();
     } catch (err) {
-      setPackError(err instanceof ApiRequestError ? err.message : t.ui.errors.pack);
+      dispatchMode({ type: "packSetError", error: err instanceof ApiRequestError ? err.message : t.ui.errors.pack });
     }
   }
 
@@ -1380,8 +1393,8 @@ export function MapPage() {
   }
 
   // Rubber-band (marquee) select: a plain left-button drag started on empty
-  // canvas — previously unused (panning is native scroll/trackpad, not a
-  // click-drag) — sweeps a rectangle and, on release, replaces
+  // canvas (free to claim — panning is native scroll/trackpad, not a
+  // click-drag) sweeps a rectangle and, on release, replaces
   // multiSelectIds with every own, non-weapon node whose position falls
   // inside it. Mirrors onNodePointerDown's own screenToCanvas-based
   // tracking, just for a rectangle instead of a single point.
@@ -1449,14 +1462,8 @@ export function MapPage() {
     window.addEventListener("pointerup", onUp);
   }
 
-  // Right-click on a node: CUD + Link for your own nodes (a weapon node
-  // included — it's usual for this purpose now, same as everywhere else
-  // isOwnNode gates), plus Attack — always, now that canAttackNode is
-  // unconditionally true (combat is fully open, see its own comment). So
-  // this menu now always has at least Attack to show, own node or not;
-  // the `!own && !canAttackNode(node)` guard below is effectively dead
-  // (kept rather than special-cased away, in case attack ever gets
-  // restricted again).
+  // Right-click on a node: CUD + Link for your own nodes, plus Attack for any
+  // node (see canAttackNode).
   function handleNodeContextMenu(node: NodeDoc, e: ReactMouseEvent) {
     const own = isOwnNode(node);
     if (!own && !canAttackNode(node)) {
@@ -1567,6 +1574,31 @@ export function MapPage() {
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId });
   }
 
+  // Grows a template branch (see utils/templates.ts) from `root`: every node
+  // is a real node with its prompt as title + text, created parents-first so
+  // each one can hang from the previous.
+  async function applyTemplate(kind: TemplateKind, root: NodeDoc) {
+    if (!mapId) return;
+    const rootPos = positions.get(root.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const placed = layoutTemplate(kind, rootPos, obstaclePoints());
+    const ids = new Map<TemplateNodeKey, string>();
+    for (const p of placed) {
+      const copy = t.ui.templates.nodes[p.key];
+      const node = await nodesApi.createNode(mapId, {
+        text: copy.text,
+        title: copy.title,
+        type: p.type,
+        order: p.order,
+        x: p.x,
+        y: p.y,
+        parentId: p.parentKey ? ids.get(p.parentKey) : root.nodeId,
+      });
+      ids.set(p.key, node.nodeId);
+      upsertNode(node);
+    }
+    showNotice(t.ui.templates.created(placed.length));
+  }
+
   // Fires once the inline pending-node input (see PendingNodeCard) actually
   // confirms with non-empty text — the one place any node-creation path
   // (toolbar, double-click, "Create branch", quick-add) ends up.
@@ -1648,22 +1680,14 @@ export function MapPage() {
     }
     setSelectedId(null);
     setMultiSelectIds(new Set());
-    setChooseMode(false);
-    setPackMode(false);
-    setPackContainerId(null);
-    setPackSelection(new Set());
     setContextMenu(null);
     setCanvasContextMenu(null);
     setPendingCreate(null);
-    setDrawPoints([]);
-    setDrawMode(true);
+    dispatchMode({ type: "drawStart" });
   }
 
   function exitDrawMode() {
-    setDrawMode(false);
-    setDrawPoints([]);
-    setDrawHover(null);
-    setDrawBlocked(null);
+    dispatchMode({ type: "reset" });
   }
 
   // A point may go anywhere no node and no zone covers, and so may the stretch
@@ -1702,21 +1726,21 @@ export function MapPage() {
     const p = snapToLines(raw, lines);
     const refusal = drawRefusal(p);
     if (refusal) {
-      setDrawBlocked(refusal);
+      dispatchMode({ type: "drawSetBlocked", blocked: refusal });
       if (drawBlockedTimeoutRef.current) clearTimeout(drawBlockedTimeoutRef.current);
-      drawBlockedTimeoutRef.current = setTimeout(() => setDrawBlocked(null), 2200);
+      drawBlockedTimeoutRef.current = setTimeout(() => dispatchMode({ type: "drawSetBlocked", blocked: null }), 2200);
       return;
     }
-    setDrawBlocked(null);
+    dispatchMode({ type: "drawSetBlocked", blocked: null });
     // A double-click lands two clicks on the same spot — one point is enough.
     const last = drawPoints[drawPoints.length - 1];
     if (last && Math.hypot(p.x - last.x, p.y - last.y) < 8) return;
     if (drawPoints.length >= 200) return; // the backend's own limit per line
-    setDrawPoints((prev) => [...prev, p]);
+    dispatchMode({ type: "drawAddPoint", point: p });
   }
 
   function undoDrawPoint() {
-    setDrawPoints((prev) => prev.slice(0, -1));
+    dispatchMode({ type: "drawUndoPoint" });
   }
 
   // Follows the pointer with the free/blocked ring — at most once per frame.
@@ -1724,21 +1748,21 @@ export function MapPage() {
     if (e.pointerType === "touch") return;
     const p = snapToLines(screenToCanvas(e.clientX, e.clientY), lines);
     if (drawHoverFrameRef.current !== null) cancelAnimationFrame(drawHoverFrameRef.current);
-    drawHoverFrameRef.current = requestAnimationFrame(() => setDrawHover(p));
+    drawHoverFrameRef.current = requestAnimationFrame(() => dispatchMode({ type: "drawSetHover", hover: p }));
   }
 
   async function finishLine() {
     if (!mapId || drawPoints.length < 2 || drawSaving) return;
-    setDrawSaving(true);
+    dispatchMode({ type: "drawSetSaving", saving: true });
     setActionError(null);
     try {
       const line = await linesApi.createLine(mapId, drawPoints);
       upsertLine(line);
-      setDrawPoints([]);
+      dispatchMode({ type: "drawClearPoints" });
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.lines.createFailed);
     } finally {
-      setDrawSaving(false);
+      dispatchMode({ type: "drawSetSaving", saving: false });
     }
   }
 
@@ -2205,7 +2229,7 @@ export function MapPage() {
         }
         if (!e.ctrlKey && !e.metaKey && e.key === "Escape") {
           e.preventDefault();
-          if (drawPoints.length > 0) setDrawPoints([]);
+          if (drawPoints.length > 0) dispatchMode({ type: "drawClearPoints" });
           else exitDrawMode();
           return;
         }
@@ -2287,7 +2311,7 @@ export function MapPage() {
       {notice && (
         <div className="mx-4 mt-[0.6rem] flex items-center justify-between gap-3 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">
           {notice}
-          <button className={btnSmGhost} onClick={() => setNotice(null)}>
+          <button className={btnSmGhost} onClick={dismissNotice}>
             ✕
           </button>
         </div>
@@ -2337,7 +2361,7 @@ export function MapPage() {
               plain fixed pixel margin at zoom 1 would read as a much
               smaller (or larger) safety net once zoomed. transformOrigin
               "0 0" keeps that scaling anchored at this wrapper's own
-              top-left, same as canvasRef's own transform used to. */}
+              top-left. */}
           <div
             style={{
               position: "relative",
@@ -2349,10 +2373,9 @@ export function MapPage() {
               // real canvas inset within it — a darkened, hatched band on
               // every side, so it reads as "past the edge of the map" and
               // the framed canvas (see its own style below) reads as the
-              // one active space. The dot grid that used to sit on the
-              // scroll container itself now lives on the canvas instead,
-              // so it stops at the border rather than continuing under
-              // the blind zone.
+              // one active space. The dot grid lives on the canvas rather
+              // than the scroll container, so it stops at the border
+              // instead of continuing under the blind zone.
               background:
                 "repeating-linear-gradient(45deg, color-mix(in srgb, var(--ink) 9%, transparent) 0 1px, transparent 1px 9px), color-mix(in srgb, #000 14%, var(--paper))",
             }}
@@ -2570,6 +2593,20 @@ export function MapPage() {
               />
             )}
 
+            {!loading && nodes.length === 0 && !pendingCreate && !drawMode && (
+              <QuickAddGhosts
+                intro
+                anchorPos={{ x: CANVAS_W / 2, y: CANVAS_H / 2 }}
+                // No bounds to squeeze the ring into: the view opens centered
+                // on this point, so a full round ring fits.
+                bounds={{ minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity }}
+                onPick={(type, pos) => {
+                  setActionError(null);
+                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null });
+                }}
+              />
+            )}
+
             {pendingCreate && (
               <PendingNodeCard
                 x={pendingCreate.x}
@@ -2663,13 +2700,7 @@ export function MapPage() {
             containerText={packContainer.text}
             picks={packPicks}
             error={packError}
-            onRemove={(id) =>
-              setPackSelection((prev) => {
-                const next = new Set(prev);
-                next.delete(id);
-                return next;
-              })
-            }
+            onRemove={(id) => dispatchMode({ type: "packToggle", nodeId: id })}
             onConfirm={confirmPackSelection}
             onCancel={exitPackMode}
           />
@@ -2691,24 +2722,24 @@ export function MapPage() {
           selectedNode &&
           user && (
             <>
-              {/* No dimming backdrop behind this any more — it used to
-                  double as "tap anywhere outside NodePanel closes it," but
-                  the canvas's own onClick (see canvasRef below) already
-                  deselects on a tap that reaches empty canvas directly, and
-                  the backdrop's real cost outweighed that one extra bit of
-                  outside-the-canvas coverage: it sat at z-30, between the
-                  canvas content (z-31+) and the panel itself (z-40), which
-                  made it the thing every quick-add ghost, node, and the
-                  pending-create input had to specifically out-rank just to
-                  stay tappable while a node was selected (see their own
-                  z-index comments) — a whole layering workaround for a
-                  backdrop that was mostly just visual dimming to begin with. */}
+              {/* No dimming backdrop behind this: the canvas's own onClick
+                  (see canvasRef below) already deselects on a tap that
+                  reaches empty canvas directly, so a backdrop's only real job
+                  left would be dimming — not worth its cost. Sitting at z-30,
+                  between the canvas content (z-31+) and the panel itself
+                  (z-40), it would be the thing every quick-add ghost, node,
+                  and the pending-create input has to specifically out-rank
+                  just to stay tappable while a node is selected (see their
+                  own z-index comments) — a whole layering workaround for
+                  what would be mostly just visual dimming. */}
               <NodePanel
                 node={selectedNode}
                 nodes={nodes}
                 edges={edges}
                 currentUserId={user._id}
                 discussionMode={isDiscussionMode}
+                isMapOwner={isOwner}
+                onApplyTemplate={(kind) => applyTemplate(kind, selectedNode)}
                 onClose={() => setSelectedId(null)}
                 onSelectNode={(id) => {
                   setSelectedId(id);

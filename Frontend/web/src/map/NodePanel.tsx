@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { idOf, nodeRefId, usernameOf, ZONE_COLORS } from "../utils/nodeType";
+import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf, ZONE_COLORS } from "../utils/nodeType";
+import type { TemplateKind } from "../utils/templates";
 import { isMobileViewport } from "../utils/canvasLayout";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
-import { ATTACK_NODE_TYPES, MANUAL_ZONE_COLORS, NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
+import { MANUAL_ZONE_COLORS, NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 
@@ -66,12 +67,12 @@ const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "13
 const PANEL_CLASS =
   "fixed inset-x-0 bottom-0 z-[46] max-h-[50dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
-// Every section below used to render stacked, all at once — text, health,
-// CRUD, links, the whole attack form, and history — which made this panel
-// the tallest thing on the page for even the plainest node. Now the header
-// only ever shows the type icon and a two-line clamp of the node's own
-// text (see the header markup below); everything else lives behind one of
-// these tabs, one screenful at a time. Which tabs actually show up (and
+// The header only ever shows the type icon and a two-line clamp of the
+// node's own text (see the header markup below); everything else — text,
+// health, CRUD, links, the whole attack form, and history — lives behind
+// one of these tabs, one screenful at a time, rather than stacked and
+// visible all at once (which would make this panel the tallest thing on
+// the page for even the plainest node). Which tabs actually show up (and
 // which one opens by default) still depends on the node — see tabsFor below.
 type Tab = "info" | "links" | "attack" | "protect" | "pack" | "history";
 
@@ -89,8 +90,12 @@ interface Props {
   nodes: NodeDoc[];
   edges: EdgeDoc[];
   currentUserId: string;
-  /** MapPage's isDiscussionMode — Personal mode (false) hides the Attack/Protect tabs entirely; everything else (Info/Links/Pack/History, including the read-only "Protects"/"Protected by" lines) stays visible either way. */
+  /** MapPage's isDiscussionMode — Discussion (battle) mode: attacks hurt and members are limited in which node types they may attack with. Personal (creating) mode: attacks still add their node but do no damage, and the Protect tab is hidden. */
   discussionMode: boolean;
+  /** The current user created this map. In battle mode the owner may attack with any node type; everyone else is limited (see allowedAttackTypes). */
+  isMapOwner: boolean;
+  /** Grows a template branch from this node (see utils/templates.ts). Resolves once every node is created. */
+  onApplyTemplate: (kind: TemplateKind) => Promise<void>;
   onClose: () => void;
   onDeleted: (nodeId: string) => void;
   /** Fired after a direct panel-side PATCH (currently just the symbol-override toggle below) with the server's response, so the canvas/other panels stay in sync — same upsert-by-id MapPage already does for every other node update. */
@@ -115,7 +120,7 @@ interface Props {
   onStartPack: () => void;
   /** One packed member got unpacked back to a normal, visible node. */
   onUnpacked: (node: NodeDoc) => void;
-  /** True when this node is a circle's own root/parent (2+ direct parentId-children — MapPage's circleRootSentimentByNode). Gates the "Extract text" button below: the whole-map export moved to the "+" toolbar menu only, so a plain non-parent node's panel no longer offers any text export at all. */
+  /** True when this node is a circle's own root/parent (2+ direct parentId-children — MapPage's circleRootSentimentByNode). Gates the "Extract text" button below: the whole-map export lives in the "+" toolbar menu only, so a plain non-parent node's panel offers no text export at all. */
   isClusterParent: boolean;
   /** Asks MapPage to open a text export scoped to this node's own cluster — plus, recursively, any cluster rooted at one of its children (see MapPage's collectClusterSubtree). Only ever called when isClusterParent is true. */
   onExtractText: () => void;
@@ -127,6 +132,8 @@ export function NodePanel({
   edges,
   currentUserId,
   discussionMode,
+  isMapOwner,
+  onApplyTemplate,
   onClose,
   onDeleted,
   onUpdated,
@@ -149,7 +156,7 @@ export function NodePanel({
   // An attack now creates a real node — this is that node's content, filled
   // in before any of the weapon buttons below will actually fire.
   const [attackText, setAttackText] = useState("");
-  const [attackType, setAttackType] = useState<AttackNodeType>("Problem");
+  const [attackType, setAttackType] = useState<NodeType>("Problem");
   // Same shape as the attack draft, for the Protect tab.
   const [protectText, setProtectText] = useState("");
   const [protectType, setProtectType] = useState<AttackNodeType>("Solution");
@@ -175,13 +182,13 @@ export function NodePanel({
   // auto-clears, same pattern the mobile-focused parts of this file already
   // favor over a persistent status line for a one-off confirmation.
   const [copied, setCopied] = useState(false);
-  // The Info tab's own text box's only "increasing fold" used to be the
-  // textarea's native CSS resize handle (a small drag grip in its own
-  // bottom-right corner) — easy to miss (no visible affordance beyond that
-  // grip), doesn't work at all via touch on most mobile browsers, and
-  // never existed in the first place for a non-owner (their read-only view
-  // is a plain div, which CSS resize doesn't apply to at all). This is an
-  // explicit, always-visible, works-everywhere substitute: expanded drops
+  // Relying on the textarea's native CSS resize handle (a small drag grip
+  // in its own bottom-right corner) for the Info tab's own text box would
+  // be easy to miss (no visible affordance beyond that grip), wouldn't
+  // work via touch on most mobile browsers, and wouldn't exist at all for
+  // a non-owner (their read-only view is a plain div, which CSS resize
+  // doesn't apply to). This is an explicit, always-visible, works-
+  // everywhere substitute instead: expanded drops
   // the box's own height cap entirely (letting it grow to fit the whole
   // text) instead of scrolling internally within a fixed 40vh — the panel
   // itself already scrolls (see PANEL_CLASS), so a long text just makes
@@ -232,16 +239,34 @@ export function NodePanel({
   // its panel can't be open in the first place).
   const packedMembers = nodes.filter((n) => nodeRefId(n.packedIntoNodeId) === node.nodeId);
 
-  // Combat is fully open now (see attackAbl.ts's own comment) — no
-  // own-node rule, no weapon-node exclusion, no already-defeated block.
-  // Mirrors MapPage's canAttackNode exactly: any node is a valid target —
-  // the one remaining gate is client-side only, Personal mode hiding the
-  // Attack tab/controls entirely (the backend itself never checks
-  // discussionMode for this — see Backend/CLAUDE.md's own doc comment).
-  function computeCanAttack() {
-    return discussionMode;
-  }
-  const canAttack = computeCanAttack();
+  // Which node types this attack may carry: in battle mode the owner may use
+  // anything, everyone else is limited by the target's side (mirrors
+  // attackAbl.ts, which enforces it); in Personal mode there is no limit.
+  const attackTypes: NodeType[] = discussionMode ? allowedAttackTypes(isMapOwner, node.type) : [...NODE_TYPES];
+  // The type actually sent: the picked one while it is still allowed, else
+  // the first allowed (a mode flip or a different target can invalidate it).
+  const effectiveAttackType = attackTypes.includes(attackType) ? attackType : attackTypes[0];
+  const attackHint = !discussionMode
+    ? t.ui.attack.hintPersonal
+    : isMapOwner
+      ? null
+      : sentimentOf(node.type) === "negative"
+        ? t.ui.attack.hintNegativeTarget
+        : t.ui.attack.hintPositiveTarget;
+
+  // Growing a template branch — only offered on a node that has no branch
+  // yet (Problem or Solution: a ready structure; Fail: analyze and retry).
+  const hasChildren = nodes.some((n) => nodeRefId(n.parentId) === node.nodeId);
+  const templateKind: TemplateKind | null =
+    !isCreator || hasChildren || node.isWeapon || node.isProtection
+      ? null
+      : node.type === "Problem"
+        ? "problem"
+        : node.type === "Solution"
+          ? "goal"
+          : node.type === "Fail"
+            ? "retry"
+            : null;
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
   // symbol at all — "unknown" nodes render the plain NodeTypeIcon glyph
   // instead, nothing here to override.
@@ -256,7 +281,7 @@ export function NodePanel({
   const tabs: Tab[] = [
     "info",
     "links",
-    ...(canAttack ? (["attack"] as const) : []),
+    "attack",
     ...(discussionMode ? (["protect"] as const) : []),
     ...(packedMembers.length > 0 ? (["pack"] as const) : []),
     "history",
@@ -270,7 +295,7 @@ export function NodePanel({
   // content (both content blocks below are gated by the same discussionMode
   // check, so it would otherwise render as a silently blank sheet).
   useEffect(() => {
-    if (!discussionMode && (tab === "attack" || tab === "protect")) setTab("info");
+    if (!discussionMode && tab === "protect") setTab("info");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [discussionMode]);
 
@@ -430,12 +455,25 @@ export function NodePanel({
     }
   }
 
+  async function handleTemplate(kind: TemplateKind) {
+    setBusy(true);
+    setError(null);
+    try {
+      await onApplyTemplate(kind);
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.templates.failed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleAttack(weapon: Weapon) {
     if (!attackText.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await nodesApi.attackNode(node.nodeId, weapon, { type: attackType, text: attackText.trim() });
+      const res = await nodesApi.attackNode(node.nodeId, weapon, { type: effectiveAttackType, text: attackText.trim() });
       onAttacked(res.node, res.weaponNode, weapon, res.healedParent, res.blocked, res.protector);
       // Landing an attack — blocked or not — creates a real node (the
       // weapon node carrying the attacker's own objection); closing here
@@ -557,10 +595,10 @@ export function NodePanel({
 
   const tabLabel: Record<Tab, string> = {
     info: t.map.panelTabs.info,
-    // Everything that used to live in the Info tab (Edit/Pack/Delete, Size,
-    // Zone, Symbol, health, and the weapon/protection relationship lines)
-    // moved onto this same "links" tab, on top of what it already had —
-    // "Modify" is the label for all of that combined now, not just linking.
+    // Edit/Pack/Delete, Size, Zone, Symbol, health, and the weapon/protection
+    // relationship lines all live on this same "links" tab, on top of what
+    // it already had — "Modify" is the label for all of that combined,
+    // not just linking.
     links: t.map.panelTabs.modify,
     attack: t.map.panelTabs.attack,
     protect: t.map.panelTabs.protect,
@@ -586,7 +624,7 @@ export function NodePanel({
           <div className="flex flex-shrink-0 items-center gap-[0.4rem]">
             <div
               className="flex items-center text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase"
-              title={node.type}
+              title={t.ui.types[node.type]}
             >
               <NodeTypeIcon type={node.type} />
             </div>
@@ -703,6 +741,32 @@ export function NodePanel({
               </button>
             )}
           </div>
+        {templateKind && (
+          <div className="mt-4 rounded-lg border border-line bg-surface-2 p-3">
+            <div className="text-[0.78rem] font-semibold text-ink-soft">
+              {templateKind === "retry" ? t.ui.templates.retry.title : t.ui.templates.section}
+            </div>
+            <p className="mt-1 text-[0.78rem] text-ink-soft">
+              {templateKind === "problem"
+                ? t.ui.templates.problem.hint
+                : templateKind === "goal"
+                  ? t.ui.templates.goal.hint
+                  : t.ui.templates.retry.hint}
+            </p>
+            <button
+              type="button"
+              className="mt-2 inline-flex cursor-pointer items-center rounded-lg border border-accent bg-accent-soft px-3 py-[0.4rem] text-[0.85rem] font-semibold text-accent-ink disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy}
+              onClick={() => handleTemplate(templateKind)}
+            >
+              {templateKind === "problem"
+                ? t.ui.templates.problem.button
+                : templateKind === "goal"
+                  ? t.ui.templates.goal.button
+                  : t.ui.templates.retry.button}
+            </button>
+          </div>
+        )}
         </div>
       )}
 
@@ -828,9 +892,9 @@ export function NodePanel({
                 disabled={busy}
                 className="rounded-lg border border-line bg-surface px-[0.55rem] py-[0.3rem] text-[0.8rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {NODE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {NODE_TYPES.map((ty) => (
+                  <option key={ty} value={ty}>
+                    {t.ui.types[ty]}
                   </option>
                 ))}
               </select>
@@ -1022,7 +1086,7 @@ export function NodePanel({
         </div>
       )}
 
-      {tab === "attack" && canAttack && (
+      {tab === "attack" && (
         <div className="mt-4">
           <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
             {t.ui.attack.intro}
@@ -1048,16 +1112,17 @@ export function NodePanel({
             </label>
             <select
               id="attack-type"
-              value={attackType}
-              onChange={(e) => setAttackType(e.target.value as AttackNodeType)}
+              value={effectiveAttackType}
+              onChange={(e) => setAttackType(e.target.value as NodeType)}
               className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
             >
-              {ATTACK_NODE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {attackTypes.map((ty) => (
+                <option key={ty} value={ty}>
+                  {t.ui.types[ty]}
                 </option>
               ))}
             </select>
+            {attackHint && <p className="text-[0.75rem] text-ink-soft">{attackHint}</p>}
           </div>
           {!attackText.trim() && (
             <p style={{ fontSize: "0.78rem", color: "var(--accent)", fontWeight: 600 }}>
@@ -1116,9 +1181,9 @@ export function NodePanel({
                   onChange={(e) => setProtectType(e.target.value as AttackNodeType)}
                   className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
                 >
-                  {PROTECT_NODE_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  {PROTECT_NODE_TYPES.map((ty) => (
+                    <option key={ty} value={ty}>
+                      {t.ui.types[ty]}
                     </option>
                   ))}
                 </select>

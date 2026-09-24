@@ -11,9 +11,9 @@ interface Props {
 const stepBtn =
   "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40";
 
-// Stacked directly above the minimap in the same bottom-right corner (used to
-// sit bottom-left; moved to keep both of the canvas's floating controls in one
-// place instead of split across the screen). bottom-[150px]: the minimap's own
+// Stacked directly above the minimap in the same bottom-right corner,
+// keeping both of the canvas's floating controls in one place instead of
+// split across the screen. bottom-[150px]: the minimap's own
 // bottom-3 (12px) plus its ~122px rendered height (120px MINIMAP_H + its 1px
 // border each side) plus a small gap, so this sits just above it rather than
 // touching. Same z-[45] reasoning as the minimap: above the canvas/panel,

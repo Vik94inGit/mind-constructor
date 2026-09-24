@@ -1,9 +1,8 @@
-// Pure, stateless canvas-geometry helpers previously living at module scope
-// inside MapPage.tsx — placement math, obstacle-avoidance, and a couple of
-// small pure predicates none of which touch React state/refs/closures at
-// all, just plain inputs to plain outputs. Pulled out here so MapPage.tsx
-// itself (which was pushing 3,500 lines) is just the component and its own
-// state/handlers; nothing here changed behavior, only location.
+// Pure, stateless canvas-geometry helpers: placement math, obstacle-
+// avoidance, and a couple of small pure predicates, none of which touch
+// React state/refs/closures — just plain inputs to plain outputs. Kept
+// separate from MapPage.tsx so that component stays just the component and
+// its own state/handlers.
 import { nodeRefId, sentimentOf } from "./nodeType";
 import type { Sentiment } from "./nodeType";
 import type { EdgeDoc, NodeDoc, NodeType } from "../types";
@@ -55,26 +54,22 @@ export function panelReserveFrac(isMobile: boolean) {
 }
 
 // Low-level seeded-hash primitive shared by this file's own hashOffset,
-// NodeCard's flightOffset, and NodeCard's seededRandoms — three independent
-// "hash a string into pseudo-random number(s)" implementations used to live
-// separately (slightly different mod bases, one returning a single number,
-// one an {x,y} pair, one an array of N fracts), which meant three formulas
-// to keep straight for what's conceptually the same trick. Consolidated
-// here as the one primitive all three now derive from — count independent
-// pseudo-random values in [0, 1) from one seed, matching seededRandoms's own
-// existing contract exactly (same mod base, same per-index sin/fract
-// formula) since that's both the most general of the three (the other two
-// each only need a subset of what it already produces) and the one on the
-// hottest path (every drifting/chaotic node re-reads it on every render via
-// chaosStyle), so its own output for a given seed stays bit-identical to
-// before — nothing about which drift waypoints an already-visible node
-// picked changes. hashOffset/flightOffset below are reimplemented as thin
-// wrappers around this instead of keeping their own separate hash loops;
-// their own numeric output for a given seed shifts as a result (different
-// mod base than before), which isn't a functional change — same output
-// range/shape either way — just a one-time visual reshuffle of exactly
-// which offset/flight-direction an existing weapon node's animation seed
-// happens to land on, not worth keeping a third formula around to avoid.
+// NodeCard's flightOffset, and NodeCard's seededRandoms — three call sites
+// that would otherwise each need their own "hash a string into pseudo-random
+// number(s)" formula (slightly different mod bases, one returning a single
+// number, one an {x,y} pair, one an array of N fracts) for what's
+// conceptually the same trick. This is the one primitive all three derive
+// from — count independent pseudo-random values in [0, 1) from one seed,
+// matching seededRandoms's own contract exactly (same mod base, same
+// per-index sin/fract formula) since that's both the most general of the
+// three (the other two each only need a subset of what it already produces)
+// and the one on the hottest path (every drifting/chaotic node re-reads it
+// on every render via chaosStyle). hashOffset/flightOffset below are thin
+// wrappers around this rather than keeping their own separate hash loops;
+// their numeric output for a given seed follows this shared mod base rather
+// than a formula tuned to each call site individually — same output
+// range/shape either way, just not necessarily the identical offset/
+// flight-direction a bespoke formula would happen to produce for that seed.
 export function hashSeed(seed: string, count: number): number[] {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 1000003;
@@ -115,10 +110,10 @@ export function computeLinkedNeighborIds(anchorId: string, nodes: NodeDoc[], edg
   return neighborIds;
 }
 
-// Shared phone-width breakpoint — used to be independently duplicated in
-// (at least) this file's own getNodeMinDist, MapPage.tsx, NodePanel.tsx, and
-// QuickAddGhosts.tsx; consolidated here as the one place that decides what
-// "mobile" means for canvas layout purposes. Read live (not memoized) since
+// Shared phone-width breakpoint — the one place that decides what "mobile"
+// means for canvas layout purposes, rather than this file's own
+// getNodeMinDist, MapPage.tsx, NodePanel.tsx, and QuickAddGhosts.tsx each
+// duplicating the same check independently. Read live (not memoized) since
 // every call site only cares at the moment something is actually placed/
 // rendered, by which point the real viewport width is already known.
 export function isMobileViewport(): boolean {

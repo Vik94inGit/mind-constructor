@@ -75,9 +75,9 @@ interface Props {
   // same reasoning as MapPage's own screenToCanvas/zoomAt.
   zoom: number;
   // MapPage's own hScrollMargin/vScrollMargin (canvas units) — the real
-  // canvas now sits inset by this much within wrap's actually-scrollable
+  // canvas sits inset by this much within wrap's actually-scrollable
   // area on every side (see their own doc comment on MapPage), so a scroll
-  // position there is no longer numerically the same as a canvasW/canvasH
+  // position there isn't numerically the same as a canvasW/canvasH
   // coordinate. navigateTo and the "you are here" rect below both need this
   // to convert between the two, same as MapPage's own screenToCanvas.
   hScrollMargin: number;

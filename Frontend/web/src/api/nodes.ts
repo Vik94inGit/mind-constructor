@@ -62,7 +62,7 @@ export async function deleteManyNodes(nodeIds: string[]) {
 export async function attackNode(
   nodeId: string,
   weapon: Weapon,
-  content: { type: AttackNodeType; text: string },
+  content: { type: NodeType; text: string },
 ) {
   // healedParent: set only when this landed as a retaliation (attacking
   // the weapon node that hit your own node) — see Backend's attackAbl.ts.

@@ -12,15 +12,14 @@ The backend for Mind Constructor, a collaborative argument/decision-mapping tool
 connected by **edges** with a sentiment (positive/negative/neutral). Multiple invited members work
 the same map live over Socket.IO. Layered on top of the mapping itself is a "combat" system:
 members can attack *any* node on the map with one of three weapons (nitpick/counterpoint/
-fatalFlaw, each with its own damage — cooldowns are defined on the weapon catalog but no longer
-enforced) to deplete its health, and each landed attack spawns a visible "weapon node" pointing at
-its target. Combat is fully open (see `attackAbl.ts`) — no own-node rule, no restriction on
-attacking a weapon node, no already-defeated block, no cooldown enforcement; this used to be far
-more restricted (an evolving history of an own-node-only rule, a `Map.discussionMode` per-map
-toggle between that and normal player-vs-player, then a "retaliation"-only exception for weapon
-nodes — all now removed). The one surviving piece of that history: landing a hit on a weapon node
-still heals whatever that weapon node's own target's parent is, for whoever lands it. The one
-remaining way to actually stop an attack: a **protection node**, created by a node's own owner
+fatalFlaw, each with its own damage) to deplete its health, and each landed attack spawns a visible
+"weapon node" pointing at its target. Combat has two modes per map (`Map.discussionMode`): **Battle**
+(Discussion, the default) — attacks hurt, and only the map's owner may attack with any node type;
+every other member is limited by the target's side (see `attackAbl.ts`'s `allowedAttackTypes`) — and
+**Creating** (Personal) — attacks still spawn their node but are decoration only (no damage, no
+heal, any type). No cooldowns either way. Landing a hit on a weapon node heals whatever that weapon
+node's own target's parent is, for whoever lands it (battle mode only).
+The one way to actually stop an attack: a **protection node**, created by a node's own owner
 (`POST /api/nodes/:nodeId/protect`), fully blocks every attack on its linked target for as long as
 it stays undefeated (see `attackAbl.ts`'s `protectNodeAbl`/`findActiveProtectorDao`). Nodes can also
 be **packed** into a chosen container node (`packAbl.ts`) — folded off the canvas, reversible via
@@ -63,9 +62,9 @@ Strict layering, one direction only: **routes → controllers → abl → dao �
 attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (body: `{ nodeIds }`)
   is the bulk counterpart of `DELETE /api/nodes/:nodeId` — one request for a multi-select delete
   instead of N parallel single-node ones; same per-node ownership check, silently skipping any id
-  the caller doesn't own rather than failing the whole batch. `GET /:mapId/nodes` no longer sends
-  each node's own `text` (see `getNodesByMapDao`'s `.select("-text")`) — a frontend now hides most
-  node captions by default, so most of a map's text used to ride along on every load for nothing;
+  the caller doesn't own rather than failing the whole batch. `GET /:mapId/nodes` omits each node's
+  own `text` (see `getNodesByMapDao`'s `.select("-text")`) — a frontend hides most node captions by
+  default, so sending the full text of every node on every load would mostly go to waste;
   `POST /:mapId/nodes/text` (body: `{ nodeIds }`, via `getNodesTextDao`) is the lazy backfill the
   client calls, in bulk, only for whichever nodes actually need their real text right now.
 - **`src/controllers/*.ts`** — HTTP concerns only: pull `req.user`/`req.params`/`req.body`, call
@@ -77,8 +76,8 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (
   `zod` schemas + `parseOrThrow` from `abl/errors.ts`, which turns a failed `safeParse` into a
   `ValidationError`), authorization checks (map membership, node ownership), and orchestrating DAO
   calls. Each module defines its own domain-specific error classes (e.g. `MapNotFoundError`,
-  `ParentNotOwnedError`, `WeaponOnCooldownError`) that the matching controller knows how to map to
-  a status code. Modules: `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `lineAbl`,
+  `ParentNotOwnedError`) that the matching controller knows how to map to a status code. Modules:
+  `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `lineAbl`,
   `attackAbl`, `attackIndicatorAbl`, `circleAbl`, `packAbl`.
 - **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`) — the only layer
   that touches Mongoose models directly.
@@ -124,8 +123,8 @@ payload)` is the one function controllers call after a mutation commits; it's a 
   so its members hold their drifted position for good, not just until the next drag. A member
   leaves its circle by clearing its own `parentId` (`PATCH /api/nodes/:nodeId` with `parentId:
 null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root has fewer than 2
-  children left it simply stops being a circle. This replaced an earlier same-sentiment k-core
-  "cluster" detector: this app's maps are normally trees radiating from a Problem/Option node, and
+  children left it simply stops being a circle. A same-sentiment k-core ("cluster") detector
+  wouldn't work here: this app's maps are normally trees radiating from a Problem/Option node, and
   a tree's k-core for any `minDegree >= 2` is always empty (a forest has no cycles), so that
   approach could never actually fire on a real map.
 - **`Line`** (`models/Line.ts`, `lineAbl.ts`, `lineDao.ts`) — a separator line a member draws on a map: a
@@ -152,29 +151,24 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `PATCH /api/nodes/:nodeId`, owner-only, same gating as `symbolOverride`; `null` removes it. If a
   node happens to have both an automatic circle *and* a manual zone at once, a frontend draws both —
   they're independent layers, not mutually exclusive.
-- **`src/models/Attack.ts`** (`WEAPONS`) — the weapon catalog (damage, cooldown). Damage is
-  snapshotted onto each `Attack` document at attack time, so rebalancing a weapon later doesn't
-  rewrite history. Cooldowns are per attacker+weapon (not per attacker+weapon+target) — landing a
-  hit with one weapon starts a cooldown for that weapon globally, regardless of target.
-- **`src/abl/attackAbl.ts`** — combat is fully open: `attackNodeAbl` no longer checks node ownership
-  (any map member can attack any node, including their own), whether the target is a weapon node,
-  whether it's already defeated, or any weapon cooldown — only map membership is still checked.
-  `CannotAttackOwnNodeError`, `CanOnlyAttackOwnNodeError`, `CannotRetaliateError`,
-  `NodeAlreadyDefeatedError`, and `WeaponOnCooldownError` are all dead (never thrown), kept exported
-  only because `nodeController.ts` still pattern-matches on them defensively — `Map.discussionMode`
-  is inert as far as the combat rules above go (nothing here reads it any more), but it's no longer
-  unused: it's a plain per-map UI setting now (owner-only PATCH via `updateMapAbl`/
-  `PATCH /api/:mapId`, broadcast to the room as `map:updated` so every member's client stays in
-  sync), which a frontend reads to decide whether to show its own combat controls at all —
-  "Discussion" mode (`discussionMode !== false`, i.e. the default) leaves them visible; "Personal"
-  mode (`discussionMode === false`) hides them client-side only. Combat itself stays exactly as
-  open either way — this field has never gated any backend combat rule since the own-node-only days
-  described above, and still doesn't. The one mechanic that survives from the old
-  ownership-gated "retaliation" concept: landing a hit on a weapon node still heals *that weapon
-  node's own target's parent* (`Node.parentId`, not the weapon node or its target itself) by a fixed
+- **`src/models/Attack.ts`** (`WEAPONS`) — the weapon catalog (label, damage). Damage is snapshotted
+  onto each `Attack` document at attack time, so rebalancing a weapon later doesn't rewrite history.
+  No cooldown field — combat has none to track (see `attackAbl.ts` below).
+- **`src/abl/attackAbl.ts`** — combat rules. `attackNodeAbl` checks map membership, then, in battle
+  mode only, which node type the attack carries: the map's owner may use any of the seven types
+  (an attack may also be a question — the `"unknown"` type, which a protection node may not be);
+  any other member answers a *negative* target (Problem / Problematic option / Fail) with a
+  positive type (Solution / Option / Success), and a *positive or unknown* target with a question
+  or a Problem / Problematic option (`allowedAttackTypes`, mirrored in the frontend's
+  `utils/nodeType.ts`). A disallowed type throws `AttackTypeNotAllowedError` (403, with the
+  `allowed` list). There is no own-node rule, no weapon-node exclusion, no already-defeated block
+  and no cooldown. `Map.discussionMode` (owner-only PATCH via `updateMapAbl`/`PATCH /api/:mapId`,
+  broadcast as `map:updated`): `!== false` is battle mode; `=== false` is creating mode, where the
+  attack still creates its weapon node and history entry but with 0 damage, no defeat, no protector
+  check and no retaliation heal, and the type rules don't apply. In battle mode, landing a hit on a
+  weapon node heals *that weapon node's own target's parent* (`Node.parentId`) by a fixed
   `RETALIATION_HEAL_AMOUNT`, via `healNodeDao` — capped at 100, and never clears `defeated` on its
-  own (nothing else in this app un-defeats a node either) — now unconditional, for whoever lands the
-  hit, not just the original victim. The attack response/broadcast (`node:attacked`) carries this as
+  own — for whoever lands it. The attack response/broadcast (`node:attacked`) carries this as
   `healedParent` (`null` when the target wasn't a weapon node, or was one with nothing to heal)
   alongside the existing `node`/`weaponNode`. `attackNodeAbl` also checks
   `findActiveProtectorDao(node._id)` right before computing damage — if any undefeated protection
@@ -237,8 +231,7 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
 internal Mongo `ObjectId` but arrives at both `createNodeAbl` and `updateNodeAbl` as a public
 `nodeId` — both resolve it the same way `createEdgeAbl` resolves `fromNodeId`/`toNodeId` (same map,
 owned by the caller) before handing it to Mongoose, and node list responses populate it back out to
-`{ nodeId, text, type }`. A previous version of this doc noted `parentId` as effectively
-write-only/broken; that's no longer true — `circleAbl.ts`'s whole feature depends on it working.
+`{ nodeId, text, type }` — `circleAbl.ts`'s whole feature depends on this resolution working.
 Explicit `Edge` documents remain a separate, parallel graph (what the frontend canvas actually
 draws as links) — a node's `parentId` and its `Edge`s don't have to agree, and usually represent
 different things (branch lineage vs. an argued-for/against relationship).

@@ -25,10 +25,10 @@ export type SymbolOverride = (typeof SYMBOL_OVERRIDES)[number];
 export const WEAPONS = ["nitpick", "counterpoint", "fatalFlaw"] as const;
 export type Weapon = (typeof WEAPONS)[number];
 
-export const WEAPON_INFO: Record<Weapon, { label: string; damage: number; cooldownMs: number }> = {
-  nitpick: { label: "Nitpick", damage: 10, cooldownMs: 0 },
-  counterpoint: { label: "Counterpoint", damage: 25, cooldownMs: 5 * 60 * 1000 },
-  fatalFlaw: { label: "Fatal flaw", damage: 50, cooldownMs: 30 * 60 * 1000 },
+export const WEAPON_INFO: Record<Weapon, { label: string; damage: number }> = {
+  nitpick: { label: "Nitpick", damage: 10 },
+  counterpoint: { label: "Counterpoint", damage: 25 },
+  fatalFlaw: { label: "Fatal flaw", damage: 50 },
 };
 
 // An attack always creates a real content node alongside the damage now —

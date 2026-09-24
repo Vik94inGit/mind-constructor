@@ -145,13 +145,13 @@ export const RADIAL_MAX_NEIGHBORS = 10;
 export const radialNeighborRadius = () => (isMobileViewport() ? 110 : 190);
 
 // Arranges `neighborIds` evenly in a circle around `center`, kept inside
-// `bounds`. Same fix as QuickAddGhosts' own ring-centering: this ring used to
-// have no bounds awareness at all, just `center + radius`, trusting
-// centerOnNode to have put `center` in the middle of the screen. A node close
-// enough to the edge of the whole 2400x1600 canvas (nothing left to scroll
-// into) never gets truly centered, and on a narrow phone viewport that's
-// routine — so members on the far side of the ring rendered clear off the
-// visible screen, unreachable to tap. Nudging the ring's own center into a
+// `bounds`. Same fix as QuickAddGhosts' own ring-centering: without bounds
+// awareness — just `center + radius`, trusting centerOnNode to have put
+// `center` in the middle of the screen — a node close enough to the edge of
+// the whole 2400x1600 canvas (nothing left to scroll into) never gets truly
+// centered, and on a narrow phone viewport that's routine, so members on
+// the far side of the ring would render clear off the visible screen,
+// unreachable to tap. Nudging the ring's own center into a
 // safe zone inside the current viewport keeps the whole ring on-screen and
 // evenly spaced regardless of where the selected node itself landed.
 export function computeRadialPositions(

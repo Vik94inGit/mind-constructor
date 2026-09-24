@@ -108,8 +108,8 @@ export function MapToolbar({
               />
             )}
           </div>
-          {/* Off by default (dragging used to arm from a bare pointerdown,
-              which read as accidental relocation on any touch imprecision). */}
+          {/* Off by default — arming drag from a bare pointerdown would read
+              as accidental relocation on any touch imprecision. */}
           <button
             type="button"
             className={`${iconBtn} ${moveMode ? pressed : idle}`}
@@ -187,8 +187,8 @@ export function MapToolbar({
           onClick={onToggleMapMode}
         >
           {/* Plain text-presentation glyphs (no emoji variation selector), not
-              the colorful emoji this used to be — matches the rest of this
-              cluster's monochrome icons. */}
+              a colorful emoji — matches the rest of this cluster's
+              monochrome icons. */}
           {isDiscussionMode ? "⚔" : "✎"}
         </button>
       )}

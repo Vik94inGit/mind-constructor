@@ -43,10 +43,10 @@ export const findNodeByInternalIdDao = async (
 // arrives via create/update/attack instead of the initial list fetch looks
 // different (raw internal ObjectIds) until the next full reload.
 // mapId is included (just its own public mapId field) so a populated node
-// already carries the map's public id — controllers that used to make a
-// separate findPublicMapIdDao round-trip after a mutation that already
-// returns a NODE_POPULATE'd node can read it straight off the node instead
-// (see nodeController.ts/edgeController.ts).
+// already carries the map's public id — a controller can read it straight
+// off the node instead of a separate findPublicMapIdDao round-trip after a
+// mutation that already returns a NODE_POPULATE'd node (see
+// nodeController.ts/edgeController.ts).
 export const NODE_POPULATE = [
   { path: "userId", select: "username" },
   { path: "parentId", select: "nodeId text type" },
@@ -117,14 +117,11 @@ export const createWeaponNodeMutationDao = async (
     isWeapon: true,
     weaponIcon: data.weaponIcon,
     targetNodeId: data.targetNodeId,
-    // Parented to its own target on arrival — every other new node gets an
-    // easy, already-chosen parent for free (branching off an existing one
-    // via "create child here"/quick-add); a weapon node used to be the one
-    // exception, always born parentless and needing its own separate
-    // drag-to-join-a-circle afterward to get one at all. An objection
-    // reads naturally as attached to the thing it objects to anyway, and
-    // this can still be dragged elsewhere or cleared later like any other
-    // node's parentId.
+    // Parented to its own target on arrival, same as every other new node
+    // gets an easy, already-chosen parent for free (branching off an existing
+    // one via "create child here"/quick-add) — an objection reads naturally
+    // as attached to the thing it objects to, and this can still be dragged
+    // elsewhere or cleared later like any other node's parentId.
     parentId: data.targetNodeId,
   });
   return weaponNode.populate(NODE_POPULATE);
@@ -264,11 +261,10 @@ export const updateNodeDao = async (
   ).populate(NODE_POPULATE);
 };
 
-// Only the node's creator may delete it. Deleting a node used to leave any
-// Edge pointing at it dangling (fromNodeId/toNodeId populating as null
-// instead of ever being cleaned up) — this now takes the rest of the graph
-// down with it: edges touching the node, branch-children's parentId, and
-// weapon nodes that were aimed at it.
+// Only the node's creator may delete it. Deleting a node takes the rest of
+// the graph down with it too, so nothing is left dangling (an Edge's
+// fromNodeId/toNodeId populating as null, say): edges touching the node,
+// branch-children's parentId, and weapon nodes that were aimed at it.
 //
 // Returns { node, damagedProtectedNode } instead of just `node` now —
 // deleting a protection node with a nonzero blockedDamage releases that
@@ -298,7 +294,7 @@ const cascadeAfterNodeDeleted = async (node: InstanceType<typeof Node>) => {
 
   await Promise.all([
     Edge.deleteMany({ $or: [{ fromNodeId: node._id }, { toNodeId: node._id }] }),
-    // Scoped to the deleted node's own map — without mapId these two used to
+    // Scoped to the deleted node's own map — without mapId these two would
     // scan every node in the whole database looking for a matching
     // parentId/targetNodeId, not just this node's own map.
     Node.updateMany({ mapId: node.mapId, parentId: node._id }, { $set: { parentId: null } }),
