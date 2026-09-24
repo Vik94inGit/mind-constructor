@@ -87,7 +87,7 @@ function chaosStyle(seed: string): CSSProperties {
   const w1 = wp(rx1, ry1);
   const w2 = wp(rx2, ry2);
   const w3 = wp(rx3, ry3);
-  const duration = 2.6 + rDuration * 2.2; // 2.6s–4.8s
+  const duration = 4.8 + rDuration * 3.6; // 4.8s–8.4s, a slow, unhurried wander
   return {
     "--chaos-x1": `${w1.x}px`,
     "--chaos-y1": `${w1.y}px`,
@@ -346,7 +346,7 @@ export const NodeCard = memo(function NodeCard({
   // before this fix.
   const transitionClass = dragging
     ? "[transition:opacity_0.15s_ease,filter_0.15s_ease]"
-    : "[transition:opacity_0.15s_ease,filter_0.15s_ease,transform_0.4s_ease]";
+    : "[transition:opacity_0.15s_ease,filter_0.15s_ease,transform_1.8s_cubic-bezier(0.4,0,0.2,1)]";
   // Single resolution point for this node's own stacking, same reasoning as
   // opacityClass/cursorClass above — exactly one z-index utility ever
   // applies, never two stacked in the same class list (whichever Tailwind
@@ -654,11 +654,11 @@ export const NodeCard = memo(function NodeCard({
             corner. */}
         {parentCrownSentiment && (
           <div
-            className="absolute -top-2 -left-2 flex h-[1.2rem] w-[1.2rem] items-center justify-center rounded-full border-[1.5px] bg-surface text-[0.7rem] leading-none"
+            className="absolute -top-2.5 -left-2.5 flex h-[1.45rem] w-[1.45rem] items-center justify-center rounded-full border-[1.5px] bg-surface text-[0.8rem] leading-none"
             style={{ color: ZONE_COLORS[parentCrownSentiment], borderColor: ZONE_COLORS[parentCrownSentiment] }}
             title={(isVariantParent ? t.ui.node.variantParent : t.ui.node.circleParent)(t.ui.sentiments[parentCrownSentiment])}
           >
-            {isVariantParent ? <KnightHelmet size={12} /> : "👑"}
+            {isVariantParent ? <KnightHelmet size={17} /> : "👑"}
           </div>
         )}
         {hiddenBranch && (

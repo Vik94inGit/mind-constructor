@@ -1,19 +1,25 @@
-// A knight's great helm — the marker for a circle parent that hangs from
-// another node (a "variant"), as opposed to the crown at the top of a tree.
-// Drawn in the current text color, so the caller tints it by setting `color`.
+// A knight's great helm with a plume — the marker for a circle parent that
+// hangs from another node (a "variant"), as opposed to the crown at the top of
+// a tree. The T-shaped visor, the rivets and the plume are what make it read
+// as a knight's helmet at a glance rather than a blob. Drawn in the current
+// text color, so the caller tints it by setting `color`.
 export function KnightHelmet({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className="inline-block">
+      {/* plume */}
+      <path d="M12.5 5.2C12 2.6 14.6 0.9 18.6 2.2C16.6 2.9 15.7 4 15.4 5.6Z" fill="currentColor" />
+      {/* helm */}
       <path
-        d="M12 2C7.6 2 4.5 5.4 4.5 9.8V15.2C4.5 17.6 6.4 19.6 8.8 20.2L9.5 22H14.5L15.2 20.2C17.6 19.6 19.5 17.6 19.5 15.2V9.8C19.5 5.4 16.4 2 12 2Z"
+        d="M4.6 12C4.6 8 7.6 5.2 12 5.2C16.4 5.2 19.4 8 19.4 12V19.2C19.4 20.3 18.6 21.2 17.5 21.2H6.5C5.4 21.2 4.6 20.3 4.6 19.2Z"
         fill="currentColor"
       />
-      <path d="M12 3.2V9" stroke="var(--surface)" strokeWidth="0.9" strokeOpacity="0.55" />
-      <rect x="6.5" y="9" width="11" height="2.3" rx="1.1" fill="var(--surface)" />
-      <circle cx="9" cy="14.2" r="0.75" fill="var(--surface)" />
-      <circle cx="9" cy="16.9" r="0.75" fill="var(--surface)" />
-      <circle cx="15" cy="14.2" r="0.75" fill="var(--surface)" />
-      <circle cx="15" cy="16.9" r="0.75" fill="var(--surface)" />
+      {/* T-shaped visor */}
+      <path d="M6.4 10.6H17.6V12.9H6.4Z M10.9 12.9H13.1V18.2H10.9Z" fill="var(--surface)" />
+      {/* rivets */}
+      <circle cx="7" cy="16.2" r="0.7" fill="var(--surface)" />
+      <circle cx="17" cy="16.2" r="0.7" fill="var(--surface)" />
+      <circle cx="7" cy="19" r="0.7" fill="var(--surface)" />
+      <circle cx="17" cy="19" r="0.7" fill="var(--surface)" />
     </svg>
   );
 }
