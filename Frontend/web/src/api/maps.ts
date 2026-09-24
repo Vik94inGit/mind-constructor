@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { MapDoc, MapTemplate, NodeType, SelectedCircle } from "../types";
+import type { MapDoc, MapKind, MapTemplate, NodeType, SelectedCircle } from "../types";
 
 export type MapFilter = "all" | "owned" | "shared";
 
@@ -19,6 +19,9 @@ export async function createMap(input: {
   color?: string;
   // Omitted or "blank" — today's only behavior — seeds nothing.
   template?: MapTemplate;
+  kind?: MapKind;
+  // Discussion (true, the default) or Personal (false).
+  discussionMode?: boolean;
 }): Promise<MapDoc> {
   return apiRequest<MapDoc>("/api/", { method: "POST", body: input });
 }

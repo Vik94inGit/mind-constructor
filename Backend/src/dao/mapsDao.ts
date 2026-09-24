@@ -4,6 +4,7 @@ import { Edge } from "../models/Edge.js";
 import { Line } from "../models/Line.js";
 import { User } from "../models/User.js";
 import { nanoid } from "nanoid";
+import { getHiddenNodesDao } from "./visibilityDao.js";
 
 export const findMapByPublicIdDao = async (publicMapId: string) => {
   return await Map.findOne({ mapId: publicMapId });
@@ -22,18 +23,17 @@ export const getMapsDao = async (
   // .lean() — this list is only ever serialized to JSON for the dashboard,
   // never mutated/saved back. A leaned result skips the schema's own toJSON
   // transform (which normally strips _id/__v), so those are stripped by
-  // hand below instead, same as m.toJSON() used to do.
+  // hand below instead, matching what toJSON() would have done.
   const maps = await Map.find(query).lean();
   if (maps.length === 0) return [];
   // A dashboard card only ever needs enough to render itself
   // (name/color/ownerId) plus how many members there are — memberColors/
-  // pendingInvites/selectedCircle used to ride along on every card in this
-  // list for no reason: nothing in the frontend's own list view reads any
-  // of them (a map's full detail, real member ids included, is only ever
-  // fetched once you're actually on that map, or opening Invite — see
-  // getMapByIdDao/InviteMemberModal's own on-demand fetch). `members`
-  // itself is dropped the same way here, replaced by its own length —
-  // never sent as the raw id array on this list endpoint.
+  // pendingInvites/selectedCircle are left out: nothing in the frontend's own
+  // list view reads any of them (a map's full detail, real member ids
+  // included, is only ever fetched once you're actually on that map, or
+  // opening Invite — see getMapByIdDao/InviteMemberModal's own on-demand
+  // fetch). `members` itself is dropped the same way here, replaced by its
+  // own length — never sent as the raw id array on this list endpoint.
   //
   // What a card *does* show — who owns the map, who the members are (just
   // their usernames), and how many nodes it has — comes back in this same
@@ -126,6 +126,10 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   const map = await Map.findOne({ mapId: publicMapId, members: userId });
   if (!map) return null;
 
+  // An invited member does not get the branches the owner has hidden.
+  const hiddenIds =
+    map.ownerId.toString() === userId.toString() ? [] : [...(await getHiddenNodesDao(map._id)).ids];
+
   // parentId/targetNodeId/protectsNodeId/packedIntoNodeId are all internal
   // ObjectId refs — populated with the same public-id projection Edge uses
   // for fromNodeId/toNodeId, so a caller never has to resolve Mongo's
@@ -141,10 +145,10 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   // sync with NODE_POPULATE by hand; the two aren't shared code since this
   // one is scoped to a whole map's nodes rather than one at a time.
   // .select("-text"): a node's own `text` is the one field this list
-  // deliberately leaves out — a whole map's worth of full node text used to
-  // ride along on every initial load even though the frontend now shows
-  // almost none of it up front (captions are hidden by default, see
-  // NodeCard's showCaption). The client fetches the real text lazily, in
+  // deliberately leaves out — the frontend shows almost none of it up front
+  // (captions are hidden by default, see NodeCard's showCaption), so sending
+  // a whole map's worth of full node text on every initial load would mostly
+  // go to waste. The client fetches the real text lazily, in
   // bulk, only for the nodes that actually need it right now — a circle's
   // own parent (always shown), a chosen cluster's members, or whatever
   // NodePanel/inline-edit/an export just opened — via getNodesTextDao
@@ -161,7 +165,7 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   // userId (a User ref) is left as-is: User's own toJSON only strips __v,
   // not _id, so its populated shape here already matches that (select
   // "username" alone still includes _id by default, same as before).
-  return await Node.find({ mapId: map._id })
+  return await Node.find({ mapId: map._id, _id: { $nin: hiddenIds } })
     .select("-text -_id -__v")
     .populate("userId", "username")
     .populate("parentId", "-_id nodeId text type")
@@ -186,8 +190,11 @@ export const getNodesTextDao = async (
   const map = await Map.findOne({ mapId: publicMapId, members: userId });
   if (!map) return null;
 
+  const hiddenIds =
+    map.ownerId.toString() === userId.toString() ? [] : [...(await getHiddenNodesDao(map._id)).ids];
+
   const rows = await Node.find(
-    { mapId: map._id, nodeId: { $in: nodeIds } },
+    { mapId: map._id, nodeId: { $in: nodeIds }, _id: { $nin: hiddenIds } },
     "nodeId text",
   ).lean<{ nodeId: string; text: string }[]>();
 
@@ -203,6 +210,7 @@ export const createMapDao = async (mapData: {
   color?: string;
   members?: string[];
   discussionMode?: boolean;
+  kind?: string;
 }) => {
   const publicMapId = nanoid(10);
   return await Map.create({
@@ -213,6 +221,7 @@ export const createMapDao = async (mapData: {
     members: mapData.members ?? [mapData.ownerId],
     memberColors: [{ userId: mapData.ownerId, color: mapData.ownerColor }],
     discussionMode: mapData.discussionMode,
+    kind: mapData.kind,
   });
 };
 

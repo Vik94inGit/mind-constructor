@@ -37,9 +37,9 @@ export function Navbar() {
     // gap-3, not gap-6, below sm — every child group here has its own
     // internal spacing already; the wide 6-unit gap between *groups* is a
     // desktop-only nicety, not something a 375px-wide phone has room to
-    // spare (see the overflow this whole row used to run into: username +
-    // logout button pushed clean off the right edge, "Mind Constructor"
-    // wrapping onto its own second line and pushing the row taller still).
+    // spare (a gap-6 row would push username + logout button clean off
+    // the right edge, and wrap "Mind Constructor" onto its own second
+    // line, pushing the row taller still).
     <header className="flex items-center gap-3 sm:gap-6 border-b border-line bg-surface px-3 sm:px-6 py-[0.85rem]">
       <NavLink
         to="/"

@@ -13,7 +13,8 @@ import { MapSummaryModal } from "../components/MapSummaryModal";
 import { MapPeopleModal } from "../components/MapPeopleModal";
 import { CardMenu } from "../components/CardMenu";
 import { ApiRequestError } from "../api/client";
-import type { MapDoc, MapTemplate } from "../types";
+import type { MapDoc, MapKind } from "../types";
+import { seedMapKind } from "../utils/seedMap";
 import { useI18n } from "../i18n/I18nContext";
 import type { Translation } from "../i18n/translations";
 
@@ -25,12 +26,7 @@ type Filter = mapsApi.MapFilter;
 // createModal.templates) instead of a hardcoded English pair, so this list
 // only has to know the *order* and which value maps to which translation
 // key.
-const TEMPLATE_KEYS: { value: MapTemplate; key: keyof Translation["dashboard"]["createModal"]["templates"] }[] = [
-  { value: "blank", key: "blank" },
-  { value: "single-problem", key: "singleProblem" },
-  { value: "decision-tree", key: "decisionTree" },
-  { value: "pro-con", key: "proCon" },
-];
+const MAP_KIND_KEYS: MapKind[] = ["problem", "decision", "goal", "retro"];
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -171,6 +167,16 @@ export function DashboardPage() {
                   style={{ background: map.color || "var(--accent)" }}
                 />
                 <h3 className="m-0 pr-[1.9rem] text-[1.05rem] font-bold">{map.name}</h3>
+                {map.kind && (
+                  <div className="text-[0.72rem] font-semibold tracking-[0.03em] text-ink-soft uppercase">
+                    {t.dashboard.createModal.templates[map.kind].label}
+                    {" · "}
+                    {(map.discussionMode === false
+                      ? t.dashboard.createModal.mode.personal
+                      : t.dashboard.createModal.mode.discussion
+                    ).label}
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-[0.6rem] text-[0.78rem] text-ink-soft">
                   {/* Members / Owner: buttons, not badges — each opens who's on
                       this map. They stop the click so the card doesn't also
@@ -293,7 +299,9 @@ function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [name, setName] = useState("");
   const [ownerColor, setOwnerColor] = useState("#22c55e");
   const [color, setColor] = useState("#e08a3e");
-  const [template, setTemplate] = useState<MapTemplate>("blank");
+  const [kind, setKind] = useState<MapKind>("problem");
+  // Discussion (battle) or Personal (creating) — the owner can switch it later on the map itself.
+  const [discussionMode, setDiscussionMode] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -302,7 +310,8 @@ function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated
     setError(null);
     setBusy(true);
     try {
-      const map = await mapsApi.createMap({ name, ownerColor, color, template });
+      const map = await mapsApi.createMap({ name, ownerColor, color, kind, discussionMode });
+      await seedMapKind(map.mapId, kind, t.ui.templates.nodes);
       onCreated(map);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.dashboard.createModal.error);
@@ -341,21 +350,42 @@ function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.startingPoint}</label>
           <div className="grid grid-cols-2 gap-[0.5rem]">
-            {TEMPLATE_KEYS.map((opt) => {
-              const label = t.dashboard.createModal.templates[opt.key];
+            {MAP_KIND_KEYS.map((value) => {
+              const label = t.dashboard.createModal.templates[value];
               return (
                 <button
-                  key={opt.value}
+                  key={value}
                   type="button"
-                  onClick={() => setTemplate(opt.value)}
+                  onClick={() => setKind(value)}
                   className={`cursor-pointer rounded-lg border px-[0.7rem] py-[0.55rem] text-left transition-[background-color,border-color] duration-[120ms] ${
-                    template === opt.value
-                      ? "border-accent bg-accent-soft"
-                      : "border-line bg-surface hover:bg-surface-2"
+                    kind === value ? "border-accent bg-accent-soft" : "border-line bg-surface hover:bg-surface-2"
+                  }`}
+                >
+                  <div className={`text-[0.82rem] font-semibold ${kind === value ? "text-accent-ink" : "text-ink"}`}>
+                    {label.label}
+                  </div>
+                  <div className="mt-[0.1rem] text-[0.72rem] text-ink-soft">{label.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="mb-4 flex flex-col gap-[0.35rem]">
+          <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.mode.label}</label>
+          <div className="grid grid-cols-2 gap-[0.5rem]">
+            {([true, false] as const).map((isDiscussion) => {
+              const label = isDiscussion ? t.dashboard.createModal.mode.discussion : t.dashboard.createModal.mode.personal;
+              return (
+                <button
+                  key={String(isDiscussion)}
+                  type="button"
+                  onClick={() => setDiscussionMode(isDiscussion)}
+                  className={`cursor-pointer rounded-lg border px-[0.7rem] py-[0.55rem] text-left transition-[background-color,border-color] duration-[120ms] ${
+                    discussionMode === isDiscussion ? "border-accent bg-accent-soft" : "border-line bg-surface hover:bg-surface-2"
                   }`}
                 >
                   <div
-                    className={`text-[0.82rem] font-semibold ${template === opt.value ? "text-accent-ink" : "text-ink"}`}
+                    className={`text-[0.82rem] font-semibold ${discussionMode === isDiscussion ? "text-accent-ink" : "text-ink"}`}
                   >
                     {label.label}
                   </div>

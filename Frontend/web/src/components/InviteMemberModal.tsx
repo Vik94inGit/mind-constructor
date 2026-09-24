@@ -23,9 +23,9 @@ export function InviteMemberModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // The `map` prop comes straight from the dashboard's own card list now,
-  // which no longer carries real member ids (see MapDoc's own doc comment
-  // and mapsDao.ts's getMapsDao) — just a memberCount. Fetching the map's
+  // The `map` prop comes straight from the dashboard's own card list, which
+  // carries no real member ids (see MapDoc's own doc comment and
+  // mapsDao.ts's getMapsDao) — just a memberCount. Fetching the map's
   // full detail here, once, whenever this modal actually opens, is exactly
   // the "on demand" this was traded for: nobody pays for the real member
   // list until they specifically open Invite. `null` means "not loaded

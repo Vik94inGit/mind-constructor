@@ -18,6 +18,10 @@ import {
   setMemberColorMutationDao,
 } from "../src/dao/mapsDao.js";
 
+vi.mock("../src/dao/visibilityDao.js", () => ({
+  getHiddenNodesDao: vi.fn().mockResolvedValue({ ids: new Set(["hidden1"]), publicIds: new Set(["h"]) }),
+}));
+
 // Mock Mongoose models for Vitest
 vi.mock("../src/models/Node.js", () => ({
   Node: {
@@ -176,7 +180,7 @@ describe("mapsDao", () => {
   });
 
   it("getNodesByMapDao - returns all nodes on the map for a member", async () => {
-    const map = { _id: "m1", mapId: "pub123" };
+    const map = { _id: "m1", mapId: "pub123", ownerId: "user1" };
     vi.mocked(Map.findOne).mockResolvedValue(map as never);
     // Node.find(...).select(...).populate(...)x5.lean() — a real Mongoose
     // Query stays chainable across select()/populate()/lean() and is itself
@@ -189,13 +193,26 @@ describe("mapsDao", () => {
 
     const result = await getNodesByMapDao("pub123", "user1");
 
-    expect(Node.find).toHaveBeenCalledWith({ mapId: "m1" });
+    expect(Node.find).toHaveBeenCalledWith({ mapId: "m1", _id: { $nin: [] } });
     expect(chain.select).toHaveBeenCalledWith("-text -_id -__v");
     expect(chain.populate).toHaveBeenNthCalledWith(1, "userId", "username");
     expect(chain.populate).toHaveBeenNthCalledWith(2, "parentId", "-_id nodeId text type");
     expect(chain.populate).toHaveBeenNthCalledWith(3, "targetNodeId", "-_id nodeId text type");
     expect(chain.lean).toHaveBeenCalled();
     expect(result).toEqual([{ text: "n1" }]);
+  });
+
+  it("getNodesByMapDao - leaves out the branches hidden from members, for a member who is not the owner", async () => {
+    vi.mocked(Map.findOne).mockResolvedValue({ _id: "m1", mapId: "pub123", ownerId: "owner1" } as never);
+    const chain: any = {};
+    chain.select = vi.fn().mockReturnValue(chain);
+    chain.populate = vi.fn().mockReturnValue(chain);
+    chain.lean = vi.fn().mockResolvedValue([]);
+    vi.mocked(Node.find).mockReturnValue(chain);
+
+    await getNodesByMapDao("pub123", "user1");
+
+    expect(Node.find).toHaveBeenCalledWith({ mapId: "m1", _id: { $nin: ["hidden1"] } });
   });
 
   it("createMapDao - creates a map with a generated public mapId", async () => {

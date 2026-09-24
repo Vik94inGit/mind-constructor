@@ -1,4 +1,6 @@
 import type { Language } from "./translations";
+import type { NodeType } from "../types";
+import type { TemplateNodeKey } from "../utils/templates";
 
 // The rest of the app's user-facing text — panels, menus, modals, and the
 // messages shown when something goes wrong. translations.ts keeps the core
@@ -6,8 +8,7 @@ import type { Language } from "./translations";
 // Same rules as there: interpolated strings are plain functions, so every
 // language is checked against the exact same shape by TypeScript itself.
 //
-// Not translated on purpose: node type names (Problem, Option, … — stored
-// values shown as-is everywhere), a server's own error text (shown as
+// Not translated on purpose: a server's own error text (shown as
 // received; the strings below are only the fallbacks for when there isn't
 // one), and the markdown a text export generates.
 export interface UiStrings {
@@ -21,6 +22,19 @@ export interface UiStrings {
     reset: string;
     edit: string;
     done: string;
+  };
+  visibility: { hide: string; show: string; hint: string; badge: string };
+  search: { title: string; placeholder: string; none: string; found: (count: number) => string };
+  compact: { label: string; hint: string };
+  types: Record<NodeType, string>;
+  templates: {
+    section: string;
+    problem: { button: string; hint: string };
+    goal: { button: string; hint: string };
+    retry: { title: string; hint: string; button: string };
+    created: (count: number) => string;
+    failed: string;
+    nodes: Record<TemplateNodeKey, { title: string; text: string }>;
   };
   contextMenu: { createBranch: string; update: string; choose: string; delete: string; attack: string };
   selection: {
@@ -114,6 +128,9 @@ export interface UiStrings {
     deleteConfirm: string;
     selectToSeeHealth: string;
     circleParent: (sentiment: string) => string;
+    variantParent: (sentiment: string) => string;
+    zoneName: string;
+    zoneNamePlaceholder: string;
     clickToChangeType: string;
     chooseHint: string;
     ghostAgain: string;
@@ -128,6 +145,9 @@ export interface UiStrings {
     writeObjection: string;
     writeFirst: string;
     weapons: { nitpick: string; counterpoint: string; fatalFlaw: string };
+    hintNegativeTarget: string;
+    hintPositiveTarget: string;
+    hintPersonal: string;
   };
   protect: {
     intro: string;
@@ -280,10 +300,71 @@ const en: UiStrings = {
     edit: "Edit",
     done: "Done",
   },
+  visibility: { hide: "Hide this branch from invited users", show: "Show this branch to invited users", hint: "Invited members cannot see this node or anything hanging from it. You always see it.", badge: "Hidden from invited users" },
+  search: { title: "Search nodes", placeholder: "Find a node by its title or text", none: "Nothing found", found: (n) => `${n} found` },
+  compact: { label: "Simplified view", hint: "Smaller icons, no halo or horns, no circle rings — less clutter on a small screen" },
+  types: {
+    Problem: "Problem",
+    "Problematic option": "Problematic option",
+    Solution: "Solution (goal)",
+    Option: "Option",
+    Success: "Success",
+    Fail: "Fail",
+    unknown: "Question (unknown)",
+  },
+  templates: {
+    section: "Templates",
+    problem: { button: "Analyze this problem", hint: "Adds sub-problems, the risk of doing nothing, past experience, ways to solve, a plan and its result." },
+    goal: { button: "Plan this goal", hint: "Adds a success criterion, ordered steps, an obstacle with a fallback, and a review." },
+    retry: { title: "This did not work out", hint: "Find out why, then choose what to change before trying again.", button: "Analyze and try again" },
+    created: (n) => `Added ${n} ${n === 1 ? "node" : "nodes"}`,
+    failed: "Could not add the template",
+    nodes: {
+      subProblem1: { title: "Sub-problem 1", text: "Which part of the problem is broken? (one cause per node)" },
+      subProblem2: { title: "Sub-problem 2", text: "What else contributes to it?" },
+      negativeScenario: { title: "If we do nothing", text: "What is the worst that happens if this is left as it is?" },
+      experiencePositive: { title: "What worked", text: "What have we already tried that helped?" },
+      experienceNegative: { title: "What did not work", text: "What have we already tried that failed, and why?" },
+      way1: { title: "Way to solve 1", text: "One possible way to solve it" },
+      way2: { title: "Way to solve 2", text: "An alternative way to solve it" },
+      plan: { title: "Plan", text: "Who does what, and by when?" },
+      resultPositive: { title: "Result: it worked", text: "What exactly improved? How do we know?" },
+      resultNegative: { title: "Result: it failed", text: "What went wrong? (then analyze and try again)" },
+      criteria: { title: "Success criterion", text: "How will we know the goal is reached? Make it measurable." },
+      step1: { title: "Step 1", text: "The first concrete action" },
+      step2: { title: "Step 2", text: "The next action" },
+      step3: { title: "Step 3", text: "The last action before the goal" },
+      obstacle: { title: "Obstacle", text: "What could stop us?" },
+      fallback: { title: "Fallback", text: "What do we do if that happens?" },
+      review: { title: "Review", text: "When do we check progress, and who decides?" },
+      whyFailed: { title: "Why did it fail?", text: "Ask why, then ask why again — until you reach the real cause." },
+      tryAgain: { title: "Try again", text: "What will we change this time?" },
+      rootProblem: { title: "The problem", text: "What exactly is the problem, and who does it affect?" },
+      rootGoal: { title: "The goal", text: "What do we want to achieve, and by when?" },
+      rootDecision: { title: "The decision", text: "What do we have to decide?" },
+      rootRetro: { title: "The review", text: "What are we looking back at?" },
+      criteriaQuestion: { title: "What matters most?", text: "Which criteria will decide it — cost, time, risk, quality?" },
+      optionA: { title: "Option A", text: "One possible choice" },
+      advantageA: { title: "Advantage of A", text: "What speaks for it?" },
+      riskA: { title: "Risk of A", text: "What could go wrong with it?" },
+      optionB: { title: "Option B", text: "One possible choice" },
+      advantageB: { title: "Advantage of B", text: "What speaks for it?" },
+      riskB: { title: "Risk of B", text: "What could go wrong with it?" },
+      optionC: { title: "Option C", text: "One possible choice" },
+      advantageC: { title: "Advantage of C", text: "What speaks for it?" },
+      riskC: { title: "Risk of C", text: "What could go wrong with it?" },
+      wentWell1: { title: "What went well", text: "Something that worked and is worth repeating" },
+      wentWell2: { title: "Another success", text: "What else went well?" },
+      wentBad1: { title: "What went badly", text: "Something that did not work, and why" },
+      wentBad2: { title: "Another problem", text: "What else went wrong?" },
+      tryNext1: { title: "Change 1", text: "One thing we will do differently" },
+      tryNext2: { title: "Change 2", text: "Another change to try" },
+    },
+  },
   contextMenu: { createBranch: "Create branch", update: "Update", choose: "Choose…", delete: "Delete", attack: "Attack" },
   selection: {
     tapToChoose: "Tap your nodes to choose them",
-    finishHint: "Tap outside or press Enter when done",
+    finishHint: "A parent brings its whole branch (Shift+tap: only that node). Tap outside or press Enter when done.",
     chosen: (n) => `${n} node${n === 1 ? "" : "s"} chosen`,
     selected: (n) => `${n} node${n === 1 ? "" : "s"} selected`,
     actions: "Actions",
@@ -374,6 +455,9 @@ const en: UiStrings = {
     deleteConfirm: "Delete this node?",
     selectToSeeHealth: "Select to see health",
     circleParent: (s) => `Circle parent (${s})`,
+    variantParent: (s) => `Variant parent (${s})`,
+    zoneName: "Zone name:",
+    zoneNamePlaceholder: "Name this zone",
     clickToChangeType: "Click to change type",
     chooseHint: "choose?",
     ghostAgain: "click again to add",
@@ -388,6 +472,9 @@ const en: UiStrings = {
     writeObjection: "Write your objection above to pick a weapon.",
     writeFirst: "Write your objection first",
     weapons: { nitpick: "Nitpick", counterpoint: "Counterpoint", fatalFlaw: "Fatal flaw" },
+    hintNegativeTarget: "Battle mode: you answer a negative node with a positive one (Solution, Option or Success).",
+    hintPositiveTarget: "Battle mode: you challenge a positive node with a question or a negative Problem / Problematic option.",
+    hintPersonal: "Creating mode: an attack only adds the node — it does no damage.",
   },
   protect: {
     intro: "A protection node fully blocks every future attack on this node while it stays undefeated — no limit, no cooldown.",
@@ -538,10 +625,71 @@ const cs: UiStrings = {
     edit: "Upravit",
     done: "Hotovo",
   },
+  visibility: { hide: "Skrýt tuto větev pozvaným uživatelům", show: "Zobrazit tuto větev pozvaným uživatelům", hint: "Pozvaní členové tento uzel ani nic, co z něj vychází, neuvidí. Vy jej vidíte vždy.", badge: "Skryto před pozvanými uživateli" },
+  search: { title: "Hledat uzly", placeholder: "Najít uzel podle názvu nebo textu", none: "Nic nenalezeno", found: (n) => `Nalezeno: ${n}` },
+  compact: { label: "Zjednodušený pohled", hint: "Menší ikony, bez svatozáře a rohů a bez kruhů — méně rušivých prvků na malé obrazovce" },
+  types: {
+    Problem: "Problém",
+    "Problematic option": "Problematická varianta",
+    Solution: "Řešení (cíl)",
+    Option: "Varianta",
+    Success: "Úspěch",
+    Fail: "Neúspěch",
+    unknown: "Otázka (neznámé)",
+  },
+  templates: {
+    section: "Šablony",
+    problem: { button: "Analyzovat tento problém", hint: "Přidá dílčí problémy, riziko nicnedělání, dosavadní zkušenosti, možnosti řešení, plán a jeho výsledek." },
+    goal: { button: "Naplánovat tento cíl", hint: "Přidá kritérium úspěchu, očíslované kroky, překážku se záložním plánem a kontrolu." },
+    retry: { title: "Nevyšlo to", hint: "Zjistěte proč a rozhodněte, co změnit, než to zkusíte znovu.", button: "Analyzovat a zkusit znovu" },
+    created: (n) => `Přidáno: ${csNodes(n)}`,
+    failed: "Šablonu se nepodařilo přidat",
+    nodes: {
+      subProblem1: { title: "Dílčí problém 1", text: "Která část problému nefunguje? (jedna příčina na uzel)" },
+      subProblem2: { title: "Dílčí problém 2", text: "Co dalšího k němu přispívá?" },
+      negativeScenario: { title: "Když nic neuděláme", text: "Co nejhoršího se stane, když to necháme, jak to je?" },
+      experiencePositive: { title: "Co fungovalo", text: "Co jsme už zkusili a pomohlo to?" },
+      experienceNegative: { title: "Co nefungovalo", text: "Co jsme už zkusili a nevyšlo to, a proč?" },
+      way1: { title: "Možnost řešení 1", text: "Jedna z možných cest k řešení" },
+      way2: { title: "Možnost řešení 2", text: "Alternativní cesta k řešení" },
+      plan: { title: "Plán", text: "Kdo co udělá a do kdy?" },
+      resultPositive: { title: "Výsledek: povedlo se", text: "Co přesně se zlepšilo? Podle čeho to poznáme?" },
+      resultNegative: { title: "Výsledek: nepovedlo se", text: "Co se pokazilo? (pak analyzujte a zkuste to znovu)" },
+      criteria: { title: "Kritérium úspěchu", text: "Podle čeho poznáme, že je cíl splněn? Ať je měřitelné." },
+      step1: { title: "Krok 1", text: "První konkrétní akce" },
+      step2: { title: "Krok 2", text: "Další akce" },
+      step3: { title: "Krok 3", text: "Poslední akce před cílem" },
+      obstacle: { title: "Překážka", text: "Co nás může zastavit?" },
+      fallback: { title: "Záložní plán", text: "Co uděláme, když to nastane?" },
+      review: { title: "Kontrola", text: "Kdy zkontrolujeme pokrok a kdo rozhoduje?" },
+      whyFailed: { title: "Proč to nevyšlo?", text: "Zeptejte se proč a pak znovu proč — až najdete skutečnou příčinu." },
+      tryAgain: { title: "Zkusit znovu", text: "Co tentokrát změníme?" },
+      rootProblem: { title: "Problém", text: "Co přesně je problém a koho se týká?" },
+      rootGoal: { title: "Cíl", text: "Čeho chceme dosáhnout a dokdy?" },
+      rootDecision: { title: "Rozhodnutí", text: "O čem se musíme rozhodnout?" },
+      rootRetro: { title: "Zhodnocení", text: "Na co se ohlížíme?" },
+      criteriaQuestion: { title: "Na čem záleží nejvíc?", text: "Která kritéria rozhodnou — cena, čas, riziko, kvalita?" },
+      optionA: { title: "Varianta A", text: "Jedna z možných voleb" },
+      advantageA: { title: "Výhoda A", text: "Co pro ni mluví?" },
+      riskA: { title: "Riziko A", text: "Co se s ní může pokazit?" },
+      optionB: { title: "Varianta B", text: "Jedna z možných voleb" },
+      advantageB: { title: "Výhoda B", text: "Co pro ni mluví?" },
+      riskB: { title: "Riziko B", text: "Co se s ní může pokazit?" },
+      optionC: { title: "Varianta C", text: "Jedna z možných voleb" },
+      advantageC: { title: "Výhoda C", text: "Co pro ni mluví?" },
+      riskC: { title: "Riziko C", text: "Co se s ní může pokazit?" },
+      wentWell1: { title: "Co se povedlo", text: "Něco, co fungovalo a stojí za opakování" },
+      wentWell2: { title: "Další úspěch", text: "Co dalšího se povedlo?" },
+      wentBad1: { title: "Co se nepovedlo", text: "Něco, co nefungovalo, a proč" },
+      wentBad2: { title: "Další problém", text: "Co dalšího se pokazilo?" },
+      tryNext1: { title: "Změna 1", text: "Jedna věc, kterou uděláme jinak" },
+      tryNext2: { title: "Změna 2", text: "Další změna k vyzkoušení" },
+    },
+  },
   contextMenu: { createBranch: "Vytvořit větev", update: "Upravit", choose: "Vybrat…", delete: "Smazat", attack: "Napadnout" },
   selection: {
     tapToChoose: "Klepnutím na své uzly je vyberete",
-    finishHint: "Hotovo: klepněte mimo nebo stiskněte Enter",
+    finishHint: "Rodič vezme celou svou větev (Shift+klepnutí: jen tento uzel). Hotovo: klepněte mimo nebo stiskněte Enter.",
     chosen: (n) => `Vybráno: ${csNodes(n)}`,
     selected: (n) => `Označeno: ${csNodes(n)}`,
     actions: "Akce",
@@ -632,6 +780,9 @@ const cs: UiStrings = {
     deleteConfirm: "Smazat tento uzel?",
     selectToSeeHealth: "Vyberte pro zobrazení zdraví",
     circleParent: (s) => `Rodič kruhu (${s})`,
+    variantParent: (s) => `Rodič varianty (${s})`,
+    zoneName: "Název zóny:",
+    zoneNamePlaceholder: "Pojmenujte tuto zónu",
     clickToChangeType: "Klepnutím změníte typ",
     chooseHint: "vybrat?",
     ghostAgain: "klepnutím znovu přidáte",
@@ -646,6 +797,9 @@ const cs: UiStrings = {
     writeObjection: "Napište námitku výše, abyste mohli zvolit zbraň.",
     writeFirst: "Nejdřív napište námitku",
     weapons: { nitpick: "Malichernost", counterpoint: "Protiargument", fatalFlaw: "Fatální chyba" },
+    hintNegativeTarget: "Bojový režim: na negativní uzel odpovídáte pozitivním (Řešení, Varianta nebo Úspěch).",
+    hintPositiveTarget: "Bojový režim: pozitivní uzel zpochybníte otázkou nebo negativním uzlem Problém / Problematická varianta.",
+    hintPersonal: "Tvůrčí režim: útok jen přidá uzel, nezpůsobí žádné poškození.",
   },
   protect: {
     intro: "Ochranný uzel plně blokuje každý další útok na tento uzel, dokud není poražen — bez limitu a bez prodlevy.",
@@ -796,10 +950,71 @@ const uk: UiStrings = {
     edit: "Редагувати",
     done: "Готово",
   },
+  visibility: { hide: "Сховати цю гілку від запрошених", show: "Показати цю гілку запрошеним", hint: "Запрошені учасники не бачать цей вузол і все, що від нього відходить. Ви бачите його завжди.", badge: "Приховано від запрошених" },
+  search: { title: "Пошук вузлів", placeholder: "Знайти вузол за назвою або текстом", none: "Нічого не знайдено", found: (n) => `Знайдено: ${n}` },
+  compact: { label: "Спрощений вигляд", hint: "Менші іконки, без німба й рогів та кілець — менше візуального шуму на малому екрані" },
+  types: {
+    Problem: "Проблема",
+    "Problematic option": "Проблемний варіант",
+    Solution: "Рішення (ціль)",
+    Option: "Варіант",
+    Success: "Успіх",
+    Fail: "Невдача",
+    unknown: "Питання (невідоме)",
+  },
+  templates: {
+    section: "Шаблони",
+    problem: { button: "Проаналізувати цю проблему", hint: "Додає підпроблеми, ризик бездіяльності, попередній досвід, способи вирішення, план і його результат." },
+    goal: { button: "Спланувати цю ціль", hint: "Додає критерій успіху, пронумеровані кроки, перешкоду із запасним планом і перевірку." },
+    retry: { title: "Не вийшло", hint: "З’ясуйте чому й вирішіть, що змінити, перш ніж пробувати знову.", button: "Проаналізувати й спробувати знову" },
+    created: (n) => `Додано: ${ukNodes(n)}`,
+    failed: "Не вдалося додати шаблон",
+    nodes: {
+      subProblem1: { title: "Підпроблема 1", text: "Яка частина проблеми не працює? (одна причина на вузол)" },
+      subProblem2: { title: "Підпроблема 2", text: "Що ще до неї призводить?" },
+      negativeScenario: { title: "Якщо нічого не робити", text: "Що найгірше станеться, якщо залишити все як є?" },
+      experiencePositive: { title: "Що спрацювало", text: "Що ми вже пробували, і це допомогло?" },
+      experienceNegative: { title: "Що не спрацювало", text: "Що ми вже пробували, і не вийшло, та чому?" },
+      way1: { title: "Спосіб вирішення 1", text: "Один із можливих шляхів вирішення" },
+      way2: { title: "Спосіб вирішення 2", text: "Альтернативний шлях вирішення" },
+      plan: { title: "План", text: "Хто що робить і до якого терміну?" },
+      resultPositive: { title: "Результат: вийшло", text: "Що саме покращилось? Як ми це визначимо?" },
+      resultNegative: { title: "Результат: не вийшло", text: "Що пішло не так? (потім проаналізуйте й спробуйте знову)" },
+      criteria: { title: "Критерій успіху", text: "Як ми зрозуміємо, що ціль досягнуто? Зробіть його вимірюваним." },
+      step1: { title: "Крок 1", text: "Перша конкретна дія" },
+      step2: { title: "Крок 2", text: "Наступна дія" },
+      step3: { title: "Крок 3", text: "Остання дія перед ціллю" },
+      obstacle: { title: "Перешкода", text: "Що може нас зупинити?" },
+      fallback: { title: "Запасний план", text: "Що робимо, якщо це станеться?" },
+      review: { title: "Перевірка", text: "Коли перевіряємо прогрес і хто вирішує?" },
+      whyFailed: { title: "Чому не вийшло?", text: "Запитайте «чому», а потім ще раз «чому» — доки не дійдете до справжньої причини." },
+      tryAgain: { title: "Спробувати знову", text: "Що ми змінимо цього разу?" },
+      rootProblem: { title: "Проблема", text: "У чому саме проблема і кого вона стосується?" },
+      rootGoal: { title: "Ціль", text: "Чого ми хочемо досягти і до якого терміну?" },
+      rootDecision: { title: "Рішення", text: "Що нам потрібно вирішити?" },
+      rootRetro: { title: "Підсумок", text: "На що ми озираємося?" },
+      criteriaQuestion: { title: "Що найважливіше?", text: "Які критерії вирішать — вартість, час, ризик, якість?" },
+      optionA: { title: "Варіант A", text: "Один із можливих виборів" },
+      advantageA: { title: "Перевага A", text: "Що на його користь?" },
+      riskA: { title: "Ризик A", text: "Що може піти не так?" },
+      optionB: { title: "Варіант B", text: "Один із можливих виборів" },
+      advantageB: { title: "Перевага B", text: "Що на його користь?" },
+      riskB: { title: "Ризик B", text: "Що може піти не так?" },
+      optionC: { title: "Варіант C", text: "Один із можливих виборів" },
+      advantageC: { title: "Перевага C", text: "Що на його користь?" },
+      riskC: { title: "Ризик C", text: "Що може піти не так?" },
+      wentWell1: { title: "Що вдалося", text: "Те, що спрацювало і варте повторення" },
+      wentWell2: { title: "Ще один успіх", text: "Що ще вдалося?" },
+      wentBad1: { title: "Що не вдалося", text: "Те, що не спрацювало, і чому" },
+      wentBad2: { title: "Ще одна проблема", text: "Що ще пішло не так?" },
+      tryNext1: { title: "Зміна 1", text: "Одна річ, яку ми зробимо інакше" },
+      tryNext2: { title: "Зміна 2", text: "Ще одна зміна для спроби" },
+    },
+  },
   contextMenu: { createBranch: "Створити гілку", update: "Змінити", choose: "Обрати…", delete: "Видалити", attack: "Атакувати" },
   selection: {
     tapToChoose: "Торкайтеся своїх вузлів, щоб обрати їх",
-    finishHint: "Готово: торкніться поза вузлами або натисніть Enter",
+    finishHint: "Батько бере всю свою гілку (Shift+торкання: лише цей вузол). Готово: торкніться поза вузлами або натисніть Enter.",
     chosen: (n) => `Обрано: ${ukNodes(n)}`,
     selected: (n) => `Виділено: ${ukNodes(n)}`,
     actions: "Дії",
@@ -890,6 +1105,9 @@ const uk: UiStrings = {
     deleteConfirm: "Видалити цей вузол?",
     selectToSeeHealth: "Виберіть, щоб побачити здоров’я",
     circleParent: (s) => `Батько кола (${s})`,
+    variantParent: (s) => `Батько варіанту (${s})`,
+    zoneName: "Назва зони:",
+    zoneNamePlaceholder: "Назвіть цю зону",
     clickToChangeType: "Натисніть, щоб змінити тип",
     chooseHint: "обрати?",
     ghostAgain: "натисніть ще раз, щоб додати",
@@ -904,6 +1122,9 @@ const uk: UiStrings = {
     writeObjection: "Напишіть заперечення вище, щоб обрати зброю.",
     writeFirst: "Спершу напишіть заперечення",
     weapons: { nitpick: "Прискіпка", counterpoint: "Контраргумент", fatalFlaw: "Фатальна вада" },
+    hintNegativeTarget: "Бойовий режим: на негативний вузол ви відповідаєте позитивним (Рішення, Варіант або Успіх).",
+    hintPositiveTarget: "Бойовий режим: позитивний вузол ви ставите під сумнів питанням або негативним вузлом Проблема / Проблемний варіант.",
+    hintPersonal: "Творчий режим: атака лише додає вузол і не завдає шкоди.",
   },
   protect: {
     intro: "Захисний вузол повністю блокує кожну наступну атаку на цей вузол, доки його не переможено — без обмежень і без затримки.",
@@ -1054,10 +1275,71 @@ const ru: UiStrings = {
     edit: "Изменить",
     done: "Готово",
   },
+  visibility: { hide: "Скрыть эту ветку от приглашённых", show: "Показать эту ветку приглашённым", hint: "Приглашённые участники не видят этот узел и всё, что от него отходит. Вы видите его всегда.", badge: "Скрыто от приглашённых" },
+  search: { title: "Поиск узлов", placeholder: "Найти узел по названию или тексту", none: "Ничего не найдено", found: (n) => `Найдено: ${n}` },
+  compact: { label: "Упрощённый вид", hint: "Меньшие иконки, без нимба и рогов и без колец — меньше визуального шума на маленьком экране" },
+  types: {
+    Problem: "Проблема",
+    "Problematic option": "Проблемный вариант",
+    Solution: "Решение (цель)",
+    Option: "Вариант",
+    Success: "Успех",
+    Fail: "Неудача",
+    unknown: "Вопрос (неизвестное)",
+  },
+  templates: {
+    section: "Шаблоны",
+    problem: { button: "Проанализировать эту проблему", hint: "Добавляет подпроблемы, риск бездействия, прошлый опыт, способы решения, план и его результат." },
+    goal: { button: "Спланировать эту цель", hint: "Добавляет критерий успеха, пронумерованные шаги, препятствие с запасным планом и проверку." },
+    retry: { title: "Не получилось", hint: "Выясните почему и решите, что изменить, прежде чем пробовать снова.", button: "Проанализировать и попробовать снова" },
+    created: (n) => `Добавлено: ${ruNodes(n)}`,
+    failed: "Не удалось добавить шаблон",
+    nodes: {
+      subProblem1: { title: "Подпроблема 1", text: "Какая часть проблемы не работает? (одна причина на узел)" },
+      subProblem2: { title: "Подпроблема 2", text: "Что ещё к ней приводит?" },
+      negativeScenario: { title: "Если ничего не делать", text: "Что худшее произойдёт, если оставить всё как есть?" },
+      experiencePositive: { title: "Что сработало", text: "Что мы уже пробовали, и это помогло?" },
+      experienceNegative: { title: "Что не сработало", text: "Что мы уже пробовали, и не получилось, и почему?" },
+      way1: { title: "Способ решения 1", text: "Один из возможных путей решения" },
+      way2: { title: "Способ решения 2", text: "Альтернативный путь решения" },
+      plan: { title: "План", text: "Кто что делает и к какому сроку?" },
+      resultPositive: { title: "Результат: получилось", text: "Что именно улучшилось? Как мы это определим?" },
+      resultNegative: { title: "Результат: не получилось", text: "Что пошло не так? (затем проанализируйте и попробуйте снова)" },
+      criteria: { title: "Критерий успеха", text: "Как мы поймём, что цель достигнута? Сделайте его измеримым." },
+      step1: { title: "Шаг 1", text: "Первое конкретное действие" },
+      step2: { title: "Шаг 2", text: "Следующее действие" },
+      step3: { title: "Шаг 3", text: "Последнее действие перед целью" },
+      obstacle: { title: "Препятствие", text: "Что может нас остановить?" },
+      fallback: { title: "Запасной план", text: "Что делаем, если это случится?" },
+      review: { title: "Проверка", text: "Когда проверяем прогресс и кто решает?" },
+      whyFailed: { title: "Почему не получилось?", text: "Спросите «почему», а потом ещё раз «почему» — пока не дойдёте до настоящей причины." },
+      tryAgain: { title: "Попробовать снова", text: "Что мы изменим на этот раз?" },
+      rootProblem: { title: "Проблема", text: "В чём именно проблема и кого она касается?" },
+      rootGoal: { title: "Цель", text: "Чего мы хотим достичь и к какому сроку?" },
+      rootDecision: { title: "Решение", text: "Что нам нужно решить?" },
+      rootRetro: { title: "Итоги", text: "На что мы оглядываемся?" },
+      criteriaQuestion: { title: "Что важнее всего?", text: "Какие критерии решат — стоимость, время, риск, качество?" },
+      optionA: { title: "Вариант A", text: "Один из возможных выборов" },
+      advantageA: { title: "Преимущество A", text: "Что говорит в его пользу?" },
+      riskA: { title: "Риск A", text: "Что может пойти не так?" },
+      optionB: { title: "Вариант B", text: "Один из возможных выборов" },
+      advantageB: { title: "Преимущество B", text: "Что говорит в его пользу?" },
+      riskB: { title: "Риск B", text: "Что может пойти не так?" },
+      optionC: { title: "Вариант C", text: "Один из возможных выборов" },
+      advantageC: { title: "Преимущество C", text: "Что говорит в его пользу?" },
+      riskC: { title: "Риск C", text: "Что может пойти не так?" },
+      wentWell1: { title: "Что получилось", text: "То, что сработало и стоит повторить" },
+      wentWell2: { title: "Ещё один успех", text: "Что ещё получилось?" },
+      wentBad1: { title: "Что не получилось", text: "То, что не сработало, и почему" },
+      wentBad2: { title: "Ещё одна проблема", text: "Что ещё пошло не так?" },
+      tryNext1: { title: "Изменение 1", text: "Одна вещь, которую мы сделаем иначе" },
+      tryNext2: { title: "Изменение 2", text: "Ещё одно изменение для проверки" },
+    },
+  },
   contextMenu: { createBranch: "Создать ветку", update: "Изменить", choose: "Выбрать…", delete: "Удалить", attack: "Атаковать" },
   selection: {
     tapToChoose: "Касайтесь своих узлов, чтобы выбрать их",
-    finishHint: "Готово: коснитесь вне узлов или нажмите Enter",
+    finishHint: "Родитель берёт всю свою ветку (Shift+касание: только этот узел). Готово: коснитесь вне узлов или нажмите Enter.",
     chosen: (n) => `Выбрано: ${ruNodes(n)}`,
     selected: (n) => `Выделено: ${ruNodes(n)}`,
     actions: "Действия",
@@ -1148,6 +1430,9 @@ const ru: UiStrings = {
     deleteConfirm: "Удалить этот узел?",
     selectToSeeHealth: "Выберите, чтобы увидеть здоровье",
     circleParent: (s) => `Родитель круга (${s})`,
+    variantParent: (s) => `Родитель варианта (${s})`,
+    zoneName: "Название зоны:",
+    zoneNamePlaceholder: "Назовите эту зону",
     clickToChangeType: "Нажмите, чтобы изменить тип",
     chooseHint: "выбрать?",
     ghostAgain: "нажмите ещё раз, чтобы добавить",
@@ -1162,6 +1447,9 @@ const ru: UiStrings = {
     writeObjection: "Напишите возражение выше, чтобы выбрать оружие.",
     writeFirst: "Сначала напишите возражение",
     weapons: { nitpick: "Придирка", counterpoint: "Контраргумент", fatalFlaw: "Фатальный изъян" },
+    hintNegativeTarget: "Боевой режим: на негативный узел вы отвечаете позитивным (Решение, Вариант или Успех).",
+    hintPositiveTarget: "Боевой режим: позитивный узел вы ставите под сомнение вопросом или негативным узлом Проблема / Проблемный вариант.",
+    hintPersonal: "Творческий режим: атака лишь добавляет узел и не наносит урона.",
   },
   protect: {
     intro: "Защитный узел полностью блокирует каждую следующую атаку на этот узел, пока его не победили — без ограничений и без задержки.",

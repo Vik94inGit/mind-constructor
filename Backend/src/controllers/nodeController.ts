@@ -6,6 +6,8 @@ import { broadcastToMap } from "../realtime/io.js";
 import {
   createNodeAbl,
   updateNodeAbl,
+  setBranchHiddenAbl,
+  NotMapOwnerError,
   MapNotFoundError,
   ParentNotFoundError,
   CrossMapParentError,
@@ -16,12 +18,8 @@ import {
   attackNodeAbl,
   getAttackHistoryAbl,
   protectNodeAbl,
-  CannotAttackOwnNodeError,
-  CanOnlyAttackOwnNodeError,
-  CannotRetaliateError,
-  NodeAlreadyDefeatedError,
-  WeaponOnCooldownError,
   NotNodeOwnerError,
+  AttackTypeNotAllowedError,
 } from "../abl/attackAbl.js";
 import {
   packNodesAbl,
@@ -189,24 +187,7 @@ export const attackNode = async (req: Request<nodeIdParams>, res: Response) => {
     return handleAblError(
       res,
       error,
-      [
-        [CannotAttackOwnNodeError, 400, "You can't attack your own node"],
-        [CanOnlyAttackOwnNodeError, 400, "Discussion mode: you can only attack your own nodes"],
-        [
-          CannotRetaliateError,
-          403,
-          "You can only retaliate against an attack that targeted your own node",
-        ],
-        [NodeAlreadyDefeatedError, 400, "This node has already been defeated"],
-        [
-          WeaponOnCooldownError,
-          429,
-          (e: Error) => ({
-            error: "That weapon is still on cooldown",
-            readyAt: new Date((e as WeaponOnCooldownError).readyAt).toISOString(),
-          }),
-        ],
-      ],
+      [[AttackTypeNotAllowedError, 403, (e) => ({ error: e.message, allowed: (e as AttackTypeNotAllowedError).allowed })]],
       { message: "Attack failed", logLabel: "attackNode" },
     );
   }
@@ -307,6 +288,38 @@ export const unpackNode = async (req: Request<nodeIdParams>, res: Response) => {
   }
 };
 
+// ========== HIDE / SHOW A BRANCH (map owner only) ==========
+export const setNodeVisibility = async (req: Request<nodeIdParams>, res: Response) => {
+  try {
+    const { nodeId } = req.params;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Not authenticated" });
+    }
+
+    const node = await setBranchHiddenAbl(nodeId, userId, req.body);
+
+    if (!node) {
+      return res.status(404).json({ success: false, error: "Node not found" });
+    }
+
+    // Every member reloads what it can see; the payload deliberately carries
+    // no node id, so this goes to everyone rather than the owner alone.
+    const publicMapId = (node.mapId as unknown as { mapId?: string } | null)?.mapId ?? null;
+    if (publicMapId) broadcastToMap(publicMapId, "nodes:visibility", { changed: true });
+
+    return res.status(200).json({ success: true, node });
+  } catch (error) {
+    return handleAblError(
+      res,
+      error,
+      [[NotMapOwnerError, 403, "Only the map's owner can hide or show a branch"]],
+      { message: "Could not change the branch's visibility", logLabel: "setNodeVisibility" },
+    );
+  }
+};
+
 // ========== NODE ATTACK HISTORY ==========
 export const getNodeAttackHistory = async (
   req: Request<nodeIdParams>,
@@ -384,11 +397,11 @@ export const deleteNode = async (
   }
 };
 
-// Bulk counterpart of deleteNode — the frontend's multi-select "Delete N
-// nodes" used to fire one DELETE per node in parallel; this collapses that
-// into a single request. Same ownership contract as the single-node route
-// (see deleteManyNodesDao): an id the caller doesn't own, or that's already
-// gone, is silently skipped rather than failing the whole batch.
+// Bulk counterpart of deleteNode — one request for the frontend's multi-select
+// "Delete N nodes" instead of N parallel single-node DELETEs. Same ownership
+// contract as the single-node route (see deleteManyNodesDao): an id the
+// caller doesn't own, or that's already gone, is silently skipped rather than
+// failing the whole batch.
 export const deleteManyNodes = async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;

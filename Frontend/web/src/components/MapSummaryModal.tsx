@@ -57,7 +57,7 @@ export function MapSummaryModal({ map, onClose }: { map: MapDoc; onClose: () => 
                 <div className="grid grid-cols-[16px_9rem_1fr_2ch] items-center gap-[0.6rem]" key={type}>
                   <NodeTypeIcon type={type} size={16} />
                   <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[0.8rem] text-ink-soft">
-                    {type}
+                    {t.ui.types[type]}
                   </span>
                   <div className="h-5 overflow-hidden rounded-[4px] bg-surface-2">
                     <div

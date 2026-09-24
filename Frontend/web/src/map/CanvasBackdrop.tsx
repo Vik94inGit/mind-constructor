@@ -26,6 +26,8 @@ interface Props {
   onLineClick: (line: LineDoc) => void;
   /** False while drawing a line: zones and grouped branches stop taking clicks, so a click on one lands on the canvas as a (refused) point instead of choosing a circle. */
   interactive: boolean;
+  /** The simplified view: no ring drawn around a circle's parent. */
+  compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
   drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
 }
@@ -50,6 +52,7 @@ export function CanvasBackdrop({
   onLineClick,
   interactive,
   drawing,
+  compact = false,
 }: Props) {
   const { t } = useI18n();
   return (
@@ -144,7 +147,8 @@ export function CanvasBackdrop({
         never owner-chosen — this one exists for every circle root automatically,
         alongside the crown badge rather than instead of it.
       */}
-      {visibleNodes
+      {!compact &&
+        visibleNodes
         .filter((n) => circleRootSentimentByNode.has(n.nodeId))
         .map((n) => {
           const p = posFor(n);

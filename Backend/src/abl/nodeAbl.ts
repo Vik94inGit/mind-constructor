@@ -1,12 +1,13 @@
 import { z } from "zod";
 import type mongoose from "mongoose";
 import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS } from "../models/Node.js";
-import { getMapByIdDao } from "../dao/mapsDao.js";
+import { getMapByIdDao, getMapByInternalIdDao } from "../dao/mapsDao.js";
 import {
   createNodeMutationDao,
   countNodesByMapInternalIdDao,
   updateNodeDao,
   findNodeByPublicIdDao,
+  setBranchHiddenMutationDao,
 } from "../dao/nodeDao.js";
 import { parseOrThrow } from "./errors.js";
 
@@ -21,10 +22,14 @@ export class ParentNotFoundError extends Error {}
 export class CrossMapParentError extends Error {}
 export class ParentNotOwnedError extends Error {}
 export class SelfParentError extends Error {}
+export class NotMapOwnerError extends Error {}
 
 // Shared by create/update: same cap as Node.title's own maxlength. Empty is
 // valid (it's how "no title" is stored, and how an update clears one).
 const titleSchema = z.string().trim().max(80, "title must be at most 80 characters");
+
+// Node.zoneName — same shape as the title: "" clears it.
+const zoneNameSchema = z.string().trim().max(40, "zone name must be at most 40 characters");
 
 // Node.order — a whole step number, 1..9999. null clears it (update only).
 const orderSchema = z
@@ -97,6 +102,7 @@ const updateNodeSchema = z
     text: z.string().min(1).optional(),
     // "" clears the title (back to the text's own first words).
     title: titleSchema.optional(),
+    zoneName: zoneNameSchema.optional(),
     // null clears the step number — same nullish-vs-absent convention as
     // symbolOverride/manualZone below.
     order: orderSchema.nullish(),
@@ -161,4 +167,19 @@ export const updateNodeAbl = async (
   }
 
   return await updateNodeDao(publicNodeId, userId, definedUpdates);
+};
+
+const setBranchHiddenSchema = z.object({ hidden: z.boolean({ error: () => "hidden must be true or false" }) });
+
+// The map's owner hides or shows a branch (this node and everything hanging
+// from it) for the map's invited members. Returns null if the node does not
+// exist. See dao/visibilityDao.ts.
+export const setBranchHiddenAbl = async (publicNodeId: string, userId: string, input: unknown) => {
+  const { hidden } = parseOrThrow(setBranchHiddenSchema, input);
+  const node = await findNodeByPublicIdDao(publicNodeId);
+  if (!node) return null;
+  const map = await getMapByInternalIdDao(node.mapId);
+  if (!map) return null;
+  if (map.ownerId.toString() !== userId.toString()) throw new NotMapOwnerError();
+  return await setBranchHiddenMutationDao(publicNodeId, hidden);
 };

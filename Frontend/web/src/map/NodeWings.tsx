@@ -42,11 +42,11 @@ function DevilWings({ color }: { color: string }) {
 // geometric center already *is* (200, 150).
 const WINGS_VIEWBOX = "60 88 280 124";
 const WINGS_ASPECT = 124 / 280;
-// Scaled so the wings sit at the same size relative to a node's 48px icon
-// circle that they used to when they shared OutcomeBadge's own canvas with
-// a face of radius 54 there — i.e. this width : 48px circle diameter is
-// the same ratio as this viewBox's own 280 units : a 108-unit (r=54) face
-// diameter. (48, not the original 60, per the node icon's own -20% resize.)
+// Scaled to keep the same wing-to-icon size ratio as OutcomeBadge's own
+// symbol-to-face ratio: this width : 48px circle diameter matches this
+// viewBox's own 280 units : a 108-unit (r=54) face diameter, the radius
+// OutcomeBadge's symbols are drawn against. (48, not the original 60, per
+// the node icon's own -20% resize.)
 const WINGS_WIDTH = 280 * (48 / 108);
 
 // Flanks a node's own 48px icon circle from behind (a plain sibling,

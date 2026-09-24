@@ -10,6 +10,7 @@ import {
 import { parseOrThrow } from "./errors.js";
 import { createNodeAbl } from "./nodeAbl.js";
 import type { NodeType } from "../models/Node.js";
+import { MAP_KINDS } from "../models/Map.js";
 
 // A Mongo ObjectId is always exactly 24 hex characters — cheap to check
 // before ever handing the value to Mongoose, which would otherwise throw its
@@ -113,6 +114,8 @@ const createMapSchema = z.object({
   // — combat controls visible) via the Map model itself — omitting this is
   // exactly the same as sending true.
   discussionMode: z.boolean().optional(),
+  // See MAP_KINDS.
+  kind: z.enum(MAP_KINDS).optional(),
 });
 
 // Seeds one template's node tree via the real createNodeAbl, not a direct

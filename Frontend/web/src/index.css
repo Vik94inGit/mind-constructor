@@ -46,10 +46,10 @@
   /* NodeCard own inner icon circle color, shared with QuickAddGhosts own
      ghost preview fill (see both callers own bg-[var(--node-fill)] usage)
      so a real node and the ghost that previewed it always look the same.
-     Plain white here, not the light-brown/tan this used to be — that tan
-     moved to --paper above instead, so the swap reads as "nodes are the
-     bright thing sitting on a warm canvas" rather than both landing on
-     roughly the same near-white. Written as its own literal hex, not
+     Plain white here, not a light-brown/tan matching --paper above —
+     sharing that tan between both would land nodes and canvas on roughly
+     the same near-white; staying distinct instead reads as "nodes are the
+     bright thing sitting on a warm canvas." Written as its own literal hex, not
      var(--surface) — Tailwind own CSS processing here silently drops a
      custom property whose value is itself a var() reference (confirmed
      live: --node-fill computed to an empty string, and the node fill
@@ -68,7 +68,7 @@
 /* Explicit data-theme attribute, not a prefers-color-scheme media query —
    index.html's own inline script sets this before first paint (reading a
    saved choice, else falling back to the OS preference, the same fallback
-   a plain media query used to provide on its own) and ThemeProvider
+   a plain media query would provide on its own) and ThemeProvider
    (src/theme/ThemeContext.tsx) keeps it in sync afterward, toggled from
    the navbar. A bare media query can't be overridden by an in-app choice
    at all; this can. */
@@ -91,9 +91,9 @@
        border/edges/zones read as noticeably more saturated against a dark
        background than the same hex ever did on the light paper color, so
        dark mode gets its own toned-down set rather than inheriting the
-       light-mode values unchanged (which every node-type color used to do
-       — this file's dark-mode block never touched --n-* or --zone-* at
-       all until now). Same hue as each light-mode counterpart, just pulled
+       light-mode values unchanged, which is what every node-type color
+       would do if this dark-mode block left --n-* and --zone-* unset.
+       Same hue as each light-mode counterpart, just pulled
        down in saturation/lightness so the map itself doesn't outshine the
        rest of the (already muted) dark theme around it. */
     --n-problem: #a8623f;
@@ -156,6 +156,7 @@
   --animate-weapon-fly-in: weapon-fly-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-weapon-arrow-fly: weapon-arrow-fly 0.55s ease-in forwards;
   --animate-quick-add-pulse: quick-add-ghost-pulse 1.8s ease-in-out infinite;
+  --animate-ghost-in: ghost-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   --animate-outcome-particle-out: outcome-particle-out 0.7s ease-out forwards;
   --animate-unsolved-pulse: unsolved-problem-pulse 1.6s ease-in-out infinite;
 }
@@ -239,6 +240,13 @@
     opacity: 0;
   }
 }
+@keyframes ghost-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
 @keyframes quick-add-ghost-pulse {
   0%,
   100% {

@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import mongoose from "mongoose";
 import { Edge, type EdgeSentiment } from "../models/Edge.js";
 import { getMapByIdDao } from "./mapsDao.js";
+import { getHiddenNodesDao } from "./visibilityDao.js";
 
 type InternalId = mongoose.Types.ObjectId | string;
 
@@ -45,10 +46,20 @@ export const getEdgesByMapDao = async (publicMapId: string, userId: string) => {
   const map = await getMapByIdDao(publicMapId, userId);
   if (!map) return null;
 
-  return await Edge.find({ mapId: map._id })
+  const edges = await Edge.find({ mapId: map._id })
     .populate("fromNodeId", "nodeId text type")
     .populate("toNodeId", "nodeId text type")
     .populate("userId", "username");
+
+  // An invited member does not see links to or from a branch the owner has hidden.
+  if (map.ownerId.toString() === userId.toString()) return edges;
+  const hidden = await getHiddenNodesDao(map._id);
+  if (hidden.publicIds.size === 0) return edges;
+  return edges.filter((e) => {
+    const from = (e.fromNodeId as unknown as { nodeId?: string } | null)?.nodeId;
+    const to = (e.toNodeId as unknown as { nodeId?: string } | null)?.nodeId;
+    return !(from && hidden.publicIds.has(from)) && !(to && hidden.publicIds.has(to));
+  });
 };
 
 // Every edge touching this node, either direction — used by packAbl.ts to

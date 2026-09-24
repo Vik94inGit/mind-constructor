@@ -1,6 +1,8 @@
 # Mind Constructor — Web
 
-React + TypeScript + Vite frontend for the Mind Constructor API (see `../../Backend/docs/api-guide.html`).
+React + TypeScript + Vite frontend for the Mind Constructor API (see
+[`../../Backend/docs/api-guide.html`](../../Backend/docs/api-guide.html) for the REST reference and
+[`../../Backend/CLAUDE.md`](../../Backend/CLAUDE.md) for the domain model).
 
 ## Setup
 
@@ -14,28 +16,40 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 
 ## What's here
 
-- **Auth** — register/login/logout, JWT stored in `localStorage`. There's no `/me` endpoint on the
-  backend, so on login the app fetches `GET /api/auth/users` and matches its own id out of the list
-  to learn its `role` (needed to show the Admin tab) — the only place `role` is exposed at all.
-- **Dashboard** (`/`) — maps you own or were invited to, create/delete/invite.
-- **Map canvas** (`/maps/:mapId`) — drag your own nodes, create nodes/edges, attack other members'
-  nodes with the three combat weapons, see auto-detected clusters and attack indicators as overlays.
-- **Admin** (`/admin`) — visible only if your user's `role` is `admin`. Block/unblock/delete users,
-  wipe the database.
+- **Auth** (`/login`, `/register`) — email/password or "Sign in with Google" (one endpoint for
+  both registering and logging in), JWT stored in `localStorage`. "Try it without an account"
+  spins up a throwaway demo account with its own seeded map — nothing to configure to try it.
+- **Dashboard** (`/`) — maps you own or were invited to; create/rename/delete, invite members, see
+  who's on a map and who owns it, copy a whole map's nodes to paste into another one.
+- **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
+  with the quick-add ghosts or the toolbar, link nodes explicitly, draw separator lines, attack
+  other members' nodes with the three combat weapons, shield your own, pack nodes into a
+  container, group nodes into a chosen circle, choose a node (and optionally its whole branch) to
+  link/copy/number/delete together, and switch how nodes read (icons only, icons + text, or a
+  classical mind map) for the whole map or just the chosen nodes.
+- **Admin** (`/admin`) — visible only if your account's `role` is `admin` (granted with
+  `npm run admin:promote` in `Backend/`, never through the app itself). Block/unblock/delete
+  users, wipe the database.
+- **i18n** — English, Czech, Ukrainian and Russian throughout the toolbar, panels, menus and error
+  messages (`src/i18n/`), node type names included (the stored value stays English).
+- **Templates** — the node panel's Info tab offers a ready branch on a node with no children yet:
+  a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
+  breakdown, and a failed (Fail) node gets "Analyze and try again". See `src/utils/templates.ts`.
+- **Map types** — creating a map asks for one of four kinds (Problem analysis, Decision, Goal planning,
+  Retrospective), each seeded with a starter structure in your language, and for a mode (Discussion or
+  Personal). The owner can switch the mode later from the map's toolbar.
+- **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
+  matches stay lit while everything else dims, and a result takes you to that node.
+- **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden
+  nodes carry a crossed-eye badge for the owner. Enforced by the backend, not just the UI.
+- **Simplified view** — the toolbar's `Aa` menu has a switch that shrinks icons and drops halo/horns,
+  wings and circle-parent rings to cut visual noise. It defaults to on for a phone-sized screen and
+  is remembered per browser.
 
 ## Known API limitations reflected in the UI
 
-- `Node.parentId` and the weapon node's `targetNodeId` are the *internal* Mongo `_id` of the
-  referenced node, not its public `nodeId` — the docs call this out explicitly. Since node list
-  responses only ever expose the public `nodeId`, the frontend can't resolve either reference, so
-  the argument-tree (`parentId`) isn't drawn on the canvas and a weapon node's "points at" line only
-  shows up when it happens to be resolvable. Explicit **Edges** don't have this problem (the edges
-  endpoint populates both ends with public ids) and are what the canvas actually draws.
-- This cuts both ways: it also breaks `parentId` on *creation*, not just reading. `createNodeAbl`
-  passes `parentId` straight through to Mongoose with no public-id → internal-id lookup (unlike
-  `createEdgeAbl`, which explicitly resolves both node ids first) — so sending any real node's
-  public `nodeId` as `parentId` fails Mongoose's `ObjectId` cast server-side. `null` is the only
-  value that ever succeeds. The "New node" form has no parent picker for exactly this reason; add
-  one once the backend resolves public ids for `parentId` the way it already does for edges.
-- Combat cooldowns are tracked per attacker+weapon, not per attacker+weapon+target — the UI mirrors
-  that: attacking anyone with `counterpoint` starts one 5-minute cooldown for that weapon everywhere.
+- Combat has no cooldowns. In Battle mode (the map's default) attacks do damage; the map's owner may
+  attack with any node type, other members answer a negative node with a positive one and a positive
+  node with a question or a Problem / Problematic option (enforced by the backend's `attackAbl.ts`).
+  In Creating mode attacks only add their node and do no damage. The one way to stop a battle-mode
+  attack is a protection node, created by the target's own owner.

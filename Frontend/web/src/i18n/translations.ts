@@ -71,10 +71,15 @@ export interface Translation {
       boardColor: string;
       startingPoint: string;
       templates: {
-        blank: { label: string; desc: string };
-        singleProblem: { label: string; desc: string };
-        decisionTree: { label: string; desc: string };
-        proCon: { label: string; desc: string };
+        problem: { label: string; desc: string };
+        decision: { label: string; desc: string };
+        goal: { label: string; desc: string };
+        retro: { label: string; desc: string };
+      };
+      mode: {
+        label: string;
+        discussion: { label: string; desc: string };
+        personal: { label: string; desc: string };
       };
       cancel: string;
       submit: string;
@@ -195,10 +200,15 @@ const en: Translation = {
       boardColor: "Board color",
       startingPoint: "Starting point",
       templates: {
-        blank: { label: "Blank canvas", desc: "Start from nothing." },
-        singleProblem: { label: "Single Problem", desc: "One root node to branch off." },
-        decisionTree: { label: "Decision tree", desc: "A Problem with two Options already branched off it." },
-        proCon: { label: "Pro / Con", desc: "A topic with one case-for and one case-against branch." },
+        problem: { label: "Problem analysis", desc: "Break a problem into parts, weigh ways to solve it, plan and check the result." },
+        decision: { label: "Decision", desc: "Compare options with their advantages and risks." },
+        goal: { label: "Goal planning", desc: "A goal with success criteria, steps, obstacles and a review." },
+        retro: { label: "Retrospective", desc: "What went well, what did not, and what to change." },
+      },
+      mode: {
+        label: "Mode",
+        discussion: { label: "Discussion", desc: "Battle: attacks do damage, and the owner may attack with any type of node." },
+        personal: { label: "Personal", desc: "Creating: attacks are decoration and do no damage. You can switch any time." },
       },
       cancel: "Cancel",
       submit: "Create map",
@@ -222,9 +232,9 @@ const en: Translation = {
       moveOn: "Move nodes: on — tap Done to go back to just selecting",
       moveOff: "Move nodes: off — turn on to drag nodes around",
       discussionTooltip:
-        "Discussion mode: on — combat (attack/protect) is visible. Click to switch to Personal mode.",
+        "Battle mode: on — attacks do damage, and members other than the owner are limited in what they can attack with. Click to switch to Creating mode.",
       personalTooltip:
-        "Personal mode: on — combat (attack/protect) is hidden for solo organizing. Click to switch back to Discussion mode.",
+        "Creating mode: on — attacks are decoration only and do no damage; no shields. Click to switch back to Battle mode.",
       zoomOut: "Zoom out",
       zoomReset: "Reset zoom",
       zoomIn: "Zoom in",
@@ -311,10 +321,15 @@ const cs: Translation = {
       boardColor: "Barva nástěnky",
       startingPoint: "Výchozí bod",
       templates: {
-        blank: { label: "Prázdné plátno", desc: "Začít od ničeho." },
-        singleProblem: { label: "Jeden problém", desc: "Jeden kořenový uzel k rozvětvení." },
-        decisionTree: { label: "Rozhodovací strom", desc: "Problém se dvěma již rozvětvenými možnostmi." },
-        proCon: { label: "Pro / Proti", desc: "Téma s jednou větví pro a jednou proti." },
+        problem: { label: "Analýza problému", desc: "Rozložte problém na části, zvažte řešení, naplánujte a ověřte výsledek." },
+        decision: { label: "Rozhodnutí", desc: "Porovnejte varianty s jejich výhodami a riziky." },
+        goal: { label: "Plánování cíle", desc: "Cíl s kritérii úspěchu, kroky, překážkami a kontrolou." },
+        retro: { label: "Retrospektiva", desc: "Co se povedlo, co ne a co změnit." },
+      },
+      mode: {
+        label: "Režim",
+        discussion: { label: "Diskuze", desc: "Bojový režim: útoky způsobují poškození a vlastník může útočit jakýmkoli typem uzlu." },
+        personal: { label: "Osobní", desc: "Tvůrčí režim: útoky jsou jen dekorace bez poškození. Kdykoli lze přepnout." },
       },
       cancel: "Zrušit",
       submit: "Vytvořit mapu",
@@ -338,9 +353,9 @@ const cs: Translation = {
       moveOn: "Přesouvání uzlů: zapnuto — klepnutím na Hotovo se vrátíte jen k výběru",
       moveOff: "Přesouvání uzlů: vypnuto — zapněte pro přetahování uzlů",
       discussionTooltip:
-        "Diskuzní režim: zapnuto — souboj (útok/ochrana) je viditelný. Klepnutím přepnete do osobního režimu.",
+        "Bojový režim: zapnuto — útoky způsobují poškození a členové kromě vlastníka jsou omezeni v tom, čím mohou útočit. Klepnutím přepnete do tvůrčího režimu.",
       personalTooltip:
-        "Osobní režim: zapnuto — souboj (útok/ochrana) je skrytý pro samostatnou organizaci. Klepnutím přepnete zpět do diskuzního režimu.",
+        "Tvůrčí režim: zapnuto — útoky jsou jen dekorace a nezpůsobují poškození; bez štítů. Klepnutím přepnete zpět do bojového režimu.",
       zoomOut: "Oddálit",
       zoomReset: "Obnovit přiblížení",
       zoomIn: "Přiblížit",
@@ -427,10 +442,15 @@ const uk: Translation = {
       boardColor: "Колір дошки",
       startingPoint: "Початкова точка",
       templates: {
-        blank: { label: "Порожнє полотно", desc: "Почати з нуля." },
-        singleProblem: { label: "Одна проблема", desc: "Один кореневий вузол для розгалуження." },
-        decisionTree: { label: "Дерево рішень", desc: "Проблема з двома вже розгалуженими варіантами." },
-        proCon: { label: "За / Проти", desc: "Тема з однією гілкою «за» та однією «проти»." },
+        problem: { label: "Аналіз проблеми", desc: "Розбийте проблему на частини, зважте способи вирішення, сплануйте й перевірте результат." },
+        decision: { label: "Рішення", desc: "Порівняйте варіанти з їхніми перевагами й ризиками." },
+        goal: { label: "Планування цілі", desc: "Ціль із критеріями успіху, кроками, перешкодами та перевіркою." },
+        retro: { label: "Ретроспектива", desc: "Що вдалося, що ні і що змінити." },
+      },
+      mode: {
+        label: "Режим",
+        discussion: { label: "Обговорення", desc: "Бойовий режим: атаки завдають шкоди, власник може атакувати будь-яким типом вузла." },
+        personal: { label: "Особистий", desc: "Творчий режим: атаки лише декорація без шкоди. Перемкнути можна будь-коли." },
       },
       cancel: "Скасувати",
       submit: "Створити карту",
@@ -454,9 +474,9 @@ const uk: Translation = {
       moveOn: "Переміщення вузлів: увімкнено — натисніть «Готово», щоб повернутися до вибору",
       moveOff: "Переміщення вузлів: вимкнено — увімкніть, щоб перетягувати вузли",
       discussionTooltip:
-        "Режим обговорення: увімкнено — бій (атака/захист) видимий. Натисніть, щоб перейти в особистий режим.",
+        "Бойовий режим: увімкнено — атаки завдають шкоди, а учасники, крім власника, обмежені в тому, чим можуть атакувати. Натисніть, щоб перейти в творчий режим.",
       personalTooltip:
-        "Особистий режим: увімкнено — бій (атака/захист) прихований для самостійної роботи. Натисніть, щоб повернутися в режим обговорення.",
+        "Творчий режим: увімкнено — атаки лише декорація й не завдають шкоди; без щитів. Натисніть, щоб повернутися в бойовий режим.",
       zoomOut: "Зменшити",
       zoomReset: "Скинути масштаб",
       zoomIn: "Збільшити",
@@ -543,10 +563,15 @@ const ru: Translation = {
       boardColor: "Цвет доски",
       startingPoint: "Отправная точка",
       templates: {
-        blank: { label: "Пустой холст", desc: "Начать с нуля." },
-        singleProblem: { label: "Одна проблема", desc: "Один корневой узел для ветвления." },
-        decisionTree: { label: "Дерево решений", desc: "Проблема с двумя уже разветвлёнными вариантами." },
-        proCon: { label: "За / Против", desc: "Тема с одной веткой «за» и одной «против»." },
+        problem: { label: "Анализ проблемы", desc: "Разбейте проблему на части, взвесьте способы решения, спланируйте и проверьте результат." },
+        decision: { label: "Решение", desc: "Сравните варианты с их преимуществами и рисками." },
+        goal: { label: "Планирование цели", desc: "Цель с критериями успеха, шагами, препятствиями и проверкой." },
+        retro: { label: "Ретроспектива", desc: "Что получилось, что нет и что изменить." },
+      },
+      mode: {
+        label: "Режим",
+        discussion: { label: "Обсуждение", desc: "Боевой режим: атаки наносят урон, владелец может атаковать любым типом узла." },
+        personal: { label: "Личный", desc: "Творческий режим: атаки лишь декорация без урона. Переключить можно в любой момент." },
       },
       cancel: "Отмена",
       submit: "Создать карту",
@@ -570,9 +595,9 @@ const ru: Translation = {
       moveOn: "Перемещение узлов: включено — нажмите «Готово», чтобы вернуться к выбору",
       moveOff: "Перемещение узлов: выключено — включите, чтобы перетаскивать узлы",
       discussionTooltip:
-        "Режим обсуждения: включён — бой (атака/защита) виден. Нажмите, чтобы переключиться в личный режим.",
+        "Боевой режим: включён — атаки наносят урон, а участники, кроме владельца, ограничены в том, чем могут атаковать. Нажмите, чтобы переключиться в творческий режим.",
       personalTooltip:
-        "Личный режим: включён — бой (атака/защита) скрыт для самостоятельной работы. Нажмите, чтобы вернуться в режим обсуждения.",
+        "Творческий режим: включён — атаки лишь декорация и не наносят урона; без щитов. Нажмите, чтобы вернуться в боевой режим.",
       zoomOut: "Уменьшить",
       zoomReset: "Сбросить масштаб",
       zoomIn: "Увеличить",

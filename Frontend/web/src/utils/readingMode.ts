@@ -12,7 +12,10 @@ export type ReadingMode = "classic" | "iconText" | "actual";
 // Menu order: the most text-heavy first.
 export const READING_MODES: ReadingMode[] = ["classic", "iconText", "actual"];
 
+import { isMobileViewport } from "./canvasLayout";
+
 const STORAGE_KEY = "mc_reading_mode";
+const COMPACT_KEY = "mc_compact_view";
 
 export function loadReadingMode(): ReadingMode {
   try {
@@ -27,6 +30,28 @@ export function loadReadingMode(): ReadingMode {
 export function saveReadingMode(mode: ReadingMode): void {
   try {
     localStorage.setItem(STORAGE_KEY, mode);
+  } catch {
+    // best-effort — the choice just won't survive a reload
+  }
+}
+
+// The simplified view: smaller icons, no halo/horns/wings and no circle rings,
+// for less visual noise on a small screen. Also a per-viewer preference; until
+// one is chosen it defaults to on for a phone-sized screen and off otherwise.
+export function loadCompactView(): boolean {
+  try {
+    const v = localStorage.getItem(COMPACT_KEY);
+    if (v === "1") return true;
+    if (v === "0") return false;
+  } catch {
+    // storage blocked or unavailable — fall through to the default
+  }
+  return isMobileViewport();
+}
+
+export function saveCompactView(compact: boolean): void {
+  try {
+    localStorage.setItem(COMPACT_KEY, compact ? "1" : "0");
   } catch {
     // best-effort — the choice just won't survive a reload
   }

@@ -21,7 +21,7 @@ export function MapLegend() {
       {NODE_TYPES.map((nt) => (
         <span key={nt} className={item}>
           <NodeTypeSymbol type={nt} size={13} />
-          {nt}
+          {t.ui.types[nt]}
         </span>
       ))}
       <span className={item}>

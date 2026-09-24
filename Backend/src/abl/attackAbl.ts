@@ -1,6 +1,6 @@
-// Combat rules. This is the clearest case in the whole app of logic that
-// used to live in a DAO file (attackDao.ts) even though none of it is "how
-// do I query Mongo" — it's "is this attack allowed, and what does it do."
+// Combat rules — none of this is "how do I query Mongo", it's "is this
+// attack allowed, and what does it do," so it belongs here in the ABL
+// layer rather than in a DAO file (attackDao.ts).
 import { z } from "zod";
 import type mongoose from "mongoose";
 import { WEAPONS, type WeaponKey } from "../models/Attack.js";
@@ -16,23 +16,23 @@ import {
 } from "../dao/nodeDao.js";
 import { getMapByInternalIdDao, isMapMemberDao } from "../dao/mapsDao.js";
 import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../dao/attackDao.js";
+import { getHiddenNodesDao } from "../dao/visibilityDao.js";
 import { parseOrThrow } from "./errors.js";
 
-// Combat is fully open now — attackNodeAbl below no longer throws any of
-// these; every restriction on *who* can attack, *what* can be attacked,
-// and *how often* has been removed. All five classes are kept exported and
-// unused (rather than torn out of every layer that still references them —
-// nodeController.ts's own error handling, mainly) purely so nothing else
-// has to change just to keep compiling; none of them can fire any more.
-export class CannotAttackOwnNodeError extends Error {}
-export class CanOnlyAttackOwnNodeError extends Error {}
-export class CannotRetaliateError extends Error {}
-export class NodeAlreadyDefeatedError extends Error {}
-export class WeaponOnCooldownError extends Error {
-  readyAt: number;
-  constructor(readyAt: number) {
-    super("Weapon is still on cooldown");
-    this.readyAt = readyAt;
+// Combat has two modes, set per map (Map.discussionMode):
+//
+//  - Discussion (the default, "battle"): attacks hurt. The map's owner may
+//    attack any node with any node type; every other member is limited by
+//    the target's side (see allowedAttackTypes). There are no cooldowns, no
+//    own-node rule, and no already-defeated block — only these type rules,
+//    map membership, and an active protection node (see below).
+//  - Personal ("creating", discussionMode === false): attacking still works
+//    and still spawns the objection node, but it is decoration only — zero
+//    damage, no defeat, no retaliation heal — and any member may use any
+//    type.
+export class AttackTypeNotAllowedError extends Error {
+  constructor(public readonly allowed: readonly string[]) {
+    super(`This attack node type is not allowed here. Allowed: ${allowed.join(", ")}`);
   }
 }
 
@@ -48,17 +48,12 @@ const RETALIATION_HEAL_AMOUNT = 10;
 // shield's own ongoing block-and-bank-damage behavior in attackNodeAbl.
 const PROTECT_CREATE_HEAL_AMOUNT = 15;
 
-// An attack now always creates a real content node alongside the damage —
-// restricted to every outcome type (see OutcomeBadge.tsx on the frontend),
-// just not "unknown" (which draws no ring/framing at all, so it doesn't
-// read as an attack's own claim one way or the other). Used to be only the
-// three negative-framed types (Problem/Problematic option/Fail) on the
-// theory that an attack is inherently an objection — but retaliation
-// (see CannotRetaliateError below) is exactly the case where the
-// attacker's own claim is naturally a positive one ("my defense holds"),
-// so the positive types (Success/Solution/Option) belong here too now.
-// The weapon node this becomes carries this type + text instead of the
-// old generic "<weapon> attack" placeholder.
+// An attack always creates a real content node alongside the damage — every
+// outcome type (see OutcomeBadge.tsx on the frontend). This list is also what
+// a protection node's "why" may be (PROTECT_NODE_TYPES); an attack may
+// additionally be a question ("unknown") — see ATTACK_TYPES_WITH_QUESTION.
+// The weapon node this becomes carries the chosen type and text — the
+// attacker's actual objection, not a generic placeholder.
 export const ATTACK_NODE_TYPES = [
   "Problem",
   "Problematic option",
@@ -69,7 +64,31 @@ export const ATTACK_NODE_TYPES = [
 ] as const;
 export type AttackNodeType = (typeof ATTACK_NODE_TYPES)[number];
 
+// What an attack node may be, by the attacker. "unknown" is a question — it
+// draws no ring, so it only ever reads as "are you sure?" — which is why it
+// is an attack type but not a protection type (see PROTECT_NODE_TYPES).
+const ATTACK_TYPES_WITH_QUESTION = [...ATTACK_NODE_TYPES, "unknown"] as const;
+const POSITIVE_TYPES: readonly string[] = ["Solution", "Option", "Success"];
+const NEGATIVE_TYPES: readonly string[] = ["Problem", "Problematic option", "Fail"];
+
+// Discussion-mode rule for a member who is not the map's owner: a negative
+// node is answered with positive ones; a positive (or unknown) node is
+// answered with a question or a negative problem/option. The owner's set is
+// everything.
+export const allowedAttackTypes = (isMapOwner: boolean, targetType: string): readonly string[] => {
+  if (isMapOwner) return ATTACK_TYPES_WITH_QUESTION;
+  if (NEGATIVE_TYPES.includes(targetType)) return POSITIVE_TYPES;
+  return ["unknown", "Problem", "Problematic option"];
+};
+
 const attackContentSchema = z.object({
+  type: z.enum(ATTACK_TYPES_WITH_QUESTION, {
+    error: () => `type is required and must be one of: ${ATTACK_TYPES_WITH_QUESTION.join(", ")}`,
+  }),
+  text: z.string().min(1, "text is required"),
+});
+
+const protectContentSchema = z.object({
   type: z.enum(ATTACK_NODE_TYPES, {
     error: () => `type is required and must be one of: ${ATTACK_NODE_TYPES.join(", ")}`,
   }),
@@ -99,28 +118,29 @@ export const attackNodeAbl = async (
   const node = await findNodeByPublicIdDao(publicNodeId);
   if (!node) return null;
 
-  // Still fetched for the membership check right below — an attacker has
-  // to actually belong to the map, full stop; that's the one thing left
-  // that isn't a "combat rule" so much as basic access control.
+  // An attacker has to actually belong to the map — basic access control,
+  // before any combat rule.
   const map = await getMapByInternalIdDao(node.mapId);
   if (!map) return null;
   const isMember = map.members.some((m) => m.toString() === attackerId.toString());
   if (!isMember) return null;
 
-  // Fully open combat: no own-node rule, no restriction on attacking a
-  // weapon node (used to require being the one it actually hit —
-  // "retaliation," see the removed CannotRetaliateError), no
-  // already-defeated block, no cooldowns. Every check that used to gate
-  // *who* could land a hit, *what* it could land on, and *how often* is
-  // gone — any map member can attack any node, any number of times, with
-  // any weapon, regardless of its current health.
-  //
-  // The one thing that survives from the old retaliation mechanic is the
-  // reward itself, now unconditional: landing a hit on a weapon node still
-  // heals whatever that weapon node's own target's parent is, for whoever
-  // lands it — not just the original victim striking back any more.
+  const isMapOwner = map.ownerId.toString() === attackerId.toString();
+  // A branch the owner has hidden from invited members can't be attacked by them.
+  if (!isMapOwner && (await getHiddenNodesDao(node.mapId)).ids.has(node._id.toString())) return null;
+
+  // Personal mode is decoration only (see the top of this file).
+  const battle = map.discussionMode !== false;
+  if (battle) {
+    const allowed = allowedAttackTypes(isMapOwner, node.type);
+    if (!allowed.includes(type)) throw new AttackTypeNotAllowedError(allowed);
+  }
+
+  // Landing a hit on a weapon node heals whatever that weapon node's own
+  // target's parent is, for whoever lands it — a reward for "retaliating,"
+  // open to anyone rather than gated to the original victim.
   let healParentId: mongoose.Types.ObjectId | null = null;
-  if (node.isWeapon) {
+  if (battle && node.isWeapon) {
     const victim = node.targetNodeId ? await findNodeByInternalIdDao(node.targetNodeId) : null;
     healParentId = victim?.parentId ?? null;
   }
@@ -133,7 +153,7 @@ export const attackNodeAbl = async (
   // happens even when blocked (the attacker's objection is still a real
   // recorded node/history entry, see below); only the health/defeated
   // change is skipped.
-  const protector = await findActiveProtectorDao(node._id);
+  const protector = battle ? await findActiveProtectorDao(node._id) : null;
   const blocked = !!protector;
 
   const weaponDef = WEAPONS[weapon];
@@ -149,14 +169,15 @@ export const attackNodeAbl = async (
   // the blocked branch has to populate explicitly or the response goes out
   // with a raw userId ObjectId instead of { _id, username }.
   const updatedProtector = blocked ? await incrementBlockedDamageDao(protector._id, weaponDef.damage) : null;
-  const updatedNode = blocked ? await node.populate(NODE_POPULATE) : await applyDamageDao(node._id, newHealth, newHealth <= 0);
+  const noDamage = blocked || !battle;
+  const updatedNode = noDamage ? await node.populate(NODE_POPULATE) : await applyDamageDao(node._id, newHealth, newHealth <= 0);
 
   await logAttackDao({
     mapId: node.mapId,
     targetNodeId: node._id,
     attackerId,
     weapon,
-    damage: blocked ? 0 : weaponDef.damage,
+    damage: noDamage ? 0 : weaponDef.damage,
   });
 
   // Every landed attack spawns its own weapon node pointing at the target
@@ -188,8 +209,6 @@ export const attackNodeAbl = async (
 // same kind of real, typed content node a weapon node is, just framed as a
 // defense instead of an objection.
 export const PROTECT_NODE_TYPES = ATTACK_NODE_TYPES;
-
-const protectContentSchema = attackContentSchema;
 
 // Creates a protection node aimed at publicNodeId. Owner-of-target-only —
 // deliberately *not* open like attackNodeAbl above: a shield has a

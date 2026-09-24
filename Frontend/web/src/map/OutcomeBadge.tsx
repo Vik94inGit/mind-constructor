@@ -7,13 +7,13 @@ import { NODE_TYPE_COLORS, ZONE_COLORS } from "../utils/nodeType";
 // "unknown" alone keeps the plain NodeTypeIcon glyph instead; there's no
 // outcome-specific symbol to give it.
 //
-// This used to also carry a halo/horns ring around the symbol, wings, and
-// the node's own health rendered as that ring's own border — all removed:
-// too many separately-colored, separately-positioned pieces sharing one
-// SVG canvas kept leaving a visible gap (or, for wings specifically, an
-// outright deformed render — see NodeWings's own doc comment) between
-// whichever two were least aligned, no matter how each individual gap got
-// closed. NodeCard draws its own plain border (same treatment "unknown"
+// A halo/horns ring around the symbol, wings, and the node's own health
+// rendered as that ring's own border would need too many separately-
+// colored, separately-positioned pieces sharing one SVG canvas — that
+// leaves a visible gap (or, for wings specifically, an outright deformed
+// render — see NodeWings's own doc comment) between whichever two are
+// least aligned, no matter how each individual gap gets closed. So
+// NodeCard draws its own plain border instead (same treatment "unknown"
 // nodes already had) around whichever glyph — this symbol or
 // NodeTypeIcon's — sits inside it, plus its own separate NodeCrown
 // (halo/horns) and NodeWings decorations, both straddling/flanking that

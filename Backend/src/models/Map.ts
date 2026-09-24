@@ -1,5 +1,9 @@
 import mongoose from "mongoose";
 
+// What a map is for — picked when it is created, and the frontend seeds a
+// matching starter structure. Purely descriptive: nothing here is enforced.
+export const MAP_KINDS = ["problem", "decision", "goal", "retro"] as const;
+
 export const MapSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -60,6 +64,8 @@ export const MapSchema = new mongoose.Schema(
     // default, matching the app's behavior from before this toggle existed
     // at all.
     discussionMode: { type: Boolean, default: true },
+    // See MAP_KINDS. null for a map created without one (older maps, demo).
+    kind: { type: String, enum: MAP_KINDS, default: null },
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields

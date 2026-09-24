@@ -62,7 +62,7 @@ export async function deleteManyNodes(nodeIds: string[]) {
 export async function attackNode(
   nodeId: string,
   weapon: Weapon,
-  content: { type: AttackNodeType; text: string },
+  content: { type: NodeType; text: string },
 ) {
   // healedParent: set only when this landed as a retaliation (attacking
   // the weapon node that hit your own node) — see Backend's attackAbl.ts.
@@ -122,4 +122,14 @@ export async function unpackNode(nodeId: string) {
   return apiRequest<{ success: boolean; node: NodeDoc }>(`/api/nodes/${nodeId}/unpack`, {
     method: "POST",
   });
+}
+
+// The map's owner hides or shows a branch (this node and everything hanging
+// from it) for the map's invited members.
+export async function setBranchHidden(nodeId: string, hidden: boolean): Promise<NodeDoc> {
+  const res = await apiRequest<{ success: boolean; node: NodeDoc }>(`/api/nodes/${nodeId}/visibility`, {
+    method: "POST",
+    body: { hidden },
+  });
+  return res.node;
 }

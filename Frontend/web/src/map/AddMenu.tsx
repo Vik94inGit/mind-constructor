@@ -13,9 +13,9 @@ interface Props {
   onClose: () => void;
 }
 
-// The simplified top toolbar's whole surface area now — a single "+"
-// trigger (see MapPage's compact top-left floating cluster) opening this
-// small dropdown instead of the old full-width bar of buttons. Positioned
+// The top toolbar's whole surface area: a single "+" trigger (see MapPage's
+// compact top-left floating cluster) opening this small dropdown rather
+// than a full-width bar of buttons. Positioned
 // by its parent (a `relative` wrapper around the "+" button), opening
 // *downward and left-aligned* since the trigger itself lives at the
 // top-left of the screen — there's no room above it, and right-aligning
