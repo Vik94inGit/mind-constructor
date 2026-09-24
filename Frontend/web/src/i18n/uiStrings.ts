@@ -253,6 +253,7 @@ export interface UiStrings {
     newNodeText: string;
   };
   minimapTitle: string;
+  panelDragHandle: string;
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
   cardMenuLabel: string;
@@ -584,6 +585,7 @@ const en: UiStrings = {
     newNodeText: "New node",
   },
   minimapTitle: "Minimap — click or drag to jump around the map",
+  panelDragHandle: "Drag to move this panel",
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
   summary: {
     title: (name) => `Summary — "${name}"`,
@@ -909,6 +911,7 @@ const cs: UiStrings = {
     newNodeText: "Nový uzel",
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
+  panelDragHandle: "Přetažením posunete tento panel",
   exportText: { title: (name) => `Export textu — „${name}“`, download: "Stáhnout .md" },
   summary: {
     title: (name) => `Souhrn — „${name}“`,
@@ -1234,6 +1237,7 @@ const uk: UiStrings = {
     newNodeText: "Новий вузол",
   },
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
+  panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   exportText: { title: (name) => `Експорт тексту — «${name}»`, download: "Завантажити .md" },
   summary: {
     title: (name) => `Підсумок — «${name}»`,
@@ -1559,6 +1563,7 @@ const ru: UiStrings = {
     newNodeText: "Новый узел",
   },
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
+  panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   exportText: { title: (name) => `Экспорт текста — «${name}»`, download: "Скачать .md" },
   summary: {
     title: (name) => `Сводка — «${name}»`,

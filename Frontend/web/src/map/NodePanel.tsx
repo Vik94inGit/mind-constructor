@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
@@ -66,6 +67,13 @@ const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "13
 // this panel included.
 const PANEL_CLASS =
   "fixed inset-x-0 bottom-0 z-[46] max-h-[50dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+
+// How much of the panel's own width/height must stay on screen while it's
+// being dragged (see the grip handle below) — small enough to shove the
+// bulk of the sheet out of the way (e.g. to uncover the bottom-left corner
+// it docks over — see ZoneNames), but never so far it can be dragged
+// somewhere the user can't grab it again to bring it back.
+const PANEL_DRAG_MIN_VISIBLE_PX = 48;
 
 // The header only ever shows the type icon and a two-line clamp of the
 // node's own text (see the header markup below); everything else — text,
@@ -198,6 +206,55 @@ export function NodePanel({
   // scrollbar.
   const [expanded, setExpanded] = useState(false);
 
+  // Lets the whole sheet be dragged off its default bottom-dock, via the
+  // grip handle in the JSX below — a plain translate on top of PANEL_CLASS's
+  // own fixed inset-x-0 bottom-0 positioning, not a replacement for it (so
+  // the sheet still opens docked at the bottom every time, same as before
+  // this existed). Reset to {0,0} on every node change, same as every other
+  // per-node draft in the effect below — a leftover offset from the last
+  // node would otherwise make the sheet reopen already shoved out of the
+  // way for a node the user never dragged it for.
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const panelRef = useRef<HTMLDivElement>(null);
+  const draggingPanelRef = useRef(false);
+
+  function onGripPointerDown(e: ReactPointerEvent) {
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    draggingPanelRef.current = true;
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const startOffset = dragOffset;
+    // Bounds computed once, off the panel's own untransformed box (offsetWidth/
+    // offsetHeight aren't affected by the transform this drag itself applies) —
+    // a live measurement per move would be redundant work for a size that
+    // never changes mid-drag.
+    const panelW = panelRef.current?.offsetWidth ?? 0;
+    const panelH = panelRef.current?.offsetHeight ?? 0;
+    const minX = PANEL_DRAG_MIN_VISIBLE_PX - panelW;
+    const maxX = window.innerWidth - PANEL_DRAG_MIN_VISIBLE_PX;
+    // Base (untransformed) top is bottom-docked: window.innerHeight - panelH.
+    // dy is relative to that dock, so its own bounds are expressed the same
+    // way maxX/minX are for the left-anchored x axis above.
+    const baseTop = window.innerHeight - panelH;
+    const minY = PANEL_DRAG_MIN_VISIBLE_PX - panelH - baseTop;
+    const maxY = window.innerHeight - PANEL_DRAG_MIN_VISIBLE_PX - baseTop;
+
+    function onMove(ev: PointerEvent) {
+      if (!draggingPanelRef.current) return;
+      const nextX = Math.min(maxX, Math.max(minX, startOffset.x + (ev.clientX - startClientX)));
+      const nextY = Math.min(maxY, Math.max(minY, startOffset.y + (ev.clientY - startClientY)));
+      setDragOffset({ x: nextX, y: nextY });
+    }
+    function onUp() {
+      draggingPanelRef.current = false;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
   // A <textarea>'s own rendered height is CSS/rows-driven, not content-
   // driven — removing max-height above (the `expanded` class swap) doesn't
   // by itself make the box taller, it only lifts the *cap*, same way
@@ -312,6 +369,7 @@ export function NodePanel({
     setZoneNameDraft(node.zoneName ?? "");
     setOrderDraft(node.order != null ? String(node.order) : "");
     setExpanded(false);
+    setDragOffset({ x: 0, y: 0 });
     setTab("info");
     nodesApi
       .getAttackHistory(node.nodeId)
@@ -642,7 +700,25 @@ export function NodePanel({
   };
 
   return (
-    <div className={PANEL_CLASS}>
+    <div
+      ref={panelRef}
+      className={PANEL_CLASS}
+      style={dragOffset.x || dragOffset.y ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined}
+    >
+      {/* Grip handle — the only way to drag this sheet off its default
+          bottom dock (see dragOffset/onGripPointerDown above). A dedicated
+          strip rather than making the whole header draggable, so the tab
+          buttons and ✕ right below it stay plain clickable/tappable targets
+          instead of every pointerdown on them being swallowed as a drag
+          attempt. touch-none: without it a touch-drag here scrolls/bounces
+          the page underneath instead of moving the sheet. */}
+      <div
+        className="-mx-5 -mt-5 mb-3 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
+        onPointerDown={onGripPointerDown}
+        title={t.ui.panelDragHandle}
+      >
+        <div className="h-[0.28rem] w-[2.5rem] rounded-full bg-line" aria-hidden />
+      </div>
       {/* Type/byline and the tabs now share one row instead of stacking as
           two — freeing up a whole row of this panel's own limited height
           (capped at 34dvh/50dvh — see PANEL_CLASS) means the actual node
