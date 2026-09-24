@@ -174,6 +174,8 @@ export function NodePanel({
   // field above the text, saved on Enter/blur the same way the text is.
   // Unlike text it's never lazy-loaded, so there's no backfill to wait for.
   const [titleDraft, setTitleDraft] = useState(node.title ?? "");
+  // The zone name, for a circle parent (see NodeDoc.zoneName).
+  const [zoneNameDraft, setZoneNameDraft] = useState(node.zoneName ?? "");
   // The optional step number, as typed — a string so the field can be empty
   // or half-typed; parsed on save.
   const [orderDraft, setOrderDraft] = useState(node.order != null ? String(node.order) : "");
@@ -307,6 +309,7 @@ export function NodePanel({
     setProtectType("Solution");
     setTextDraft(node.text);
     setTitleDraft(node.title ?? "");
+    setZoneNameDraft(node.zoneName ?? "");
     setOrderDraft(node.order != null ? String(node.order) : "");
     setExpanded(false);
     setTab("info");
@@ -377,6 +380,38 @@ export function NodePanel({
 
   // Empty is a valid save here (unlike text): it clears the title, sending
   // the canvas back to showing the start of the text. A no-op if unchanged.
+  async function handleToggleHidden() {
+    setBusy(true);
+    setError(null);
+    try {
+      onUpdated(await nodesApi.setBranchHidden(node.nodeId, !node.hiddenFromMembers));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.zone);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleZoneNameSave(): Promise<boolean> {
+    const trimmed = zoneNameDraft.trim();
+    if (trimmed === (node.zoneName ?? "")) {
+      setZoneNameDraft(node.zoneName ?? "");
+      return true;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { zoneName: trimmed });
+      onUpdated(updated);
+      return true;
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.zone);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleTitleSave(): Promise<boolean> {
     const trimmed = titleDraft.trim();
     if (trimmed === (node.title ?? "")) {
@@ -848,6 +883,48 @@ export function NodePanel({
                 onBlur={() => void handleTitleSave()}
                 className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
               />
+            </div>
+          )}
+
+          {/* Name of the zone this node is the parent of — shown under it on
+              the canvas and on the minimap. Saves on blur/Enter. */}
+          {isCreator && isClusterParent && (
+            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
+              <label htmlFor="node-zone-name" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                {t.ui.node.zoneName}
+              </label>
+              <input
+                id="node-zone-name"
+                type="text"
+                maxLength={40}
+                value={zoneNameDraft}
+                onChange={(e) => setZoneNameDraft(e.target.value)}
+                disabled={busy}
+                placeholder={t.ui.node.zoneNamePlaceholder}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleZoneNameSave().then((ok) => ok && onClose());
+                  }
+                }}
+                onBlur={() => void handleZoneNameSave()}
+                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+          )}
+
+          {/* The map owner can hide this whole branch from invited members. */}
+          {isMapOwner && (
+            <div className="mt-[0.6rem]">
+              <button
+                type="button"
+                className="inline-flex cursor-pointer items-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={busy}
+                onClick={() => void handleToggleHidden()}
+              >
+                {node.hiddenFromMembers ? t.ui.visibility.show : t.ui.visibility.hide}
+              </button>
+              <p className="mt-1 text-[0.72rem] text-ink-soft">{t.ui.visibility.hint}</p>
             </div>
           )}
 

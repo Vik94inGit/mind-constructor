@@ -6,6 +6,8 @@ import { broadcastToMap } from "../realtime/io.js";
 import {
   createNodeAbl,
   updateNodeAbl,
+  setBranchHiddenAbl,
+  NotMapOwnerError,
   MapNotFoundError,
   ParentNotFoundError,
   CrossMapParentError,
@@ -283,6 +285,38 @@ export const unpackNode = async (req: Request<nodeIdParams>, res: Response) => {
     return res.status(200).json({ success: true, node });
   } catch (error) {
     return handleAblError(res, error, [], { message: "Unpack failed", logLabel: "unpackNode" });
+  }
+};
+
+// ========== HIDE / SHOW A BRANCH (map owner only) ==========
+export const setNodeVisibility = async (req: Request<nodeIdParams>, res: Response) => {
+  try {
+    const { nodeId } = req.params;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Not authenticated" });
+    }
+
+    const node = await setBranchHiddenAbl(nodeId, userId, req.body);
+
+    if (!node) {
+      return res.status(404).json({ success: false, error: "Node not found" });
+    }
+
+    // Every member reloads what it can see; the payload deliberately carries
+    // no node id, so this goes to everyone rather than the owner alone.
+    const publicMapId = (node.mapId as unknown as { mapId?: string } | null)?.mapId ?? null;
+    if (publicMapId) broadcastToMap(publicMapId, "nodes:visibility", { changed: true });
+
+    return res.status(200).json({ success: true, node });
+  } catch (error) {
+    return handleAblError(
+      res,
+      error,
+      [[NotMapOwnerError, 403, "Only the map's owner can hide or show a branch"]],
+      { message: "Could not change the branch's visibility", logLabel: "setNodeVisibility" },
+    );
   }
 };
 

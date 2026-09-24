@@ -1,5 +1,5 @@
 import { CANVAS_H, CANVAS_W, CAPTION_WIDTH } from "./canvasLayout";
-import type { NodeType } from "../types";
+import type { MapKind, NodeType } from "../types";
 
 // Ready-made branches a node's owner can grow from it in one click. Each one
 // follows a well-known way of working a problem, so the empty prompts lead
@@ -11,8 +11,12 @@ import type { NodeType } from "../types";
 //    order, the obstacle that could stop them and a fallback, and a review.
 //  - "retry": what a failed result leads to — ask why (root cause) and choose
 //    what to change before trying again.
+//  - "decision": a criteria question and three options, each with its
+//    advantage and its risk.
+//  - "retro": what went well, what went badly, and what to change — the
+//    starting structure of a retrospective map (see MAP_KIND_ROOTS).
 
-export type TemplateKind = "problem" | "goal" | "retry";
+export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro";
 
 export type TemplateNodeKey =
   | "subProblem1"
@@ -33,7 +37,27 @@ export type TemplateNodeKey =
   | "fallback"
   | "review"
   | "whyFailed"
-  | "tryAgain";
+  | "tryAgain"
+  | "rootProblem"
+  | "rootGoal"
+  | "rootDecision"
+  | "rootRetro"
+  | "criteriaQuestion"
+  | "optionA"
+  | "advantageA"
+  | "riskA"
+  | "optionB"
+  | "advantageB"
+  | "riskB"
+  | "optionC"
+  | "advantageC"
+  | "riskC"
+  | "wentWell1"
+  | "wentWell2"
+  | "wentBad1"
+  | "wentBad2"
+  | "tryNext1"
+  | "tryNext2";
 
 interface TemplateNode {
   key: TemplateNodeKey;
@@ -78,6 +102,28 @@ const TEMPLATES: Record<TemplateKind, TemplateNode[]> = {
     { key: "whyFailed", type: "Problematic option" },
     { key: "tryAgain", type: "Option" },
   ],
+  decision: [
+    { key: "criteriaQuestion", type: "unknown" },
+    { key: "optionA", type: "Option", children: [{ key: "advantageA", type: "Success" }, { key: "riskA", type: "Fail" }] },
+    { key: "optionB", type: "Option", children: [{ key: "advantageB", type: "Success" }, { key: "riskB", type: "Fail" }] },
+    { key: "optionC", type: "Option", children: [{ key: "advantageC", type: "Success" }, { key: "riskC", type: "Fail" }] },
+  ],
+  retro: [
+    { key: "wentWell1", type: "Success" },
+    { key: "wentWell2", type: "Success" },
+    { key: "wentBad1", type: "Fail" },
+    { key: "wentBad2", type: "Fail" },
+    { key: "tryNext1", type: "Option" },
+    { key: "tryNext2", type: "Option" },
+  ],
+};
+
+// The node a new map of each kind starts from, and the template grown from it.
+export const MAP_KIND_ROOTS: Record<MapKind, { key: TemplateNodeKey; type: NodeType; template: TemplateKind }> = {
+  problem: { key: "rootProblem", type: "Problem", template: "problem" },
+  decision: { key: "rootDecision", type: "Problem", template: "decision" },
+  goal: { key: "rootGoal", type: "Solution", template: "goal" },
+  retro: { key: "rootRetro", type: "unknown", template: "retro" },
 };
 
 export interface PlacedTemplateNode {

@@ -1,14 +1,17 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
-import { getMapByIdDao } from "../src/dao/mapsDao.js";
+import { getMapByIdDao, getMapByInternalIdDao } from "../src/dao/mapsDao.js";
 import {
   createNodeMutationDao,
   countNodesByMapInternalIdDao,
   updateNodeDao,
   findNodeByPublicIdDao,
+  setBranchHiddenMutationDao,
 } from "../src/dao/nodeDao.js";
 import {
   createNodeAbl,
   updateNodeAbl,
+  setBranchHiddenAbl,
+  NotMapOwnerError,
   MapNotFoundError,
   ParentNotFoundError,
   CrossMapParentError,
@@ -19,12 +22,14 @@ import { ValidationError } from "../src/abl/errors.js";
 
 vi.mock("../src/dao/mapsDao.js", () => ({
   getMapByIdDao: vi.fn(),
+  getMapByInternalIdDao: vi.fn(),
 }));
 vi.mock("../src/dao/nodeDao.js", () => ({
   createNodeMutationDao: vi.fn(),
   countNodesByMapInternalIdDao: vi.fn(),
   updateNodeDao: vi.fn(),
   findNodeByPublicIdDao: vi.fn(),
+  setBranchHiddenMutationDao: vi.fn(),
 }));
 
 describe("nodeAbl", () => {
@@ -182,6 +187,17 @@ describe("nodeAbl", () => {
       expect(updateNodeDao).not.toHaveBeenCalled();
     });
 
+    it("passes a zone name through, trimmed, and rejects one over 40 characters", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      await updateNodeAbl("node1", "user1", { zoneName: "  Marketing  " });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { zoneName: "Marketing" });
+
+      await expect(
+        updateNodeAbl("node1", "user1", { zoneName: "x".repeat(41) }),
+      ).rejects.toThrow(ValidationError);
+    });
+
     it("passes a valid symbolOverride through to the DAO", async () => {
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
 
@@ -280,6 +296,27 @@ describe("nodeAbl", () => {
 
       await expect(updateNodeAbl("node1", "user1", { parentId: "p1" })).rejects.toThrow(CrossMapParentError);
       expect(updateNodeDao).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("setBranchHiddenAbl", () => {
+    it("lets only the map's owner hide a branch", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({ mapId: "m1" } as never);
+      vi.mocked(setBranchHiddenMutationDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue({ ownerId: "someoneElse" } as never);
+      await expect(setBranchHiddenAbl("node1", "user1", { hidden: true })).rejects.toBeInstanceOf(NotMapOwnerError);
+      expect(setBranchHiddenMutationDao).not.toHaveBeenCalled();
+
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue({ ownerId: "user1" } as never);
+      await setBranchHiddenAbl("node1", "user1", { hidden: true });
+      expect(setBranchHiddenMutationDao).toHaveBeenCalledWith("node1", true);
+    });
+
+    it("rejects a body without a boolean, and reports a missing node", async () => {
+      await expect(setBranchHiddenAbl("node1", "user1", { hidden: "yes" })).rejects.toThrow(ValidationError);
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(null as never);
+      expect(await setBranchHiddenAbl("node1", "user1", { hidden: false })).toBeNull();
     });
   });
 });

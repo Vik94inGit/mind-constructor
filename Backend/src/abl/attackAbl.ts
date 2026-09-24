@@ -16,6 +16,7 @@ import {
 } from "../dao/nodeDao.js";
 import { getMapByInternalIdDao, isMapMemberDao } from "../dao/mapsDao.js";
 import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../dao/attackDao.js";
+import { getHiddenNodesDao } from "../dao/visibilityDao.js";
 import { parseOrThrow } from "./errors.js";
 
 // Combat has two modes, set per map (Map.discussionMode):
@@ -124,10 +125,13 @@ export const attackNodeAbl = async (
   const isMember = map.members.some((m) => m.toString() === attackerId.toString());
   if (!isMember) return null;
 
+  const isMapOwner = map.ownerId.toString() === attackerId.toString();
+  // A branch the owner has hidden from invited members can't be attacked by them.
+  if (!isMapOwner && (await getHiddenNodesDao(node.mapId)).ids.has(node._id.toString())) return null;
+
   // Personal mode is decoration only (see the top of this file).
   const battle = map.discussionMode !== false;
   if (battle) {
-    const isMapOwner = map.ownerId.toString() === attackerId.toString();
     const allowed = allowedAttackTypes(isMapOwner, node.type);
     if (!allowed.includes(type)) throw new AttackTypeNotAllowedError(allowed);
   }

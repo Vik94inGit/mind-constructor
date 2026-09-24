@@ -61,6 +61,10 @@ export const NodeSchema = new mongoose.Schema(
     // it's capped small enough that a whole map's titles are a rounding
     // error next to what stripping `text` saved.
     title: { type: String, default: "", trim: true, maxlength: 80 },
+    // An optional name for the zone (circle) this node is the parent of —
+    // shown under the parent on the canvas and on the minimap. Only
+    // meaningful on a circle parent; empty (the default) means unnamed.
+    zoneName: { type: String, default: "", trim: true, maxlength: 40 },
     // An optional step number (1, 2, 3, …) for describing a process by
     // labeling nodes in sequence — a frontend draws it as a small badge on the
     // node. Purely a label: nothing orders, links or validates against other
@@ -126,6 +130,10 @@ export const NodeSchema = new mongoose.Schema(
     // Edge-linked or branch-linked to the container) that a bare PATCH
     // can't enforce. null means "not packed into anything."
     packedIntoNodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", default: null },
+    // Set by the map's owner on the root of a branch to hide that branch (the
+    // node and everything hanging from it) from the map's invited members —
+    // see dao/visibilityDao.ts. The owner always sees it.
+    hiddenFromMembers: { type: Boolean, default: false },
 
     // See SIZE_TIERS above for the null-vs-1 contract.
     sizeTier: { type: Number, enum: SIZE_TIERS, default: null },

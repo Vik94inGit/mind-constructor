@@ -4,6 +4,7 @@ import { Edge } from "../models/Edge.js";
 import { Line } from "../models/Line.js";
 import { User } from "../models/User.js";
 import { nanoid } from "nanoid";
+import { getHiddenNodesDao } from "./visibilityDao.js";
 
 export const findMapByPublicIdDao = async (publicMapId: string) => {
   return await Map.findOne({ mapId: publicMapId });
@@ -125,6 +126,10 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   const map = await Map.findOne({ mapId: publicMapId, members: userId });
   if (!map) return null;
 
+  // An invited member does not get the branches the owner has hidden.
+  const hiddenIds =
+    map.ownerId.toString() === userId.toString() ? [] : [...(await getHiddenNodesDao(map._id)).ids];
+
   // parentId/targetNodeId/protectsNodeId/packedIntoNodeId are all internal
   // ObjectId refs — populated with the same public-id projection Edge uses
   // for fromNodeId/toNodeId, so a caller never has to resolve Mongo's
@@ -160,7 +165,7 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   // userId (a User ref) is left as-is: User's own toJSON only strips __v,
   // not _id, so its populated shape here already matches that (select
   // "username" alone still includes _id by default, same as before).
-  return await Node.find({ mapId: map._id })
+  return await Node.find({ mapId: map._id, _id: { $nin: hiddenIds } })
     .select("-text -_id -__v")
     .populate("userId", "username")
     .populate("parentId", "-_id nodeId text type")
@@ -185,8 +190,11 @@ export const getNodesTextDao = async (
   const map = await Map.findOne({ mapId: publicMapId, members: userId });
   if (!map) return null;
 
+  const hiddenIds =
+    map.ownerId.toString() === userId.toString() ? [] : [...(await getHiddenNodesDao(map._id)).ids];
+
   const rows = await Node.find(
-    { mapId: map._id, nodeId: { $in: nodeIds } },
+    { mapId: map._id, nodeId: { $in: nodeIds }, _id: { $nin: hiddenIds } },
     "nodeId text",
   ).lean<{ nodeId: string; text: string }[]>();
 
@@ -202,6 +210,7 @@ export const createMapDao = async (mapData: {
   color?: string;
   members?: string[];
   discussionMode?: boolean;
+  kind?: string;
 }) => {
   const publicMapId = nanoid(10);
   return await Map.create({
@@ -212,6 +221,7 @@ export const createMapDao = async (mapData: {
     members: mapData.members ?? [mapData.ownerId],
     memberColors: [{ userId: mapData.ownerId, color: mapData.ownerColor }],
     discussionMode: mapData.discussionMode,
+    kind: mapData.kind,
   });
 };
 

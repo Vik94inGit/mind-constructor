@@ -11,6 +11,7 @@ import {
   protectNode,
   packNode,
   unpackNode,
+  setNodeVisibility,
 } from "../controllers/nodeController.js";
 import { protect } from "#src/middleware/auth.js";
 
@@ -32,5 +33,6 @@ router.get<{ nodeId: string }>("/:nodeId/attacks", protect, getNodeAttackHistory
 router.post<{ nodeId: string }>("/:nodeId/protect", protect, protectNode);
 router.post<{ nodeId: string }>("/:nodeId/pack", protect, packNode);
 router.post<{ nodeId: string }>("/:nodeId/unpack", protect, unpackNode);
+router.post<{ nodeId: string }>("/:nodeId/visibility", protect, setNodeVisibility);
 
 export default router;

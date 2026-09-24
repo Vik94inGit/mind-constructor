@@ -5,6 +5,8 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { AddMenu } from "./AddMenu";
 import { ReadingModeMenu } from "./ReadingModeMenu";
+import { NodeSearch } from "./NodeSearch";
+import type { NodeDoc } from "../types";
 import type { ReadingMode } from "../utils/readingMode";
 
 interface Props {
@@ -22,6 +24,13 @@ interface Props {
   onToggleDraw: () => void;
   readingMode: ReadingMode;
   onPickReadingMode: (mode: ReadingMode) => void;
+  compact: boolean;
+  onToggleCompact: () => void;
+  /** Node search (see NodeSearch). */
+  nodes: NodeDoc[];
+  onLoadTexts: () => Promise<void>;
+  onSearchMatches: (ids: Set<string> | null) => void;
+  onPickSearchResult: (nodeId: string) => void;
   onToggleMapMode: () => void;
   /** Demo sessions only: leave the demo (log out) to log in or register. */
   onExitDemo: () => void;
@@ -54,6 +63,12 @@ export function MapToolbar({
   onToggleDraw,
   readingMode,
   onPickReadingMode,
+  compact,
+  onToggleCompact,
+  nodes,
+  onLoadTexts,
+  onSearchMatches,
+  onPickSearchResult,
   onToggleMapMode,
   onExitDemo,
   onInvite,
@@ -67,6 +82,7 @@ export function MapToolbar({
   // Each dropdown's own open/closed state.
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showReadingMenu, setShowReadingMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   // A menu item closes the menu, then does its thing.
   const closeAddThen = (action: () => void) => () => {
     setShowAddMenu(false);
@@ -144,11 +160,36 @@ export function MapToolbar({
             {showReadingMenu && (
               <ReadingModeMenu
                 mode={readingMode}
+                compact={compact}
+                onToggleCompact={onToggleCompact}
                 onPick={(mode) => {
                   onPickReadingMode(mode);
                   setShowReadingMenu(false);
                 }}
                 onClose={() => setShowReadingMenu(false)}
+              />
+            )}
+          </div>
+          {/* Node search — find a node by its title/text; the matches stay lit. */}
+          <div className="relative">
+            <button
+              type="button"
+              className={`${iconBtn} ${showSearch ? pressed : idle}`}
+              title={t.ui.search.title}
+              onClick={() => setShowSearch((v) => !v)}
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="6.5" cy="6.5" r="4.2" stroke="currentColor" strokeWidth="1.8" fill="none" />
+                <path d="M9.8 9.8 L14 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+            {showSearch && (
+              <NodeSearch
+                nodes={nodes}
+                onLoadTexts={onLoadTexts}
+                onMatches={onSearchMatches}
+                onPick={onPickSearchResult}
+                onClose={() => setShowSearch(false)}
               />
             )}
           </div>

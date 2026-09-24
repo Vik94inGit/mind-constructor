@@ -18,6 +18,7 @@ import {
   allowedAttackTypes,
 } from "../src/abl/attackAbl.js";
 import { ValidationError } from "../src/abl/errors.js";
+import { getHiddenNodesDao } from "../src/dao/visibilityDao.js";
 
 // An attack always carries the attacker's real objection now — every
 // call below that isn't specifically testing validation supplies this so
@@ -44,6 +45,9 @@ vi.mock("../src/dao/nodeDao.js", () => ({
 vi.mock("../src/dao/mapsDao.js", () => ({
   isMapMemberDao: vi.fn(),
   getMapByInternalIdDao: vi.fn(),
+}));
+vi.mock("../src/dao/visibilityDao.js", () => ({
+  getHiddenNodesDao: vi.fn().mockResolvedValue({ ids: new Set(), publicIds: new Set() }),
 }));
 vi.mock("../src/dao/attackDao.js", () => ({
   applyDamageDao: vi.fn(),
@@ -433,6 +437,24 @@ describe("attackAbl", () => {
 
       expect(getAttackHistoryByNodeDao).toHaveBeenCalledWith("n1");
       expect(result).toEqual([{ weapon: "nitpick" }]);
+    });
+  });
+
+  describe("attackNodeAbl — hidden branches", () => {
+    it("treats a node in a branch hidden from members as not found for a non-owner, but not for the owner", async () => {
+      const node = { _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100, type: "Problem", populate: vi.fn().mockResolvedValue({}) };
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue(node as never);
+      vi.mocked(getHiddenNodesDao).mockResolvedValue({ ids: new Set(["n1"]), publicIds: new Set() });
+      vi.mocked(findActiveProtectorDao).mockResolvedValue(null as never);
+      vi.mocked(applyDamageDao).mockResolvedValue(node as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
+
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue({ ownerId: "victim1", members: ["attacker1", "victim1"] } as never);
+      expect(await attackNodeAbl("node1", "attacker1", "nitpick", { type: "Solution", text: "x" })).toBeNull();
+
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue({ ownerId: "attacker1", members: ["attacker1", "victim1"] } as never);
+      expect(await attackNodeAbl("node1", "attacker1", "nitpick", { type: "Solution", text: "x" })).not.toBeNull();
+      vi.mocked(getHiddenNodesDao).mockResolvedValue({ ids: new Set(), publicIds: new Set() });
     });
   });
 

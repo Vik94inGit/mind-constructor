@@ -6,13 +6,15 @@ import type { ReadingMode } from "../utils/readingMode";
 interface Props {
   mode: ReadingMode;
   onPick: (mode: ReadingMode) => void;
+  compact: boolean;
+  onToggleCompact: () => void;
   onClose: () => void;
 }
 
 // The toolbar's "Aa" dropdown — which way the map reads (see
 // utils/readingMode.ts). Same open-downward, dismiss-on-outside-click/Escape
 // pattern as AddMenu, positioned by a `relative` wrapper around its trigger.
-export function ReadingModeMenu({ mode, onPick, onClose }: Props) {
+export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, onClose }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -56,6 +58,20 @@ export function ReadingModeMenu({ mode, onPick, onClose }: Props) {
           {m === mode && <span aria-hidden>✓</span>}
         </button>
       ))}
+      <div className="my-[0.15rem] border-t border-line" />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={compact}
+        title={t.ui.compact.hint}
+        className={`flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] hover:bg-surface-2 ${
+          compact ? "font-semibold text-accent-ink" : "text-ink"
+        }`}
+        onClick={onToggleCompact}
+      >
+        <span className="flex-1">{t.ui.compact.label}</span>
+        {compact && <span aria-hidden>✓</span>}
+      </button>
     </div>
   );
 }

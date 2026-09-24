@@ -71,6 +71,17 @@ describe("mapAbl", () => {
       expect(result).toEqual({ mapId: "abc123" });
     });
 
+    it("stores a map kind, and rejects one that is not a kind", async () => {
+      vi.mocked(createMapDao).mockResolvedValue({ mapId: "abc123" } as never);
+
+      await createMapAbl({ name: "Test Map", ownerColor: "#4f46e5", kind: "decision" }, "user1");
+      expect(createMapDao).toHaveBeenCalledWith(expect.objectContaining({ kind: "decision" }));
+
+      await expect(
+        createMapAbl({ name: "Test Map", ownerColor: "#4f46e5", kind: "party" }, "user1"),
+      ).rejects.toThrow(ValidationError);
+    });
+
     it("rejects an unknown template", async () => {
       await expect(
         createMapAbl(

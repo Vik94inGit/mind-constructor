@@ -19,6 +19,8 @@ interface Params {
   upsertLine: (line: LineDoc) => void;
   applyCircleSelection: (selectedCircle: SelectedCircle | null) => void;
   refreshInsights: (mapId: string) => void;
+  /** The map owner hid or showed a branch — reload what this viewer may see. */
+  onVisibilityChanged: () => void;
 }
 
 export function useMapSocket({
@@ -35,6 +37,7 @@ export function useMapSocket({
   upsertLine,
   applyCircleSelection,
   refreshInsights,
+  onVisibilityChanged,
 }: Params) {
   // Live sync: join this map's room once the initial REST snapshot has
   // landed (guarded on `loading` so an event can't arrive mid-fetch and
@@ -138,8 +141,10 @@ export function useMapSocket({
     socket.on("node:packed", onNodePacked);
     socket.on("node:unpacked", onNodeUnpacked);
     socket.on("map:updated", onMapUpdated);
+    socket.on("nodes:visibility", onVisibilityChanged);
 
     return () => {
+      socket.off("nodes:visibility", onVisibilityChanged);
       socket.off("node:created", onNodeCreated);
       socket.off("node:updated", onNodeUpdated);
       socket.off("node:deleted", onNodeDeleted);

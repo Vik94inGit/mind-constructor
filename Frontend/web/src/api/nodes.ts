@@ -123,3 +123,13 @@ export async function unpackNode(nodeId: string) {
     method: "POST",
   });
 }
+
+// The map's owner hides or shows a branch (this node and everything hanging
+// from it) for the map's invited members.
+export async function setBranchHidden(nodeId: string, hidden: boolean): Promise<NodeDoc> {
+  const res = await apiRequest<{ success: boolean; node: NodeDoc }>(`/api/nodes/${nodeId}/visibility`, {
+    method: "POST",
+    body: { hidden },
+  });
+  return res.node;
+}

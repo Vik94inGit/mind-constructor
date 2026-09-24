@@ -40,7 +40,7 @@ export function SelectionBar({ count, chooseMode, onLink, onNumber, onDisplay, o
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[46] flex items-center justify-between gap-3 border-t border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
+    <div className="fixed inset-x-0 bottom-0 z-[46] flex items-center gap-3 border-t border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
       <div className="flex items-center gap-3">
         <span className="text-[0.88rem] font-semibold text-ink">
           {count === 0 ? t.ui.selection.tapToChoose : chooseMode ? t.ui.selection.chosen(count) : t.ui.selection.selected(count)}
@@ -67,10 +67,10 @@ export function SelectionBar({ count, chooseMode, onLink, onNumber, onDisplay, o
             />
           )}
         </div>
+        <button className={btn} onClick={onDone} title={chooseMode ? t.ui.selection.finishHint : undefined}>
+          {chooseMode ? t.ui.common.done : t.ui.selection.deselect}
+        </button>
       </div>
-      <button className={btn} onClick={onDone} title={chooseMode ? t.ui.selection.finishHint : undefined}>
-        {chooseMode ? t.ui.common.done : t.ui.selection.deselect}
-      </button>
     </div>
   );
 }

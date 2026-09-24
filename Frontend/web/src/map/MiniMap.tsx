@@ -42,6 +42,8 @@ interface MiniMapGroup {
   // actually matches what's on the real canvas rather than just
   // approximating its bounding circle.
   outline: { x: number; y: number }[];
+  /** A circle parent that itself hangs from another node: drawn with a helmet instead of a crown. */
+  variant?: boolean;
 }
 
 interface Props {
@@ -82,6 +84,8 @@ interface Props {
   // to convert between the two, same as MapPage's own screenToCanvas.
   hScrollMargin: number;
   vScrollMargin: number;
+  /** Moves the view (see useCanvasViewport's panTo): a click glides there, a drag follows the pointer. */
+  onPanTo: (left: number, top: number, animate: boolean) => void;
 }
 
 export const MiniMap = memo(function MiniMap({
@@ -96,6 +100,7 @@ export const MiniMap = memo(function MiniMap({
   zoom,
   hScrollMargin,
   vScrollMargin,
+  onPanTo,
 }: Props) {
   const { t } = useI18n();
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -160,7 +165,7 @@ export const MiniMap = memo(function MiniMap({
   // land in canvas-coordinate space (0..canvasW/canvasH), but
   // scrollLeft/scrollTop/scrollWidth are screen pixels of the rendered
   // (zoomed) canvas — same conversion MapPage's own zoomAt does.
-  function navigateTo(clientX: number, clientY: number) {
+  function navigateTo(clientX: number, clientY: number, animate: boolean) {
     const wrap = wrapRef.current;
     const svg = svgRef.current;
     if (!wrap || !svg) return;
@@ -177,13 +182,10 @@ export const MiniMap = memo(function MiniMap({
     // + hScrollMargin/+ vScrollMargin: canvasX/canvasY are real canvas
     // coordinates; scrollLeft/scrollTop are screen pixels within the
     // *padded* canvas — same conversion MapPage's own centerOnNode uses.
-    wrap.scrollLeft = Math.min(
-      maxLeft,
-      Math.max(0, (canvasX + hScrollMargin) * zoom - wrap.clientWidth / 2),
-    );
-    wrap.scrollTop = Math.min(
-      maxTop,
-      Math.max(0, (canvasY + vScrollMargin) * zoom - wrap.clientHeight / 2),
+    onPanTo(
+      Math.min(maxLeft, Math.max(0, (canvasX + hScrollMargin) * zoom - wrap.clientWidth / 2)),
+      Math.min(maxTop, Math.max(0, (canvasY + vScrollMargin) * zoom - wrap.clientHeight / 2)),
+      animate,
     );
   }
 
@@ -219,11 +221,11 @@ export const MiniMap = memo(function MiniMap({
         onPointerDown={(e) => {
           draggingRef.current = true;
           (e.target as Element).setPointerCapture(e.pointerId);
-          navigateTo(e.clientX, e.clientY);
+          navigateTo(e.clientX, e.clientY, true);
         }}
         onPointerMove={(e) => {
           if (!draggingRef.current) return;
-          navigateTo(e.clientX, e.clientY);
+          navigateTo(e.clientX, e.clientY, false);
         }}
         onPointerUp={() => {
           draggingRef.current = false;
@@ -411,7 +413,11 @@ export const MiniMap = memo(function MiniMap({
                 strokeWidth={0.9}
               />
               <path
-                d="M-3.9,2.7 L-3.9,-1.2 L-1.95,0.75 L0,-2.7 L1.95,0.75 L3.9,-1.2 L3.9,2.7 Z"
+                d={
+                  g.variant
+                    ? "M-3.6,3 V-0.6 A3.6,3.6 0 0 1 3.6,-0.6 V3 L2.6,4 H-2.6 Z"
+                    : "M-3.9,2.7 L-3.9,-1.2 L-1.95,0.75 L0,-2.7 L1.95,0.75 L3.9,-1.2 L3.9,2.7 Z"
+                }
                 transform={`translate(${cx}, ${cy}) scale(0.8)`}
                 fill={color}
               />

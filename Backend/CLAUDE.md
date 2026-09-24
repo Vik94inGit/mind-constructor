@@ -140,6 +140,27 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `nodeAbl.ts`; an empty string on PATCH clears it). Unlike `text`, it is *not* stripped from
   `GET /:mapId/nodes` — it's small enough to ride along, and it's what lets a frontend caption a node
   without the lazy `text` backfill. The `"demo"` map template seeds a couple of titles.
+- **`Node.zoneName`** — an optional name (max 40 chars, `""` = none) for the zone a circle parent
+  radiates. Set via `PATCH /api/nodes/:nodeId` (`zoneNameSchema` in `nodeAbl.ts`; an empty string
+  clears it), owner-only like every node edit. A frontend shows it under the parent on the canvas and
+  on the minimap. In a frontend, the circle parent at the top of a tree wears a crown and one that
+  itself hangs from another node (`parentId` set) is a variant and wears a helmet. Like `title`, it is
+  *not* stripped from `GET /:mapId/nodes`.
+- **Hidden branches** (`Node.hiddenFromMembers`, `dao/visibilityDao.ts`, `POST /api/nodes/:nodeId/visibility`
+  body `{ hidden }`) — the map's *owner* (not merely the node's creator; `NotMapOwnerError` → 403
+  otherwise) can hide a branch from invited members. A node is hidden when it, or any ancestor by
+  `parentId`, is flagged, or when it is a protection node guarding a hidden node (weapon nodes are
+  parented to their target, so they follow it). Enforced server-side for non-owners: the node list
+  (`getNodesByMapDao`), the lazy text backfill, the edge list (links touching a hidden node),
+  `findNodeDao` (single node → 404) and `attackNodeAbl` (→ null/404). Not filtered: the map summary
+  counts, attack indicators and the selected-circle id lists. Realtime: `io.ts` puts the map's owner in
+  an extra room `map:{id}:owner`, and `broadcastToMap` sends any event whose payload mentions a hidden
+  node's `nodeId` to that room only (per-map queue keeps event order); a toggle broadcasts
+  `nodes:visibility` (no node id in its payload, so everyone gets it) and clients reload what they may see.
+- **`Map.kind`** — `problem | decision | goal | retro` (`MAP_KINDS`), chosen when a map is created
+  (`POST /api/` body `kind`, alongside `discussionMode`). Descriptive only; a frontend seeds the matching
+  starter structure itself (`utils/seedMap.ts`), so the seeded text is in the user's language. The older
+  server-side `template` seeds (blank / single-problem / decision-tree / pro-con / demo) still work.
 - **`Node.order`** — an optional step number (whole number 1..9999, `null` = none) for describing a
   process by labeling nodes in sequence; a frontend draws it as a small numbered badge on the node.
   Set via `POST`/`PATCH /api/nodes` (`orderSchema` in `nodeAbl.ts`; explicit `null` on PATCH clears

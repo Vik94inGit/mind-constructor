@@ -35,6 +35,16 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Templates** — the node panel's Info tab offers a ready branch on a node with no children yet:
   a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
   breakdown, and a failed (Fail) node gets "Analyze and try again". See `src/utils/templates.ts`.
+- **Map types** — creating a map asks for one of four kinds (Problem analysis, Decision, Goal planning,
+  Retrospective), each seeded with a starter structure in your language, and for a mode (Discussion or
+  Personal). The owner can switch the mode later from the map's toolbar.
+- **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
+  matches stay lit while everything else dims, and a result takes you to that node.
+- **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden
+  nodes carry a crossed-eye badge for the owner. Enforced by the backend, not just the UI.
+- **Simplified view** — the toolbar's `Aa` menu has a switch that shrinks icons and drops halo/horns,
+  wings and circle-parent rings to cut visual noise. It defaults to on for a phone-sized screen and
+  is remembered per browser.
 
 ## Known API limitations reflected in the UI
 

@@ -39,6 +39,8 @@ import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId } from "../utils/nodeType";
 import { layoutTemplate } from "../utils/templates";
+import { useRadialBlend } from "../hooks/useRadialBlend";
+import { ZoneNames } from "../map/ZoneNames";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import type { Sentiment } from "../utils/nodeType";
 import {
@@ -46,6 +48,7 @@ import {
   CANVAS_H,
   ZOOM_STEP,
   MAX_ZOOM,
+  MIN_ZOOM,
   CIRCLE_DROP_RADIUS,
   computeLinkedNeighborIds,
   getNodeMinDist,
@@ -60,7 +63,7 @@ import {
   computeLinkCycles,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
-import { loadReadingMode, saveReadingMode } from "../utils/readingMode";
+import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
 import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, EdgeDoc, LineDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
 
@@ -133,6 +136,16 @@ export function MapPage() {
   // How this viewer reads the map (see utils/readingMode.ts) — remembered per
   // browser, never shared with the map's other members.
   const [readingMode, setReadingModeState] = useState<ReadingMode>(loadReadingMode);
+  // The simplified view (smaller icons, no halo/horns/rings) — on by default on a phone.
+  // The ids the node search currently matches (null = no search): everything else dims.
+  const [searchMatches, setSearchMatches] = useState<Set<string> | null>(null);
+  const [compactView, setCompactViewState] = useState<boolean>(loadCompactView);
+  function toggleCompactView() {
+    setCompactViewState((v) => {
+      saveCompactView(!v);
+      return !v;
+    });
+  }
   function setReadingMode(mode: ReadingMode) {
     setReadingModeState(mode);
     saveReadingMode(mode);
@@ -288,6 +301,7 @@ export function MapPage() {
     settledViewportBounds,
     centerOnNode,
     centerOnPoint,
+    panTo,
   } = useCanvasViewport({ mapId, loading, sheetOpen, positions });
 
   // Every insertion into `nodes`/`edges` goes through these, not a blind
@@ -440,6 +454,22 @@ export function MapPage() {
     loadAll();
   }, [loadAll]);
 
+  // Reloads just the nodes and links this viewer may see, without the loading
+  // screen — for when the owner hides or shows a branch.
+  const refreshNodesAndEdges = useCallback(async () => {
+    if (!mapId) return;
+    try {
+      const [nodeList, edgeList] = await Promise.all([nodesApi.listNodes(mapId), edgesApi.listEdges(mapId)]);
+      setNodes((prev) => {
+        const known = new Map(prev.map((n) => [n.nodeId, n.text]));
+        return nodeList.map((n) => ({ ...n, text: n.text ?? known.get(n.nodeId) ?? "" }));
+      });
+      setEdges(edgeList);
+    } catch {
+      // best-effort: the next full load picks it up
+    }
+  }, [mapId]);
+
   useMapSocket({
     mapId,
     loading,
@@ -454,7 +484,26 @@ export function MapPage() {
     upsertLine,
     applyCircleSelection,
     refreshInsights,
+    onVisibilityChanged: refreshNodesAndEdges,
   });
+
+  // For the owner: every node in a branch hidden from invited members (a
+  // flagged root, and everything hanging from it by parentId).
+  const hiddenBranchIds = useMemo(() => {
+    const out = new Set<string>();
+    if (!nodes.some((n) => n.hiddenFromMembers)) return out;
+    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+    const isHidden = (id: string, seen: Set<string>): boolean => {
+      const n = byId.get(id);
+      if (!n || seen.has(id)) return false;
+      seen.add(id);
+      if (n.hiddenFromMembers) return true;
+      const parent = nodeRefId(n.parentId);
+      return !!parent && isHidden(parent, seen);
+    };
+    for (const n of nodes) if (isHidden(n.nodeId, new Set())) out.add(n.nodeId);
+    return out;
+  }, [nodes]);
 
   // Any node "chosen" on the map right now — a multi-select takes priority
   // (it's the more specific state), falling back to the plain single
@@ -552,13 +601,18 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, multiSelectIds, nodes, edges, positions, selectionSettled, chooseMode, packMode]);
 
+  // Neighbors glide into (and back out of) the ring rather than jumping.
+  const radialBlend = useRadialBlend(radialPositions);
+
   function posFor(node: NodeDoc) {
     const grouped = groupDragState?.get(node.nodeId);
     if (grouped) return grouped;
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
-    const radial = radialPositions?.get(node.nodeId);
-    if (radial) return radial;
-    return positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const own = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const radial = radialBlend.map?.get(node.nodeId);
+    if (!radial) return own;
+    const b = radialBlend.blend;
+    return { x: own.x + (radial.x - own.x) * b, y: own.y + (radial.y - own.y) * b };
   }
 
   // The points a new or moved node has to stay clear of: every *visible*
@@ -1651,6 +1705,28 @@ export function MapPage() {
     if (centerOn) setTimeout(() => centerOnPoint(centerOn.x, centerOn.y), 250);
   }
 
+  // After an action on chosen nodes finishes, brings them into view: zooms out
+  // just enough for all of them to fit on screen (never in), then glides to
+  // their middle.
+  function showNodes(ids: string[]) {
+    const wrap = wrapRef.current;
+    const pts = ids.map((id) => positions.get(id)).filter((p): p is { x: number; y: number } => !!p);
+    if (!wrap || pts.length === 0) return;
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    const PAD = 140;
+    const width = Math.max(...xs) - Math.min(...xs) + PAD * 2;
+    const height = Math.max(...ys) - Math.min(...ys) + PAD * 2;
+    const middle = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 };
+    const target = Math.max(MIN_ZOOM, Math.min(zoom, wrap.clientWidth / width, wrap.clientHeight / height));
+    if (target < zoom - 0.005) {
+      zoomFromCenter(0, target);
+      setTimeout(() => centerOnPoint(middle.x, middle.y), 260);
+    } else {
+      centerOnPoint(middle.x, middle.y);
+    }
+  }
+
   // The group bar's "Show as": the chosen nodes take this reading mode (null =
   // back to following the map's), then the view zooms in if they'd overlap.
   function setDisplayForChosen(mode: ReadingMode | null) {
@@ -2098,6 +2174,7 @@ export function MapPage() {
       }
       setMultiSelectIds(new Set());
       setSelectedId(root.nodeId);
+      showNodes(selectedNodes.map((n) => n.nodeId));
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.groupCircle);
     }
@@ -2116,6 +2193,7 @@ export function MapPage() {
         picks.map((n, i) => nodesApi.updateNode(n.nodeId, { order: clear ? null : i + 1 })),
       );
       updated.forEach(upsertNode);
+      showNodes(picks.map((n) => n.nodeId));
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.numberNodes);
     }
@@ -2458,6 +2536,7 @@ export function MapPage() {
               canDeleteLine={canDeleteLine}
               onLineClick={handleLineClick}
               interactive={!drawMode}
+              compact={compactView}
               drawing={
                 drawMode
                   ? {
@@ -2519,13 +2598,16 @@ export function MapPage() {
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
                   readingMode={nodeDisplay[node.nodeId] ?? readingMode}
+                  compact={compactView}
+                  hiddenBranch={hiddenBranchIds.has(node.nodeId)}
                   discussionMode={isDiscussionMode}
                   celebrate={celebrateIds.has(node.nodeId)}
                   flightVector={flightVector}
                   muted={
                     ((quickAddActive && node.nodeId !== selectedId) ||
                       (!!spotlightedNodeIds && !spotlightedNodeIds.includes(node.nodeId)) ||
-                      (!chooseMode && multiSelectIds.size > 0 && !multiSelectIds.has(node.nodeId))) &&
+                      (!chooseMode && multiSelectIds.size > 0 && !multiSelectIds.has(node.nodeId)) ||
+                      (!!searchMatches && !searchMatches.has(node.nodeId))) &&
                     !unmutedAttackNodeIds?.has(node.nodeId)
                   }
                   dropHighlight={dropTarget?.nodeId === node.nodeId ? (dropTarget.valid ? "valid" : "invalid") : undefined}
@@ -2589,6 +2671,8 @@ export function MapPage() {
               <QuickAddGhosts
                 anchorPos={posFor(selectedNode)}
                 bounds={settledViewportBounds()}
+                compact={compactView}
+                zoom={zoom}
                 onPick={(type, pos) => startQuickAdd(type, pos, selectedNode)}
               />
             )}
@@ -2596,6 +2680,8 @@ export function MapPage() {
             {!loading && nodes.length === 0 && !pendingCreate && !drawMode && (
               <QuickAddGhosts
                 intro
+                compact={compactView}
+                zoom={zoom}
                 anchorPos={{ x: CANVAS_W / 2, y: CANVAS_H / 2 }}
                 // No bounds to squeeze the ring into: the view opens centered
                 // on this point, so a full round ring fits.
@@ -2644,9 +2730,24 @@ export function MapPage() {
             edges={edges}
             lines={lines}
             positions={positions}
-            groups={nodeGroups}
+            groups={nodeGroups.map((g) => ({ ...g, variant: !!nodes.find((n) => n.nodeId === g.rootId)?.parentId }))}
             canvasW={CANVAS_W}
             canvasH={CANVAS_H}
+            zoom={zoom}
+            hScrollMargin={hScrollMargin}
+            vScrollMargin={vScrollMargin}
+            onPanTo={panTo}
+          />
+
+          <ZoneNames
+            wrapRef={wrapRef}
+            zones={nodeGroups.flatMap((g) => {
+              const root = nodes.find((n) => n.nodeId === g.rootId);
+              return root?.zoneName
+                ? [{ rootId: g.rootId, name: root.zoneName, sentiment: g.sentiment, variant: !!root.parentId }]
+                : [];
+            })}
+            positions={positions}
             zoom={zoom}
             hScrollMargin={hScrollMargin}
             vScrollMargin={vScrollMargin}
@@ -2664,6 +2765,17 @@ export function MapPage() {
             onToggleDraw={toggleDrawMode}
             readingMode={readingMode}
             onPickReadingMode={setReadingMode}
+            compact={compactView}
+            onToggleCompact={toggleCompactView}
+            nodes={visibleNodes}
+            onLoadTexts={async () => {
+              await ensureNodeText(visibleNodes.map((n) => n.nodeId));
+            }}
+            onSearchMatches={setSearchMatches}
+            onPickSearchResult={(id) => {
+              setSelectedId(id);
+              centerOnNode(id);
+            }}
             onToggleMapMode={toggleMapMode}
             onExitDemo={exitDemo}
             onInvite={() => setShowInvite(true)}
@@ -2861,6 +2973,7 @@ export function MapPage() {
           onClose={() => setPendingLink(null)}
           onCreated={(created) => {
             created.forEach(upsertEdge);
+            showNodes(pendingLink.map((n) => n.nodeId));
             setPendingLink(null);
             refreshInsights(mapId);
           }}

@@ -95,6 +95,10 @@ export interface SelectedCircle {
 // it isn't a field on MapDoc below.
 export type MapTemplate = "blank" | "single-problem" | "decision-tree" | "pro-con";
 
+// What a map is for — see MAP_KINDS on the backend. Picked when the map is created.
+export const MAP_KINDS = ["problem", "decision", "goal", "retro"] as const;
+export type MapKind = (typeof MAP_KINDS)[number];
+
 export interface MapDoc {
   mapId: string;
   name: string;
@@ -123,6 +127,7 @@ export interface MapDoc {
   // Owner-only to toggle, live, via updateMap — unlike MapTemplate above,
   // this isn't a one-time creation choice.
   discussionMode?: boolean;
+  kind?: MapKind | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -203,6 +208,10 @@ export interface NodeDoc {
   // symbolOverride; independent of (and drawn alongside, if both apply)
   // MapPage's own automatic nodeGroups zones.
   manualZone?: ManualZoneColor | null;
+  /** Set by the map owner on the root of a branch hidden from invited members — see Node.hiddenFromMembers on the backend. */
+  hiddenFromMembers?: boolean;
+  /** Name of the zone this node is the parent of — see Node.zoneName on the backend. */
+  zoneName?: string;
   createdAt?: string;
   updatedAt?: string;
 }

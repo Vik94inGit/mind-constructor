@@ -66,6 +66,10 @@ interface Props {
   onPick: (type: NodeType, pos: { x: number; y: number }) => void;
   /** An empty map's hint: the ghosts draw in one at a time — icon, then its name — instead of all being there at once. */
   intro?: boolean;
+  /** The simplified view: no halo/horns on the ghosts. */
+  compact?: boolean;
+  /** The canvas zoom: the ghosts are drawn inside the zoomed canvas, so they shrink by it to stay one size on screen, as the nodes do. */
+  zoom?: number;
 }
 
 // One step of the ghosts' sequence. In the intro each ghost takes two steps
@@ -78,7 +82,7 @@ const STEP_MS = 1000;
 // node of that type at the ghost's spot and auto-links it to the anchor —
 // branching an argument tree becomes two clicks instead of toolbar button ->
 // modal -> manual placement.
-export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick, intro = false }: Props) {
+export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick, intro = false, compact = false, zoom = 1 }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
   useEffect(() => {
@@ -100,8 +104,10 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   // old module-level home for why this can't be hoisted back out to module
   // scope.
   const mobile = isMobileViewport();
-  const RADIUS = mobile ? 104 : 126;
-  const EDGE_MARGIN = mobile ? 38 : 58;
+  // Everything below is in canvas units, so on-screen sizes are divided by zoom.
+  const k = 1 / zoom;
+  const RADIUS = (mobile ? 104 : 126) * k;
+  const EDGE_MARGIN = (mobile ? 38 : 58) * k;
   // If the anchor were simply the ring's center, with each of the 7 points
   // *independently* clamped into bounds afterward, that would be fine when
   // the anchor sits well clear of every edge — but a node close enough to
@@ -162,7 +168,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   // Raised from 83: a circle parent draws at 130%, so its wings reach ~80px
   // out — at 83 the side ghosts (a ghost's own half-width is ~20px) sat right
   // on the wingtips whenever a cramped viewport forced R down to this floor.
-  const MIN_RADIUS = 100;
+  const MIN_RADIUS = 100 * k;
   const availLeft = ringCenter.x - bounds.minX;
   const availRight = bounds.maxX - ringCenter.x;
   // + UP_SLACK: `bounds`' own pad (baked in by MapPage's viewportBounds/
@@ -176,7 +182,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   // on a short mobile screen: the ring's whole point is to surround the
   // node, not cover part of it). Only the *up* direction gets this — down/
   // left/right have no comparable "own decoration" to clear.
-  const UP_SLACK = 12;
+  const UP_SLACK = 12 * k;
   const availUp = ringCenter.y - bounds.minY + UP_SLACK;
   const availDown = bounds.maxY - ringCenter.y;
   const tightest = Math.min(availLeft, availRight, availUp, availDown);
@@ -239,13 +245,14 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
               else setArmedType(type);
             }}
           >
-            <div
-              className="relative"
-              style={{ height: ICON_SIZE, width: ICON_SIZE, transform: `scale(${GHOST_SCALE})` }}
-            >
+            <div className="relative" style={{ height: ICON_SIZE * k, width: ICON_SIZE * k }}>
+              <div
+                className="absolute top-1/2 left-1/2"
+                style={{ height: ICON_SIZE, width: ICON_SIZE, transform: `translate(-50%, -50%) scale(${GHOST_SCALE * k})` }}
+              >
               {/* Same halo/horns crown a real node of this type gets — see
                   NodeCrown's own doc comment. */}
-              <NodeCrown type={type} />
+              {!compact && <NodeCrown type={type} />}
               <div
                 // bg-[var(--node-fill)], not bg-surface: same fill the real
                 // node this previews will actually render with (see index.css's
@@ -265,6 +272,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
                   <NodeTypeIcon type={type} size={21} />
                 )}
               </div>
+              </div>
             </div>
             {/* Always mounted and faded (not added/removed) so the names
                 cross-fade instead of popping, and absolutely placed under the
@@ -279,9 +287,10 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
                 overlapping its neighbors', worse than one line running a
                 little wide. */}
             <div
-              className={`pointer-events-none absolute left-1/2 top-full mt-[0.3rem] flex -translate-x-1/2 flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card transition-opacity duration-500 ease-in-out ${
+              className={`pointer-events-none absolute left-1/2 top-full flex -translate-x-1/2 flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card transition-opacity duration-500 ease-in-out ${
                 armedType === type || labelIndex === i ? "opacity-100" : "opacity-0"
               }`}
+              style={{ marginTop: 4.8 * k, transform: `scale(${k})`, transformOrigin: "50% 0" }}
             >
               <span className="text-[0.66rem] font-semibold">{t.ui.types[type]}</span>
               {armedType === type && <span className="text-[0.55rem] text-ink-soft">{t.ui.node.ghostAgain}</span>}

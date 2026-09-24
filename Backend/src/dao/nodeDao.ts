@@ -2,7 +2,8 @@ import { nanoid } from "nanoid";
 import mongoose from "mongoose";
 import { Node, type NodeType, type WeaponIcon } from "../models/Node.js";
 import { Edge } from "../models/Edge.js";
-import { isMapMemberDao } from "./mapsDao.js";
+import { isMapMemberDao, getMapByInternalIdDao } from "./mapsDao.js";
+import { getHiddenNodesDao } from "./visibilityDao.js";
 
 type MapInternalId = mongoose.Types.ObjectId | string;
 
@@ -245,7 +246,25 @@ export const findNodeDao = async (publicNodeId: string, userId: string) => {
   const isMember = await isMapMemberDao(node.mapId, userId);
   if (!isMember) return null;
 
+  // An invited member cannot open a node in a branch the owner has hidden.
+  const map = await getMapByInternalIdDao(node.mapId);
+  if (map && map.ownerId.toString() !== userId.toString()) {
+    const hidden = await getHiddenNodesDao(node.mapId);
+    if (hidden.ids.has(node._id.toString())) return null;
+  }
+
   return node;
+};
+
+// The map owner hides or shows a branch (its root and everything hanging from
+// it) for the map's invited members. Not gated by who created the node —
+// the caller (nodeAbl.setBranchHiddenAbl) has already checked map ownership.
+export const setBranchHiddenMutationDao = async (publicNodeId: string, hidden: boolean) => {
+  return await Node.findOneAndUpdate(
+    { nodeId: publicNodeId },
+    { $set: { hiddenFromMembers: hidden } },
+    { new: true },
+  ).populate(NODE_POPULATE);
 };
 
 // Only the node's creator may edit it.
