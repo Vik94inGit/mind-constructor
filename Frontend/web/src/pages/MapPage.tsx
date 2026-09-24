@@ -76,6 +76,18 @@ const ADDRESSES_PROBLEM_TYPES = new Set<NodeType>(["Success", "Option", "Solutio
 // (see zoneAngleGuard).
 const NEW_NODE_ID = "__new__";
 
+// Group-drag "follow the leader" catch-up — see onNodePointerDown's group-
+// drag branch. Only the pointer-downed node ("the leader") tracks the
+// pointer live; every other selected node stays put until the leader is
+// dropped, then catches up to its own new offset in a few discrete hops
+// instead of snapping there in one frame, staggered so the group reads as
+// trailing after the leader rather than teleporting in lockstep with it.
+const GROUP_FOLLOW_STEPS = 3;
+const GROUP_FOLLOW_STEP_DELAY_MS = 130;
+const GROUP_FOLLOW_STAGGER_MS = 90;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
 // would still work, just as a fresh, unnecessary object every render. Never
@@ -262,6 +274,13 @@ export function MapPage() {
   // inside it. null outside of an active marquee drag.
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const dragMoved = useRef(false);
+  // Bumped at the start of every group drag; a follower's catch-up
+  // animation (see onNodePointerDown's group-drag branch) checks its own
+  // captured token against this on each hop and bails out the moment it no
+  // longer matches — i.e. a new group drag started (or this one's own drop
+  // already ran) before it finished, so its now-stale writes into
+  // groupDragState/the API never land on top of whatever drag superseded it.
+  const groupDragToken = useRef(0);
   // onNodePointerDown calls setPointerCapture on the node's own element —
   // per the Pointer Events spec that re-targets every subsequent event for
   // this interaction, *including the browser's own synthesized "click"*, to
@@ -848,20 +867,26 @@ export function MapPage() {
     if (!isOwnNode(node)) return;
 
     // Group drag: the pointer-downed node is itself a member of a 2+-node
-    // multi-selection — move every selected (own) node by the same pointer
-    // delta at once instead of the single-node path below. No circle-join
-    // drop-target check here at all (see the plan's own scope note) — a
-    // group drop is always a plain bulk reposition; each member persists
-    // with its own PATCH /api/nodes/:nodeId (no bulk endpoint exists), all
-    // in parallel. Skipped when the pointer-downed node itself is locked
-    // (Node.locked — its circle is the currently-chosen one, see
-    // handleCircleBackdropClick): a chosen cluster holds its position for
-    // good, so falls through to the ordinary long-press/tap paths below
-    // instead of starting a reposition.
+    // multi-selection — dragging it moves the whole selection, not just
+    // itself. Only this "leader" node actually tracks the pointer live;
+    // every other selected node ("follower") stays put until the leader is
+    // dropped, then catches up to the same offset the leader moved by, in a
+    // few staggered hops (see GROUP_FOLLOW_* above) instead of snapping
+    // there in lockstep — reads as the group trailing after the leader,
+    // like a line of animals following one another, rather than the whole
+    // cluster teleporting as one rigid block. No circle-join drop-target
+    // check here at all (see the plan's own scope note) — a group drop is
+    // always a plain bulk reposition; each member persists with its own
+    // PATCH /api/nodes/:nodeId (no bulk endpoint exists). Skipped when the
+    // pointer-downed node itself is locked (Node.locked — its circle is the
+    // currently-chosen one, see handleCircleBackdropClick): a chosen
+    // cluster holds its position for good, so falls through to the
+    // ordinary long-press/tap paths below instead of starting a reposition.
     if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !node.locked) {
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       dragMoved.current = false;
+      const token = ++groupDragToken.current;
       // !n.locked too — a locked member caught up in a wider multi-selection
       // still can't move even if the node the drag actually started from
       // isn't itself locked.
@@ -869,49 +894,85 @@ export function MapPage() {
         const n = nodes.find((nn) => nn.nodeId === id);
         return !!n && isOwnNode(n) && !n.isWeapon && !n.locked;
       });
+      const followerIds = memberIds.filter((id) => id !== node.nodeId);
       const startPositions = new Map(
         memberIds.map((id) => [id, posFor(nodes.find((n) => n.nodeId === id)!)]),
       );
       setGroupDragState(startPositions);
       const startPt = screenToCanvas(e.clientX, e.clientY);
+      const margin = 60;
+      const clamp = (x: number, y: number) => ({
+        x: Math.min(CANVAS_W - margin, Math.max(margin, x)),
+        y: Math.min(CANVAS_H - margin, Math.max(margin, y)),
+      });
 
+      // Only the leader's own entry moves during the live drag — followers
+      // are left at their startPositions value (identical to their real
+      // position, so nothing visually shifts for them yet).
       function onGroupMove(ev: PointerEvent) {
         const p = screenToCanvas(ev.clientX, ev.clientY);
-        const dx = p.x - startPt.x;
-        const dy = p.y - startPt.y;
         dragMoved.current = true;
-        const next = new Map<string, { x: number; y: number }>();
-        for (const [id, pos] of startPositions) next.set(id, { x: pos.x + dx, y: pos.y + dy });
-        setGroupDragState(next);
+        setGroupDragState((prev) => {
+          const next = new Map(prev ?? startPositions);
+          const leaderStart = startPositions.get(node.nodeId)!;
+          next.set(node.nodeId, { x: leaderStart.x + (p.x - startPt.x), y: leaderStart.y + (p.y - startPt.y) });
+          return next;
+        });
       }
 
       async function onGroupUp(ev: PointerEvent) {
         window.removeEventListener("pointermove", onGroupMove);
         window.removeEventListener("pointerup", onGroupUp);
         suppressNextClick.current = true;
-        setGroupDragState(null);
         if (!dragMoved.current) {
+          setGroupDragState(null);
           handleNodeClick(node, false);
           return;
         }
         const p = screenToCanvas(ev.clientX, ev.clientY);
         const dx = p.x - startPt.x;
         const dy = p.y - startPt.y;
-        const margin = 60;
         setActionError(null);
-        try {
-          await Promise.all(
-            memberIds.map(async (id) => {
-              const startPos = startPositions.get(id)!;
-              const nx = Math.min(CANVAS_W - margin, Math.max(margin, startPos.x + dx));
-              const ny = Math.min(CANVAS_H - margin, Math.max(margin, startPos.y + dy));
-              const updated = await nodesApi.updateNode(id, { x: nx, y: ny });
-              upsertNode(updated);
-            }),
-          );
-        } catch (err) {
-          setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
-        }
+
+        const leaderStart = startPositions.get(node.nodeId)!;
+        const leaderTarget = clamp(leaderStart.x + dx, leaderStart.y + dy);
+        setGroupDragState((prev) => new Map(prev ?? startPositions).set(node.nodeId, leaderTarget));
+
+        const leaderDone = nodesApi
+          .updateNode(node.nodeId, { x: leaderTarget.x, y: leaderTarget.y })
+          .then(upsertNode)
+          .catch((err) => setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes));
+
+        // Followers catch up in their own selection order, each one's own
+        // stepped animation starting GROUP_FOLLOW_STAGGER_MS after the
+        // previous one's — the cascade the comment above describes — and
+        // every write (each hop, and the final persist) checks `token`
+        // against groupDragToken.current first, so a follower still mid-
+        // animation when a new group drag starts (or this same one's own
+        // drop logic re-enters somehow) quietly stops instead of clobbering
+        // whatever superseded it.
+        const followerDone = followerIds.map(async (id, i) => {
+          if (i > 0) await sleep(i * GROUP_FOLLOW_STAGGER_MS);
+          if (groupDragToken.current !== token) return;
+          const start = startPositions.get(id)!;
+          const target = clamp(start.x + dx, start.y + dy);
+          for (let step = 1; step <= GROUP_FOLLOW_STEPS; step++) {
+            if (groupDragToken.current !== token) return;
+            const frac = step / GROUP_FOLLOW_STEPS;
+            const hop = { x: start.x + (target.x - start.x) * frac, y: start.y + (target.y - start.y) * frac };
+            setGroupDragState((prev) => new Map(prev ?? startPositions).set(id, hop));
+            if (step < GROUP_FOLLOW_STEPS) await sleep(GROUP_FOLLOW_STEP_DELAY_MS);
+          }
+          try {
+            const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
+            if (groupDragToken.current === token) upsertNode(updated);
+          } catch (err) {
+            setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
+          }
+        });
+
+        await Promise.all([leaderDone, ...followerDone]);
+        if (groupDragToken.current === token) setGroupDragState(null);
       }
 
       window.addEventListener("pointermove", onGroupMove);
@@ -2698,6 +2759,7 @@ export function MapPage() {
                 x={pendingCreate.x}
                 y={pendingCreate.y}
                 type={pendingCreate.type}
+                zoom={zoom}
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}
               />
