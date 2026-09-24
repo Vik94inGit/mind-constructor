@@ -415,11 +415,12 @@ export const MiniMap = memo(function MiniMap({
               <path
                 d={
                   g.variant
-                    ? "M-3.6,3 V-0.6 A3.6,3.6 0 0 1 3.6,-0.6 V3 L2.6,4 H-2.6 Z"
+                    ? "M-3.6,3.6 V-0.4 A3.6,3.6 0 0 1 3.6,-0.4 V3.6 Z M-2.7,-0.6 H2.7 V0.5 H-2.7 Z M-0.5,0.5 H0.5 V2.8 H-0.5 Z"
                     : "M-3.9,2.7 L-3.9,-1.2 L-1.95,0.75 L0,-2.7 L1.95,0.75 L3.9,-1.2 L3.9,2.7 Z"
                 }
                 transform={`translate(${cx}, ${cy}) scale(0.8)`}
                 fill={color}
+                fillRule="evenodd"
               />
             </g>
           );

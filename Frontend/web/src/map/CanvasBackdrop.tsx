@@ -210,6 +210,9 @@ export function CanvasBackdrop({
       {visibleNodes.map((node) => {
         const parentId = nodeRefId(node.parentId);
         if (!parentId) return null;
+        // An attack node hangs from its target, but the bow-and-arrows mark
+        // already says what it points at — no branch line as well.
+        if (node.isWeapon) return null;
         const parentNode = visibleNodes.find((n) => n.nodeId === parentId);
         if (!parentNode) return null;
         const a = posFor(parentNode);

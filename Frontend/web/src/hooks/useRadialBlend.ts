@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 type Pt = { x: number; y: number };
 
-const BLEND_MS = 950;
+const BLEND_MS = 1500;
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
