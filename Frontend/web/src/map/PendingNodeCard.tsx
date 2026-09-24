@@ -14,6 +14,8 @@ interface Props {
   type: NodeType;
   onConfirm: (text: string, type: NodeType) => void;
   onCancel: () => void;
+  /** MapPage's own canvas zoom — see QuickAddGhosts' identical prop. This card is drawn inside the zoomed canvas the same as everything else, so it has to counter-scale by 1/zoom or it visibly balloons/shrinks along with whatever zoom level the map happens to be at instead of staying the same size on screen as a real node's own icon. */
+  zoom?: number;
 }
 
 // A not-yet-created node: same icon+caption footprint as a real NodeCard so
@@ -21,7 +23,7 @@ interface Props {
 // sent to the backend until there's actual text — clicking a quick-add
 // ghost (or the toolbar/double-click/"Create branch" paths) opens one of
 // these instead of a modal, autofocused so typing can start immediately.
-export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
+export function PendingNodeCard({ x, y, type, onConfirm, onCancel, zoom = 1 }: Props) {
   const { t } = useI18n();
   const [text, setText] = useState("");
   const [draftType, setDraftType] = useState<NodeType>(type);
@@ -40,18 +42,26 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
 
   const ring = ringKindFor(draftType);
   const isOutcome = !!ring;
-  // Plain `transform:` arbitrary value, not Tailwind's -translate-x-1/2
-  // utility — see the identical note in NodeCard.tsx. This element doesn't
-  // currently animate `transform`, so it isn't actually double-offset today,
-  // but staying consistent means it won't silently become double-offset the
-  // moment something here ever does.
+  // 1/zoom — same counter-scale QuickAddGhosts' own `k` and NodeCard's own
+  // inverseScaleStyle apply, and for the same reason: this card sits inside
+  // MapPage's zoomed canvas wrapper (transform: scale(zoom)) same as every
+  // node/ghost on it, so without this it would render at 48px * zoom instead
+  // of a constant 48px — correct-looking at the default 100% zoom (which is
+  // how this went unnoticed), but visibly oversized (or undersized) the
+  // moment the map isn't at exactly 100%. Folded into the same transform as
+  // the translate(-50%,-50%) centering below rather than a separate inner
+  // wrapper (see NodeCard's own inverseScaleStyle comment for why it needs
+  // one there) — nothing outside this component reads this card's own
+  // layout footprint, so there's no separate "reserved space" to keep in
+  // sync with the visual size the way NodeCard's ring/caption siblings need.
+  const k = 1 / zoom;
   // z-[33]: same reasoning as QuickAddGhosts's own z-[33] — above MapPage's
   // full-screen NodePanel backdrop (z-30), which otherwise sits on top of
   // this input (the anchor node that opened it stays selected the whole
   // time this is up, so the backdrop never unmounts) and swallows every
   // tap meant for it.
   const classes =
-    "absolute z-[33] flex w-[74px] [transform:translate(-50%,-50%)] flex-col items-center transition-[opacity,filter] duration-150 ease-[ease] cursor-default opacity-90";
+    "absolute z-[33] flex w-[74px] flex-col items-center transition-[opacity,filter] duration-150 ease-[ease] cursor-default opacity-90";
 
   function resolve() {
     if (cancelingRef.current) {
@@ -70,7 +80,7 @@ export function PendingNodeCard({ x, y, type, onConfirm, onCancel }: Props) {
   return (
     <div
       className={classes}
-      style={{ left: x, top: y } as CSSProperties}
+      style={{ left: x, top: y, transform: `translate(-50%, -50%) scale(${k})` } as CSSProperties}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       // Without this, double-clicking to select a word while typing here

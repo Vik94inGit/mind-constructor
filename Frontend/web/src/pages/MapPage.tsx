@@ -2759,6 +2759,7 @@ export function MapPage() {
                 x={pendingCreate.x}
                 y={pendingCreate.y}
                 type={pendingCreate.type}
+                zoom={zoom}
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}
               />
