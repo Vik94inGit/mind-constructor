@@ -60,7 +60,7 @@ export function ZoneNames({ wrapRef, zones, positions, zoom, hScrollMargin, vScr
           className="flex items-center gap-[0.35rem] self-start rounded-md border border-line bg-surface px-[0.5rem] py-[0.2rem] text-[0.75rem] font-semibold text-ink shadow-card"
         >
           <span aria-hidden style={{ color: ZONE_COLORS[z.sentiment] }}>
-            {z.variant ? <KnightHelmet size={16} /> : "👑"}
+            {z.variant ? <KnightHelmet size={16} sentiment={z.sentiment} /> : "👑"}
           </span>
           <span className="truncate" style={{ color: ZONE_COLORS[z.sentiment] }}>
             {z.name}

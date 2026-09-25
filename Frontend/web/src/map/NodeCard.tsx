@@ -658,7 +658,7 @@ export const NodeCard = memo(function NodeCard({
             style={{ color: ZONE_COLORS[parentCrownSentiment], borderColor: ZONE_COLORS[parentCrownSentiment] }}
             title={(isVariantParent ? t.ui.node.variantParent : t.ui.node.circleParent)(t.ui.sentiments[parentCrownSentiment])}
           >
-            {isVariantParent ? <KnightHelmet size={17} /> : "👑"}
+            {isVariantParent ? <KnightHelmet size={17} sentiment={parentCrownSentiment} /> : "👑"}
           </div>
         )}
         {hiddenBranch && (
