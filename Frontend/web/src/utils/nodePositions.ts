@@ -1,4 +1,4 @@
-import { CANVAS_W, CANVAS_H, avoidOverlap, getNodeMinDist, hashOffset, isMobileViewport, nodeObstacles } from "./canvasLayout";
+import { CANVAS_W, CANVAS_H, avoidOverlap, getNodeMinDist, hashOffset, isMobileViewport, nodeObstacles, spiralPoint } from "./canvasLayout";
 import type { ViewportBounds } from "./canvasLayout";
 import { idOf, nodeRefId } from "./nodeType";
 import type { NodeDoc } from "../types";
@@ -48,14 +48,11 @@ export function computeBasePositions(nodes: NodeDoc[]): Map<string, Pt> {
       map.set(n.nodeId, { x: n.x, y: n.y });
     } else {
       // A sunflower (golden-angle) spiral for nodes with no stored x/y
-      // (everything a template map seeds): radius grows with sqrt(i),
-      // which keeps every node's nearest neighbor ~1.9x `spacing` away no
-      // matter how many there are. Spacing is derived from
-      // getNodeMinDist() so the base layout gets the room placement
-      // elsewhere already enforces.
-      const angle = i * 137.508 * (Math.PI / 180);
-      const radius = (getNodeMinDist() / 1.9) * Math.sqrt(i + 0.5);
-      map.set(n.nodeId, { x: CANVAS_W / 2 + radius * Math.cos(angle), y: CANVAS_H / 2 + radius * Math.sin(angle) });
+      // (everything a template map seeds) — see spiralPoint's own doc
+      // comment (canvasLayout.ts) for why it's shaped the way it is.
+      // Spacing is derived from getNodeMinDist() so the base layout gets
+      // the room placement elsewhere already enforces.
+      map.set(n.nodeId, spiralPoint(i, { x: CANVAS_W / 2, y: CANVAS_H / 2 }));
     }
   });
   weapons.forEach((n) => {

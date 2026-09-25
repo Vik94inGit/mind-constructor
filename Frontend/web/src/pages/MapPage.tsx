@@ -61,6 +61,8 @@ import {
   isDescendant,
   computeNodeGroups,
   computeLinkCycles,
+  isNegativeMajority,
+  computeNegativeMajoritySwap,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
 import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
@@ -85,6 +87,15 @@ const NEW_NODE_ID = "__new__";
 const GROUP_FOLLOW_STEPS = 3;
 const GROUP_FOLLOW_STEP_DELAY_MS = 130;
 const GROUP_FOLLOW_STAGGER_MS = 90;
+
+// Negative-majority auto-reposition — see the effect keyed off
+// negativeMajority below. Same staggered-hop shape as the group-drag catch-
+// up above, just slower/more spread out: this is a rare, dramatic, whole-
+// map event rather than the tail end of a quick drag release, so it reads
+// better drawn out rather than snapped through as fast as possible.
+const MAJORITY_SWAP_STEPS = 5;
+const MAJORITY_SWAP_STEP_DELAY_MS = 160;
+const MAJORITY_SWAP_STAGGER_MS = 70;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -263,6 +274,12 @@ export function MapPage() {
   // member moves by the same pointer delta at once. posFor consults this
   // before the single-node dragState. null outside of an active group drag.
   const [groupDragState, setGroupDragState] = useState<Map<string, { x: number; y: number }> | null>(null);
+  // Same overlay-map shape as groupDragState above, for the negative-
+  // majority auto-reposition effect (see the useEffect keyed off
+  // negativeMajority further down) — posFor consults this too, after
+  // dragState/groupDragState so a live manual drag always wins visually
+  // over the automatic effect's own in-flight animation.
+  const [majoritySwapState, setMajoritySwapState] = useState<Map<string, { x: number; y: number }> | null>(null);
   // Live, while dragging: whichever node the pointer is currently hovering
   // close enough to read as "drop here to join its circle" — null once the
   // pointer isn't over anything droppable. Drives NodeCard's highlight ring.
@@ -281,6 +298,12 @@ export function MapPage() {
   // already ran) before it finished, so its now-stale writes into
   // groupDragState/the API never land on top of whatever drag superseded it.
   const groupDragToken = useRef(0);
+  // Cancellation token for the negative-majority auto-reposition effect,
+  // same contract as groupDragToken above. Bumped (and majoritySwapState
+  // cleared) the moment any node is pointer-downed — see onNodePointerDown's
+  // very first lines — so a real user gesture always preempts the automatic
+  // effect outright rather than the two fighting over the same nodes.
+  const majoritySwapToken = useRef(0);
   // onNodePointerDown calls setPointerCapture on the node's own element —
   // per the Pointer Events spec that re-targets every subsequent event for
   // this interaction, *including the browser's own synthesized "click"*, to
@@ -627,6 +650,8 @@ export function MapPage() {
     const grouped = groupDragState?.get(node.nodeId);
     if (grouped) return grouped;
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
+    const swapped = majoritySwapState?.get(node.nodeId);
+    if (swapped) return swapped;
     const own = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
     const radial = radialBlend.map?.get(node.nodeId);
     if (!radial) return own;
@@ -823,6 +848,61 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes]);
 
+  // Negative-majority auto-reposition: the whole map's own negative-vs-
+  // positive sentiment tally (isNegativeMajority — the same pos/neg vote
+  // circleSentiment already runs per-circle, just whole-map and a plain
+  // boolean). Only the false->true *edge* below fires a reposition, not
+  // every render while it holds.
+  const negativeMajority = useMemo(() => isNegativeMajority(nodes), [nodes]);
+  // Seeded with the initial value (not false) so a map that already opens
+  // negative-majority reads as "that's just how it is," not "this just
+  // happened" — the effect below only ever fires on a genuine transition.
+  const prevNegativeMajorityRef = useRef(negativeMajority);
+
+  useEffect(() => {
+    const wasMajority = prevNegativeMajorityRef.current;
+    prevNegativeMajorityRef.current = negativeMajority;
+    if (wasMajority || !negativeMajority) return;
+
+    const token = ++majoritySwapToken.current;
+    const excludeIds = new Set(nodeGroups.map((g) => g.rootId));
+    const targets = computeNegativeMajoritySwap(nodes, positions, excludeIds);
+    if (targets.size === 0) return;
+
+    showNotice(t.ui.negativeMajorityNotice);
+    const ids = Array.from(targets.keys());
+    // Seeded with each node's own current position (not yet its target) so
+    // posFor has a stable value to return the instant this starts, same as
+    // the group-drag catch-up's own startPositions seed.
+    setMajoritySwapState(new Map(ids.map((id) => [id, positions.get(id)!])));
+
+    void (async () => {
+      await Promise.all(
+        ids.map(async (id, i) => {
+          if (i > 0) await sleep(i * MAJORITY_SWAP_STAGGER_MS);
+          if (majoritySwapToken.current !== token) return;
+          const start = positions.get(id)!;
+          const target = targets.get(id)!;
+          for (let step = 1; step <= MAJORITY_SWAP_STEPS; step++) {
+            if (majoritySwapToken.current !== token) return;
+            const frac = step / MAJORITY_SWAP_STEPS;
+            const hop = { x: start.x + (target.x - start.x) * frac, y: start.y + (target.y - start.y) * frac };
+            setMajoritySwapState((prev) => new Map(prev ?? []).set(id, hop));
+            if (step < MAJORITY_SWAP_STEPS) await sleep(MAJORITY_SWAP_STEP_DELAY_MS);
+          }
+          try {
+            const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
+            if (majoritySwapToken.current === token) upsertNode(updated);
+          } catch (err) {
+            setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
+          }
+        }),
+      );
+      if (majoritySwapToken.current === token) setMajoritySwapState(null);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [negativeMajority]);
+
   // ----- dragging -----
 
   // What dragging `dragged` to (x,y) would land it on, if anything — the
@@ -863,6 +943,15 @@ export function MapPage() {
   }
 
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
+    // A real interaction with any node always preempts the negative-
+    // majority auto-reposition effect outright — see majoritySwapToken's
+    // own doc comment above. Unconditional, ahead of every other early
+    // return below: the effect fighting a user's own gesture for the same
+    // node(s) would be far worse than just stopping early here.
+    if (majoritySwapState) {
+      majoritySwapToken.current++;
+      setMajoritySwapState(null);
+    }
     if (chooseMode || packMode || drawMode) return;
     if (!isOwnNode(node)) return;
 

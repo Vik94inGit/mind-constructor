@@ -145,6 +145,22 @@ export function getNodeMinDist() {
   return CAPTION_WIDTH + (isMobileViewport() ? 50 : 100);
 }
 
+// A sunflower (golden-angle) spiral, indexed by i — shared by
+// computeBasePositions' own fallback layout (nodePositions.ts, for a node
+// with no stored x/y at all) and computeNegativeMajoritySwap below (for
+// packing a cluster of nodes in around a center point without stacking them
+// exactly on top of each other). Radius grows with sqrt(i), which keeps
+// every point's nearest neighbor ~1.9x `spacing` away no matter how many
+// points there are.
+function spiralRadius(i: number, spacing: number): number {
+  return (spacing / 1.9) * Math.sqrt(i + 0.5);
+}
+export function spiralPoint(i: number, center: Pt, spacing: number = getNodeMinDist()): Pt {
+  const angle = i * 137.508 * (Math.PI / 180);
+  const radius = spiralRadius(i, spacing);
+  return { x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) };
+}
+
 // The rectangle (in canvas coordinates) a placement is allowed to land in —
 // defaults to the whole canvas, but every creation/drag path in MapPage is
 // handed the currently-scrolled-into-view rectangle instead, so a new or
@@ -453,6 +469,75 @@ export function circleSentiment(members: NodeDoc[]): Sentiment {
   }
   if (pos === neg) return "neutral";
   return pos > neg ? "positive" : "negative";
+}
+
+// Same pos/neg tally as circleSentiment above, but whole-map and a plain
+// boolean rather than a three-way Sentiment — the trigger for MapPage's own
+// negative-majority auto-reposition effect (a tie or a positive lean never
+// fires it, only neg strictly outnumbering pos).
+export function isNegativeMajority(nodes: NodeDoc[]): boolean {
+  let pos = 0;
+  let neg = 0;
+  for (const n of nodes) {
+    const s = sentimentOf(n.type);
+    if (s === "positive") pos++;
+    else if (s === "negative") neg++;
+  }
+  return neg > pos;
+}
+
+// Target positions for the negative-majority auto-reposition: every
+// negative-sentiment node gets a spot on the same sunflower spiral
+// spiralPoint already uses to seed a freshly-loaded node's position
+// (computeBasePositions), packed in around `center`; any non-negative node
+// currently sitting inside the resulting cluster's own radius is "in the
+// way" and gets pushed straight out along its own current angle from
+// center, to just past that radius (clamped to stay on the canvas) — a node
+// already further out than the cluster is left alone entirely, since
+// nothing is actually in its way. `excludeIds` (a circle's own root nodes —
+// see computeNodeGroups) never appear on either side of this: skipped from
+// the negative side's own spiral, and never counted as "in the way" either,
+// so a circle's root — and the zone shape hanging off it — never moves out
+// from under the user. Pure — MapPage is the one that persists whatever
+// this returns; nothing here touches the network or React state.
+export function computeNegativeMajoritySwap(
+  nodes: NodeDoc[],
+  positions: Map<string, Pt>,
+  excludeIds: Set<string>,
+  center: Pt = { x: CANVAS_W / 2, y: CANVAS_H / 2 },
+): Map<string, Pt> {
+  const eligible = nodes.filter((n) => !excludeIds.has(n.nodeId) && positions.has(n.nodeId));
+  const negative = eligible.filter((n) => sentimentOf(n.type) === "negative");
+  const nonNegative = eligible.filter((n) => sentimentOf(n.type) !== "negative");
+  const spacing = getNodeMinDist();
+  const margin = 60;
+
+  const result = new Map<string, Pt>();
+  negative.forEach((n, i) => result.set(n.nodeId, spiralPoint(i, center, spacing)));
+
+  // The outermost radius the negative cluster above actually reaches —
+  // anything already past it was never "in the way" of the incoming
+  // cluster to begin with.
+  const clusterRadius = negative.length > 0 ? spiralRadius(negative.length - 1, spacing) : 0;
+
+  for (const n of nonNegative) {
+    const p = positions.get(n.nodeId)!;
+    const dx = p.x - center.x;
+    const dy = p.y - center.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist >= clusterRadius) continue;
+    // dist === 0: a node sitting exactly on center has no angle of its own
+    // to push along — hashOffset spreads several such nodes apart instead
+    // of stacking them all back up along the same angle-0 direction.
+    const angle = dist > 0 ? Math.atan2(dy, dx) : hashOffset(n.nodeId, 360) * (Math.PI / 180);
+    const outRadius = clusterRadius + margin;
+    result.set(n.nodeId, {
+      x: Math.min(CANVAS_W - margin, Math.max(margin, center.x + outRadius * Math.cos(angle))),
+      y: Math.min(CANVAS_H - margin, Math.max(margin, center.y + outRadius * Math.sin(angle))),
+    });
+  }
+
+  return result;
 }
 
 // How close a drop has to land to an existing node to read as "onto it"
