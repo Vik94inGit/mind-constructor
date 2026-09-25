@@ -256,6 +256,13 @@ export interface UiStrings {
   panelDragHandle: string;
   negativeMajorityNotice: string;
   positiveMajorityNotice: string;
+  presentation: {
+    exit: string;
+    prev: string;
+    next: string;
+    slideCount: (current: number, total: number) => string;
+    empty: string;
+  };
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
   cardMenuLabel: string;
@@ -590,6 +597,13 @@ const en: UiStrings = {
   panelDragHandle: "Drag to move this panel",
   negativeMajorityNotice: "Negative arguments are now the majority — the map has shifted",
   positiveMajorityNotice: "Positive arguments are now the majority — the map has shifted",
+  presentation: {
+    exit: "Exit",
+    prev: "Prev",
+    next: "Next",
+    slideCount: (current, total) => `${current} / ${total}`,
+    empty: "Nothing to present yet — add a node first",
+  },
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
   summary: {
     title: (name) => `Summary — "${name}"`,
@@ -918,6 +932,13 @@ const cs: UiStrings = {
   panelDragHandle: "Přetažením posunete tento panel",
   negativeMajorityNotice: "Negativní argumenty jsou nyní většinou — mapa se přeuspořádala",
   positiveMajorityNotice: "Pozitivní argumenty jsou nyní většinou — mapa se přeuspořádala",
+  presentation: {
+    exit: "Ukončit",
+    prev: "Předchozí",
+    next: "Další",
+    slideCount: (current, total) => `${current} / ${total}`,
+    empty: "Zatím není co prezentovat — nejprve přidejte uzel",
+  },
   exportText: { title: (name) => `Export textu — „${name}“`, download: "Stáhnout .md" },
   summary: {
     title: (name) => `Souhrn — „${name}“`,
@@ -1246,6 +1267,13 @@ const uk: UiStrings = {
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   negativeMajorityNotice: "Негативні аргументи тепер у більшості — мапа перебудувалася",
   positiveMajorityNotice: "Позитивні аргументи тепер у більшості — мапа перебудувалася",
+  presentation: {
+    exit: "Вийти",
+    prev: "Назад",
+    next: "Далі",
+    slideCount: (current, total) => `${current} / ${total}`,
+    empty: "Поки нема чого презентувати — спершу додайте вузол",
+  },
   exportText: { title: (name) => `Експорт тексту — «${name}»`, download: "Завантажити .md" },
   summary: {
     title: (name) => `Підсумок — «${name}»`,
@@ -1574,6 +1602,13 @@ const ru: UiStrings = {
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   negativeMajorityNotice: "Негативные аргументы теперь в большинстве — карта перестроилась",
   positiveMajorityNotice: "Позитивные аргументы теперь в большинстве — карта перестроилась",
+  presentation: {
+    exit: "Выйти",
+    prev: "Назад",
+    next: "Далее",
+    slideCount: (current, total) => `${current} / ${total}`,
+    empty: "Пока нечего презентовать — сначала добавьте узел",
+  },
   exportText: { title: (name) => `Экспорт текста — «${name}»`, download: "Скачать .md" },
   summary: {
     title: (name) => `Сводка — «${name}»`,

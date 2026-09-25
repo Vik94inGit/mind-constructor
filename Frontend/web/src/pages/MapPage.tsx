@@ -41,6 +41,8 @@ import { idOf, nodeRefId } from "../utils/nodeType";
 import { layoutTemplate } from "../utils/templates";
 import { useRadialBlend } from "../hooks/useRadialBlend";
 import { ZoneNames } from "../map/ZoneNames";
+import { PresentationOverlay } from "../map/PresentationOverlay";
+import { computeSlideOrder, computeGeometrizedPositions } from "../utils/presentation";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import type { Sentiment } from "../utils/nodeType";
 import {
@@ -160,6 +162,18 @@ export function MapPage() {
   // already-multi-selected group's own drag — both stay available
   // regardless, since neither one is the "accidental" case this addresses.
   const [moveMode, setMoveMode] = useState(false);
+  // Presentation mode: steps through the map's own nodes as slides (see
+  // computeSlideOrder/utils/presentation.ts), with the canvas auto-tidied
+  // into a clean org-chart shape for the duration (computeGeometrizedPositions
+  // — a display override only, never written back to a node's own stored
+  // x/y, same "never touches positions/backend" contract radialPositions
+  // below already follows). Personal to this viewer/session, not map data —
+  // deliberately NOT the Map.discussionMode server-persisted pattern, and
+  // not folded into the useCanvasMode reducer above either: that one is
+  // purpose-built for canvas click-interaction semantics (choose/pack/draw),
+  // not a full-screen takeover with its own slide index.
+  const [presenting, setPresenting] = useState(false);
+  const [slideIndex, setSlideIndex] = useState(0);
   // How this viewer reads the map (see utils/readingMode.ts) — remembered per
   // browser, never shared with the map's other members.
   const [readingMode, setReadingModeState] = useState<ReadingMode>(loadReadingMode);
@@ -657,6 +671,17 @@ export function MapPage() {
     const swapped = majoritySwapState?.get(node.nodeId);
     if (swapped) return swapped;
     const own = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    // Presentation mode's own org-chart blend — checked ahead of the radial
+    // selection ring below since the two are mutually exclusive in practice
+    // (there's no NodePanel/selection to ring neighbors around while
+    // presenting — see enterPresentation), but resolving the order
+    // explicitly here means nothing actually depends on that invariant
+    // holding forever elsewhere in the file.
+    const geo = geometrizeBlend.map?.get(node.nodeId);
+    if (geo) {
+      const b = geometrizeBlend.blend;
+      return { x: own.x + (geo.x - own.x) * b, y: own.y + (geo.y - own.y) * b };
+    }
     const radial = radialBlend.map?.get(node.nodeId);
     if (!radial) return own;
     const b = radialBlend.blend;
@@ -684,6 +709,70 @@ export function MapPage() {
   // container's own unpack list even though the canvas itself doesn't
   // render it.
   const visibleNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
+
+  // Presentation mode's own slide order and org-chart target positions —
+  // see computeSlideOrder/computeGeometrizedPositions (utils/presentation.ts)
+  // and the enter/exitPresentation functions below. `visibleNodes` already
+  // strips packed-away members; also drops weapon/protection decorator
+  // nodes and anything the owner has hidden from members — a presentation
+  // is for showing, not attack/defense bookkeeping or a branch deliberately
+  // kept out of sight. Empty (not just skipped) while `presenting` is
+  // false, so nothing here does real work between presentations.
+  const slideNodes = useMemo(() => {
+    if (!presenting) return [];
+    const eligible = visibleNodes.filter(
+      (n) => !n.isWeapon && !n.isProtection && !hiddenBranchIds.has(n.nodeId),
+    );
+    return computeSlideOrder(eligible);
+  }, [presenting, visibleNodes, hiddenBranchIds]);
+
+  const geometrizedPositions = useMemo(
+    () => (presenting && slideNodes.length > 0 ? computeGeometrizedPositions(slideNodes) : null),
+    [presenting, slideNodes],
+  );
+  // Same glide-toward-a-target-map-or-back-to-nothing mechanism the radial
+  // selection ring already uses (useRadialBlend is fully general — nothing
+  // about it is ring/neighbor-specific), reused here as a second,
+  // independent instance for the org-chart shape.
+  const geometrizeBlend = useRadialBlend(geometrizedPositions);
+
+  // Keeps the camera on the current slide while presenting — including
+  // while it's still gliding into its own org-chart spot (this effect
+  // re-fires on every geometrizeBlend.blend tick, so it re-centers on the
+  // node's own live, still-moving posFor position rather than jump-cutting
+  // to the final spot only once the glide finishes). centerOnPoint (not
+  // centerOnNode, which deliberately reads a node's raw *stored* position —
+  // see its own doc comment) is the right primitive here since there's no
+  // single stored position to key off during the glide.
+  useEffect(() => {
+    if (!presenting || slideNodes.length === 0) return;
+    const current = slideNodes[Math.min(slideIndex, slideNodes.length - 1)];
+    const p = posFor(current);
+    centerOnPoint(p.x, p.y);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presenting, slideIndex, slideNodes, geometrizeBlend.blend]);
+
+  // Guards an empty map (nothing eligible to present) rather than entering
+  // a blank slideshow; computes the same way slideNodes' own memo would,
+  // but eagerly — this runs once, on the toolbar click itself, well before
+  // `presenting` flips true and that memo would otherwise recompute.
+  function enterPresentation() {
+    const eligible = visibleNodes.filter(
+      (n) => !n.isWeapon && !n.isProtection && !hiddenBranchIds.has(n.nodeId),
+    );
+    if (eligible.length === 0) {
+      setActionError(t.ui.presentation.empty);
+      return;
+    }
+    setSlideIndex(0);
+    setSelectedId(null);
+    dispatchMode({ type: "reset" });
+    setPresenting(true);
+  }
+  function exitPresentation() {
+    setPresenting(false);
+    setSlideIndex(0);
+  }
 
   // How many nodes are currently packed into each container — NodeCard's
   // own corner badge reads this by nodeId.
@@ -2470,6 +2559,30 @@ export function MapPage() {
     }
     function onKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
+      // Presentation mode takes the keyboard over outright while active —
+      // checked first, ahead of every other mode branch below, with a bare
+      // `return` at the end so a presentation-mode keypress can never fall
+      // through into copy/paste or any other mode's own shortcuts further
+      // down (those read multiSelectIds/clipboard state that shouldn't be
+      // reachable while presenting).
+      if (presenting) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          exitPresentation();
+          return;
+        }
+        if (e.key === "ArrowRight" || e.key === " ") {
+          e.preventDefault();
+          setSlideIndex((i) => Math.min(i + 1, slideNodes.length - 1));
+          return;
+        }
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setSlideIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        return;
+      }
       // Drawing a line: Enter finishes it, Backspace / Ctrl+Z takes back the
       // last point, Escape clears the line (or leaves drawing when nothing is
       // placed). A focused button keeps its own Enter.
@@ -2919,74 +3032,93 @@ export function MapPage() {
           </div>
           </div>
           </div>
-          <MiniMap
-            wrapRef={wrapRef}
-            nodes={visibleNodes}
-            edges={edges}
-            lines={lines}
-            positions={positions}
-            groups={nodeGroups.map((g) => ({ ...g, variant: !!nodes.find((n) => n.nodeId === g.rootId)?.parentId }))}
-            canvasW={CANVAS_W}
-            canvasH={CANVAS_H}
-            zoom={zoom}
-            hScrollMargin={hScrollMargin}
-            vScrollMargin={vScrollMargin}
-            onPanTo={panTo}
-          />
+          {/* All of this is normal editing chrome — replaced outright by
+              PresentationOverlay below while presenting, not just dimmed
+              underneath it, same "swap the slot, don't hide-under" approach
+              the pack/choose/draw bottom-sheet ternary just below already
+              uses for NodePanel. */}
+          {!presenting && (
+            <>
+              <MiniMap
+                wrapRef={wrapRef}
+                nodes={visibleNodes}
+                edges={edges}
+                lines={lines}
+                positions={positions}
+                groups={nodeGroups.map((g) => ({ ...g, variant: !!nodes.find((n) => n.nodeId === g.rootId)?.parentId }))}
+                canvasW={CANVAS_W}
+                canvasH={CANVAS_H}
+                zoom={zoom}
+                hScrollMargin={hScrollMargin}
+                vScrollMargin={vScrollMargin}
+                onPanTo={panTo}
+              />
 
-          <ZoneNames
-            wrapRef={wrapRef}
-            zones={nodeGroups.flatMap((g) => {
-              const root = nodes.find((n) => n.nodeId === g.rootId);
-              return root?.zoneName
-                ? [{ rootId: g.rootId, name: root.zoneName, sentiment: g.sentiment, variant: !!root.parentId }]
-                : [];
-            })}
-            positions={positions}
-            zoom={zoom}
-            hScrollMargin={hScrollMargin}
-            vScrollMargin={vScrollMargin}
-          />
+              <ZoneNames
+                wrapRef={wrapRef}
+                zones={nodeGroups.flatMap((g) => {
+                  const root = nodes.find((n) => n.nodeId === g.rootId);
+                  return root?.zoneName
+                    ? [{ rootId: g.rootId, name: root.zoneName, sentiment: g.sentiment, variant: !!root.parentId }]
+                    : [];
+                })}
+                positions={positions}
+                zoom={zoom}
+                hScrollMargin={hScrollMargin}
+                vScrollMargin={vScrollMargin}
+              />
 
-          <MapToolbar
-            isDemo={!!user?.isDemo}
-            isOwner={isOwner}
-            isDiscussionMode={isDiscussionMode}
-            expanded={!quickAddActive || forceShowToolbar}
-            onExpand={() => setForceShowToolbar(true)}
-            moveMode={moveMode}
-            onToggleMove={() => setMoveMode((v) => !v)}
-            drawMode={drawMode}
-            onToggleDraw={toggleDrawMode}
-            readingMode={readingMode}
-            onPickReadingMode={setReadingMode}
-            compact={compactView}
-            onToggleCompact={toggleCompactView}
-            nodes={visibleNodes}
-            onLoadTexts={async () => {
-              await ensureNodeText(visibleNodes.map((n) => n.nodeId));
-            }}
-            onSearchMatches={setSearchMatches}
-            onPickSearchResult={(id) => {
-              setSelectedId(id);
-              centerOnNode(id);
-            }}
-            onToggleMapMode={toggleMapMode}
-            onExitDemo={exitDemo}
-            onInvite={() => setShowInvite(true)}
-            onCreateNode={startCreateNodeInView}
-            onCreateCircle={createCircle}
-            onCopyMap={copyWholeMap}
-            onPaste={() => pasteClipboard()}
-            onExportText={openExportText}
-          />
+              <MapToolbar
+                isDemo={!!user?.isDemo}
+                isOwner={isOwner}
+                isDiscussionMode={isDiscussionMode}
+                expanded={!quickAddActive || forceShowToolbar}
+                onExpand={() => setForceShowToolbar(true)}
+                moveMode={moveMode}
+                onToggleMove={() => setMoveMode((v) => !v)}
+                drawMode={drawMode}
+                onToggleDraw={toggleDrawMode}
+                readingMode={readingMode}
+                onPickReadingMode={setReadingMode}
+                compact={compactView}
+                onToggleCompact={toggleCompactView}
+                nodes={visibleNodes}
+                onLoadTexts={async () => {
+                  await ensureNodeText(visibleNodes.map((n) => n.nodeId));
+                }}
+                onSearchMatches={setSearchMatches}
+                onPickSearchResult={(id) => {
+                  setSelectedId(id);
+                  centerOnNode(id);
+                }}
+                onToggleMapMode={toggleMapMode}
+                onExitDemo={exitDemo}
+                onInvite={() => setShowInvite(true)}
+                onCreateNode={startCreateNodeInView}
+                onCreateCircle={createCircle}
+                onCopyMap={copyWholeMap}
+                onPaste={() => pasteClipboard()}
+                onExportText={openExportText}
+                onPresent={enterPresentation}
+              />
 
-          <ZoomControls
-            zoom={zoom}
-            onZoomOut={() => zoomFromCenter(-ZOOM_STEP)}
-            onZoomIn={() => zoomFromCenter(ZOOM_STEP)}
-            onReset={() => zoomFromCenter(0, 1)}
-          />
+              <ZoomControls
+                zoom={zoom}
+                onZoomOut={() => zoomFromCenter(-ZOOM_STEP)}
+                onZoomIn={() => zoomFromCenter(ZOOM_STEP)}
+                onReset={() => zoomFromCenter(0, 1)}
+              />
+            </>
+          )}
+
+          {presenting && (
+            <PresentationOverlay
+              slides={slideNodes}
+              index={Math.min(slideIndex, Math.max(0, slideNodes.length - 1))}
+              onIndexChange={setSlideIndex}
+              onExit={exitPresentation}
+            />
+          )}
         </div>
 
         {/* The pack picker and the group bar each take over this bottom-sheet
@@ -3026,6 +3158,12 @@ export function MapPage() {
             onDone={exitChooseMode}
           />
         ) : (
+          // !presenting: NodePanel already only renders when a node is
+          // selected, and enterPresentation clears selectedId — but this
+          // guard stays defensive rather than relying on that alone, in
+          // case anything else (e.g. a queued search-result pick) ever
+          // re-selects a node while presenting.
+          !presenting &&
           selectedNode &&
           user && (
             <>
@@ -3159,7 +3297,7 @@ export function MapPage() {
         />
       )}
 
-      <MapLegend />
+      {!presenting && <MapLegend />}
 
       {pendingLink && mapId && (
         <CreateEdgeModal
