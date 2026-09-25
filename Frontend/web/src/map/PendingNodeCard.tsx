@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { NODE_TYPE_COLORS, cycleNodeType } from "../utils/nodeType";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
@@ -16,6 +16,8 @@ interface Props {
   onCancel: () => void;
   /** MapPage's own canvas zoom — see QuickAddGhosts' identical prop. This card is drawn inside the zoomed canvas the same as everything else, so it has to counter-scale by 1/zoom or it visibly balloons/shrinks along with whatever zoom level the map happens to be at instead of staying the same size on screen as a real node's own icon. */
   zoom?: number;
+  /** Fires with the currently-armed draft type on mount and every time the type-cycle button changes it — lets MapPage's own negative-majority auto-reposition effect react live to whichever type is picked, before this card is ever confirmed into a real node. */
+  onTypeChange?: (type: NodeType) => void;
 }
 
 // A not-yet-created node: same icon+caption footprint as a real NodeCard so
@@ -23,10 +25,17 @@ interface Props {
 // sent to the backend until there's actual text — clicking a quick-add
 // ghost (or the toolbar/double-click/"Create branch" paths) opens one of
 // these instead of a modal, autofocused so typing can start immediately.
-export function PendingNodeCard({ x, y, type, onConfirm, onCancel, zoom = 1 }: Props) {
+export function PendingNodeCard({ x, y, type, onConfirm, onCancel, zoom = 1, onTypeChange }: Props) {
   const { t } = useI18n();
   const [text, setText] = useState("");
   const [draftType, setDraftType] = useState<NodeType>(type);
+  // Also fires once on mount (with the starting type) — harmless: MapPage
+  // already knows that starting type itself (it's what opened this card),
+  // so being told it again a beat later changes nothing.
+  useEffect(() => {
+    onTypeChange?.(draftType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftType]);
   // Same single-resolution-point pattern as NodeCard's inline editor —
   // Escape blurs and defers to this flag instead of racing a separate path.
   const cancelingRef = useRef(false);

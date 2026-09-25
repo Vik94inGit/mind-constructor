@@ -474,8 +474,13 @@ export function circleSentiment(members: NodeDoc[]): Sentiment {
 // Same pos/neg tally as circleSentiment above, but whole-map and a plain
 // boolean rather than a three-way Sentiment — the trigger for MapPage's own
 // negative-majority auto-reposition effect (a tie or a positive lean never
-// fires it, only neg strictly outnumbering pos).
-export function isNegativeMajority(nodes: NodeDoc[]): boolean {
+// fires it, only neg strictly outnumbering pos). Takes just `{ type }`, not
+// a full NodeDoc[] — a real node array satisfies this trivially, but it
+// also lets MapPage fold in a lightweight synthetic entry for a node that's
+// still being drafted (not yet a real NodeDoc at all — see the
+// pendingCreate-aware negativeMajority memo) without needing to fake up
+// every other NodeDoc field just to satisfy this signature.
+export function isNegativeMajority(nodes: { type: NodeType }[]): boolean {
   let pos = 0;
   let neg = 0;
   for (const n of nodes) {

@@ -853,7 +853,20 @@ export function MapPage() {
   // circleSentiment already runs per-circle, just whole-map and a plain
   // boolean). Only the false->true *edge* below fires a reposition, not
   // every render while it holds.
-  const negativeMajority = useMemo(() => isNegativeMajority(nodes), [nodes]);
+  //
+  // Folds in whichever type is currently armed on an open pending-create
+  // card (see pendingCreate's own onTypeChange above) as a lightweight
+  // { type } entry — not a real NodeDoc, since it isn't one yet — so the
+  // map reacts live while someone is drafting a node, the instant they
+  // cycle its type, without waiting for them to actually confirm it into a
+  // real node first. That virtual entry only ever affects this boolean:
+  // computeNegativeMajoritySwap below is still handed the real `nodes`
+  // array alone, so the not-yet-created draft itself is never a move
+  // target, only ever the thing that can tip real nodes into moving.
+  const negativeMajority = useMemo(() => {
+    const tally = pendingCreate ? [...nodes, { type: pendingCreate.type }] : nodes;
+    return isNegativeMajority(tally);
+  }, [nodes, pendingCreate]);
   // Seeded with the initial value (not false) so a map that already opens
   // negative-majority reads as "that's just how it is," not "this just
   // happened" — the effect below only ever fires on a genuine transition.
@@ -2851,6 +2864,13 @@ export function MapPage() {
                 zoom={zoom}
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}
+                // Keeps pendingCreate.type in sync with whichever type is
+                // currently armed in the card, live — the negativeMajority
+                // memo below reads it straight off pendingCreate rather
+                // than needing its own separate piece of state.
+                onTypeChange={(draftType) =>
+                  setPendingCreate((prev) => (prev ? { ...prev, type: draftType } : prev))
+                }
               />
             )}
 
