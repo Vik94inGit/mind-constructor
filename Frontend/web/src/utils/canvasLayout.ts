@@ -471,16 +471,17 @@ export function circleSentiment(members: NodeDoc[]): Sentiment {
   return pos > neg ? "positive" : "negative";
 }
 
-// Same pos/neg tally as circleSentiment above, but whole-map and a plain
-// boolean rather than a three-way Sentiment — the trigger for MapPage's own
-// negative-majority auto-reposition effect (a tie or a positive lean never
-// fires it, only neg strictly outnumbering pos). Takes just `{ type }`, not
-// a full NodeDoc[] — a real node array satisfies this trivially, but it
-// also lets MapPage fold in a lightweight synthetic entry for a node that's
-// still being drafted (not yet a real NodeDoc at all — see the
-// pendingCreate-aware negativeMajority memo) without needing to fake up
-// every other NodeDoc field just to satisfy this signature.
-export function isNegativeMajority(nodes: { type: NodeType }[]): boolean {
+// Same pos/neg tally as circleSentiment above, but whole-map and three-way
+// tie-aware rather than per-circle — the trigger for MapPage's own
+// majority-swap auto-reposition effect (a tie never fires it, only pos or
+// neg strictly outnumbering the other does, and only on the swing from one
+// decisive side to the other — see MapPage's own edge-detecting ref).
+// Takes just `{ type }`, not a full NodeDoc[] — a real node array satisfies
+// this trivially, but it also lets MapPage fold in a lightweight synthetic
+// entry for a node that's still being drafted (not yet a real NodeDoc at
+// all — see the pendingCreate-aware dominantSentiment memo) without needing
+// to fake up every other NodeDoc field just to satisfy this signature.
+export function computeDominantSentiment(nodes: { type: NodeType }[]): "positive" | "negative" | "tie" {
   let pos = 0;
   let neg = 0;
   for (const n of nodes) {
@@ -488,61 +489,145 @@ export function isNegativeMajority(nodes: { type: NodeType }[]): boolean {
     if (s === "positive") pos++;
     else if (s === "negative") neg++;
   }
-  return neg > pos;
+  if (pos === neg) return "tie";
+  return pos > neg ? "positive" : "negative";
 }
 
-// Target positions for the negative-majority auto-reposition: every
-// negative-sentiment node gets a spot on the same sunflower spiral
+// One rigid movement unit for computeMajoritySwap below — either a single
+// node, or a whole circle group (its root plus every direct member, see
+// computeNodeGroups) that always moves as one piece, translated together so
+// the zone's own shape never distorts — "zones move synchronically with
+// their own nodes," a plain node doesn't share a unit with anything else.
+// `ids[0]` is the group's own rootId for a group unit, just the node's own
+// id for a solo one; `cx`/`cy` is the unit's own centroid (a solo node's
+// own position, or the group's already-computed cx/cy).
+interface MajoritySwapUnit {
+  ids: string[];
+  sentiment: Sentiment;
+  cx: number;
+  cy: number;
+}
+
+// Target positions for the majority-swap auto-reposition, symmetric in
+// either direction: every unit sharing the map's own dominant sentiment
+// (`majoritySentiment`) gets a spot on the same sunflower spiral
 // spiralPoint already uses to seed a freshly-loaded node's position
-// (computeBasePositions), packed in around `center`; any non-negative node
-// currently sitting inside the resulting cluster's own radius is "in the
-// way" and gets pushed straight out along its own current angle from
-// center, to just past that radius (clamped to stay on the canvas) — a node
-// already further out than the cluster is left alone entirely, since
-// nothing is actually in its way. `excludeIds` (a circle's own root nodes —
-// see computeNodeGroups) never appear on either side of this: skipped from
-// the negative side's own spiral, and never counted as "in the way" either,
-// so a circle's root — and the zone shape hanging off it — never moves out
-// from under the user. Pure — MapPage is the one that persists whatever
-// this returns; nothing here touches the network or React state.
-export function computeNegativeMajoritySwap(
+// (computeBasePositions), packed in around `center`; every unit on the
+// opposite (minority) side is pushed out along its own current angle from
+// center, to just past that cluster's own claimed radius — the losing side
+// always ends up nearer the edge, not just whichever ones happened to be
+// "in the way." A unit that's neither (a neutral/tied circle, or an
+// "unknown"-typed solo node) is left alone unless it genuinely sits inside
+// the incoming cluster's own radius, same "in the way" treatment as before.
+// Every push/pull is a uniform translation of the unit's own centroid,
+// applied identically to every one of its ids — a solo node just has one id
+// to move, a group's whole cluster keeps its own internal shape. Pure —
+// MapPage is the one that persists whatever this returns and animates each
+// unit's own ids together (its own doc comment covers the "why" of that);
+// nothing here touches the network, React state, or timing.
+export function computeMajoritySwap(
   nodes: NodeDoc[],
   positions: Map<string, Pt>,
-  excludeIds: Set<string>,
+  groups: NodeGroup[],
+  majoritySentiment: "positive" | "negative",
   center: Pt = { x: CANVAS_W / 2, y: CANVAS_H / 2 },
-): Map<string, Pt> {
-  const eligible = nodes.filter((n) => !excludeIds.has(n.nodeId) && positions.has(n.nodeId));
-  const negative = eligible.filter((n) => sentimentOf(n.type) === "negative");
-  const nonNegative = eligible.filter((n) => sentimentOf(n.type) !== "negative");
+): { targets: Map<string, Pt>; units: string[][] } {
+  const minoritySentiment: Sentiment = majoritySentiment === "positive" ? "negative" : "positive";
   const spacing = getNodeMinDist();
   const margin = 60;
 
-  const result = new Map<string, Pt>();
-  negative.forEach((n, i) => result.set(n.nodeId, spiralPoint(i, center, spacing)));
-
-  // The outermost radius the negative cluster above actually reaches —
-  // anything already past it was never "in the way" of the incoming
-  // cluster to begin with.
-  const clusterRadius = negative.length > 0 ? spiralRadius(negative.length - 1, spacing) : 0;
-
-  for (const n of nonNegative) {
-    const p = positions.get(n.nodeId)!;
-    const dx = p.x - center.x;
-    const dy = p.y - center.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist >= clusterRadius) continue;
-    // dist === 0: a node sitting exactly on center has no angle of its own
-    // to push along — hashOffset spreads several such nodes apart instead
-    // of stacking them all back up along the same angle-0 direction.
-    const angle = dist > 0 ? Math.atan2(dy, dx) : hashOffset(n.nodeId, 360) * (Math.PI / 180);
-    const outRadius = clusterRadius + margin;
-    result.set(n.nodeId, {
-      x: Math.min(CANVAS_W - margin, Math.max(margin, center.x + outRadius * Math.cos(angle))),
-      y: Math.min(CANVAS_H - margin, Math.max(margin, center.y + outRadius * Math.sin(angle))),
-    });
+  // Build the units: one per circle group first (claiming its root and
+  // every member so none of them is *also* picked up as a solo node
+  // below), then one per remaining node with a real position. A member
+  // that's itself another group's own root stays with that group instead —
+  // groups are walked in `groups`' own order, so whichever one claims a
+  // shared id first wins it outright, rather than the id getting pulled by
+  // two different translations at once.
+  const claimed = new Set<string>();
+  const units: MajoritySwapUnit[] = [];
+  for (const g of groups) {
+    if (claimed.has(g.rootId)) continue;
+    const ids = g.members.map((m) => m.nodeId).filter((id) => !claimed.has(id) && positions.has(id));
+    if (ids.length === 0) continue;
+    for (const id of ids) claimed.add(id);
+    units.push({ ids, sentiment: g.sentiment, cx: g.cx, cy: g.cy });
+  }
+  for (const n of nodes) {
+    if (claimed.has(n.nodeId)) continue;
+    const p = positions.get(n.nodeId);
+    if (!p) continue;
+    claimed.add(n.nodeId);
+    units.push({ ids: [n.nodeId], sentiment: sentimentOf(n.type) ?? "neutral", cx: p.x, cy: p.y });
   }
 
-  return result;
+  const majorityUnits = units.filter((u) => u.sentiment === majoritySentiment);
+  const minorityUnits = units.filter((u) => u.sentiment === minoritySentiment);
+  const otherUnits = units.filter((u) => u.sentiment !== majoritySentiment && u.sentiment !== minoritySentiment);
+
+  const targets = new Map<string, Pt>();
+  const movedUnitIds: string[][] = [];
+
+  // Translates every id in `u` by the same (dx,dy) — a uniform shift of the
+  // unit's own current positions, which is what keeps a group's internal
+  // shape intact instead of re-deriving each member's spot independently.
+  // Skips (and reports) a unit whose own centroid doesn't actually move —
+  // no point PATCHing every member of a unit already exactly where it
+  // needs to be.
+  function applyTranslation(u: MajoritySwapUnit, targetCx: number, targetCy: number) {
+    const dx = targetCx - u.cx;
+    const dy = targetCy - u.cy;
+    if (dx === 0 && dy === 0) return;
+    for (const id of u.ids) {
+      const p = positions.get(id)!;
+      targets.set(id, { x: p.x + dx, y: p.y + dy });
+    }
+    movedUnitIds.push(u.ids);
+  }
+
+  majorityUnits.forEach((u, i) => {
+    const slot = spiralPoint(i, center, spacing);
+    applyTranslation(u, slot.x, slot.y);
+  });
+
+  // The outermost radius the majority cluster above actually reaches —
+  // anything already past it was never inside the incoming cluster's own
+  // footprint to begin with.
+  const clusterRadius = majorityUnits.length > 0 ? spiralRadius(majorityUnits.length - 1, spacing) : 0;
+
+  for (const u of minorityUnits) {
+    const dx0 = u.cx - center.x;
+    const dy0 = u.cy - center.y;
+    const dist = Math.hypot(dx0, dy0);
+    // dist === 0: a unit centered exactly on center has no angle of its own
+    // to push along — hashOffset spreads several such units apart instead
+    // of stacking them all back up along the same angle-0 direction.
+    const angle = dist > 0 ? Math.atan2(dy0, dx0) : hashOffset(u.ids[0], 360) * (Math.PI / 180);
+    // Math.max(dist, ...): the losing side only ever gets pushed further
+    // out, never pulled in closer than it already was, on the rare chance
+    // it's already further from center than this cluster's own edge.
+    const outRadius = Math.max(dist, clusterRadius + margin);
+    applyTranslation(
+      u,
+      Math.min(CANVAS_W - margin, Math.max(margin, center.x + outRadius * Math.cos(angle))),
+      Math.min(CANVAS_H - margin, Math.max(margin, center.y + outRadius * Math.sin(angle))),
+    );
+  }
+
+  for (const u of otherUnits) {
+    const dx0 = u.cx - center.x;
+    const dy0 = u.cy - center.y;
+    const dist = Math.hypot(dx0, dy0);
+    if (dist >= clusterRadius) continue;
+    const angle = dist > 0 ? Math.atan2(dy0, dx0) : hashOffset(u.ids[0], 360) * (Math.PI / 180);
+    const outRadius = clusterRadius + margin;
+    applyTranslation(
+      u,
+      Math.min(CANVAS_W - margin, Math.max(margin, center.x + outRadius * Math.cos(angle))),
+      Math.min(CANVAS_H - margin, Math.max(margin, center.y + outRadius * Math.sin(angle))),
+    );
+  }
+
+  return { targets, units: movedUnitIds };
 }
 
 // How close a drop has to land to an existing node to read as "onto it"

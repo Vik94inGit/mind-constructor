@@ -61,8 +61,8 @@ import {
   isDescendant,
   computeNodeGroups,
   computeLinkCycles,
-  isNegativeMajority,
-  computeNegativeMajoritySwap,
+  computeDominantSentiment,
+  computeMajoritySwap,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
 import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
@@ -88,11 +88,15 @@ const GROUP_FOLLOW_STEPS = 3;
 const GROUP_FOLLOW_STEP_DELAY_MS = 130;
 const GROUP_FOLLOW_STAGGER_MS = 90;
 
-// Negative-majority auto-reposition — see the effect keyed off
-// negativeMajority below. Same staggered-hop shape as the group-drag catch-
-// up above, just slower/more spread out: this is a rare, dramatic, whole-
-// map event rather than the tail end of a quick drag release, so it reads
-// better drawn out rather than snapped through as fast as possible.
+// Majority-swap auto-reposition — see the effect keyed off dominantSentiment
+// below. Same staggered-hop shape as the group-drag catch-up above, just
+// slower/more spread out: this is a rare, dramatic, whole-map event rather
+// than the tail end of a quick drag release, so it reads better drawn out
+// rather than snapped through as fast as possible. Staggered between units
+// (each solo node or whole circle group is one unit — see
+// computeMajoritySwap's own doc comment), never within one: every id inside
+// a single unit shares the exact same step/timing, moving in lockstep so a
+// circle's own shape never distorts mid-animation.
 const MAJORITY_SWAP_STEPS = 5;
 const MAJORITY_SWAP_STEP_DELAY_MS = 160;
 const MAJORITY_SWAP_STAGGER_MS = 70;
@@ -274,11 +278,11 @@ export function MapPage() {
   // member moves by the same pointer delta at once. posFor consults this
   // before the single-node dragState. null outside of an active group drag.
   const [groupDragState, setGroupDragState] = useState<Map<string, { x: number; y: number }> | null>(null);
-  // Same overlay-map shape as groupDragState above, for the negative-
-  // majority auto-reposition effect (see the useEffect keyed off
-  // negativeMajority further down) — posFor consults this too, after
-  // dragState/groupDragState so a live manual drag always wins visually
-  // over the automatic effect's own in-flight animation.
+  // Same overlay-map shape as groupDragState above, for the majority-swap
+  // auto-reposition effect (see the useEffect keyed off dominantSentiment
+  // further down) — posFor consults this too, after dragState/groupDragState
+  // so a live manual drag always wins visually over the automatic effect's
+  // own in-flight animation.
   const [majoritySwapState, setMajoritySwapState] = useState<Map<string, { x: number; y: number }> | null>(null);
   // Live, while dragging: whichever node the pointer is currently hovering
   // close enough to read as "drop here to join its circle" — null once the
@@ -298,7 +302,7 @@ export function MapPage() {
   // already ran) before it finished, so its now-stale writes into
   // groupDragState/the API never land on top of whatever drag superseded it.
   const groupDragToken = useRef(0);
-  // Cancellation token for the negative-majority auto-reposition effect,
+  // Cancellation token for the majority-swap auto-reposition effect,
   // same contract as groupDragToken above. Bumped (and majoritySwapState
   // cleared) the moment any node is pointer-downed — see onNodePointerDown's
   // very first lines — so a real user gesture always preempts the automatic
@@ -848,73 +852,93 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes]);
 
-  // Negative-majority auto-reposition: the whole map's own negative-vs-
-  // positive sentiment tally (isNegativeMajority — the same pos/neg vote
-  // circleSentiment already runs per-circle, just whole-map and a plain
-  // boolean). Only the false->true *edge* below fires a reposition, not
-  // every render while it holds.
+  // Majority-swap auto-reposition: the whole map's own negative-vs-positive
+  // sentiment tally (computeDominantSentiment — the same pos/neg vote
+  // circleSentiment already runs per-circle, just whole-map and three-way
+  // tie-aware). Symmetric: whichever side is strictly ahead is the one that
+  // gets pulled toward center, the other gets pushed toward the edge — see
+  // computeMajoritySwap's own doc comment. Only a genuine swing to a new
+  // decisive side below fires a reposition (tie->positive, tie->negative,
+  // positive->negative, or negative->positive) — a tie itself never fires
+  // one, and neither does the same side staying ahead across renders.
   //
   // Folds in whichever type is currently armed on an open pending-create
   // card (see pendingCreate's own onTypeChange above) as a lightweight
   // { type } entry — not a real NodeDoc, since it isn't one yet — so the
   // map reacts live while someone is drafting a node, the instant they
   // cycle its type, without waiting for them to actually confirm it into a
-  // real node first. That virtual entry only ever affects this boolean:
-  // computeNegativeMajoritySwap below is still handed the real `nodes`
-  // array alone, so the not-yet-created draft itself is never a move
-  // target, only ever the thing that can tip real nodes into moving.
-  const negativeMajority = useMemo(() => {
+  // real node first. That virtual entry only ever affects this tally:
+  // computeMajoritySwap below is still handed the real `nodes` array alone,
+  // so the not-yet-created draft itself is never a move target, only ever
+  // the thing that can tip real nodes into moving.
+  const dominantSentiment = useMemo(() => {
     const tally = pendingCreate ? [...nodes, { type: pendingCreate.type }] : nodes;
-    return isNegativeMajority(tally);
+    return computeDominantSentiment(tally);
   }, [nodes, pendingCreate]);
-  // Seeded with the initial value (not false) so a map that already opens
-  // negative-majority reads as "that's just how it is," not "this just
-  // happened" — the effect below only ever fires on a genuine transition.
-  const prevNegativeMajorityRef = useRef(negativeMajority);
+  // Seeded with the initial value (not "tie") so a map that already opens
+  // with one side ahead reads as "that's just how it is," not "this just
+  // happened" — the effect below only ever fires on a genuine swing.
+  const prevDominantSentimentRef = useRef(dominantSentiment);
 
   useEffect(() => {
-    const wasMajority = prevNegativeMajorityRef.current;
-    prevNegativeMajorityRef.current = negativeMajority;
-    if (wasMajority || !negativeMajority) return;
+    const prev = prevDominantSentimentRef.current;
+    prevDominantSentimentRef.current = dominantSentiment;
+    if (dominantSentiment === "tie" || dominantSentiment === prev) return;
+    const majoritySentiment = dominantSentiment;
 
     const token = ++majoritySwapToken.current;
-    const excludeIds = new Set(nodeGroups.map((g) => g.rootId));
-    const targets = computeNegativeMajoritySwap(nodes, positions, excludeIds);
+    const { targets, units } = computeMajoritySwap(nodes, positions, nodeGroups, majoritySentiment);
     if (targets.size === 0) return;
 
-    showNotice(t.ui.negativeMajorityNotice);
-    const ids = Array.from(targets.keys());
-    // Seeded with each node's own current position (not yet its target) so
-    // posFor has a stable value to return the instant this starts, same as
-    // the group-drag catch-up's own startPositions seed.
-    setMajoritySwapState(new Map(ids.map((id) => [id, positions.get(id)!])));
+    showNotice(majoritySentiment === "negative" ? t.ui.negativeMajorityNotice : t.ui.positiveMajorityNotice);
+    // Seeded with every affected node's own current position (not yet its
+    // target) so posFor has a stable value to return the instant this
+    // starts, same as the group-drag catch-up's own startPositions seed.
+    setMajoritySwapState(new Map(Array.from(targets.keys(), (id) => [id, positions.get(id)!])));
 
     void (async () => {
       await Promise.all(
-        ids.map(async (id, i) => {
+        // One entry in `units` per movement unit (a solo node's own single
+        // id, or a whole circle's root+members) — staggered against each
+        // other, same as the group-drag follow's own per-node stagger, but
+        // every id *inside* one unit shares the exact same step/timing
+        // (one setMajoritySwapState call per step, covering the whole
+        // unit at once) so a circle's own shape never distorts mid-flight.
+        units.map(async (ids, i) => {
           if (i > 0) await sleep(i * MAJORITY_SWAP_STAGGER_MS);
           if (majoritySwapToken.current !== token) return;
-          const start = positions.get(id)!;
-          const target = targets.get(id)!;
+          const starts = new Map(ids.map((id) => [id, positions.get(id)!]));
           for (let step = 1; step <= MAJORITY_SWAP_STEPS; step++) {
             if (majoritySwapToken.current !== token) return;
             const frac = step / MAJORITY_SWAP_STEPS;
-            const hop = { x: start.x + (target.x - start.x) * frac, y: start.y + (target.y - start.y) * frac };
-            setMajoritySwapState((prev) => new Map(prev ?? []).set(id, hop));
+            setMajoritySwapState((prev) => {
+              const next = new Map(prev ?? []);
+              for (const id of ids) {
+                const start = starts.get(id)!;
+                const target = targets.get(id)!;
+                next.set(id, { x: start.x + (target.x - start.x) * frac, y: start.y + (target.y - start.y) * frac });
+              }
+              return next;
+            });
             if (step < MAJORITY_SWAP_STEPS) await sleep(MAJORITY_SWAP_STEP_DELAY_MS);
           }
-          try {
-            const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
-            if (majoritySwapToken.current === token) upsertNode(updated);
-          } catch (err) {
-            setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
-          }
+          await Promise.all(
+            ids.map(async (id) => {
+              const target = targets.get(id)!;
+              try {
+                const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
+                if (majoritySwapToken.current === token) upsertNode(updated);
+              } catch (err) {
+                setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
+              }
+            }),
+          );
         }),
       );
       if (majoritySwapToken.current === token) setMajoritySwapState(null);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [negativeMajority]);
+  }, [dominantSentiment]);
 
   // ----- dragging -----
 
@@ -956,8 +980,8 @@ export function MapPage() {
   }
 
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
-    // A real interaction with any node always preempts the negative-
-    // majority auto-reposition effect outright — see majoritySwapToken's
+    // A real interaction with any node always preempts the majority-swap
+    // auto-reposition effect outright — see majoritySwapToken's
     // own doc comment above. Unconditional, ahead of every other early
     // return below: the effect fighting a user's own gesture for the same
     // node(s) would be far worse than just stopping early here.
@@ -2865,7 +2889,7 @@ export function MapPage() {
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}
                 // Keeps pendingCreate.type in sync with whichever type is
-                // currently armed in the card, live — the negativeMajority
+                // currently armed in the card, live — the dominantSentiment
                 // memo below reads it straight off pendingCreate rather
                 // than needing its own separate piece of state.
                 onTypeChange={(draftType) =>

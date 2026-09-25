@@ -255,6 +255,7 @@ export interface UiStrings {
   minimapTitle: string;
   panelDragHandle: string;
   negativeMajorityNotice: string;
+  positiveMajorityNotice: string;
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
   cardMenuLabel: string;
@@ -588,6 +589,7 @@ const en: UiStrings = {
   minimapTitle: "Minimap — click or drag to jump around the map",
   panelDragHandle: "Drag to move this panel",
   negativeMajorityNotice: "Negative arguments are now the majority — the map has shifted",
+  positiveMajorityNotice: "Positive arguments are now the majority — the map has shifted",
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
   summary: {
     title: (name) => `Summary — "${name}"`,
@@ -915,6 +917,7 @@ const cs: UiStrings = {
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
   panelDragHandle: "Přetažením posunete tento panel",
   negativeMajorityNotice: "Negativní argumenty jsou nyní většinou — mapa se přeuspořádala",
+  positiveMajorityNotice: "Pozitivní argumenty jsou nyní většinou — mapa se přeuspořádala",
   exportText: { title: (name) => `Export textu — „${name}“`, download: "Stáhnout .md" },
   summary: {
     title: (name) => `Souhrn — „${name}“`,
@@ -1242,6 +1245,7 @@ const uk: UiStrings = {
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   negativeMajorityNotice: "Негативні аргументи тепер у більшості — мапа перебудувалася",
+  positiveMajorityNotice: "Позитивні аргументи тепер у більшості — мапа перебудувалася",
   exportText: { title: (name) => `Експорт тексту — «${name}»`, download: "Завантажити .md" },
   summary: {
     title: (name) => `Підсумок — «${name}»`,
@@ -1569,6 +1573,7 @@ const ru: UiStrings = {
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   negativeMajorityNotice: "Негативные аргументы теперь в большинстве — карта перестроилась",
+  positiveMajorityNotice: "Позитивные аргументы теперь в большинстве — карта перестроилась",
   exportText: { title: (name) => `Экспорт текста — «${name}»`, download: "Скачать .md" },
   summary: {
     title: (name) => `Сводка — «${name}»`,
