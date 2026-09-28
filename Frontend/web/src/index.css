@@ -152,7 +152,6 @@
      utility only supplies the animation-name/timing-function/iteration
      that's shared across every instance. See NodeCard.tsx/QuickAddGhosts.tsx. */
   --animate-node-chaos-drift: node-chaos-drift 3s ease-in-out infinite;
-  --animate-zone-float: zone-float 6s ease-in-out infinite;
   --animate-drop-target-pulse: drop-target-pulse 0.9s ease-in-out infinite;
   --animate-weapon-fly-in: weapon-fly-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-weapon-arrow-fly: weapon-arrow-fly 0.55s ease-in forwards;
@@ -180,32 +179,6 @@
   }
   75% {
     transform: translate(calc(-50% + var(--chaos-x3, 0px)), calc(-50% + var(--chaos-y3, 0px)));
-  }
-}
-/* A zone's own backdrop — see CanvasBackdrop.tsx's zoneFloatStyle — gets
-   the same "still undecided" floating quality its own member nodes already
-   have (node-chaos-drift above), just gentler and slower: the polygon is
-   the whole shape those nodes sit inside, not one small icon, so a wobble
-   at the same relative scale would read as the backdrop shaking rather
-   than breathing. Plain translate in the polygon's own SVG coordinate
-   space (canvas units, not screen pixels) — there's no counter-scale
-   wrapper here the way NodeCard's own icon has, so this necessarily scales
-   with the canvas zoom the same way the zone's own size already does,
-   which keeps the wobble reading as proportionally the same "small" at any
-   zoom level rather than needing its own separate tuning per zoom. */
-@keyframes zone-float {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  25% {
-    transform: translate(var(--zone-x1, 0px), var(--zone-y1, 0px));
-  }
-  50% {
-    transform: translate(var(--zone-x2, 0px), var(--zone-y2, 0px));
-  }
-  75% {
-    transform: translate(var(--zone-x3, 0px), var(--zone-y3, 0px));
   }
 }
 @keyframes drop-target-pulse {

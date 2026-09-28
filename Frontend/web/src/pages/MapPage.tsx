@@ -120,6 +120,12 @@ export function MapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Bumped on every click on empty canvas — passed down to CanvasBackdrop,
+  // which hands it to useZoneFloat so a click can sprint every currently-
+  // drifting zone back to its real position instead of waiting out its own
+  // normal, slower leg. See useZoneFloat's own doc comment.
+  const [zoneFloatBoostTick, setZoneFloatBoostTick] = useState(0);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
@@ -2080,6 +2086,9 @@ export function MapPage() {
                 suppressNextClick.current = false;
                 return;
               }
+              // Any real click on empty canvas, regardless of mode below —
+              // see zoneFloatBoostTick's own doc comment.
+              setZoneFloatBoostTick((n) => n + 1);
               // Drawing a line: a click places a point (if the spot is free).
               if (drawMode) {
                 addDrawPoint(screenToCanvas(e.clientX, e.clientY));
@@ -2127,6 +2136,7 @@ export function MapPage() {
               onLineClick={handleLineClick}
               interactive={!drawMode}
               compact={compactView}
+              zoneFloatBoostTick={zoneFloatBoostTick}
               drawing={
                 drawMode
                   ? {
@@ -2348,8 +2358,13 @@ export function MapPage() {
                 wrapRef={wrapRef}
                 zones={nodeGroups.flatMap((g) => {
                   const root = nodes.find((n) => n.nodeId === g.rootId);
-                  return root?.zoneName
-                    ? [{ rootId: g.rootId, name: root.zoneName, sentiment: g.sentiment, variant: !!root.parentId }]
+                  // An owner-given zoneName wins when set; otherwise every
+                  // zone still gets *some* label rather than none at all —
+                  // same title-falls-back-to-text the node's own caption
+                  // uses elsewhere (see e.g. PresentationOverlay).
+                  const name = root?.zoneName || root?.title || root?.text;
+                  return name
+                    ? [{ rootId: g.rootId, name, sentiment: g.sentiment, variant: !!root!.parentId }]
                     : [];
                 })}
                 positions={positions}
