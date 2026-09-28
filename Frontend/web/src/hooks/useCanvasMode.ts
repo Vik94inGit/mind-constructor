@@ -49,7 +49,10 @@ const NONE: CanvasMode = { kind: "none" };
 // *decision* of whether an action is currently allowed (is this node
 // eligible to pack, is this point free to draw to, …) is made by the caller
 // before dispatching — this reducer only ever applies what it's told.
-function reducer(state: CanvasMode, action: CanvasModeAction): CanvasMode {
+// Exported for direct unit testing — useCanvasMode itself is just this
+// reducer wired into useReducer, so the reducer is where the real behavior
+// (and test coverage) belongs.
+export function reducer(state: CanvasMode, action: CanvasModeAction): CanvasMode {
   switch (action.type) {
     case "reset":
       return NONE;
