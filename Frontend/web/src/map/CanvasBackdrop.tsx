@@ -1,10 +1,46 @@
-import { CANVAS_W, CANVAS_H } from "../utils/canvasLayout";
+import { CANVAS_W, CANVAS_H, hashSeed } from "../utils/canvasLayout";
 import { roundedPath } from "../utils/drawLine";
 import { useI18n } from "../i18n/I18nContext";
 import type { NodeGroup } from "../utils/canvasLayout";
 import { nodeRefId, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
+import type { CSSProperties } from "react";
 import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
+
+// How far (in the zone polygon's own SVG coordinate space, i.e. canvas
+// units — see zone-float's own doc comment in index.css) each waypoint
+// nudges the whole shape. Small relative to a zone's own typical size —
+// this is meant to read as the backdrop gently breathing, not visibly
+// resizing or drifting away from its own member nodes.
+const ZONE_FLOAT_AMPLITUDE = 12;
+
+// Per-zone floating drift, matching NodeCard's own chaosStyle in spirit
+// (same hashSeed primitive, same three-waypoint keyframe shape — see
+// node-chaos-drift/zone-float in index.css) but for the whole polygon
+// rather than one small icon: a slower, gentler wobble sized for a big
+// background shape, seeded off the zone's own rootId so different zones
+// drift independently instead of in lockstep.
+function zoneFloatStyle(seed: string): CSSProperties {
+  const [rx1, ry1, rx2, ry2, rx3, ry3, rDuration, rDelay] = hashSeed(seed, 8);
+  const wp = (rx: number, ry: number) => ({
+    x: (rx * 2 - 1) * ZONE_FLOAT_AMPLITUDE,
+    y: (ry * 2 - 1) * ZONE_FLOAT_AMPLITUDE,
+  });
+  const w1 = wp(rx1, ry1);
+  const w2 = wp(rx2, ry2);
+  const w3 = wp(rx3, ry3);
+  const duration = 5 + rDuration * 4; // 5s–9s — slower than a node's own 4.8s–8.4s wobble
+  return {
+    "--zone-x1": `${w1.x}px`,
+    "--zone-y1": `${w1.y}px`,
+    "--zone-x2": `${w2.x}px`,
+    "--zone-y2": `${w2.y}px`,
+    "--zone-x3": `${w3.x}px`,
+    "--zone-y3": `${w3.y}px`,
+    animationDuration: `${duration}s`,
+    animationDelay: `-${rDelay * duration}s`,
+  } as CSSProperties;
+}
 
 interface Props {
   nodeGroups: NodeGroup[];
@@ -82,6 +118,12 @@ export function CanvasBackdrop({
         // group, if any, is currently stabilized.
         const isStabilized = selectedCircle?.rootId === g.rootId;
         const dimmed = !!selectedCircle && !isStabilized;
+        // Same "still undecided" floating quality NodeCard's own chaotic
+        // drift already gives an unchosen circle's member nodes — once
+        // the circle is stabilized, both its members and its own backdrop
+        // settle and hold their spot for good (see zoneFloatStyle's own
+        // doc comment).
+        const floating = !isStabilized;
         return (
           <polygon
             key={`zone-${g.rootId}`}
@@ -91,12 +133,16 @@ export function CanvasBackdrop({
             stroke={color}
             strokeOpacity={dimmed ? 0.25 : 0.5}
             strokeWidth={2.5}
+            className={floating ? "animate-zone-float" : undefined}
             // The whole overlay SVG is pointer-events-none (so its
             // decorative shapes never steal a drag/click from a
             // NodeCard div sitting underneath) — a zone is one of
             // the few things in it that's actually meant to be
             // clicked, so it has to explicitly opt back in.
-            style={interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
+            style={{
+              ...(floating ? zoneFloatStyle(g.rootId) : undefined),
+              ...(interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined),
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onCircleClick(g.rootId);
