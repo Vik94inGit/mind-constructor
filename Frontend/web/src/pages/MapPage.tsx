@@ -264,31 +264,18 @@ export function MapPage() {
   const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
 
 
-  const [dragState, setDragState] = useState<{ nodeId: string; x: number; y: number } | null>(null);
-  // Group-drag counterpart to dragState above — set instead of (never
-  // alongside) dragState when the pointer-downed node is itself a member
-  // of multiSelectIds and there's more than one node selected; every
-  // member moves by the same pointer delta at once. posFor consults this
-  // before the single-node dragState. null outside of an active group drag.
-  const [groupDragState, setGroupDragState] = useState<Map<string, { x: number; y: number }> | null>(null);
-  // Live, while dragging: whichever node the pointer is currently hovering
-  // close enough to read as "drop here to join its circle" — null once the
-  // pointer isn't over anything droppable. Drives NodeCard's highlight ring.
-  const [dropTarget, setDropTarget] = useState<{ nodeId: string; valid: boolean } | null>(null);
+  // dragState/groupDragState/dropTarget (posFor's own overlay inputs, and
+  // NodeCard's dragging/dropHighlight props below) plus the dragMoved and
+  // groupDragToken refs are now owned entirely inside useNodeDragAndDrop —
+  // see hooks/dragUIState.ts — and read back from its return value further
+  // down instead of living here as five separate pieces of state.
+  //
   // Rubber-band select: a plain left-button drag started on empty canvas
   // (free to claim — panning is native scroll/trackpad, not a click-drag)
   // sweeps this rectangle (canvas coordinates) and, on release,
   // replaces multiSelectIds with every own node whose position falls
   // inside it. null outside of an active marquee drag.
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const dragMoved = useRef(false);
-  // Bumped at the start of every group drag; a follower's catch-up
-  // animation (see onNodePointerDown's group-drag branch) checks its own
-  // captured token against this on each hop and bails out the moment it no
-  // longer matches — i.e. a new group drag started (or this one's own drop
-  // already ran) before it finished, so its now-stale writes into
-  // groupDragState/the API never land on top of whatever drag superseded it.
-  const groupDragToken = useRef(0);
   // onNodePointerDown calls setPointerCapture on the node's own element —
   // per the Pointer Events spec that re-targets every subsequent event for
   // this interaction, *including the browser's own synthesized "click"*, to
@@ -541,21 +528,11 @@ export function MapPage() {
   // focused on this one" state everywhere else (NodeCard's own outline/
   // health/wings), so its edges should read that way too.
   const chosenNodeIds = multiSelectIds.size > 0 ? multiSelectIds : selectedId ? new Set([selectedId]) : null;
-  // Same condition that gates the quick-add ghost ring below — reused here
-  // so every other node dims while it's showing, putting the focus on the
-  // selected node and its type-to-create options instead of competing with
-  // the rest of the canvas. selectionSettled: the ghosts (and the dimming
-  // that comes with them) wait until centerOnNode's own pan has landed —
-  // see its own doc comment.
-  const quickAddActive =
-    !!(selectedNode && isOwnNode(selectedNode) && !chooseMode && !packMode && !dragState) && selectionSettled;
-
-  // See forceShowToolbar's own doc comment — every fresh quick-add starts
-  // collapsed again, regardless of whether a previous one was manually
-  // expanded.
-  useEffect(() => {
-    if (!quickAddActive) setForceShowToolbar(false);
-  }, [quickAddActive]);
+  // quickAddActive (below useNodeDragAndDrop further down, since it reads
+  // that hook's own dragState) gates the quick-add ghost ring; the same
+  // condition is reused here so every other node dims while it's showing,
+  // putting the focus on the selected node and its type-to-create options
+  // instead of competing with the rest of the canvas.
   // Same "focus on the one thing" treatment as quickAddActive above, keyed
   // off a *chosen circle* instead of a selected node — every node outside
   // the chosen circle (a member of some other circle, or standalone) dims,
@@ -1015,7 +992,7 @@ export function MapPage() {
   // The node drag/drop system: single-node reposition-or-join-a-circle,
   // group ("follow the leader") drag, and touch's own long-press-to-
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
-  const { onNodePointerDown } = useNodeDragAndDrop({
+  const { onNodePointerDown, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
     nodes,
     positions,
     nodeGroups,
@@ -1038,15 +1015,26 @@ export function MapPage() {
     setNodes,
     setSelectedId,
     setMultiSelectIds,
-    setDragState,
-    setGroupDragState,
-    setDropTarget,
-    dragMoved,
-    groupDragToken,
     suppressNextClick,
     t,
   });
 
+  // Same condition that gates the quick-add ghost ring below — reused
+  // higher up (chosenNodeIds' own muted computation) so every other node
+  // dims while it's showing, putting the focus on the selected node and its
+  // type-to-create options instead of competing with the rest of the
+  // canvas. selectionSettled: the ghosts (and the dimming that comes with
+  // them) wait until centerOnNode's own pan has landed — see its own doc
+  // comment.
+  const quickAddActive =
+    !!(selectedNode && isOwnNode(selectedNode) && !chooseMode && !packMode && !dragState) && selectionSettled;
+
+  // See forceShowToolbar's own doc comment — every fresh quick-add starts
+  // collapsed again, regardless of whether a previous one was manually
+  // expanded.
+  useEffect(() => {
+    if (!quickAddActive) setForceShowToolbar(false);
+  }, [quickAddActive]);
 
   // "Mine" gates dragging, linking, quick-add branching, and editing alike —
   // a weapon node counts here too now: it's a real node its own attacker

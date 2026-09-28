@@ -1,3 +1,4 @@
+import { useReducer, useRef } from "react";
 import type { Dispatch, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
@@ -5,6 +6,7 @@ import { avoidOverlap, footprintObstacles, CANVAS_H, CANVAS_W, CIRCLE_DROP_RADIU
 import type { NodeGroup, Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import { nodeRefId } from "../utils/nodeType";
 import { sleep } from "../utils/sleep";
+import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 
@@ -45,11 +47,11 @@ interface Params {
   setNodes: Dispatch<SetStateAction<NodeDoc[]>>;
   setSelectedId: Dispatch<SetStateAction<string | null>>;
   setMultiSelectIds: Dispatch<SetStateAction<Set<string>>>;
-  setDragState: Dispatch<SetStateAction<{ nodeId: string; x: number; y: number } | null>>;
-  setGroupDragState: Dispatch<SetStateAction<Map<string, Pt> | null>>;
-  setDropTarget: Dispatch<SetStateAction<{ nodeId: string; valid: boolean } | null>>;
-  dragMoved: MutableRefObject<boolean>;
-  groupDragToken: MutableRefObject<number>;
+  // Shared with the canvas's own marquee-select and every node's onClick
+  // (see suppressNextClick's own doc comment in MapPage) — not
+  // drag-specific, so it stays MapPage-owned and passed in, unlike
+  // dragState/groupDragState/dropTarget/dragMoved/groupDragToken below,
+  // which this hook now owns outright (see hooks/dragUIState.ts).
   suppressNextClick: MutableRefObject<boolean>;
   t: Translation;
 }
@@ -81,14 +83,21 @@ export function useNodeDragAndDrop({
   setNodes,
   setSelectedId,
   setMultiSelectIds,
-  setDragState,
-  setGroupDragState,
-  setDropTarget,
-  dragMoved,
-  groupDragToken,
   suppressNextClick,
   t,
 }: Params) {
+  // Single-node drag position, group-drag position map, and circle-join
+  // drop-target highlight — see hooks/dragUIState.ts.
+  const [dragUI, dispatch] = useReducer(dragUIReducer, initialDragUIState);
+  const dragMoved = useRef(false);
+  // Bumped at the start of every group drag; a follower's catch-up
+  // animation checks its own captured token against this on each hop and
+  // bails out the moment it no longer matches — i.e. a new group drag
+  // started (or this one's own drop logic already ran) before it finished,
+  // so its now-stale writes never land on top of whatever drag superseded
+  // it.
+  const groupDragToken = useRef(0);
+
   // What dragging `dragged` to (x,y) would land it on, if anything — the
   // nearest other node within CIRCLE_DROP_RADIUS. Every restriction on
   // *joining* a circle this way (own-node-only, the 7-node cap, matching
@@ -168,7 +177,7 @@ export function useNodeDragAndDrop({
       const startPositions = new Map(
         memberIds.map((id) => [id, posFor(nodes.find((n) => n.nodeId === id)!)]),
       );
-      setGroupDragState(startPositions);
+      dispatch({ type: "groupStart", positions: startPositions });
       const startPt = screenToCanvas(e.clientX, e.clientY);
       const margin = 60;
       const clamp = (x: number, y: number) => ({
@@ -182,11 +191,12 @@ export function useNodeDragAndDrop({
       function onGroupMove(ev: PointerEvent) {
         const p = screenToCanvas(ev.clientX, ev.clientY);
         dragMoved.current = true;
-        setGroupDragState((prev) => {
-          const next = new Map(prev ?? startPositions);
-          const leaderStart = startPositions.get(node.nodeId)!;
-          next.set(node.nodeId, { x: leaderStart.x + (p.x - startPt.x), y: leaderStart.y + (p.y - startPt.y) });
-          return next;
+        const leaderStart = startPositions.get(node.nodeId)!;
+        dispatch({
+          type: "groupSetMember",
+          id: node.nodeId,
+          pos: { x: leaderStart.x + (p.x - startPt.x), y: leaderStart.y + (p.y - startPt.y) },
+          fallback: startPositions,
         });
       }
 
@@ -195,7 +205,7 @@ export function useNodeDragAndDrop({
         window.removeEventListener("pointerup", onGroupUp);
         suppressNextClick.current = true;
         if (!dragMoved.current) {
-          setGroupDragState(null);
+          dispatch({ type: "groupClear" });
           handleNodeClick(node, false);
           return;
         }
@@ -246,7 +256,7 @@ export function useNodeDragAndDrop({
           );
         }
 
-        setGroupDragState((prev) => new Map(prev ?? startPositions).set(node.nodeId, leaderTarget));
+        dispatch({ type: "groupSetMember", id: node.nodeId, pos: leaderTarget, fallback: startPositions });
         zoomToEditAt(leaderTarget.x, leaderTarget.y);
 
         const leaderDone = nodesApi
@@ -271,7 +281,7 @@ export function useNodeDragAndDrop({
             if (groupDragToken.current !== token) return;
             const frac = step / GROUP_FOLLOW_STEPS;
             const hop = { x: start.x + (target.x - start.x) * frac, y: start.y + (target.y - start.y) * frac };
-            setGroupDragState((prev) => new Map(prev ?? startPositions).set(id, hop));
+            dispatch({ type: "groupSetMember", id, pos: hop, fallback: startPositions });
             if (step < GROUP_FOLLOW_STEPS) await sleep(GROUP_FOLLOW_STEP_DELAY_MS);
           }
           try {
@@ -283,7 +293,7 @@ export function useNodeDragAndDrop({
         });
 
         await Promise.all([leaderDone, ...followerDone]);
-        if (groupDragToken.current === token) setGroupDragState(null);
+        if (groupDragToken.current === token) dispatch({ type: "groupClear" });
       }
 
       window.addEventListener("pointermove", onGroupMove);
@@ -352,7 +362,7 @@ export function useNodeDragAndDrop({
     (e.target as Element).setPointerCapture(e.pointerId);
     dragMoved.current = false;
     const start = posFor(node);
-    setDragState({ nodeId: node.nodeId, x: start.x, y: start.y });
+    dispatch({ type: "dragSet", nodeId: node.nodeId, x: start.x, y: start.y });
 
     // screenToCanvas divides by `zoom` — canvasRef is visually scaled via a
     // CSS transform now (see the zoom controls below), so its own
@@ -389,9 +399,7 @@ export function useNodeDragAndDrop({
         longPressTimer = undefined;
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
-        setDragState(null);
-        setGroupDragState(null);
-        setDropTarget(null);
+        dispatch({ type: "reset" });
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
         // See the other long-press timer's own comment above (the !moveMode
         // branch) — same "starting a multi-selection clears any stale
@@ -418,9 +426,11 @@ export function useNodeDragAndDrop({
       const x = p.x - offsetX;
       const y = p.y - offsetY;
       dragMoved.current = true;
-      setDragState({ nodeId: node.nodeId, x, y });
+      dispatch({ type: "dragSet", nodeId: node.nodeId, x, y });
       const found = findDropTarget(node, x, y);
-      setDropTarget(found ? { nodeId: found.target.nodeId, valid: found.valid } : null);
+      dispatch(
+        found ? { type: "dropTargetSet", nodeId: found.target.nodeId, valid: found.valid } : { type: "dropTargetClear" },
+      );
     }
 
     async function onUp(ev: PointerEvent) {
@@ -438,9 +448,7 @@ export function useNodeDragAndDrop({
       const x = p.x - offsetX;
       const y = p.y - offsetY;
       const found = dragMoved.current ? findDropTarget(node, x, y) : null;
-      setDragState(null);
-      setGroupDragState(null);
-      setDropTarget(null);
+      dispatch({ type: "reset" });
       if (dragMoved.current) {
         if (found && !found.valid) {
           // Invalid drop (own descendant, per findDropTarget's own
@@ -551,5 +559,10 @@ export function useNodeDragAndDrop({
     window.addEventListener("pointerup", onUp);
   }
 
-  return { onNodePointerDown };
+  return {
+    onNodePointerDown,
+    dragState: dragUI.drag,
+    groupDragState: dragUI.group,
+    dropTarget: dragUI.dropTarget,
+  };
 }
