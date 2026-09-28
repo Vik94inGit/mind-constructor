@@ -22,7 +22,7 @@ export async function seedMapKind(
     y: rootPos.y,
   });
   const ids = new Map<TemplateNodeKey, string>();
-  for (const p of layoutTemplate(root.template, rootPos, [])) {
+  for (const p of layoutTemplate(root.template, rootPos)) {
     const node = await nodesApi.createNode(mapId, {
       text: copy[p.key].text,
       title: copy[p.key].title,

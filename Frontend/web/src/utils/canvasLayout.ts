@@ -271,90 +271,7 @@ function isClearOf(p: { x: number; y: number }, obstacles: Obstacle[]): boolean 
   return obstacles.every((o) => depthInto(o, p) <= 0);
 }
 
-// A zone's corners are its members, so a member placed almost in line with
-// two others pinches one of them into a sliver. No corner of a zone may be
-// tighter than this.
-export const MIN_ZONE_ANGLE = 30;
-
 type Pt = { x: number; y: number };
-
-// Sharpest corner (in degrees) of the zone polygon through `points` — the
-// same outline computeNodeGroups draws: members sorted by angle around their
-// centroid. Only convex corners can be sharp (a reflex corner's interior
-// angle is past 180), so those are the ones measured. Infinity below 3 points.
-export function minZoneCorner(points: Pt[]): number {
-  if (points.length < 3) return Infinity;
-  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
-  const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
-  const ring = points.slice().sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-  // Shoelace sign = winding direction, to tell convex corners from reflex ones.
-  let area2 = 0;
-  for (let i = 0; i < ring.length; i++) {
-    const a = ring[i];
-    const b = ring[(i + 1) % ring.length];
-    area2 += a.x * b.y - b.x * a.y;
-  }
-  let min = Infinity;
-  for (let i = 0; i < ring.length; i++) {
-    const prev = ring[(i + ring.length - 1) % ring.length];
-    const v = ring[i];
-    const next = ring[(i + 1) % ring.length];
-    const ax = prev.x - v.x;
-    const ay = prev.y - v.y;
-    const bx = next.x - v.x;
-    const by = next.y - v.y;
-    const lenProduct = Math.hypot(ax, ay) * Math.hypot(bx, by);
-    if (lenProduct === 0) continue;
-    const turn = (v.x - prev.x) * (next.y - v.y) - (v.y - prev.y) * (next.x - v.x);
-    if (turn * area2 < 0) continue; // reflex corner
-    const angle = (Math.acos(Math.min(1, Math.max(-1, (ax * bx + ay * by) / lenProduct))) * 180) / Math.PI;
-    min = Math.min(min, angle);
-  }
-  return min;
-}
-
-// Would `parentId`'s zone be left with a corner tighter than MIN_ZONE_ANGLE if
-// `leavingId` stopped being one of its members? A zone that was already that
-// tight is only refused further pinching, so a node can still leave a zone
-// that was cramped before it did anything.
-export function leavingPinchesZone(
-  leavingId: string,
-  parentId: string,
-  visibleNodes: NodeDoc[],
-  positions: Map<string, Pt>,
-): boolean {
-  const at = (id: string) => positions.get(id) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-  const all = visibleNodes.filter((n) => nodeRefId(n.parentId) === parentId);
-  const rest = all.filter((n) => n.nodeId !== leavingId);
-  if (rest.length < 2) return false; // no zone left to pinch
-  const corner = (kids: NodeDoc[]) => minZoneCorner([at(parentId), ...kids.map((n) => at(n.nodeId))]);
-  const after = corner(rest);
-  return after < MIN_ZONE_ANGLE && after < corner(all);
-}
-
-// Does putting node `nodeId` at a candidate spot keep every zone it belongs to
-// at MIN_ZONE_ANGLE or wider? `parentId` is the parent it will have after the
-// move (null for none) — a zone forms around that parent once the node is its
-// second child — and the node is also the root of its own zone if it has 2+
-// children. `nodeId` need not exist yet (a node about to be created). Returns
-// undefined when no zone is involved, so there is nothing to check.
-export function zoneAngleGuard(
-  nodeId: string,
-  parentId: string | null,
-  visibleNodes: NodeDoc[],
-  positions: Map<string, Pt>,
-): ((p: Pt) => boolean) | undefined {
-  const at = (id: string) => positions.get(id) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-  const zones: Pt[][] = [];
-  if (parentId) {
-    const siblings = visibleNodes.filter((n) => n.nodeId !== nodeId && nodeRefId(n.parentId) === parentId);
-    if (siblings.length >= 1) zones.push([at(parentId), ...siblings.map((n) => at(n.nodeId))]);
-  }
-  const kids = visibleNodes.filter((n) => n.nodeId !== nodeId && nodeRefId(n.parentId) === nodeId);
-  if (kids.length >= 2) zones.push(kids.map((n) => at(n.nodeId)));
-  if (zones.length === 0) return undefined;
-  return (p) => zones.every((fixed) => minZoneCorner([p, ...fixed]) >= MIN_ZONE_ANGLE);
-}
 
 // Distance to spare past the nearest obstacle — negative while overlapping,
 // Infinity with nothing in the way.
@@ -426,7 +343,7 @@ function nearestClearSpot(
 // it look across the whole canvas, because landing off-screen is better than
 // landing on top of another node.
 //
-// `accept` adds a condition on the spot itself (see zoneAngleGuard). It is
+// `accept` adds an arbitrary extra condition on the spot itself. It is
 // held to as long as any spot satisfies it; if none does, it's dropped rather
 // than leaving the node with nowhere to go.
 export function avoidOverlap(
