@@ -104,6 +104,7 @@ export interface Translation {
       moveOff: string;
       discussionTooltip: string;
       personalTooltip: string;
+      presentation: string;
       zoomOut: string;
       zoomReset: string;
       zoomIn: string;
@@ -235,6 +236,7 @@ const en: Translation = {
         "Battle mode: on — attacks do damage, and members other than the owner are limited in what they can attack with. Click to switch to Creating mode.",
       personalTooltip:
         "Creating mode: on — attacks are decoration only and do no damage; no shields. Click to switch back to Battle mode.",
+      presentation: "Present — step through the map as slides",
       zoomOut: "Zoom out",
       zoomReset: "Reset zoom",
       zoomIn: "Zoom in",
@@ -356,6 +358,7 @@ const cs: Translation = {
         "Bojový režim: zapnuto — útoky způsobují poškození a členové kromě vlastníka jsou omezeni v tom, čím mohou útočit. Klepnutím přepnete do tvůrčího režimu.",
       personalTooltip:
         "Tvůrčí režim: zapnuto — útoky jsou jen dekorace a nezpůsobují poškození; bez štítů. Klepnutím přepnete zpět do bojového režimu.",
+      presentation: "Prezentovat — projít mapu jako snímky",
       zoomOut: "Oddálit",
       zoomReset: "Obnovit přiblížení",
       zoomIn: "Přiblížit",
@@ -477,6 +480,7 @@ const uk: Translation = {
         "Бойовий режим: увімкнено — атаки завдають шкоди, а учасники, крім власника, обмежені в тому, чим можуть атакувати. Натисніть, щоб перейти в творчий режим.",
       personalTooltip:
         "Творчий режим: увімкнено — атаки лише декорація й не завдають шкоди; без щитів. Натисніть, щоб повернутися в бойовий режим.",
+      presentation: "Презентація — пройти мапу як слайди",
       zoomOut: "Зменшити",
       zoomReset: "Скинути масштаб",
       zoomIn: "Збільшити",
@@ -598,6 +602,7 @@ const ru: Translation = {
         "Боевой режим: включён — атаки наносят урон, а участники, кроме владельца, ограничены в том, чем могут атаковать. Нажмите, чтобы переключиться в творческий режим.",
       personalTooltip:
         "Творческий режим: включён — атаки лишь декорация и не наносят урона; без щитов. Нажмите, чтобы вернуться в боевой режим.",
+      presentation: "Презентация — пройти карту как слайды",
       zoomOut: "Уменьшить",
       zoomReset: "Сбросить масштаб",
       zoomIn: "Увеличить",

@@ -40,6 +40,8 @@ interface Props {
   onCopyMap: () => void;
   onPaste: () => void;
   onExportText: () => void;
+  /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay). Not owner-gated — anyone viewing a map should be able to self-present it. */
+  onPresent: () => void;
 }
 
 const iconBtn =
@@ -77,6 +79,7 @@ export function MapToolbar({
   onCopyMap,
   onPaste,
   onExportText,
+  onPresent,
 }: Props) {
   const { t } = useI18n();
   // Each dropdown's own open/closed state.
@@ -233,6 +236,18 @@ export function MapToolbar({
           {isDiscussionMode ? "⚔" : "✎"}
         </button>
       )}
+      {/* Not owner-gated, unlike the mode toggle above — presenting is a
+          read-only, personal way to view a map, not an edit, so anyone with
+          the map open can step through it. Exempted from the collapse for
+          the same reason the mode toggle is. */}
+      <button
+        type="button"
+        className={`${iconBtn} ${idle}`}
+        title={t.map.toolbar.presentation}
+        onClick={onPresent}
+      >
+        ▶
+      </button>
       {/* A demo session has no dashboard to go back to (see ProtectedRoute) and
           the global Navbar is hidden here, so this is its only way out to the
           login page. Kept outside the collapse, like the mode toggle. */}

@@ -41,6 +41,8 @@ import { idOf, nodeRefId } from "../utils/nodeType";
 import { layoutTemplate } from "../utils/templates";
 import { useRadialBlend } from "../hooks/useRadialBlend";
 import { ZoneNames } from "../map/ZoneNames";
+import { PresentationOverlay } from "../map/PresentationOverlay";
+import { computeSlideOrder, computeGeometrizedPositions } from "../utils/presentation";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import type { Sentiment } from "../utils/nodeType";
 import {
@@ -160,6 +162,18 @@ export function MapPage() {
   // already-multi-selected group's own drag — both stay available
   // regardless, since neither one is the "accidental" case this addresses.
   const [moveMode, setMoveMode] = useState(false);
+  // Presentation mode: steps through the map's own nodes as slides (see
+  // computeSlideOrder/utils/presentation.ts), with the canvas auto-tidied
+  // into a clean org-chart shape for the duration (computeGeometrizedPositions
+  // — a display override only, never written back to a node's own stored
+  // x/y, same "never touches positions/backend" contract radialPositions
+  // below already follows). Personal to this viewer/session, not map data —
+  // deliberately NOT the Map.discussionMode server-persisted pattern, and
+  // not folded into the useCanvasMode reducer above either: that one is
+  // purpose-built for canvas click-interaction semantics (choose/pack/draw),
+  // not a full-screen takeover with its own slide index.
+  const [presenting, setPresenting] = useState(false);
+  const [slideIndex, setSlideIndex] = useState(0);
   // How this viewer reads the map (see utils/readingMode.ts) — remembered per
   // browser, never shared with the map's other members.
   const [readingMode, setReadingModeState] = useState<ReadingMode>(loadReadingMode);
@@ -282,8 +296,24 @@ export function MapPage() {
   // auto-reposition effect (see the useEffect keyed off dominantSentiment
   // further down) — posFor consults this too, after dragState/groupDragState
   // so a live manual drag always wins visually over the automatic effect's
-  // own in-flight animation.
+  // own in-flight animation. Purely a render-time overlay: real node.x/y is
+  // never touched by this effect any more (see its own comment) — a node's
+  // stored position stays exactly where the user actually left it, so this
+  // can stay showing indefinitely without ever costing the user anything.
   const [majoritySwapState, setMajoritySwapState] = useState<Map<string, { x: number; y: number }> | null>(null);
+  // Mirrors majoritySwapState for the effect below to read synchronously —
+  // the effect only depends on [dominantSentiment], so closing back over the
+  // state variable itself would see a stale snapshot from whenever the
+  // effect was last (re)created, not whatever the in-flight animation has
+  // actually drawn since. Needed so a sentiment swing that arrives while an
+  // earlier swap animation is still easing in starts from wherever the node
+  // visually is right now, not from its true stored position — jumping back
+  // to storage first, then back out to the new target, would read as a
+  // stutter instead of one continuous glide.
+  const majoritySwapStateRef = useRef<Map<string, { x: number; y: number }> | null>(null);
+  useEffect(() => {
+    majoritySwapStateRef.current = majoritySwapState;
+  }, [majoritySwapState]);
   // Live, while dragging: whichever node the pointer is currently hovering
   // close enough to read as "drop here to join its circle" — null once the
   // pointer isn't over anything droppable. Drives NodeCard's highlight ring.
@@ -657,6 +687,17 @@ export function MapPage() {
     const swapped = majoritySwapState?.get(node.nodeId);
     if (swapped) return swapped;
     const own = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    // Presentation mode's own org-chart blend — checked ahead of the radial
+    // selection ring below since the two are mutually exclusive in practice
+    // (there's no NodePanel/selection to ring neighbors around while
+    // presenting — see enterPresentation), but resolving the order
+    // explicitly here means nothing actually depends on that invariant
+    // holding forever elsewhere in the file.
+    const geo = geometrizeBlend.map?.get(node.nodeId);
+    if (geo) {
+      const b = geometrizeBlend.blend;
+      return { x: own.x + (geo.x - own.x) * b, y: own.y + (geo.y - own.y) * b };
+    }
     const radial = radialBlend.map?.get(node.nodeId);
     if (!radial) return own;
     const b = radialBlend.blend;
@@ -684,6 +725,70 @@ export function MapPage() {
   // container's own unpack list even though the canvas itself doesn't
   // render it.
   const visibleNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
+
+  // Presentation mode's own slide order and org-chart target positions —
+  // see computeSlideOrder/computeGeometrizedPositions (utils/presentation.ts)
+  // and the enter/exitPresentation functions below. `visibleNodes` already
+  // strips packed-away members; also drops weapon/protection decorator
+  // nodes and anything the owner has hidden from members — a presentation
+  // is for showing, not attack/defense bookkeeping or a branch deliberately
+  // kept out of sight. Empty (not just skipped) while `presenting` is
+  // false, so nothing here does real work between presentations.
+  const slideNodes = useMemo(() => {
+    if (!presenting) return [];
+    const eligible = visibleNodes.filter(
+      (n) => !n.isWeapon && !n.isProtection && !hiddenBranchIds.has(n.nodeId),
+    );
+    return computeSlideOrder(eligible);
+  }, [presenting, visibleNodes, hiddenBranchIds]);
+
+  const geometrizedPositions = useMemo(
+    () => (presenting && slideNodes.length > 0 ? computeGeometrizedPositions(slideNodes) : null),
+    [presenting, slideNodes],
+  );
+  // Same glide-toward-a-target-map-or-back-to-nothing mechanism the radial
+  // selection ring already uses (useRadialBlend is fully general — nothing
+  // about it is ring/neighbor-specific), reused here as a second,
+  // independent instance for the org-chart shape.
+  const geometrizeBlend = useRadialBlend(geometrizedPositions);
+
+  // Keeps the camera on the current slide while presenting — including
+  // while it's still gliding into its own org-chart spot (this effect
+  // re-fires on every geometrizeBlend.blend tick, so it re-centers on the
+  // node's own live, still-moving posFor position rather than jump-cutting
+  // to the final spot only once the glide finishes). centerOnPoint (not
+  // centerOnNode, which deliberately reads a node's raw *stored* position —
+  // see its own doc comment) is the right primitive here since there's no
+  // single stored position to key off during the glide.
+  useEffect(() => {
+    if (!presenting || slideNodes.length === 0) return;
+    const current = slideNodes[Math.min(slideIndex, slideNodes.length - 1)];
+    const p = posFor(current);
+    centerOnPoint(p.x, p.y);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presenting, slideIndex, slideNodes, geometrizeBlend.blend]);
+
+  // Guards an empty map (nothing eligible to present) rather than entering
+  // a blank slideshow; computes the same way slideNodes' own memo would,
+  // but eagerly — this runs once, on the toolbar click itself, well before
+  // `presenting` flips true and that memo would otherwise recompute.
+  function enterPresentation() {
+    const eligible = visibleNodes.filter(
+      (n) => !n.isWeapon && !n.isProtection && !hiddenBranchIds.has(n.nodeId),
+    );
+    if (eligible.length === 0) {
+      setActionError(t.ui.presentation.empty);
+      return;
+    }
+    setSlideIndex(0);
+    setSelectedId(null);
+    dispatchMode({ type: "reset" });
+    setPresenting(true);
+  }
+  function exitPresentation() {
+    setPresenting(false);
+    setSlideIndex(0);
+  }
 
   // How many nodes are currently packed into each container — NodeCard's
   // own corner badge reads this by nodeId.
@@ -875,26 +980,75 @@ export function MapPage() {
     const tally = pendingCreate ? [...nodes, { type: pendingCreate.type }] : nodes;
     return computeDominantSentiment(tally);
   }, [nodes, pendingCreate]);
-  // Seeded with the initial value (not "tie") so a map that already opens
-  // with one side ahead reads as "that's just how it is," not "this just
-  // happened" — the effect below only ever fires on a genuine swing.
-  const prevDominantSentimentRef = useRef(dominantSentiment);
+  // Seeded with "tie" (not the initial value) — a map that already opens
+  // with one side ahead now plays the reveal animation on open too, same as
+  // any later swing does. Purely visual and repeatable (see majoritySwapState's
+  // own comment: nothing is ever persisted here any more), so there's no
+  // downside to it running every time the map is opened — that's the point,
+  // it's meant to be pleasant to watch settle in each time you look at it.
+  const prevDominantSentimentRef = useRef<"positive" | "negative" | "tie">("tie");
 
   useEffect(() => {
     const prev = prevDominantSentimentRef.current;
     prevDominantSentimentRef.current = dominantSentiment;
-    if (dominantSentiment === "tie" || dominantSentiment === prev) return;
-    const majoritySentiment = dominantSentiment;
+    if (dominantSentiment === prev) return;
 
     const token = ++majoritySwapToken.current;
+
+    if (dominantSentiment === "tie") {
+      // Swinging back to a tie: glide every currently-displaced node back to
+      // its real stored position, then drop the overlay entirely. Nothing to
+      // persist either way — the stored position never moved.
+      const current = majoritySwapStateRef.current;
+      if (!current || current.size === 0) return;
+      const ids = Array.from(current.keys());
+      const starts = new Map(current);
+      void (async () => {
+        for (let step = 1; step <= MAJORITY_SWAP_STEPS; step++) {
+          if (majoritySwapToken.current !== token) return;
+          const frac = step / MAJORITY_SWAP_STEPS;
+          setMajoritySwapState((prevState) => {
+            const next = new Map(prevState ?? []);
+            for (const id of ids) {
+              const start = starts.get(id)!;
+              const real = positions.get(id);
+              if (!real) continue;
+              next.set(id, { x: start.x + (real.x - start.x) * frac, y: start.y + (real.y - start.y) * frac });
+            }
+            return next;
+          });
+          if (step < MAJORITY_SWAP_STEPS) await sleep(MAJORITY_SWAP_STEP_DELAY_MS);
+        }
+        if (majoritySwapToken.current === token) setMajoritySwapState(null);
+      })();
+      return;
+    }
+
+    const majoritySentiment = dominantSentiment;
     const { targets, units } = computeMajoritySwap(nodes, positions, nodeGroups, majoritySentiment);
     if (targets.size === 0) return;
 
+    // The whole point of this being visual is watching it happen — on a
+    // narrow phone viewport, whatever the user happened to be scrolled to
+    // before the sentiment flipped can easily be nowhere near the affected
+    // nodes' start *or* end spot, so the glide plays entirely off-screen and
+    // reads as "nothing happened." Both endpoints of every moving unit go
+    // in, not just the targets, so the camera settles somewhere the whole
+    // glide stays visible rather than just where it lands.
+    showPoints(Array.from(targets.entries()).flatMap(([id, target]) => [positions.get(id)!, target]));
     showNotice(majoritySentiment === "negative" ? t.ui.negativeMajorityNotice : t.ui.positiveMajorityNotice);
     // Seeded with every affected node's own current position (not yet its
     // target) so posFor has a stable value to return the instant this
-    // starts, same as the group-drag catch-up's own startPositions seed.
-    setMajoritySwapState(new Map(Array.from(targets.keys(), (id) => [id, positions.get(id)!])));
+    // starts, same as the group-drag catch-up's own startPositions seed. An
+    // id already showing mid-flight from a still-unwinding earlier swap
+    // keeps its current visual spot rather than being reset to storage.
+    setMajoritySwapState((prevState) => {
+      const seeded = new Map(prevState ?? []);
+      for (const id of targets.keys()) {
+        if (!seeded.has(id)) seeded.set(id, positions.get(id)!);
+      }
+      return seeded;
+    });
 
     void (async () => {
       await Promise.all(
@@ -907,7 +1061,11 @@ export function MapPage() {
         units.map(async (ids, i) => {
           if (i > 0) await sleep(i * MAJORITY_SWAP_STAGGER_MS);
           if (majoritySwapToken.current !== token) return;
-          const starts = new Map(ids.map((id) => [id, positions.get(id)!]));
+          // Starts from wherever the node visually is right now (an
+          // in-flight earlier swap, or its real position) rather than always
+          // its real stored position — see majoritySwapStateRef's own
+          // comment for why that avoids a stutter on a fast double-swing.
+          const starts = new Map(ids.map((id) => [id, majoritySwapStateRef.current?.get(id) ?? positions.get(id)!]));
           for (let step = 1; step <= MAJORITY_SWAP_STEPS; step++) {
             if (majoritySwapToken.current !== token) return;
             const frac = step / MAJORITY_SWAP_STEPS;
@@ -922,20 +1080,14 @@ export function MapPage() {
             });
             if (step < MAJORITY_SWAP_STEPS) await sleep(MAJORITY_SWAP_STEP_DELAY_MS);
           }
-          await Promise.all(
-            ids.map(async (id) => {
-              const target = targets.get(id)!;
-              try {
-                const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
-                if (majoritySwapToken.current === token) upsertNode(updated);
-              } catch (err) {
-                setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
-              }
-            }),
-          );
         }),
       );
-      if (majoritySwapToken.current === token) setMajoritySwapState(null);
+      // Deliberately left set (not nulled) — the swapped layout is purely a
+      // render overlay (posFor), so it stays showing for as long as this
+      // sentiment keeps its majority. Real node.x/y was never touched, so
+      // there's nothing to reconcile: it unwinds only via the "tie" branch
+      // above, or gets preempted outright by a real user gesture (see
+      // onNodePointerDown, which clears this on any pointer-down).
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dominantSentiment]);
@@ -1060,8 +1212,20 @@ export function MapPage() {
         const dy = p.y - startPt.y;
         setActionError(null);
 
+        // Group drag had zero overlap protection at all before — only the
+        // canvas-bounds clamp. Same nearest-clear-spot settle the single-node
+        // drop now gets: every node NOT in this drag (footprint) and every
+        // zone backdrop the drag isn't itself part of (bigNodeObstacles) is a
+        // real obstacle for where the leader/followers finally land.
+        const memberIdSet = new Set(memberIds);
+        const ownGroupRootIds = new Set(nodeGroups.filter((g) => memberIdSet.has(g.rootId)).map((g) => g.rootId));
+        const dragObstacles = [
+          ...footprintObstacles(obstaclePoints(memberIdSet)),
+          ...bigNodeObstacles(ownGroupRootIds),
+        ];
+
         const leaderStart = startPositions.get(node.nodeId)!;
-        const leaderTarget = clamp(leaderStart.x + dx, leaderStart.y + dy);
+        const leaderTarget = avoidOverlap(clamp(leaderStart.x + dx, leaderStart.y + dy), dragObstacles, viewportBounds());
         setGroupDragState((prev) => new Map(prev ?? startPositions).set(node.nodeId, leaderTarget));
 
         const leaderDone = nodesApi
@@ -1081,7 +1245,7 @@ export function MapPage() {
           if (i > 0) await sleep(i * GROUP_FOLLOW_STAGGER_MS);
           if (groupDragToken.current !== token) return;
           const start = startPositions.get(id)!;
-          const target = clamp(start.x + dx, start.y + dy);
+          const target = avoidOverlap(clamp(start.x + dx, start.y + dy), dragObstacles, viewportBounds());
           for (let step = 1; step <= GROUP_FOLLOW_STEPS; step++) {
             if (groupDragToken.current !== token) return;
             const frac = step / GROUP_FOLLOW_STEPS;
@@ -1315,9 +1479,17 @@ export function MapPage() {
         // are what the drop is checked against (see zoneAngleGuard); a node
         // being pulled out no longer shapes it.
         const staysMember = !!ownCircle && Math.hypot(x - ownCircle.cx, y - ownCircle.cy) <= ownCircle.r;
+        // Every other circle's backdrop is now a real obstacle here too (not
+        // just at creation time) — a plain reposition drop used to be able to
+        // land a node's icon right on top of a zone it doesn't belong to.
+        // Its own circle is excluded (staysMember only) so this never pushes
+        // a node out of the zone it's still a member of.
         const dropped = avoidOverlap(
           { x, y },
-          footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
+          [
+            ...footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
+            ...bigNodeObstacles(staysMember && ownCircle ? new Set([ownCircle.rootId]) : undefined),
+          ],
           viewportBounds(),
           zoneAngleGuard(node.nodeId, staysMember ? (parentId ?? null) : null, visibleNodes, positions),
         );
@@ -1332,6 +1504,13 @@ export function MapPage() {
           return;
         }
 
+        // Remembered so a failed persist below can put the node back exactly
+        // where it actually still is on the server, instead of leaving the
+        // optimistic drop showing as "moved" when it never saved — that
+        // silent mismatch (until the next reload happened to fix it) was the
+        // real bug: a courtesy update still has to be honest about whether
+        // it landed.
+        const before = { x: node.x, y: node.y, parentId: node.parentId };
         setNodes((prev) =>
           prev.map((n) =>
             n.nodeId === node.nodeId ? { ...n, x: dropped.x, y: dropped.y, ...(leftCircle ? { parentId: null } : {}) } : n,
@@ -1339,19 +1518,17 @@ export function MapPage() {
         );
         try {
           if (leftCircle) {
-            // A structural change, not just a courtesy position update — a
-            // failed persist here would leave the UI showing the node as
-            // detached when the server still has it in the circle, so this
-            // one gets surfaced and reconciled from the real response
-            // instead of silently trusted like the position-only case below.
             const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y, parentId: null });
             upsertNode(updated);
           } else {
-            await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y });
+            const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y });
+            upsertNode(updated);
           }
         } catch (err) {
-          if (leftCircle) setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.leaveCircle);
-          // otherwise: position is a courtesy update — a failed persist just means it snaps back on next reload
+          setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
+          setActionError(
+            err instanceof ApiRequestError ? err.message : leftCircle ? t.ui.errors.leaveCircle : t.ui.errors.moveNodes,
+          );
         }
       } else {
         handleNodeClick(node);
@@ -1892,12 +2069,13 @@ export function MapPage() {
     if (centerOn) setTimeout(() => centerOnPoint(centerOn.x, centerOn.y), 250);
   }
 
-  // After an action on chosen nodes finishes, brings them into view: zooms out
-  // just enough for all of them to fit on screen (never in), then glides to
-  // their middle.
-  function showNodes(ids: string[]) {
+  // Brings an arbitrary set of canvas points into view: zooms out just
+  // enough for all of them to fit on screen (never in), then glides to their
+  // middle. Shared core of showNodes (below) and the majority-swap effect's
+  // own camera cue — the latter passes both a unit's start *and* end point so
+  // the whole glide stays on-screen, not just wherever it happens to end up.
+  function showPoints(pts: { x: number; y: number }[]) {
     const wrap = wrapRef.current;
-    const pts = ids.map((id) => positions.get(id)).filter((p): p is { x: number; y: number } => !!p);
     if (!wrap || pts.length === 0) return;
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
@@ -1912,6 +2090,13 @@ export function MapPage() {
     } else {
       centerOnPoint(middle.x, middle.y);
     }
+  }
+
+  // After an action on chosen nodes finishes, brings them into view: zooms out
+  // just enough for all of them to fit on screen (never in), then glides to
+  // their middle.
+  function showNodes(ids: string[]) {
+    showPoints(ids.map((id) => positions.get(id)).filter((p): p is { x: number; y: number } => !!p));
   }
 
   // The group bar's "Show as": the chosen nodes take this reading mode (null =
@@ -2470,6 +2655,30 @@ export function MapPage() {
     }
     function onKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
+      // Presentation mode takes the keyboard over outright while active —
+      // checked first, ahead of every other mode branch below, with a bare
+      // `return` at the end so a presentation-mode keypress can never fall
+      // through into copy/paste or any other mode's own shortcuts further
+      // down (those read multiSelectIds/clipboard state that shouldn't be
+      // reachable while presenting).
+      if (presenting) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          exitPresentation();
+          return;
+        }
+        if (e.key === "ArrowRight" || e.key === " ") {
+          e.preventDefault();
+          setSlideIndex((i) => Math.min(i + 1, slideNodes.length - 1));
+          return;
+        }
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setSlideIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        return;
+      }
       // Drawing a line: Enter finishes it, Backspace / Ctrl+Z takes back the
       // last point, Escape clears the line (or leaves drawing when nothing is
       // placed). A focused button keeps its own Enter.
@@ -2718,7 +2927,18 @@ export function MapPage() {
               linkCycles={linkCycles}
               chosenNodeIds={chosenNodeIds}
               pendingLink={pendingLink}
-              onCircleClick={handleCircleBackdropClick}
+              onCircleClick={(rootId) => {
+                // A zone's own polygon stops the click from ever reaching the
+                // canvas div's onClick (see its own chooseMode branch above)
+                // — so without this, choosing was only exitable by clicking
+                // truly empty canvas, not a zone. Choosing wins over the
+                // zone's normal stabilize/release behavior while it's active.
+                if (chooseMode) {
+                  exitChooseMode();
+                  return;
+                }
+                handleCircleBackdropClick(rootId);
+              }}
               lines={lines}
               canDeleteLine={canDeleteLine}
               onLineClick={handleLineClick}
@@ -2919,74 +3139,93 @@ export function MapPage() {
           </div>
           </div>
           </div>
-          <MiniMap
-            wrapRef={wrapRef}
-            nodes={visibleNodes}
-            edges={edges}
-            lines={lines}
-            positions={positions}
-            groups={nodeGroups.map((g) => ({ ...g, variant: !!nodes.find((n) => n.nodeId === g.rootId)?.parentId }))}
-            canvasW={CANVAS_W}
-            canvasH={CANVAS_H}
-            zoom={zoom}
-            hScrollMargin={hScrollMargin}
-            vScrollMargin={vScrollMargin}
-            onPanTo={panTo}
-          />
+          {/* All of this is normal editing chrome — replaced outright by
+              PresentationOverlay below while presenting, not just dimmed
+              underneath it, same "swap the slot, don't hide-under" approach
+              the pack/choose/draw bottom-sheet ternary just below already
+              uses for NodePanel. */}
+          {!presenting && (
+            <>
+              <MiniMap
+                wrapRef={wrapRef}
+                nodes={visibleNodes}
+                edges={edges}
+                lines={lines}
+                positions={positions}
+                groups={nodeGroups.map((g) => ({ ...g, variant: !!nodes.find((n) => n.nodeId === g.rootId)?.parentId }))}
+                canvasW={CANVAS_W}
+                canvasH={CANVAS_H}
+                zoom={zoom}
+                hScrollMargin={hScrollMargin}
+                vScrollMargin={vScrollMargin}
+                onPanTo={panTo}
+              />
 
-          <ZoneNames
-            wrapRef={wrapRef}
-            zones={nodeGroups.flatMap((g) => {
-              const root = nodes.find((n) => n.nodeId === g.rootId);
-              return root?.zoneName
-                ? [{ rootId: g.rootId, name: root.zoneName, sentiment: g.sentiment, variant: !!root.parentId }]
-                : [];
-            })}
-            positions={positions}
-            zoom={zoom}
-            hScrollMargin={hScrollMargin}
-            vScrollMargin={vScrollMargin}
-          />
+              <ZoneNames
+                wrapRef={wrapRef}
+                zones={nodeGroups.flatMap((g) => {
+                  const root = nodes.find((n) => n.nodeId === g.rootId);
+                  return root?.zoneName
+                    ? [{ rootId: g.rootId, name: root.zoneName, sentiment: g.sentiment, variant: !!root.parentId }]
+                    : [];
+                })}
+                positions={positions}
+                zoom={zoom}
+                hScrollMargin={hScrollMargin}
+                vScrollMargin={vScrollMargin}
+              />
 
-          <MapToolbar
-            isDemo={!!user?.isDemo}
-            isOwner={isOwner}
-            isDiscussionMode={isDiscussionMode}
-            expanded={!quickAddActive || forceShowToolbar}
-            onExpand={() => setForceShowToolbar(true)}
-            moveMode={moveMode}
-            onToggleMove={() => setMoveMode((v) => !v)}
-            drawMode={drawMode}
-            onToggleDraw={toggleDrawMode}
-            readingMode={readingMode}
-            onPickReadingMode={setReadingMode}
-            compact={compactView}
-            onToggleCompact={toggleCompactView}
-            nodes={visibleNodes}
-            onLoadTexts={async () => {
-              await ensureNodeText(visibleNodes.map((n) => n.nodeId));
-            }}
-            onSearchMatches={setSearchMatches}
-            onPickSearchResult={(id) => {
-              setSelectedId(id);
-              centerOnNode(id);
-            }}
-            onToggleMapMode={toggleMapMode}
-            onExitDemo={exitDemo}
-            onInvite={() => setShowInvite(true)}
-            onCreateNode={startCreateNodeInView}
-            onCreateCircle={createCircle}
-            onCopyMap={copyWholeMap}
-            onPaste={() => pasteClipboard()}
-            onExportText={openExportText}
-          />
+              <MapToolbar
+                isDemo={!!user?.isDemo}
+                isOwner={isOwner}
+                isDiscussionMode={isDiscussionMode}
+                expanded={!quickAddActive || forceShowToolbar}
+                onExpand={() => setForceShowToolbar(true)}
+                moveMode={moveMode}
+                onToggleMove={() => setMoveMode((v) => !v)}
+                drawMode={drawMode}
+                onToggleDraw={toggleDrawMode}
+                readingMode={readingMode}
+                onPickReadingMode={setReadingMode}
+                compact={compactView}
+                onToggleCompact={toggleCompactView}
+                nodes={visibleNodes}
+                onLoadTexts={async () => {
+                  await ensureNodeText(visibleNodes.map((n) => n.nodeId));
+                }}
+                onSearchMatches={setSearchMatches}
+                onPickSearchResult={(id) => {
+                  setSelectedId(id);
+                  centerOnNode(id);
+                }}
+                onToggleMapMode={toggleMapMode}
+                onExitDemo={exitDemo}
+                onInvite={() => setShowInvite(true)}
+                onCreateNode={startCreateNodeInView}
+                onCreateCircle={createCircle}
+                onCopyMap={copyWholeMap}
+                onPaste={() => pasteClipboard()}
+                onExportText={openExportText}
+                onPresent={enterPresentation}
+              />
 
-          <ZoomControls
-            zoom={zoom}
-            onZoomOut={() => zoomFromCenter(-ZOOM_STEP)}
-            onZoomIn={() => zoomFromCenter(ZOOM_STEP)}
-            onReset={() => zoomFromCenter(0, 1)}
-          />
+              <ZoomControls
+                zoom={zoom}
+                onZoomOut={() => zoomFromCenter(-ZOOM_STEP)}
+                onZoomIn={() => zoomFromCenter(ZOOM_STEP)}
+                onReset={() => zoomFromCenter(0, 1)}
+              />
+            </>
+          )}
+
+          {presenting && (
+            <PresentationOverlay
+              slides={slideNodes}
+              index={Math.min(slideIndex, Math.max(0, slideNodes.length - 1))}
+              onIndexChange={setSlideIndex}
+              onExit={exitPresentation}
+            />
+          )}
         </div>
 
         {/* The pack picker and the group bar each take over this bottom-sheet
@@ -3026,6 +3265,12 @@ export function MapPage() {
             onDone={exitChooseMode}
           />
         ) : (
+          // !presenting: NodePanel already only renders when a node is
+          // selected, and enterPresentation clears selectedId — but this
+          // guard stays defensive rather than relying on that alone, in
+          // case anything else (e.g. a queued search-result pick) ever
+          // re-selects a node while presenting.
+          !presenting &&
           selectedNode &&
           user && (
             <>
@@ -3159,7 +3404,7 @@ export function MapPage() {
         />
       )}
 
-      <MapLegend />
+      {!presenting && <MapLegend />}
 
       {pendingLink && mapId && (
         <CreateEdgeModal
