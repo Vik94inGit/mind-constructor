@@ -987,12 +987,14 @@ export function MapPage() {
   // fixed buffer (not a fraction of getNodeMinDist() any more — that put a
   // ~150px empty ring of dead space around every zone on top of the radius'
   // own +70 built-in padding, reading as an overly spread-out, uncompact
-  // map instead of a clear-but-tight boundary). Just enough for a node's own
-  // icon+caption to clear the backdrop's edge, not its full spacing margin.
+  // map instead of a clear-but-tight boundary; even the first cut down to
+  // +40 still read as a single-node drag landing surprisingly far from
+  // where it was actually dropped). Just enough for a node's own icon to
+  // clear the backdrop's edge, not its full caption-width spacing margin.
   function bigNodeObstacles(excludeRootIds: Set<string> = new Set()): Obstacle[] {
     return nodeGroups
       .filter((g) => !excludeRootIds.has(g.rootId))
-      .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 40 }));
+      .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 20 }));
   }
 
   // Any closed loop in the Link graph reads as a "figure" and gets colored
@@ -1291,13 +1293,41 @@ export function MapPage() {
         // real obstacle for where the leader/followers finally land.
         const memberIdSet = new Set(memberIds);
         const ownGroupRootIds = new Set(nodeGroups.filter((g) => memberIdSet.has(g.rootId)).map((g) => g.rootId));
-        const dragObstacles = [
+        const externalObstacles = [
           ...footprintObstacles(obstaclePoints(memberIdSet)),
           ...bigNodeObstacles(ownGroupRootIds),
         ];
 
+        // Every member's own final target, worked out up front (leader
+        // first, then followers in order) rather than each one independently
+        // inside the async catch-up loop below. `obstaclePoints(memberIdSet)`
+        // above only ever excludes the *whole* group from each other's
+        // obstacle list — fine for the group's own shape (translating every
+        // member by the same dx/dy can't newly overlap them with each
+        // other), but a member nudged clear of some *external* obstacle
+        // (another zone, another node) had no way to know it was landing on
+        // top of a groupmate, since groupmates were never obstacles to begin
+        // with. Feeding each already-placed member's own target into the
+        // next one's own obstacle list (footprintObstacles(...)) fixes that:
+        // a follower now steers clear of the leader and of every earlier
+        // follower too, not just of the outside world.
+        const memberTargets = new Map<string, { x: number; y: number }>();
         const leaderStart = startPositions.get(node.nodeId)!;
-        const leaderTarget = avoidOverlap(clamp(leaderStart.x + dx, leaderStart.y + dy), dragObstacles, viewportBounds());
+        const leaderTarget = avoidOverlap(
+          clamp(leaderStart.x + dx, leaderStart.y + dy),
+          externalObstacles,
+          viewportBounds(),
+        );
+        memberTargets.set(node.nodeId, leaderTarget);
+        for (const id of followerIds) {
+          const start = startPositions.get(id)!;
+          const placedSoFar = footprintObstacles(Array.from(memberTargets.values()));
+          memberTargets.set(
+            id,
+            avoidOverlap(clamp(start.x + dx, start.y + dy), [...externalObstacles, ...placedSoFar], viewportBounds()),
+          );
+        }
+
         setGroupDragState((prev) => new Map(prev ?? startPositions).set(node.nodeId, leaderTarget));
         zoomToEditAt(leaderTarget.x, leaderTarget.y);
 
@@ -1318,7 +1348,7 @@ export function MapPage() {
           if (i > 0) await sleep(i * GROUP_FOLLOW_STAGGER_MS);
           if (groupDragToken.current !== token) return;
           const start = startPositions.get(id)!;
-          const target = avoidOverlap(clamp(start.x + dx, start.y + dy), dragObstacles, viewportBounds());
+          const target = memberTargets.get(id)!;
           for (let step = 1; step <= GROUP_FOLLOW_STEPS; step++) {
             if (groupDragToken.current !== token) return;
             const frac = step / GROUP_FOLLOW_STEPS;
@@ -1343,23 +1373,22 @@ export function MapPage() {
       return;
     }
 
-    // Outside explicit move mode, a bare pointer-down on a single node
-    // never arms a reposition/reparent drag — only touch's own
-    // long-press-to-multiselect gesture still lives here (a deliberate,
-    // held gesture, not the accidental case this addresses); a plain tap
-    // or click falls straight through to NodeCard's own onClick, untouched.
-    // This is what actually fixes "uncomfortable to accidentally drag and
-    // drop nodes": dragging has to be turned on first (the toolbar's own
-    // Move toggle) instead of arming from the very first pointerdown on
-    // any node, so a phone's own touch imprecision while just trying to
-    // tap a node can't relocate — or even re-parent — it by accident.
-    // node.locked takes the same path even with Move on — a
+    // Mouse only: outside explicit move mode, a bare pointer-down on a
+    // single node never arms a reposition/reparent drag — a plain click
+    // falls straight through to NodeCard's own onClick, untouched. Touch no
+    // longer needs the Move toggle at all (see the branch below skipping
+    // this gate for it) — its own long-press-vs-drag disambiguation
+    // (LONG_PRESS_MOVE_TOLERANCE, further down) is what protects against a
+    // stray swipe-while-tapping instead: holding still still toggles
+    // multi-select, only real movement past that tolerance now starts a
+    // drag, so an accidental few px of touch imprecision still can't
+    // relocate a node the way a bare, ungated pointerdown could have.
+    // node.locked still blocks dragging outright, on both input types — a
     // chosen circle's own members hold their position for good (see the
-    // group-drag branch's own comment above), so Move toggled on never
-    // re-arms a reposition for one of them either; touch long-press-to-
-    // multiselect still works, since picking a locked node into some other
-    // selection doesn't move anything.
-    if (!moveMode || node.locked) {
+    // group-drag branch's own comment above); touch long-press-to-
+    // multiselect still works on one, since picking a locked node into some
+    // other selection doesn't move anything.
+    if ((!moveMode && e.pointerType !== "touch") || node.locked) {
       if (e.pointerType !== "touch") return;
       const touchStartX = e.clientX;
       const touchStartY = e.clientY;
