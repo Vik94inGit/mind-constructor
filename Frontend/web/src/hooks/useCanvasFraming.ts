@@ -48,20 +48,25 @@ export function useCanvasFraming({
   stillOverlapNotice,
   zoomedToFitNotice,
 }: Params) {
-  // Nodes in a text mode (icons + text, classic mind map) take far more room
-  // than an icon does, and overlap their neighbors at the current spacing. A
-  // node draws at a constant size on screen whatever the zoom is, so
-  // zooming in spreads the positions apart without changing anything else —
-  // the view "extends" until the expanded nodes clear each other (or as far
-  // as the zoom allows). Only ever zooms in; nothing is moved.
+  // A node's own drawn footprint (icon or text box, depending on reading
+  // mode) takes real room, and can overlap a neighbor's at the current
+  // spacing — a node draws at a constant size on screen whatever the zoom
+  // is, so zooming in spreads the positions apart without changing
+  // anything else. Only ever zooms in; nothing is moved. Weapon/protection
+  // nodes are left out — a protection node actively defending an attack is
+  // deliberately placed overlapping both its attacker's and its target's
+  // own footprint (see nodePositions.ts's own doc comment on that), which
+  // would otherwise read as permanent crowding needing a fix that isn't
+  // one.
   function fitZoomForDisplay(display: NodeDisplay, globalMode: ReadingMode, centerOn?: Pt) {
     const items = visibleNodes.flatMap((n) => {
+      if (n.isWeapon || n.isProtection) return [];
       const pos = positions.get(n.nodeId);
       if (!pos) return [];
       const mode = display[n.nodeId] ?? globalMode;
       const tier = circleRootSentimentByNode.has(n.nodeId) ? 3 : (n.sizeTier ?? 1);
       const multiplier = tier === 3 ? 1.3 : tier === 2 ? 1.15 : 1;
-      return [{ x: pos.x, y: pos.y, ...nodeFootprint(n, mode, multiplier), expanded: mode !== "actual" }];
+      return [{ x: pos.x, y: pos.y, ...nodeFootprint(n, mode, multiplier) }];
     });
     const needed = zoomToSeparate(items);
     if (needed <= zoom + 0.005) return;

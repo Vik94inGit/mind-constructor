@@ -75,6 +75,15 @@ const PANEL_CLASS =
 // somewhere the user can't grab it again to bring it back.
 const PANEL_DRAG_MIN_VISIBLE_PX = 48;
 
+// A person-chosen panel height (see the resize handle/onResizeHandlePointerDown
+// below) — remembered across nodes and reloads, unlike dragOffset above (which
+// resets per node): this is a standing size preference, not per-node UI state.
+const PANEL_HEIGHT_STORAGE_KEY = "mc_node_panel_height_px";
+const MIN_PANEL_HEIGHT_PX = 200;
+// Left clear at the top so the resize handle (and whatever's behind it) never
+// becomes fully unreachable by dragging the sheet to fill the entire screen.
+const PANEL_RESIZE_TOP_MARGIN_PX = 72;
+
 // The header only ever shows the type icon and a two-line clamp of the
 // node's own text (see the header markup below); everything else — text,
 // health, CRUD, links, the whole attack form, and history — lives behind
@@ -217,6 +226,58 @@ export function NodePanel({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const panelRef = useRef<HTMLDivElement>(null);
   const draggingPanelRef = useRef(false);
+
+  // null means "no override yet" — PANEL_CLASS's own responsive max-height
+  // (34dvh/50dvh) still applies, same as before this existed. Once someone
+  // drags the resize handle, this becomes a literal height that replaces
+  // that cap and sticks around (see the storage effect right below).
+  const [panelHeight, setPanelHeight] = useState<number | null>(() => {
+    try {
+      const raw = localStorage.getItem(PANEL_HEIGHT_STORAGE_KEY);
+      const parsed = raw ? Number(raw) : NaN;
+      return Number.isFinite(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
+  const draggingHeightRef = useRef(false);
+
+  function onResizeHandlePointerDown(e: ReactPointerEvent) {
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    draggingHeightRef.current = true;
+    const startClientY = e.clientY;
+    const startHeight = panelRef.current?.getBoundingClientRect().height ?? MIN_PANEL_HEIGHT_PX;
+    const maxHeight = window.innerHeight - PANEL_RESIZE_TOP_MARGIN_PX;
+
+    function onMove(ev: PointerEvent) {
+      if (!draggingHeightRef.current) return;
+      // The sheet is bottom-docked, so dragging the top edge *up* (a
+      // shrinking clientY) is what grows it — the same inverted relationship
+      // dragOffset's own minY/maxY above have to account for.
+      const next = Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT_PX, startHeight + (startClientY - ev.clientY)));
+      setPanelHeight(next);
+    }
+    function onUp() {
+      draggingHeightRef.current = false;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  // Persisted as it changes (not just on pointerup) so a refresh mid-drag
+  // still keeps whatever size was last reached.
+  useEffect(() => {
+    if (panelHeight == null) return;
+    try {
+      localStorage.setItem(PANEL_HEIGHT_STORAGE_KEY, String(panelHeight));
+    } catch {
+      // Private-browsing/blocked storage — the size just won't survive a
+      // reload; nothing here depends on the write actually landing.
+    }
+  }, [panelHeight]);
 
   function onGripPointerDown(e: ReactPointerEvent) {
     e.stopPropagation();
@@ -633,27 +694,6 @@ export function NodePanel({
     }
   }
 
-  // Owner-only — the type itself, not to be confused with symbolOverride
-  // (which only ever tweaks an outcome node's inner check/cross, never its
-  // actual claimed type). The canvas's own inline editor (double-click, or
-  // the Edit button below) already lets you cycle through types by
-  // clicking the node's icon — this is a second, more discoverable path to
-  // the exact same field, same reasoning Size/Zone/Symbol already got
-  // their own explicit controls here instead of staying inline-editor-only.
-  async function handleSetType(type: NodeType) {
-    if (type === node.type) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await nodesApi.updateNode(node.nodeId, { type });
-      onUpdated(updated);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.type);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   // Owner-only (same as text/type edits) — a manually-chosen zone ring
   // around just this node, independent of the automatic circle/nodeGroups
   // detection. null explicitly removes it, same nullish contract
@@ -703,8 +743,28 @@ export function NodePanel({
     <div
       ref={panelRef}
       className={PANEL_CLASS}
-      style={dragOffset.x || dragOffset.y ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined}
+      style={{
+        ...(dragOffset.x || dragOffset.y ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined),
+        // Overrides PANEL_CLASS's own responsive max-height cap the moment
+        // someone's actually resized this — see panelHeight's own doc
+        // comment above. Both height and maxHeight: the sheet's content
+        // (whichever tab is open) can be shorter than the chosen size, and
+        // height alone wouldn't stop max-height from still capping it below
+        // that on a small viewport.
+        ...(panelHeight != null ? { height: panelHeight, maxHeight: panelHeight } : undefined),
+      }}
     >
+      {/* Resize handle — drags the sheet's top edge to grow/shrink it (see
+          panelHeight/onResizeHandlePointerDown above). Separate from the
+          grip below (which repositions the whole sheet instead) so the two
+          gestures never fight over the same strip. Same bleed-to-the-edge
+          technique the grip already uses, just for height instead of
+          reach. */}
+      <div
+        className="-mx-5 -mt-5 mb-[0.15rem] h-[0.6rem] touch-none cursor-ns-resize select-none"
+        onPointerDown={onResizeHandlePointerDown}
+        title={t.ui.panelResizeHandle}
+      />
       {/* Grip handle — the only way to drag this sheet off its default
           bottom dock (see dragOffset/onGripPointerDown above). A dedicated
           strip rather than making the whole header draggable, so the tab
@@ -713,7 +773,7 @@ export function NodePanel({
           attempt. touch-none: without it a touch-drag here scrolls/bounces
           the page underneath instead of moving the sheet. */}
       <div
-        className="-mx-5 -mt-5 mb-3 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
+        className="-mx-5 mb-3 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
         onPointerDown={onGripPointerDown}
         title={t.ui.panelDragHandle}
       >
@@ -1033,24 +1093,6 @@ export function NodePanel({
                 onBlur={() => void handleOrderSave()}
                 className="w-24 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
               />
-            </div>
-          )}
-
-          {isCreator && (
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.type}</span>
-              <select
-                value={node.type}
-                onChange={(e) => handleSetType(e.target.value as NodeType)}
-                disabled={busy}
-                className="rounded-lg border border-line bg-surface px-[0.55rem] py-[0.3rem] text-[0.8rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {NODE_TYPES.map((ty) => (
-                  <option key={ty} value={ty}>
-                    {t.ui.types[ty]}
-                  </option>
-                ))}
-              </select>
             </div>
           )}
 

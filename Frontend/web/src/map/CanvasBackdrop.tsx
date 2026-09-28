@@ -1,10 +1,20 @@
+import { useMemo, useRef } from "react";
 import { CANVAS_W, CANVAS_H } from "../utils/canvasLayout";
 import { roundedPath } from "../utils/drawLine";
 import { useI18n } from "../i18n/I18nContext";
+import { useZoneFloat } from "../hooks/useZoneFloat";
 import type { NodeGroup } from "../utils/canvasLayout";
 import { nodeRefId, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
+
+const CANVAS_CENTER = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+
+function centroidOf(points: { x: number; y: number }[]) {
+  const n = points.length || 1;
+  const sum = points.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+  return { x: sum.x / n, y: sum.y / n };
+}
 
 interface Props {
   nodeGroups: NodeGroup[];
@@ -30,6 +40,8 @@ interface Props {
   compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
   drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
+  /** Bumped on every click on empty canvas — see useZoneFloat's own boostTick doc comment. */
+  zoneFloatBoostTick: number;
 }
 
 // Everything drawn *behind* the node cards: zone polygons, manual zones and
@@ -52,9 +64,19 @@ export function CanvasBackdrop({
   onLineClick,
   interactive,
   drawing,
+  zoneFloatBoostTick,
   compact = false,
 }: Props) {
   const { t } = useI18n();
+  const zonePolygonsRef = useRef(new Map<string, SVGPolygonElement>());
+  const floatingZones = useMemo(
+    () =>
+      nodeGroups
+        .filter((g) => selectedCircle?.rootId !== g.rootId)
+        .map((g) => ({ rootId: g.rootId, centroid: centroidOf(g.outline) })),
+    [nodeGroups, selectedCircle],
+  );
+  useZoneFloat(floatingZones, CANVAS_CENTER, zonePolygonsRef, zoneFloatBoostTick);
   return (
     <svg
       className="pointer-events-none absolute inset-0 h-full w-full"
@@ -85,6 +107,13 @@ export function CanvasBackdrop({
         return (
           <polygon
             key={`zone-${g.rootId}`}
+            ref={(el) => {
+              // Handed to useZoneFloat above, which drives this element's
+              // own transform/transition directly — see its doc comment
+              // for why that's imperative rather than a style prop here.
+              if (el) zonePolygonsRef.current.set(g.rootId, el);
+              else zonePolygonsRef.current.delete(g.rootId);
+            }}
             points={g.outline.map((p) => `${p.x},${p.y}`).join(" ")}
             fill={color}
             fillOpacity={dimmed ? 0.06 : 0.14}

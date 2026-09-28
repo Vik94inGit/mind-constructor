@@ -71,26 +71,34 @@ export interface FootprintItem {
   y: number;
   w: number;
   h: number;
-  /** Drawn in a text mode — only pairs with at least one of these are checked. */
-  expanded: boolean;
 }
 
 const GAP_X = 14;
 const GAP_Y = 10;
 
-// The smallest canvas zoom at which no expanded node's box overlaps another
-// node's. Two boxes are clear of each other once they are far enough apart
-// horizontally OR vertically, so for a pair that is the cheaper of the two;
-// the answer is the worst pair. Nodes at exactly the same spot can't be
-// separated by zooming and are ignored. Returns a scale factor ≥ 0 (compare it
-// with the current zoom: anything at or below it is already fine).
+// The smallest canvas zoom at which no node's own footprint box overlaps
+// another's. Two boxes are clear of each other once they are far enough
+// apart horizontally OR vertically, so for a pair that is the cheaper of
+// the two; the answer is the worst pair. Nodes at exactly the same spot
+// can't be separated by zooming and are ignored. Returns a scale factor ≥ 0
+// (compare it with the current zoom: anything at or below it is already
+// fine).
+//
+// Every pair is checked now, not just ones in a text reading mode — a node
+// draws at a constant on-screen size whatever the canvas zoom is (see
+// nodeFootprint's own doc comment), so the same "zoom in to make room"
+// fix applies just as well to two icon-mode nodes placed closer together
+// than their own 150x100 footprint, which does happen (a freshly-loaded
+// node with no stored position, a zone that's grown crowded over time) —
+// the old text-mode-only check meant a map that never left the default
+// icon view had no way to ever trigger this at all, however crowded it
+// got.
 export function zoomToSeparate(items: FootprintItem[]): number {
   let needed = 0;
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
       const a = items[i];
       const b = items[j];
-      if (!a.expanded && !b.expanded) continue;
       const dx = Math.abs(a.x - b.x);
       const dy = Math.abs(a.y - b.y);
       if (dx === 0 && dy === 0) continue;

@@ -54,7 +54,7 @@ import {
   CANVAS_H,
   ZOOM_STEP,
   computeLinkedNeighborIds,
-  getNodeMinDist,
+  getCirclePackSpacing,
   pickNonOverlappingPosition,
   nodeObstacles,
   avoidOverlap,
@@ -119,6 +119,12 @@ export function MapPage() {
   const [indicators, setIndicators] = useState<AttackIndicator[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Bumped on every click on empty canvas — passed down to CanvasBackdrop,
+  // which hands it to useZoneFloat so a click can sprint every currently-
+  // drifting zone back to its real position instead of waiting out its own
+  // normal, slower leg. See useZoneFloat's own doc comment.
+  const [zoneFloatBoostTick, setZoneFloatBoostTick] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
@@ -922,6 +928,21 @@ export function MapPage() {
     zoomedToFitNotice: t.ui.display.zoomedToFit,
   });
 
+  // A map that's already crowded the moment it's opened gets the same
+  // "zoom in to make room" treatment a reading-mode change triggers —
+  // without this, a map that stays in the default icon view the whole time
+  // has no way to ever surface this at all, however crowded loading it left
+  // the canvas (see fitZoomForDisplay's own doc comment: it now checks
+  // icon-mode footprints too, not just text modes). Runs once, right as the
+  // initial load settles — keyed on `loading` alone, not on positions/nodes,
+  // so a node moving near another one mid-drag doesn't zoom the screen in
+  // on its own, fighting the gesture that caused it.
+  useEffect(() => {
+    if (loading) return;
+    fitZoomForDisplay(nodeDisplay, readingMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   // What any node creation/drag has to steer clear of so it never lands
   // inside a big group backdrop — the group's own members are exempt
   // (excludeRootIds), since they belong there and are what the backdrop is
@@ -1063,11 +1084,10 @@ export function MapPage() {
   // Single entry point for "start editing this node's text/type inline, on
   // its own icon" — always selects (so the side panel shows something,
   // including the locked message when editing isn't allowed), but only
-  // actually turns the inline input on when canEditNode agrees. Reached
-  // from the context menu's "Update" and the side panel's own Edit button —
-  // deliberately not a node double-click any more (see zoom controls below,
-  // which claim that gesture instead), so editing only ever starts from an
-  // explicit, hard-to-fat-finger control.
+  // actually turns the inline input on when canEditNode agrees. Reached from
+  // a node double-click and the side panel's own Edit button. The context
+  // menu's own "Edit" item is a different, separate action now — it just
+  // opens the panel (see handleNodeClick below), not this inline editor.
   async function startInlineEdit(node: NodeDoc) {
     setContextMenu(null);
     setPendingCreate(null);
@@ -1161,6 +1181,21 @@ export function MapPage() {
       const attackers = nodes.filter((n) => n.isWeapon && nodeRefId(n.targetNodeId) === node.nodeId);
       const latestAttacker = attackers[attackers.length - 1];
       if (latestAttacker) triggerWeaponShot(latestAttacker.nodeId);
+    }
+  }
+
+  // The context menu's own "Change type" submenu — a third path to the same
+  // field the inline editor's icon-click cycling and the node panel's own
+  // (now removed) type dropdown used to cover, for picking a type without
+  // opening either of those. Owner-only, same as every other context-menu
+  // action on someone else's node (see NodeContextMenu's own isOwner gate).
+  async function handleChangeNodeType(node: NodeDoc, type: NodeType) {
+    setActionError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { type });
+      upsertNode(updated);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.type);
     }
   }
 
@@ -1767,8 +1802,11 @@ export function MapPage() {
 
       // Two children fanned either side of straight up from the root —
       // same angle-from-vertical idea QuickAddGhosts' own ring uses, just
-      // two fixed slots instead of one per node type.
-      const radius = getNodeMinDist() + 40;
+      // two fixed slots instead of one per node type. getCirclePackSpacing
+      // (not getNodeMinDist), same reasoning as layoutTemplate's own switch
+      // — these two are deliberately fanned around a shared root, not two
+      // unrelated nodes that happened to land near each other.
+      const radius = getCirclePackSpacing();
       const children = await Promise.all(
         [-50, 50].map(async (deg) => {
           const angle = (-90 + deg) * (Math.PI / 180);
@@ -2062,6 +2100,9 @@ export function MapPage() {
                 suppressNextClick.current = false;
                 return;
               }
+              // Any real click on empty canvas, regardless of mode below —
+              // see zoneFloatBoostTick's own doc comment.
+              setZoneFloatBoostTick((n) => n + 1);
               // Drawing a line: a click places a point (if the spot is free).
               if (drawMode) {
                 addDrawPoint(screenToCanvas(e.clientX, e.clientY));
@@ -2109,6 +2150,7 @@ export function MapPage() {
               onLineClick={handleLineClick}
               interactive={!drawMode}
               compact={compactView}
+              zoneFloatBoostTick={zoneFloatBoostTick}
               drawing={
                 drawMode
                   ? {
@@ -2330,8 +2372,13 @@ export function MapPage() {
                 wrapRef={wrapRef}
                 zones={nodeGroups.flatMap((g) => {
                   const root = nodes.find((n) => n.nodeId === g.rootId);
-                  return root?.zoneName
-                    ? [{ rootId: g.rootId, name: root.zoneName, sentiment: g.sentiment, variant: !!root.parentId }]
+                  // An owner-given zoneName wins when set; otherwise every
+                  // zone still gets *some* label rather than none at all —
+                  // same title-falls-back-to-text the node's own caption
+                  // uses elsewhere (see e.g. PresentationOverlay).
+                  const name = root?.zoneName || root?.title || root?.text;
+                  return name
+                    ? [{ rootId: g.rootId, name, sentiment: g.sentiment, variant: !!root!.parentId }]
                     : [];
                 })}
                 positions={positions}
@@ -2508,10 +2555,15 @@ export function MapPage() {
 
       {contextMenu && (
         <NodeContextMenu
+          // Remounts fresh (back to the root menu, not stuck on whatever
+          // submenu the previous node's menu was showing) whenever the
+          // target node changes.
+          key={contextMenu.node.nodeId}
           x={contextMenu.x}
           y={contextMenu.y}
           isOwner={isOwnNode(contextMenu.node)}
           canAttack={canAttackNode(contextMenu.node)}
+          nodeType={contextMenu.node.type}
           onClose={() => setContextMenu(null)}
           onCreate={() => {
             const anchor = contextMenu.node;
@@ -2527,7 +2579,8 @@ export function MapPage() {
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: anchor.nodeId });
           }}
-          onUpdate={() => startInlineEdit(contextMenu.node)}
+          onEdit={() => handleNodeClick(contextMenu.node)}
+          onChangeType={(type) => handleChangeNodeType(contextMenu.node, type)}
           onDelete={() => {
             const node = contextMenu.node;
             setContextMenu(null);
