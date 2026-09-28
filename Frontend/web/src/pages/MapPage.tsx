@@ -11,8 +11,7 @@ import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
-import { stepPrefix, stepRank } from "../utils/textExport";
-import { buildNodeClipboard, nodeClipboardSize, readNodeClipboard, writeNodeClipboard } from "../utils/nodeClipboard";
+import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
@@ -27,8 +26,7 @@ import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
-import { isPointFree, isSegmentFree, snapToLines } from "../utils/drawLine";
-import { loadNodeDisplay, saveNodeDisplay, nodeFootprint, zoomToSeparate } from "../utils/nodeDisplay";
+import { loadNodeDisplay } from "../utils/nodeDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
 import { MapToolbar } from "../map/MapToolbar";
@@ -40,6 +38,11 @@ import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId } from "../utils/nodeType";
 import { layoutTemplate } from "../utils/templates";
 import { useRadialBlend } from "../hooks/useRadialBlend";
+import { useMajoritySwap } from "../hooks/useMajoritySwap";
+import { useCanvasFraming } from "../hooks/useCanvasFraming";
+import { useClipboardActions } from "../hooks/useClipboardActions";
+import { useLineDrawing } from "../hooks/useLineDrawing";
+import { sleep } from "../utils/sleep";
 import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
 import { computeSlideOrder, computeGeometrizedPositions } from "../utils/presentation";
@@ -49,8 +52,6 @@ import {
   CANVAS_W,
   CANVAS_H,
   ZOOM_STEP,
-  MAX_ZOOM,
-  MIN_ZOOM,
   CIRCLE_DROP_RADIUS,
   computeLinkedNeighborIds,
   getNodeMinDist,
@@ -61,8 +62,6 @@ import {
   isDescendant,
   computeNodeGroups,
   computeLinkCycles,
-  computeDominantSentiment,
-  computeMajoritySwap,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
 import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
@@ -84,25 +83,10 @@ const GROUP_FOLLOW_STEPS = 3;
 const GROUP_FOLLOW_STEP_DELAY_MS = 130;
 const GROUP_FOLLOW_STAGGER_MS = 90;
 
-// Majority-swap auto-reposition — see the effect keyed off dominantSentiment
-// below. Same staggered-hop shape as the group-drag catch-up above, just
-// slower/more spread out: this is a rare, dramatic, whole-map event rather
-// than the tail end of a quick drag release, so it reads better drawn out
-// rather than snapped through as fast as possible. Staggered between units
-// (each solo node or whole circle group is one unit — see
-// computeMajoritySwap's own doc comment), never within one: every id inside
-// a single unit shares the exact same step/timing, moving in lockstep so a
-// circle's own shape never distorts mid-animation.
-const MAJORITY_SWAP_STEPS = 5;
-const MAJORITY_SWAP_STEP_DELAY_MS = 160;
-const MAJORITY_SWAP_STAGGER_MS = 70;
-
 // applyTemplate's own reveal pace — long enough that each node in a growing
 // template branch reads as its own discrete step (plus its celebrate burst),
 // not a flash of everything at once.
 const TEMPLATE_NODE_STAGGER_MS = 250;
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -142,8 +126,6 @@ export function MapPage() {
   const drawHover = mode.kind === "draw" ? mode.hover : null;
   const drawBlocked = mode.kind === "draw" ? mode.blocked : null;
   const drawSaving = mode.kind === "draw" ? mode.saving : false;
-  const drawBlockedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const drawHoverFrameRef = useRef<number | null>(null);
   const [indicators, setIndicators] = useState<AttackIndicator[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -299,28 +281,6 @@ export function MapPage() {
   // member moves by the same pointer delta at once. posFor consults this
   // before the single-node dragState. null outside of an active group drag.
   const [groupDragState, setGroupDragState] = useState<Map<string, { x: number; y: number }> | null>(null);
-  // Same overlay-map shape as groupDragState above, for the majority-swap
-  // auto-reposition effect (see the useEffect keyed off dominantSentiment
-  // further down) — posFor consults this too, after dragState/groupDragState
-  // so a live manual drag always wins visually over the automatic effect's
-  // own in-flight animation. Purely a render-time overlay: real node.x/y is
-  // never touched by this effect any more (see its own comment) — a node's
-  // stored position stays exactly where the user actually left it, so this
-  // can stay showing indefinitely without ever costing the user anything.
-  const [majoritySwapState, setMajoritySwapState] = useState<Map<string, { x: number; y: number }> | null>(null);
-  // Mirrors majoritySwapState for the effect below to read synchronously —
-  // the effect only depends on [dominantSentiment], so closing back over the
-  // state variable itself would see a stale snapshot from whenever the
-  // effect was last (re)created, not whatever the in-flight animation has
-  // actually drawn since. Needed so a sentiment swing that arrives while an
-  // earlier swap animation is still easing in starts from wherever the node
-  // visually is right now, not from its true stored position — jumping back
-  // to storage first, then back out to the new target, would read as a
-  // stutter instead of one continuous glide.
-  const majoritySwapStateRef = useRef<Map<string, { x: number; y: number }> | null>(null);
-  useEffect(() => {
-    majoritySwapStateRef.current = majoritySwapState;
-  }, [majoritySwapState]);
   // Live, while dragging: whichever node the pointer is currently hovering
   // close enough to read as "drop here to join its circle" — null once the
   // pointer isn't over anything droppable. Drives NodeCard's highlight ring.
@@ -339,12 +299,6 @@ export function MapPage() {
   // already ran) before it finished, so its now-stale writes into
   // groupDragState/the API never land on top of whatever drag superseded it.
   const groupDragToken = useRef(0);
-  // Cancellation token for the majority-swap auto-reposition effect,
-  // same contract as groupDragToken above. Bumped (and majoritySwapState
-  // cleared) the moment any node is pointer-downed — see onNodePointerDown's
-  // very first lines — so a real user gesture always preempts the automatic
-  // effect outright rather than the two fighting over the same nodes.
-  const majoritySwapToken = useRef(0);
   // onNodePointerDown calls setPointerCapture on the node's own element —
   // per the Pointer Events spec that re-targets every subsequent event for
   // this interaction, *including the browser's own synthesized "click"*, to
@@ -980,6 +934,27 @@ export function MapPage() {
     return map;
   }, [nodeGroups]);
 
+  // Every camera-framing cue (fit-to-zoom for a text reading mode, the
+  // floor-at-100%-for-editing after a drag, bringing a set of nodes into
+  // view) — see hooks/useCanvasFraming.ts.
+  const { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen } = useCanvasFraming({
+    visibleNodes,
+    positions,
+    circleRootSentimentByNode,
+    zoom,
+    zoomFromCenter,
+    centerOnPoint,
+    wrapRef,
+    showNotice,
+    mapId,
+    multiSelectIds,
+    nodeDisplay,
+    setNodeDisplay,
+    readingMode,
+    stillOverlapNotice: t.ui.display.stillOverlap,
+    zoomedToFitNotice: t.ui.display.zoomedToFit,
+  });
+
   // What any node creation/drag has to steer clear of so it never lands
   // inside a big group backdrop — the group's own members are exempt
   // (excludeRootIds), since they belong there and are what the backdrop is
@@ -1031,140 +1006,21 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes]);
 
-  // Majority-swap auto-reposition: the whole map's own negative-vs-positive
-  // sentiment tally (computeDominantSentiment — the same pos/neg vote
-  // circleSentiment already runs per-circle, just whole-map and three-way
-  // tie-aware). Symmetric: whichever side is strictly ahead is the one that
-  // gets pulled toward center, the other gets pushed toward the edge — see
-  // computeMajoritySwap's own doc comment. Only a genuine swing to a new
-  // decisive side below fires a reposition (tie->positive, tie->negative,
-  // positive->negative, or negative->positive) — a tie itself never fires
-  // one, and neither does the same side staying ahead across renders.
-  //
-  // Folds in whichever type is currently armed on an open pending-create
-  // card (see pendingCreate's own onTypeChange above) as a lightweight
-  // { type } entry — not a real NodeDoc, since it isn't one yet — so the
-  // map reacts live while someone is drafting a node, the instant they
-  // cycle its type, without waiting for them to actually confirm it into a
-  // real node first. That virtual entry only ever affects this tally:
-  // computeMajoritySwap below is still handed the real `nodes` array alone,
-  // so the not-yet-created draft itself is never a move target, only ever
-  // the thing that can tip real nodes into moving.
-  const dominantSentiment = useMemo(() => {
-    const tally = pendingCreate ? [...nodes, { type: pendingCreate.type }] : nodes;
-    return computeDominantSentiment(tally);
-  }, [nodes, pendingCreate]);
-  // Seeded with "tie" (not the initial value) — a map that already opens
-  // with one side ahead now plays the reveal animation on open too, same as
-  // any later swing does. Purely visual and repeatable (see majoritySwapState's
-  // own comment: nothing is ever persisted here any more), so there's no
-  // downside to it running every time the map is opened — that's the point,
-  // it's meant to be pleasant to watch settle in each time you look at it.
-  const prevDominantSentimentRef = useRef<"positive" | "negative" | "tie">("tie");
-
-  useEffect(() => {
-    const prev = prevDominantSentimentRef.current;
-    prevDominantSentimentRef.current = dominantSentiment;
-    if (dominantSentiment === prev) return;
-
-    const token = ++majoritySwapToken.current;
-
-    if (dominantSentiment === "tie") {
-      // Swinging back to a tie: glide every currently-displaced node back to
-      // its real stored position, then drop the overlay entirely. Nothing to
-      // persist either way — the stored position never moved.
-      const current = majoritySwapStateRef.current;
-      if (!current || current.size === 0) return;
-      const ids = Array.from(current.keys());
-      const starts = new Map(current);
-      void (async () => {
-        for (let step = 1; step <= MAJORITY_SWAP_STEPS; step++) {
-          if (majoritySwapToken.current !== token) return;
-          const frac = step / MAJORITY_SWAP_STEPS;
-          setMajoritySwapState((prevState) => {
-            const next = new Map(prevState ?? []);
-            for (const id of ids) {
-              const start = starts.get(id)!;
-              const real = positions.get(id);
-              if (!real) continue;
-              next.set(id, { x: start.x + (real.x - start.x) * frac, y: start.y + (real.y - start.y) * frac });
-            }
-            return next;
-          });
-          if (step < MAJORITY_SWAP_STEPS) await sleep(MAJORITY_SWAP_STEP_DELAY_MS);
-        }
-        if (majoritySwapToken.current === token) setMajoritySwapState(null);
-      })();
-      return;
-    }
-
-    const majoritySentiment = dominantSentiment;
-    const { targets, units } = computeMajoritySwap(nodes, positions, nodeGroups, majoritySentiment);
-    if (targets.size === 0) return;
-
-    // The whole point of this being visual is watching it happen — on a
-    // narrow phone viewport, whatever the user happened to be scrolled to
-    // before the sentiment flipped can easily be nowhere near the affected
-    // nodes' start *or* end spot, so the glide plays entirely off-screen and
-    // reads as "nothing happened." Both endpoints of every moving unit go
-    // in, not just the targets, so the camera settles somewhere the whole
-    // glide stays visible rather than just where it lands.
-    showPoints(Array.from(targets.entries()).flatMap(([id, target]) => [positions.get(id)!, target]));
-    showNotice(majoritySentiment === "negative" ? t.ui.negativeMajorityNotice : t.ui.positiveMajorityNotice);
-    // Seeded with every affected node's own current position (not yet its
-    // target) so posFor has a stable value to return the instant this
-    // starts, same as the group-drag catch-up's own startPositions seed. An
-    // id already showing mid-flight from a still-unwinding earlier swap
-    // keeps its current visual spot rather than being reset to storage.
-    setMajoritySwapState((prevState) => {
-      const seeded = new Map(prevState ?? []);
-      for (const id of targets.keys()) {
-        if (!seeded.has(id)) seeded.set(id, positions.get(id)!);
-      }
-      return seeded;
-    });
-
-    void (async () => {
-      await Promise.all(
-        // One entry in `units` per movement unit (a solo node's own single
-        // id, or a whole circle's root+members) — staggered against each
-        // other, same as the group-drag follow's own per-node stagger, but
-        // every id *inside* one unit shares the exact same step/timing
-        // (one setMajoritySwapState call per step, covering the whole
-        // unit at once) so a circle's own shape never distorts mid-flight.
-        units.map(async (ids, i) => {
-          if (i > 0) await sleep(i * MAJORITY_SWAP_STAGGER_MS);
-          if (majoritySwapToken.current !== token) return;
-          // Starts from wherever the node visually is right now (an
-          // in-flight earlier swap, or its real position) rather than always
-          // its real stored position — see majoritySwapStateRef's own
-          // comment for why that avoids a stutter on a fast double-swing.
-          const starts = new Map(ids.map((id) => [id, majoritySwapStateRef.current?.get(id) ?? positions.get(id)!]));
-          for (let step = 1; step <= MAJORITY_SWAP_STEPS; step++) {
-            if (majoritySwapToken.current !== token) return;
-            const frac = step / MAJORITY_SWAP_STEPS;
-            setMajoritySwapState((prev) => {
-              const next = new Map(prev ?? []);
-              for (const id of ids) {
-                const start = starts.get(id)!;
-                const target = targets.get(id)!;
-                next.set(id, { x: start.x + (target.x - start.x) * frac, y: start.y + (target.y - start.y) * frac });
-              }
-              return next;
-            });
-            if (step < MAJORITY_SWAP_STEPS) await sleep(MAJORITY_SWAP_STEP_DELAY_MS);
-          }
-        }),
-      );
-      // Deliberately left set (not nulled) — the swapped layout is purely a
-      // render overlay (posFor), so it stays showing for as long as this
-      // sentiment keeps its majority. Real node.x/y was never touched, so
-      // there's nothing to reconcile: it unwinds only via the "tie" branch
-      // above, or gets preempted outright by a real user gesture (see
-      // onNodePointerDown, which clears this on any pointer-down).
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dominantSentiment]);
+  // Majority-swap auto-reposition (see hooks/useMajoritySwap.ts) — the whole
+  // map's own negative-vs-positive sentiment tally decides which side glides
+  // toward center and which toward the edge. majoritySwapState feeds posFor
+  // below (purely a render overlay, never persisted); cancelMajoritySwap is
+  // called from onNodePointerDown so a real user gesture always preempts it.
+  const { majoritySwapState, cancelMajoritySwap } = useMajoritySwap({
+    nodes,
+    positions,
+    nodeGroups,
+    draftType: pendingCreate?.type,
+    showPoints,
+    showNotice,
+    positiveMajorityNotice: t.ui.positiveMajorityNotice,
+    negativeMajorityNotice: t.ui.negativeMajorityNotice,
+  });
 
   // ----- dragging -----
 
@@ -1207,14 +1063,11 @@ export function MapPage() {
 
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
     // A real interaction with any node always preempts the majority-swap
-    // auto-reposition effect outright — see majoritySwapToken's
-    // own doc comment above. Unconditional, ahead of every other early
-    // return below: the effect fighting a user's own gesture for the same
-    // node(s) would be far worse than just stopping early here.
-    if (majoritySwapState) {
-      majoritySwapToken.current++;
-      setMajoritySwapState(null);
-    }
+    // auto-reposition effect outright (see hooks/useMajoritySwap.ts).
+    // Unconditional, ahead of every other early return below: the effect
+    // fighting a user's own gesture for the same node(s) would be far worse
+    // than just stopping early here.
+    cancelMajoritySwap();
     if (chooseMode || packMode || drawMode) return;
     if (!isOwnNode(node)) return;
 
@@ -2147,438 +2000,82 @@ export function MapPage() {
     }
   }
 
-  // ---- Display of chosen nodes ----
-  // Nodes in a text mode (icons + text, classic mind map) take far more room
-  // than an icon does, and overlap their neighbors at the current spacing. A node
-  // draws at a constant size on screen whatever the zoom is, so zooming in
-  // spreads the positions apart without changing anything else — the view
-  // "extends" until the expanded nodes clear each other (or as far as the zoom
-  // allows). Only ever zooms in; nothing is moved.
-  function fitZoomForDisplay(display: NodeDisplay, globalMode: ReadingMode, centerOn?: { x: number; y: number }) {
-    const items = visibleNodes.flatMap((n) => {
-      const pos = positions.get(n.nodeId);
-      if (!pos) return [];
-      const mode = display[n.nodeId] ?? globalMode;
-      const tier = circleRootSentimentByNode.has(n.nodeId) ? 3 : (n.sizeTier ?? 1);
-      const multiplier = tier === 3 ? 1.3 : tier === 2 ? 1.15 : 1;
-      return [{ x: pos.x, y: pos.y, ...nodeFootprint(n, mode, multiplier), expanded: mode !== "actual" }];
-    });
-    const needed = zoomToSeparate(items);
-    if (needed <= zoom + 0.005) return;
-    const target = Math.min(MAX_ZOOM, needed * 1.03);
-    zoomFromCenter(0, target);
-    showNotice(needed > MAX_ZOOM ? t.ui.display.stillOverlap : t.ui.display.zoomedToFit);
-    // Zooming keeps the middle of the screen fixed; bring the nodes that just
-    // changed back into it.
-    if (centerOn) setTimeout(() => centerOnPoint(centerOn.x, centerOn.y), 250);
-  }
-
-  // After a drag settles, jumps the zoom to 100% if it was below that —
-  // editing a node's text/type reads and hit-targets best at its native
-  // size, and a zoomed-out map is exactly where a drag is most likely to
-  // have happened (more of the canvas fits on screen). Deliberately only
-  // ever zooms *in* to exactly 1, never out and never past 1 if already
-  // zoomed in further — this is a floor for "about to edit," not a reset.
-  // Runs after the drop, not before: zooming mid-drag would fight the
-  // gesture by moving the canvas under the pointer while it's still down.
-  function zoomToEditAt(x: number, y: number) {
-    if (zoom >= 1) return;
-    zoomFromCenter(0, 1);
-    setTimeout(() => centerOnPoint(x, y), 250);
-  }
-
-  // Brings an arbitrary set of canvas points into view: zooms out just
-  // enough for all of them to fit on screen (never in), then glides to their
-  // middle. Shared core of showNodes (below) and the majority-swap effect's
-  // own camera cue — the latter passes both a unit's start *and* end point so
-  // the whole glide stays on-screen, not just wherever it happens to end up.
-  function showPoints(pts: { x: number; y: number }[]) {
-    const wrap = wrapRef.current;
-    if (!wrap || pts.length === 0) return;
-    const xs = pts.map((p) => p.x);
-    const ys = pts.map((p) => p.y);
-    const PAD = 140;
-    const width = Math.max(...xs) - Math.min(...xs) + PAD * 2;
-    const height = Math.max(...ys) - Math.min(...ys) + PAD * 2;
-    const middle = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 };
-    const target = Math.max(MIN_ZOOM, Math.min(zoom, wrap.clientWidth / width, wrap.clientHeight / height));
-    if (target < zoom - 0.005) {
-      zoomFromCenter(0, target);
-      setTimeout(() => centerOnPoint(middle.x, middle.y), 260);
-    } else {
-      centerOnPoint(middle.x, middle.y);
-    }
-  }
-
-  // After an action on chosen nodes finishes, brings them into view: zooms out
-  // just enough for all of them to fit on screen (never in), then glides to
-  // their middle.
-  function showNodes(ids: string[]) {
-    showPoints(ids.map((id) => positions.get(id)).filter((p): p is { x: number; y: number } => !!p));
-  }
-
-  // The group bar's "Show as": the chosen nodes take this reading mode (null =
-  // back to following the map's), then the view zooms in if they'd overlap.
-  function setDisplayForChosen(mode: ReadingMode | null) {
-    const ids = Array.from(multiSelectIds);
-    if (ids.length === 0) return;
-    const next: NodeDisplay = { ...nodeDisplay };
-    for (const id of ids) {
-      if (mode === null) delete next[id];
-      else next[id] = mode;
-    }
-    setNodeDisplay(next);
-    saveNodeDisplay(mapId, next);
-    const chosen = ids.map((id) => positions.get(id)).filter((p): p is { x: number; y: number } => !!p);
-    const middle = chosen.length
-      ? { x: chosen.reduce((sum, p) => sum + p.x, 0) / chosen.length, y: chosen.reduce((sum, p) => sum + p.y, 0) / chosen.length }
-      : undefined;
-    fitZoomForDisplay(next, readingMode, middle);
-  }
-
   // ---- Separator lines ----
-  // Drawing takes over the canvas clicks and the bottom sheet, so anything
-  // else in progress steps aside first.
-  function toggleDrawMode() {
-    if (drawMode) {
-      exitDrawMode();
-      return;
-    }
-    setSelectedId(null);
-    setMultiSelectIds(new Set());
-    setContextMenu(null);
-    setCanvasContextMenu(null);
-    setPendingCreate(null);
-    dispatchMode({ type: "drawStart" });
-  }
+  // Drawing takes over the canvas clicks and the bottom sheet — see
+  // hooks/useLineDrawing.ts.
+  const {
+    toggleDrawMode,
+    exitDrawMode,
+    drawRefusal,
+    addDrawPoint,
+    undoDrawPoint,
+    onDrawPointerMove,
+    finishLine,
+    canDeleteLine,
+    handleLineClick,
+  } = useLineDrawing({
+    drawMode,
+    drawPoints,
+    drawSaving,
+    dispatchMode,
+    visibleNodes,
+    nodeGroups,
+    linkCycles,
+    posFor,
+    readingMode,
+    lines,
+    setLines,
+    upsertLine,
+    mapId,
+    setActionError,
+    screenToCanvas,
+    setSelectedId,
+    setMultiSelectIds,
+    setContextMenu,
+    setCanvasContextMenu,
+    setPendingCreate,
+    currentUserId: user?._id,
+    mapOwnerId: map?.ownerId,
+    createFailedMessage: t.ui.lines.createFailed,
+    deleteConfirmMessage: t.ui.lines.deleteConfirm,
+    deleteFailedMessage: t.ui.lines.deleteFailed,
+  });
 
-  function exitDrawMode() {
-    dispatchMode({ type: "reset" });
-  }
-
-  // A point may go anywhere no node and no zone covers, and so may the stretch
-  // leading to it — see utils/drawLine.ts. Other lines are not obstacles: lines
-  // may cross and join each other.
-  function drawObstacles() {
-    return {
-      nodes: visibleNodes.map((n) => posFor(n)),
-      polygons: [
-        ...nodeGroups.map((g) => g.outline),
-        ...linkCycles.map((cycle) =>
-          cycle
-            .map((id) => visibleNodes.find((n) => n.nodeId === id))
-            .filter((n): n is NodeDoc => !!n)
-            .map((n) => posFor(n)),
-        ),
-      ],
-      circles: visibleNodes.filter((n) => n.manualZone).map((n) => posFor(n)),
-      classic: readingMode === "classic",
-    };
-  }
-
-  // Why `p` can't be the next point of the line in progress, or null when it can.
-  function drawRefusal(p: { x: number; y: number }): "spot" | "crossing" | null {
-    const obstacles = drawObstacles();
-    if (!isPointFree(p, obstacles)) return "spot";
-    const last = drawPoints[drawPoints.length - 1];
-    if (last && !isSegmentFree(last, p, obstacles)) return "crossing";
-    return null;
-  }
-
-  function addDrawPoint(raw: { x: number; y: number }) {
-    if (drawSaving) return;
-    // A click near an existing line joins it — on its corner, or on the spot
-    // along it nearest to the click.
-    const p = snapToLines(raw, lines);
-    const refusal = drawRefusal(p);
-    if (refusal) {
-      dispatchMode({ type: "drawSetBlocked", blocked: refusal });
-      if (drawBlockedTimeoutRef.current) clearTimeout(drawBlockedTimeoutRef.current);
-      drawBlockedTimeoutRef.current = setTimeout(() => dispatchMode({ type: "drawSetBlocked", blocked: null }), 2200);
-      return;
-    }
-    dispatchMode({ type: "drawSetBlocked", blocked: null });
-    // A double-click lands two clicks on the same spot — one point is enough.
-    const last = drawPoints[drawPoints.length - 1];
-    if (last && Math.hypot(p.x - last.x, p.y - last.y) < 8) return;
-    if (drawPoints.length >= 200) return; // the backend's own limit per line
-    dispatchMode({ type: "drawAddPoint", point: p });
-  }
-
-  function undoDrawPoint() {
-    dispatchMode({ type: "drawUndoPoint" });
-  }
-
-  // Follows the pointer with the free/blocked ring — at most once per frame.
-  function onDrawPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
-    if (e.pointerType === "touch") return;
-    const p = snapToLines(screenToCanvas(e.clientX, e.clientY), lines);
-    if (drawHoverFrameRef.current !== null) cancelAnimationFrame(drawHoverFrameRef.current);
-    drawHoverFrameRef.current = requestAnimationFrame(() => dispatchMode({ type: "drawSetHover", hover: p }));
-  }
-
-  async function finishLine() {
-    if (!mapId || drawPoints.length < 2 || drawSaving) return;
-    dispatchMode({ type: "drawSetSaving", saving: true });
-    setActionError(null);
-    try {
-      const line = await linesApi.createLine(mapId, drawPoints);
-      upsertLine(line);
-      dispatchMode({ type: "drawClearPoints" });
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.lines.createFailed);
-    } finally {
-      dispatchMode({ type: "drawSetSaving", saving: false });
-    }
-  }
-
-  // Whoever drew a line may delete it, and so may the map's owner.
-  function canDeleteLine(line: LineDoc) {
-    return idOf(line.userId as any) === user?._id || map?.ownerId === user?._id;
-  }
-
-  async function handleLineClick(line: LineDoc) {
-    if (!canDeleteLine(line)) return;
-    if (!confirm(t.ui.lines.deleteConfirm)) return;
-    setActionError(null);
-    try {
-      await linesApi.deleteLine(line.lineId);
-      setLines((prev) => prev.filter((l) => l.lineId !== line.lineId));
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.lines.deleteFailed);
-    }
-  }
-
-  // Ctrl/Cmd+C / Ctrl/Cmd+V, the selection menu's Copy, the "+" menu's Copy
-  // whole map / Paste, and the canvas menu's Paste here — see
-  // utils/nodeClipboard.ts for what a copy holds and why it survives a
-  // reload and is shared between tabs. Copies the chosen node(s)
-  // (multiSelectIds if any are picked, else the single selectedId) with their
-  // text, look, layout, branch parents and the connections among them — but
-  // not health, attacks or packing, and nothing pointing at a node that
-  // wasn't copied.
-  //
-  // Fixed offset (not random/growing) so a repeated copy-paste-paste-paste
-  // on the *same* map fans pasted copies out along one consistent diagonal
-  // instead of clustering — avoidOverlap (used when actually placing each
-  // one, below) still nudges clear of whatever's already there regardless.
-  const PASTE_OFFSET = 40;
-
-  async function copySelection() {
-    const ids = multiSelectIds.size > 0 ? Array.from(multiSelectIds) : selectedId ? [selectedId] : [];
-    if (ids.length === 0) return;
-    await copyNodes(ids);
-  }
-
-  async function copyWholeMap() {
-    await copyNodes(null);
-  }
-
-  // `pickIds` null = every node on the map.
-  async function copyNodes(pickIds: string[] | null) {
-    if (!mapId) return;
-    // Awaited, not read straight off `n.text` — a marquee/long-press pick
-    // never necessarily opened any of these nodes first, so their real text
-    // may not have loaded yet (see ensureNodeText's own doc comment on why
-    // its *return value*, not a re-read of `nodes`, is what's safe to use
-    // right after awaiting it).
-    const wanted = (pickIds ?? visibleNodes.map((n) => n.nodeId)).filter((id) => {
-      const n = nodes.find((x) => x.nodeId === id);
-      return !!n && !n.isWeapon && !n.isProtection;
-    });
-    const textById = await ensureNodeText(wanted);
-    const clipboard = buildNodeClipboard(mapId, nodes, pickIds, textById, edges);
-    if (!clipboard) {
-      showNotice(t.ui.clipboard.nothingToCopy);
-      return;
-    }
-    if (!writeNodeClipboard(clipboard)) {
-      setActionError(t.ui.clipboard.storeFailed);
-      return;
-    }
-    showNotice(t.ui.clipboard.copied(clipboard.nodes.length));
-  }
-
-  // SelectionMenu's "Copy as text" — unlike copySelection above (which feeds
-  // Ctrl/Cmd+V's in-app duplicate-paste), this writes plain text straight to
-  // the OS clipboard for pasting into a doc/chat/wherever, same
-  // navigator.clipboard.writeText pattern ExportTextModal/NodePanel already
-  // use for their own Copy buttons. Ordered top-to-bottom/left-to-right (not
-  // selection order) so the text reads in the same spatial order as the
-  // canvas, same tie-break buildTreeExport uses.
-  async function copySelectionAsText() {
-    const ids = multiSelectIds.size > 0 ? Array.from(multiSelectIds) : selectedId ? [selectedId] : [];
-    if (ids.length === 0) return;
-    const picked = ids
-      .map((id) => nodes.find((n) => n.nodeId === id))
-      .filter((n): n is NodeDoc => !!n && !n.isWeapon && !n.isProtection)
-      .sort((a, b) => {
-        const pa = positions.get(a.nodeId) ?? { x: a.x ?? 0, y: a.y ?? 0 };
-        const pb = positions.get(b.nodeId) ?? { x: b.x ?? 0, y: b.y ?? 0 };
-        return stepRank(a) - stepRank(b) || pa.y - pb.y || pa.x - pb.x;
-      });
-    if (picked.length === 0) return;
-    // See copySelection's own comment above — same reason this reads the
-    // returned map instead of `n.text` directly.
-    const textById = await ensureNodeText(picked.map((n) => n.nodeId));
-    const text = picked.map((n) => `${stepPrefix(n)}${n.type}: ${textById[n.nodeId] ?? n.text}`).join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      setActionError(t.ui.errors.clipboard);
-    }
-  }
-
-  // The "+" AddMenu's whole-map "Export text" — the only place this now
-  // lives (NodePanel's own copy of this same button is gone; a parent node
-  // gets the cluster-scoped extractClusterText below instead). Backfills
-  // every visible, real node's text before opening the modal — buildTreeExport
-  // needs all of it at once, unlike the other export/copy actions above,
-  // which only ever need a chosen few nodes' worth.
-  async function openExportText() {
-    const ids = visibleNodes.filter((n) => !n.isWeapon && !n.isProtection).map((n) => n.nodeId);
-    if (ids.length > 0) await ensureNodeText(ids);
-    setShowExportText(true);
-  }
-
-  // NodePanel's own "Extract text" for a circle's parent node — scoped to
-  // just that node's own cluster (itself + its direct children) plus, for
-  // any child that's itself the root of a further cluster, that cluster too
-  // — recursively, so a whole chain of nested clusters headed by this
-  // node's own descendants comes along, but nothing outside this node's own
-  // branch does. Same buildTreeExport-shaped output as the whole-map export
-  // (see textExport.ts), just walked from one starting node instead of
-  // every root on the map.
-  function collectClusterSubtree(rootId: string): NodeDoc[] {
-    const collected = new Map<string, NodeDoc>();
-    const queue = [rootId];
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      const group = nodeGroups.find((g) => g.rootId === id);
-      if (!group) continue;
-      for (const member of group.members) {
-        if (collected.has(member.nodeId)) continue;
-        collected.set(member.nodeId, member);
-        // A member that's itself a cluster's own root gets that cluster
-        // pulled in too — nodeGroups.find above will pick it up on a later
-        // pass through the queue.
-        queue.push(member.nodeId);
-      }
-    }
-    return Array.from(collected.values());
-  }
-
-  async function extractClusterText(rootId: string) {
-    const subtree = collectClusterSubtree(rootId);
-    if (subtree.length === 0) return;
-    await ensureNodeText(subtree.map((n) => n.nodeId));
-    setExtractClusterRootId(rootId);
-  }
-
-  // Pastes what's on the clipboard (see copyNodes) into this map — this one
-  // or a different one — as brand-new nodes, keeping branch parents and the
-  // connections among them. `at` (a canvas point, from the canvas menu's
-  // "Paste here") puts the group's middle there.
-  async function pasteClipboard(at?: { x: number; y: number }) {
-    const clipboard = readNodeClipboard();
-    if (!mapId) return;
-    if (!clipboard) {
-      showNotice(t.ui.clipboard.nothingToPaste);
-      return;
-    }
-    setActionError(null);
-    // Pasting back into the map it was copied from: keep the originals'
-    // own positions as the anchor (PASTE_OFFSET nudges just clear of them).
-    // Pasting into a *different* map: those raw x/y are meaningless here —
-    // that map's own layout has nothing to do with this one's — so anchor
-    // the whole copied group at a fresh spot inside the *current* viewport
-    // instead (same call "+ Add node" already uses), preserving the
-    // copied nodes' own relative arrangement around that new anchor rather
-    // than each one's original absolute position.
-    const sameMap = clipboard.sourceMapId === mapId;
-    let dx = PASTE_OFFSET;
-    let dy = PASTE_OFFSET;
-    if (at || !sameMap) {
-      const cx = clipboard.nodes.reduce((sum, n) => sum + n.x, 0) / clipboard.nodes.length;
-      const cy = clipboard.nodes.reduce((sum, n) => sum + n.y, 0) / clipboard.nodes.length;
-      const anchor = at ?? pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
-      dx = anchor.x - cx;
-      dy = anchor.y - cy;
-    }
-    // Each node's spot, nudged clear of what is already on the map and of the
-    // pasted nodes placed before it — decided up front so the group keeps its
-    // shape wherever it can.
-    const existing = [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()];
-    const placedPoints: { x: number; y: number }[] = [];
-    const placement = new Map<string, { x: number; y: number }>();
-    for (const n of clipboard.nodes) {
-      const placed = avoidOverlap({ x: n.x + dx, y: n.y + dy }, [...existing, ...nodeObstacles(placedPoints)], viewportBounds());
-      placement.set(n.id, placed);
-      placedPoints.push(placed);
-    }
-    const created: NodeDoc[] = [];
-    try {
-      // A node can only be created once the node it branches from exists, so
-      // this goes in waves: everything without a copied parent first, then
-      // their children, and so on. Each wave runs in parallel.
-      const newIdBySource = new Map<string, string>();
-      let pending = clipboard.nodes.slice();
-      while (pending.length > 0) {
-        let ready = pending.filter((n) => !n.parentId || newIdBySource.has(n.parentId));
-        if (ready.length === 0) ready = pending; // a parent loop can't be satisfied — create the rest unlinked
-        const batch = await Promise.all(
-          ready.map((n) => {
-            const spot = placement.get(n.id)!;
-            return nodesApi.createNode(mapId, {
-              text: n.text,
-              title: n.title,
-              type: n.type,
-              x: spot.x,
-              y: spot.y,
-              parentId: n.parentId ? (newIdBySource.get(n.parentId) ?? null) : null,
-              order: n.order,
-              symbolOverride: n.symbolOverride,
-              sizeTier: n.sizeTier,
-              manualZone: n.manualZone,
-            });
-          }),
-        );
-        ready.forEach((n, i) => newIdBySource.set(n.id, batch[i].nodeId));
-        batch.forEach((n) => {
-          upsertNode(n);
-          setCelebrateIds((prev) => new Set(prev).add(n.nodeId));
-        });
-        created.push(...batch);
-        const done = new Set(ready.map((n) => n.id));
-        pending = pending.filter((n) => !done.has(n.id));
-      }
-      // Then the connections among the copied nodes.
-      const newEdges = await Promise.all(
-        clipboard.edges.map((e) => {
-          const from = newIdBySource.get(e.from);
-          const to = newIdBySource.get(e.to);
-          return from && to ? edgesApi.createEdge(mapId, { fromNodeId: from, toNodeId: to, sentiment: e.sentiment }) : null;
-        }),
-      );
-      newEdges.forEach((e) => e && upsertEdge(e));
-      if (newEdges.some(Boolean)) refreshInsights(mapId);
-      // The pasted copies become the new selection — same "what you just
-      // did is now selected" convention confirmPendingCreate/group-drag
-      // already follow, so it's immediately obvious what paste produced
-      // and a follow-up paste (offset again from *these*, not the
-      // originals) reads as "keep fanning out from here."
-      if (created.length > 1) {
-        setSelectedId(null);
-        setMultiSelectIds(new Set(created.map((n) => n.nodeId)));
-      } else if (created.length === 1) {
-        setMultiSelectIds(new Set());
-        setSelectedId(created[0].nodeId);
-      }
-      showNotice(t.ui.clipboard.pasted(created.length));
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.paste);
-    }
-  }
+  // Every clipboard/export action (copy, copy-as-text, paste, whole-map and
+  // cluster-scoped text export) — see hooks/useClipboardActions.ts.
+  const {
+    copySelection,
+    copyWholeMap,
+    copySelectionAsText,
+    openExportText,
+    collectClusterSubtree,
+    extractClusterText,
+    pasteClipboard,
+  } = useClipboardActions({
+    mapId,
+    nodes,
+    edges,
+    visibleNodes,
+    positions,
+    nodeGroups,
+    multiSelectIds,
+    selectedId,
+    ensureNodeText,
+    upsertNode,
+    upsertEdge,
+    setActionError,
+    showNotice,
+    setSelectedId,
+    setMultiSelectIds,
+    setCelebrateIds,
+    setShowExportText,
+    setExtractClusterRootId,
+    obstaclePoints,
+    bigNodeObstacles,
+    viewportBounds,
+    refreshInsights,
+    t,
+  });
 
   // SelectionMenu's "Delete N nodes" — one bulk DELETE /api/nodes request
   // (Backend's deleteManyNodesDao) instead of N parallel single-node
