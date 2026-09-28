@@ -296,8 +296,24 @@ export function MapPage() {
   // auto-reposition effect (see the useEffect keyed off dominantSentiment
   // further down) — posFor consults this too, after dragState/groupDragState
   // so a live manual drag always wins visually over the automatic effect's
-  // own in-flight animation.
+  // own in-flight animation. Purely a render-time overlay: real node.x/y is
+  // never touched by this effect any more (see its own comment) — a node's
+  // stored position stays exactly where the user actually left it, so this
+  // can stay showing indefinitely without ever costing the user anything.
   const [majoritySwapState, setMajoritySwapState] = useState<Map<string, { x: number; y: number }> | null>(null);
+  // Mirrors majoritySwapState for the effect below to read synchronously —
+  // the effect only depends on [dominantSentiment], so closing back over the
+  // state variable itself would see a stale snapshot from whenever the
+  // effect was last (re)created, not whatever the in-flight animation has
+  // actually drawn since. Needed so a sentiment swing that arrives while an
+  // earlier swap animation is still easing in starts from wherever the node
+  // visually is right now, not from its true stored position — jumping back
+  // to storage first, then back out to the new target, would read as a
+  // stutter instead of one continuous glide.
+  const majoritySwapStateRef = useRef<Map<string, { x: number; y: number }> | null>(null);
+  useEffect(() => {
+    majoritySwapStateRef.current = majoritySwapState;
+  }, [majoritySwapState]);
   // Live, while dragging: whichever node the pointer is currently hovering
   // close enough to read as "drop here to join its circle" — null once the
   // pointer isn't over anything droppable. Drives NodeCard's highlight ring.
@@ -964,26 +980,67 @@ export function MapPage() {
     const tally = pendingCreate ? [...nodes, { type: pendingCreate.type }] : nodes;
     return computeDominantSentiment(tally);
   }, [nodes, pendingCreate]);
-  // Seeded with the initial value (not "tie") so a map that already opens
-  // with one side ahead reads as "that's just how it is," not "this just
-  // happened" — the effect below only ever fires on a genuine swing.
-  const prevDominantSentimentRef = useRef(dominantSentiment);
+  // Seeded with "tie" (not the initial value) — a map that already opens
+  // with one side ahead now plays the reveal animation on open too, same as
+  // any later swing does. Purely visual and repeatable (see majoritySwapState's
+  // own comment: nothing is ever persisted here any more), so there's no
+  // downside to it running every time the map is opened — that's the point,
+  // it's meant to be pleasant to watch settle in each time you look at it.
+  const prevDominantSentimentRef = useRef<"positive" | "negative" | "tie">("tie");
 
   useEffect(() => {
     const prev = prevDominantSentimentRef.current;
     prevDominantSentimentRef.current = dominantSentiment;
-    if (dominantSentiment === "tie" || dominantSentiment === prev) return;
-    const majoritySentiment = dominantSentiment;
+    if (dominantSentiment === prev) return;
 
     const token = ++majoritySwapToken.current;
+
+    if (dominantSentiment === "tie") {
+      // Swinging back to a tie: glide every currently-displaced node back to
+      // its real stored position, then drop the overlay entirely. Nothing to
+      // persist either way — the stored position never moved.
+      const current = majoritySwapStateRef.current;
+      if (!current || current.size === 0) return;
+      const ids = Array.from(current.keys());
+      const starts = new Map(current);
+      void (async () => {
+        for (let step = 1; step <= MAJORITY_SWAP_STEPS; step++) {
+          if (majoritySwapToken.current !== token) return;
+          const frac = step / MAJORITY_SWAP_STEPS;
+          setMajoritySwapState((prevState) => {
+            const next = new Map(prevState ?? []);
+            for (const id of ids) {
+              const start = starts.get(id)!;
+              const real = positions.get(id);
+              if (!real) continue;
+              next.set(id, { x: start.x + (real.x - start.x) * frac, y: start.y + (real.y - start.y) * frac });
+            }
+            return next;
+          });
+          if (step < MAJORITY_SWAP_STEPS) await sleep(MAJORITY_SWAP_STEP_DELAY_MS);
+        }
+        if (majoritySwapToken.current === token) setMajoritySwapState(null);
+      })();
+      return;
+    }
+
+    const majoritySentiment = dominantSentiment;
     const { targets, units } = computeMajoritySwap(nodes, positions, nodeGroups, majoritySentiment);
     if (targets.size === 0) return;
 
     showNotice(majoritySentiment === "negative" ? t.ui.negativeMajorityNotice : t.ui.positiveMajorityNotice);
     // Seeded with every affected node's own current position (not yet its
     // target) so posFor has a stable value to return the instant this
-    // starts, same as the group-drag catch-up's own startPositions seed.
-    setMajoritySwapState(new Map(Array.from(targets.keys(), (id) => [id, positions.get(id)!])));
+    // starts, same as the group-drag catch-up's own startPositions seed. An
+    // id already showing mid-flight from a still-unwinding earlier swap
+    // keeps its current visual spot rather than being reset to storage.
+    setMajoritySwapState((prevState) => {
+      const seeded = new Map(prevState ?? []);
+      for (const id of targets.keys()) {
+        if (!seeded.has(id)) seeded.set(id, positions.get(id)!);
+      }
+      return seeded;
+    });
 
     void (async () => {
       await Promise.all(
@@ -996,7 +1053,11 @@ export function MapPage() {
         units.map(async (ids, i) => {
           if (i > 0) await sleep(i * MAJORITY_SWAP_STAGGER_MS);
           if (majoritySwapToken.current !== token) return;
-          const starts = new Map(ids.map((id) => [id, positions.get(id)!]));
+          // Starts from wherever the node visually is right now (an
+          // in-flight earlier swap, or its real position) rather than always
+          // its real stored position — see majoritySwapStateRef's own
+          // comment for why that avoids a stutter on a fast double-swing.
+          const starts = new Map(ids.map((id) => [id, majoritySwapStateRef.current?.get(id) ?? positions.get(id)!]));
           for (let step = 1; step <= MAJORITY_SWAP_STEPS; step++) {
             if (majoritySwapToken.current !== token) return;
             const frac = step / MAJORITY_SWAP_STEPS;
@@ -1011,20 +1072,14 @@ export function MapPage() {
             });
             if (step < MAJORITY_SWAP_STEPS) await sleep(MAJORITY_SWAP_STEP_DELAY_MS);
           }
-          await Promise.all(
-            ids.map(async (id) => {
-              const target = targets.get(id)!;
-              try {
-                const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
-                if (majoritySwapToken.current === token) upsertNode(updated);
-              } catch (err) {
-                setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
-              }
-            }),
-          );
         }),
       );
-      if (majoritySwapToken.current === token) setMajoritySwapState(null);
+      // Deliberately left set (not nulled) — the swapped layout is purely a
+      // render overlay (posFor), so it stays showing for as long as this
+      // sentiment keeps its majority. Real node.x/y was never touched, so
+      // there's nothing to reconcile: it unwinds only via the "tie" branch
+      // above, or gets preempted outright by a real user gesture (see
+      // onNodePointerDown, which clears this on any pointer-down).
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dominantSentiment]);
@@ -1149,8 +1204,20 @@ export function MapPage() {
         const dy = p.y - startPt.y;
         setActionError(null);
 
+        // Group drag had zero overlap protection at all before — only the
+        // canvas-bounds clamp. Same nearest-clear-spot settle the single-node
+        // drop now gets: every node NOT in this drag (footprint) and every
+        // zone backdrop the drag isn't itself part of (bigNodeObstacles) is a
+        // real obstacle for where the leader/followers finally land.
+        const memberIdSet = new Set(memberIds);
+        const ownGroupRootIds = new Set(nodeGroups.filter((g) => memberIdSet.has(g.rootId)).map((g) => g.rootId));
+        const dragObstacles = [
+          ...footprintObstacles(obstaclePoints(memberIdSet)),
+          ...bigNodeObstacles(ownGroupRootIds),
+        ];
+
         const leaderStart = startPositions.get(node.nodeId)!;
-        const leaderTarget = clamp(leaderStart.x + dx, leaderStart.y + dy);
+        const leaderTarget = avoidOverlap(clamp(leaderStart.x + dx, leaderStart.y + dy), dragObstacles, viewportBounds());
         setGroupDragState((prev) => new Map(prev ?? startPositions).set(node.nodeId, leaderTarget));
 
         const leaderDone = nodesApi
@@ -1170,7 +1237,7 @@ export function MapPage() {
           if (i > 0) await sleep(i * GROUP_FOLLOW_STAGGER_MS);
           if (groupDragToken.current !== token) return;
           const start = startPositions.get(id)!;
-          const target = clamp(start.x + dx, start.y + dy);
+          const target = avoidOverlap(clamp(start.x + dx, start.y + dy), dragObstacles, viewportBounds());
           for (let step = 1; step <= GROUP_FOLLOW_STEPS; step++) {
             if (groupDragToken.current !== token) return;
             const frac = step / GROUP_FOLLOW_STEPS;
@@ -1404,9 +1471,17 @@ export function MapPage() {
         // are what the drop is checked against (see zoneAngleGuard); a node
         // being pulled out no longer shapes it.
         const staysMember = !!ownCircle && Math.hypot(x - ownCircle.cx, y - ownCircle.cy) <= ownCircle.r;
+        // Every other circle's backdrop is now a real obstacle here too (not
+        // just at creation time) — a plain reposition drop used to be able to
+        // land a node's icon right on top of a zone it doesn't belong to.
+        // Its own circle is excluded (staysMember only) so this never pushes
+        // a node out of the zone it's still a member of.
         const dropped = avoidOverlap(
           { x, y },
-          footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
+          [
+            ...footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
+            ...bigNodeObstacles(staysMember && ownCircle ? new Set([ownCircle.rootId]) : undefined),
+          ],
           viewportBounds(),
           zoneAngleGuard(node.nodeId, staysMember ? (parentId ?? null) : null, visibleNodes, positions),
         );
@@ -1421,6 +1496,13 @@ export function MapPage() {
           return;
         }
 
+        // Remembered so a failed persist below can put the node back exactly
+        // where it actually still is on the server, instead of leaving the
+        // optimistic drop showing as "moved" when it never saved — that
+        // silent mismatch (until the next reload happened to fix it) was the
+        // real bug: a courtesy update still has to be honest about whether
+        // it landed.
+        const before = { x: node.x, y: node.y, parentId: node.parentId };
         setNodes((prev) =>
           prev.map((n) =>
             n.nodeId === node.nodeId ? { ...n, x: dropped.x, y: dropped.y, ...(leftCircle ? { parentId: null } : {}) } : n,
@@ -1428,19 +1510,17 @@ export function MapPage() {
         );
         try {
           if (leftCircle) {
-            // A structural change, not just a courtesy position update — a
-            // failed persist here would leave the UI showing the node as
-            // detached when the server still has it in the circle, so this
-            // one gets surfaced and reconciled from the real response
-            // instead of silently trusted like the position-only case below.
             const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y, parentId: null });
             upsertNode(updated);
           } else {
-            await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y });
+            const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y });
+            upsertNode(updated);
           }
         } catch (err) {
-          if (leftCircle) setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.leaveCircle);
-          // otherwise: position is a courtesy update — a failed persist just means it snaps back on next reload
+          setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
+          setActionError(
+            err instanceof ApiRequestError ? err.message : leftCircle ? t.ui.errors.leaveCircle : t.ui.errors.moveNodes,
+          );
         }
       } else {
         handleNodeClick(node);
@@ -2831,7 +2911,18 @@ export function MapPage() {
               linkCycles={linkCycles}
               chosenNodeIds={chosenNodeIds}
               pendingLink={pendingLink}
-              onCircleClick={handleCircleBackdropClick}
+              onCircleClick={(rootId) => {
+                // A zone's own polygon stops the click from ever reaching the
+                // canvas div's onClick (see its own chooseMode branch above)
+                // — so without this, choosing was only exitable by clicking
+                // truly empty canvas, not a zone. Choosing wins over the
+                // zone's normal stabilize/release behavior while it's active.
+                if (chooseMode) {
+                  exitChooseMode();
+                  return;
+                }
+                handleCircleBackdropClick(rootId);
+              }}
               lines={lines}
               canDeleteLine={canDeleteLine}
               onLineClick={handleLineClick}

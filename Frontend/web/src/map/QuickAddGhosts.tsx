@@ -187,6 +187,20 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   const availDown = bounds.maxY - ringCenter.y;
   const tightest = Math.min(availLeft, availRight, availUp, availDown);
   const R = Math.min(RADIUS, Math.max(MIN_RADIUS, tightest - EDGE_MARGIN));
+  // Whether the MIN_RADIUS floor above actually won (R had to be sized past
+  // what `bounds` has room for) — a real case at strong zoom-in, where
+  // `bounds` shrinks (it's the visible viewport in *canvas* units, and a
+  // canvas unit covers less screen the more you're zoomed into it) faster
+  // than MIN_RADIUS's own on-screen size does. When it did, every point's
+  // per-axis clamp below would fire, not just the "handful nearest a tight
+  // edge" the clamp was designed for — every point on the near side of a too-
+  // narrow `bounds` clamps to the exact same edge value as every other one on
+  // that side, collapsing the whole ring into two overlapping vertical (or
+  // horizontal) stacks instead of a circle. Skipping the clamp in that case
+  // keeps it a real, non-overlapping circle — some ghosts legitimately sit
+  // outside the nominal safe zone, which reads far better than several of
+  // them landing exactly on top of each other.
+  const fitsBounds = R <= tightest;
   return (
     <>
       {NODE_TYPES.map((type, i) => {
@@ -216,11 +230,12 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
         // that slack for exactly the points it was meant to help. Only
         // applied above center (sinA < 0) — the bottom half never reads
         // UP_SLACK at all.
-        const x = Math.min(bounds.maxX, Math.max(bounds.minX, ringCenter.x + R * Math.cos(angle)));
-        const y = Math.min(
-          bounds.maxY,
-          Math.max(bounds.minY - (sinA < 0 ? UP_SLACK : 0), ringCenter.y + R * sinA),
-        );
+        const rawX = ringCenter.x + R * Math.cos(angle);
+        const rawY = ringCenter.y + R * sinA;
+        const x = fitsBounds ? Math.min(bounds.maxX, Math.max(bounds.minX, rawX)) : rawX;
+        const y = fitsBounds
+          ? Math.min(bounds.maxY, Math.max(bounds.minY - (sinA < 0 ? UP_SLACK : 0), rawY))
+          : rawY;
         return (
           <button
             key={type}
