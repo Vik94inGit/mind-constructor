@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { CANVAS_W, CANVAS_H } from "../utils/canvasLayout";
 import { roundedPath } from "../utils/drawLine";
 import { useI18n } from "../i18n/I18nContext";
@@ -69,6 +69,34 @@ export function CanvasBackdrop({
 }: Props) {
   const { t } = useI18n();
   const zonePolygonsRef = useRef(new Map<string, SVGPolygonElement>());
+  // One stable callback per rootId, reused across renders — an inline arrow
+  // function passed straight as `ref` would be a *new* function every
+  // render, and React detaches+reattaches a ref whenever the function
+  // identity passed to it changes, even when the underlying DOM node
+  // hasn't. Harmless by itself (the Map ends up right either way), but
+  // needless per-render churn on every zone polygon that useZoneFloat's own
+  // RAF loop has no reason to pay for.
+  const zoneRefCallbacksRef = useRef(new Map<string, (el: SVGPolygonElement | null) => void>());
+  function zoneRefCallback(rootId: string) {
+    let cb = zoneRefCallbacksRef.current.get(rootId);
+    if (!cb) {
+      cb = (el) => {
+        if (el) zonePolygonsRef.current.set(rootId, el);
+        else zonePolygonsRef.current.delete(rootId);
+      };
+      zoneRefCallbacksRef.current.set(rootId, cb);
+    }
+    return cb;
+  }
+  // Prunes cached callbacks for zones that no longer exist (dissolved
+  // circles, deleted nodes) — otherwise zoneRefCallbacksRef only ever grows
+  // over a long session as circles form and dissolve.
+  useEffect(() => {
+    const liveIds = new Set(nodeGroups.map((g) => g.rootId));
+    for (const rootId of Array.from(zoneRefCallbacksRef.current.keys())) {
+      if (!liveIds.has(rootId)) zoneRefCallbacksRef.current.delete(rootId);
+    }
+  }, [nodeGroups]);
   const floatingZones = useMemo(
     () =>
       nodeGroups
@@ -107,13 +135,12 @@ export function CanvasBackdrop({
         return (
           <polygon
             key={`zone-${g.rootId}`}
-            ref={(el) => {
-              // Handed to useZoneFloat above, which drives this element's
-              // own transform/transition directly — see its doc comment
-              // for why that's imperative rather than a style prop here.
-              if (el) zonePolygonsRef.current.set(g.rootId, el);
-              else zonePolygonsRef.current.delete(g.rootId);
-            }}
+            // Handed to useZoneFloat above, which drives this element's own
+            // transform directly every animation frame — see its doc
+            // comment for why that's imperative rather than a style prop
+            // here. A stable per-zone callback (zoneRefCallback), not an
+            // inline one — see its own doc comment.
+            ref={zoneRefCallback(g.rootId)}
             points={g.outline.map((p) => `${p.x},${p.y}`).join(" ")}
             fill={color}
             fillOpacity={dimmed ? 0.06 : 0.14}

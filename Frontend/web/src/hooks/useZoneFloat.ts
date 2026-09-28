@@ -2,20 +2,30 @@ import { useEffect, useRef } from "react";
 import { hashSeed } from "../utils/canvasLayout";
 
 // How far (in the zone polygon's own SVG coordinate space — canvas units,
-// not screen pixels, same caveat as the old CSS-keyframe version this
-// replaced) a floating zone nudges toward the canvas center before easing
-// back to its real, stored position. Modest on purpose: the backdrop still
-// has to visibly enclose its own member nodes at every point in the cycle.
-const AMPLITUDE = 28;
-// Each way's transition duration is randomized per zone (seeded off its own
-// rootId, like NodeCard's chaosStyle) in this range, in seconds.
-const MIN_LEG_S = 2.5;
-const LEG_SPREAD_S = 2;
-// How long a zone lingers at each end of the cycle before reversing.
-const HOME_DWELL_MS = 600;
-const OUT_DWELL_MS = 900;
-// The fast transition a click forces a zone into, if it isn't home already.
-const BOOST_DURATION_S = 0.55;
+// not screen pixels) a floating zone nudges toward the canvas center before
+// easing back to its real, stored position. Modest on purpose: the backdrop
+// still has to visibly enclose its own member nodes at every point in the
+// cycle.
+const AMPLITUDE = 40;
+// Roughly how long each leg (toward center, or back home) takes, randomized
+// per zone (seeded off its own rootId, like NodeCard's chaosStyle) — not a
+// hard deadline, just when the target flips; the actual approach is
+// continuous easing (see NORMAL_TAU below), so a short leg just means it
+// reverses before fully arriving, which reads as drifting rather than
+// snapping to two fixed points.
+const MIN_LEG_S = 1.6;
+const LEG_SPREAD_S = 1.6;
+const HOME_DWELL_S = 0.3;
+const OUT_DWELL_S = 0.5;
+// How quickly the on-screen offset eases toward its current target — an
+// exponential time constant, not a fixed-duration transition (see the doc
+// comment on the hook itself for why this isn't CSS-transition-driven).
+const NORMAL_TAU_S = 0.9;
+// The tau a click forces every away-from-home zone into for a short burst,
+// so the "coming back" leg reads as a deliberate sprint instead of waiting
+// out its own normal, slower approach.
+const BOOST_TAU_S = 0.18;
+const BOOST_HOLD_S = 0.8;
 
 interface FloatingZone {
   rootId: string;
@@ -24,30 +34,33 @@ interface FloatingZone {
 }
 
 interface ZoneRuntime {
-  timer: ReturnType<typeof setTimeout> | null;
-  atHome: boolean;
+  offset: { x: number; y: number };
+  target: { x: number; y: number };
+  /** performance.now(), in seconds — when this zone's target next flips (out<->home). */
+  nextFlipAt: number;
   legDuration: number;
-  boostHome: () => void;
 }
 
 /**
- * Imperatively drives each un-stabilized zone's own backdrop through a
- * "drift toward the canvas center, dwell, ease back to its real position,
- * dwell, repeat" cycle — the same "still undecided" floating quality
- * NodeCard's own chaotic drift already gives an unchosen circle's member
- * nodes (see NodeCard's chaosStyle), just for the whole polygon rather than
- * one small icon.
+ * Drives each un-stabilized zone's own backdrop through a "drift toward the
+ * canvas center, dwell, ease back to its real position, dwell, repeat"
+ * cycle — the same "still undecided" floating quality NodeCard's own
+ * chaotic drift already gives an unchosen circle's member nodes (see
+ * NodeCard's chaosStyle), just for the whole polygon rather than one small
+ * icon.
  *
- * Deliberately not React state/CSS-keyframe driven: a click anywhere on the
- * canvas (see `boostTick`) has to be able to snap whichever zones are
- * currently away from home into a fast "sprint back" — which means reaching
- * into an in-flight CSS transition and restarting it with a shorter
- * duration, something a declarative style prop can't express (changing
- * `transition-duration` alone never affects a transition already running).
- * So each zone's own <polygon> element is mutated directly via
- * `elementsRef`, and the "go out"/"come home" cycle is just a pair of
- * mutually-recursive setTimeout calls, not a render loop — nothing here
- * re-renders React on every frame.
+ * One continuous requestAnimationFrame loop (not per-zone setTimeout
+ * chains, and not a CSS `@keyframes`/transition) recomputes every zone's
+ * offset from its own always-current target every frame and writes it
+ * straight to that zone's <polygon> element via `elementsRef`, bypassing
+ * React entirely (no state, no re-render) the same way the CSS-keyframe
+ * version this replaced never re-rendered either. Doing the easing in JS
+ * instead of via a CSS transition's own duration is specifically what lets
+ * a click (`boostTick`) actually speed up a zone that's already mid-flight:
+ * a CSS transition's timing is fixed at the moment it starts, so changing
+ * `transition-duration` after the fact has no effect on one already
+ * running — there's nothing to "reach into". A per-frame value has no such
+ * problem; boosting is just a shorter time constant for a little while.
  */
 export function useZoneFloat(
   floatingZones: FloatingZone[],
@@ -55,98 +68,107 @@ export function useZoneFloat(
   elementsRef: { current: Map<string, SVGPolygonElement> },
   boostTick: number,
 ) {
-  const runtimesRef = useRef(new Map<string, ZoneRuntime>());
-
+  // Kept fresh every render (not just at effect-setup time) so the RAF loop
+  // below — set up once and running independently of React's render cycle —
+  // always sees each zone's latest centroid/membership instead of whatever
+  // was current the one time its own closure was created.
+  const zonesRef = useRef(floatingZones);
   useEffect(() => {
-    const runtimes = runtimesRef.current;
-    const elements = elementsRef.current;
-    const seenIds = new Set(floatingZones.map((z) => z.rootId));
+    zonesRef.current = floatingZones;
+  });
 
-    // A zone that stabilized, or left the map entirely, stops floating —
-    // clear its timer and hand its polygon back its plain, un-transformed
-    // real position instead of leaving it frozen mid-drift.
-    for (const [rootId, runtime] of Array.from(runtimes.entries())) {
-      if (seenIds.has(rootId)) continue;
-      if (runtime.timer) clearTimeout(runtime.timer);
-      runtimes.delete(rootId);
-      const el = elements.get(rootId);
-      if (el) {
-        el.style.transition = "";
-        el.style.transform = "";
-      }
-    }
-
-    for (const zone of floatingZones) {
-      if (runtimes.has(zone.rootId)) continue;
-      const el = elements.get(zone.rootId);
-      if (!el) continue;
-
-      const [rLeg, rDelay] = hashSeed(zone.rootId, 2);
-      const legDuration = MIN_LEG_S + rLeg * LEG_SPREAD_S;
-      const runtime: ZoneRuntime = {
-        timer: null,
-        atHome: true,
-        legDuration,
-        boostHome: () => {},
-      };
-      runtimes.set(zone.rootId, runtime);
-
-      const goOut = () => {
-        const target = elements.get(zone.rootId);
-        if (!target || !runtimes.has(zone.rootId)) return;
-        const dx = center.x - zone.centroid.x;
-        const dy = center.y - zone.centroid.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        target.style.transition = `transform ${runtime.legDuration}s ease-in-out`;
-        target.style.transform = `translate(${(dx / dist) * AMPLITUDE}px, ${(dy / dist) * AMPLITUDE}px)`;
-        runtime.atHome = false;
-        runtime.timer = setTimeout(goHome, runtime.legDuration * 1000 + OUT_DWELL_MS);
-      };
-      const goHome = (fast = false) => {
-        const target = elements.get(zone.rootId);
-        if (!target || !runtimes.has(zone.rootId)) return;
-        const duration = fast ? BOOST_DURATION_S : runtime.legDuration;
-        target.style.transition = `transform ${duration}s ease-in-out`;
-        target.style.transform = "translate(0px, 0px)";
-        runtime.atHome = true;
-        runtime.timer = setTimeout(goOut, duration * 1000 + HOME_DWELL_MS);
-      };
-      runtime.boostHome = () => {
-        if (runtime.timer) clearTimeout(runtime.timer);
-        goHome(true);
-      };
-
-      // Desync each zone's own start so they don't all drift in lockstep.
-      runtime.timer = setTimeout(goOut, rDelay * legDuration * 1000);
-    }
-    // floatingZones is a fresh array/object every render (nodeGroups is
-    // recomputed on most position changes) — that's fine, the loop above is
-    // a no-op for every zone it's already tracking (the `continue` above),
-    // so re-running this effect often costs a cheap Set/Map scan, not a
-    // restarted animation.
-  }, [floatingZones, center.x, center.y, elementsRef]);
+  const runtimesRef = useRef(new Map<string, ZoneRuntime>());
+  const boostUntilRef = useRef(0);
+  const isFirstBoost = useRef(true);
 
   // A click anywhere on the canvas — see MapPage's own canvas onClick —
-  // sprints every zone that's currently away from home back to its real
-  // position at BOOST_DURATION_S instead of its own normal, slower leg.
-  // Zones already home have nothing to speed up, so they're left alone.
-  const isFirstBoost = useRef(true);
+  // forces every zone currently away from home back onto a home target and
+  // switches everyone to the fast tau for a short burst. Zones already home
+  // just keep gently drifting in place; there's nothing to speed up.
   useEffect(() => {
     if (isFirstBoost.current) {
       isFirstBoost.current = false;
       return;
     }
+    const now = performance.now() / 1000;
+    boostUntilRef.current = now + BOOST_HOLD_S;
     for (const runtime of runtimesRef.current.values()) {
-      if (!runtime.atHome) runtime.boostHome();
+      runtime.target = { x: 0, y: 0 };
+      runtime.nextFlipAt = now + runtime.legDuration + OUT_DWELL_S;
     }
   }, [boostTick]);
 
   useEffect(() => {
-    const runtimes = runtimesRef.current;
-    return () => {
-      for (const runtime of runtimes.values()) {
-        if (runtime.timer) clearTimeout(runtime.timer);
+    let raf = 0;
+    let lastTimeMs = performance.now();
+
+    function tick(nowMs: number) {
+      raf = requestAnimationFrame(tick);
+      const dt = Math.min((nowMs - lastTimeMs) / 1000, 0.1);
+      lastTimeMs = nowMs;
+      const now = nowMs / 1000;
+      const boosting = now < boostUntilRef.current;
+      const tau = boosting ? BOOST_TAU_S : NORMAL_TAU_S;
+      const alpha = 1 - Math.exp(-dt / tau);
+
+      const runtimes = runtimesRef.current;
+      const elements = elementsRef.current;
+      const liveZones = zonesRef.current;
+      const seenIds = new Set(liveZones.map((z) => z.rootId));
+
+      // A zone that stabilized, or left the map entirely, stops floating —
+      // hand its polygon back its plain, un-transformed real position
+      // instead of leaving it frozen mid-drift.
+      for (const [rootId] of Array.from(runtimes.entries())) {
+        if (seenIds.has(rootId)) continue;
+        runtimes.delete(rootId);
+        const el = elements.get(rootId);
+        if (el) el.style.transform = "";
       }
-    };
-  }, []);
+
+      for (const zone of liveZones) {
+        let runtime = runtimes.get(zone.rootId);
+        if (!runtime) {
+          const [rLeg, rDelay] = hashSeed(zone.rootId, 2);
+          const legDuration = MIN_LEG_S + rLeg * LEG_SPREAD_S;
+          // Desync each zone's own start so they don't all drift in
+          // lockstep — a random initial wait before its first "go out".
+          runtime = { offset: { x: 0, y: 0 }, target: { x: 0, y: 0 }, legDuration, nextFlipAt: now + rDelay * legDuration };
+          runtimes.set(zone.rootId, runtime);
+        }
+
+        if (now >= runtime.nextFlipAt) {
+          const awayFromHome = runtime.target.x !== 0 || runtime.target.y !== 0;
+          if (awayFromHome) {
+            runtime.target = { x: 0, y: 0 };
+            runtime.nextFlipAt = now + runtime.legDuration + HOME_DWELL_S;
+          } else {
+            // Recomputed fresh on every "go out", not just once — a zone
+            // dragged far from where it started still gets a direction that
+            // actually points at the canvas center right now.
+            const dx = center.x - zone.centroid.x;
+            const dy = center.y - zone.centroid.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            runtime.target = { x: (dx / dist) * AMPLITUDE, y: (dy / dist) * AMPLITUDE };
+            runtime.nextFlipAt = now + runtime.legDuration + OUT_DWELL_S;
+          }
+        }
+
+        runtime.offset = {
+          x: runtime.offset.x + (runtime.target.x - runtime.offset.x) * alpha,
+          y: runtime.offset.y + (runtime.target.y - runtime.offset.y) * alpha,
+        };
+
+        const el = elements.get(zone.rootId);
+        if (el) el.style.transform = `translate(${runtime.offset.x.toFixed(2)}px, ${runtime.offset.y.toFixed(2)}px)`;
+      }
+    }
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // center.x/center.y are stable primitives (CANVAS_CENTER is a module-
+    // level constant in CanvasBackdrop); this effect otherwise reads
+    // everything else live via the refs above, so it only ever needs to
+    // start once.
+  }, [center.x, center.y, elementsRef]);
 }
