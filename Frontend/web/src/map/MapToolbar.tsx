@@ -40,7 +40,7 @@ interface Props {
   onCopyMap: () => void;
   onPaste: () => void;
   onExportText: () => void;
-  /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay). Not owner-gated — anyone viewing a map should be able to self-present it. */
+  /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay) — offered from the "view" (eye icon) menu below, alongside reading mode. Not owner-gated — anyone viewing a map should be able to self-present it. */
   onPresent: () => void;
 }
 
@@ -148,17 +148,28 @@ export function MapToolbar({
               <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
             </svg>
           </button>
-          {/* Reading mode — how nodes read on the canvas (classic mind map /
-              icons + text / actual). Highlighted whenever it isn't the
-              default look. */}
+          {/* "View" — the reading-mode picker (Aa: classic mind map / icons +
+              text / actual) plus presentation mode both live behind this one
+              plain-eye icon now, instead of each getting their own toolbar
+              slot. Highlighted whenever reading mode isn't the default look,
+              same trigger as before, just under a different glyph. */}
           <div className="relative">
             <button
               type="button"
-              className={`${iconBtn} text-[0.8rem] ${readingMode !== "actual" ? pressed : idle}`}
+              className={`${iconBtn} ${readingMode !== "actual" ? pressed : idle}`}
               title={t.map.toolbar.readingMode}
               onClick={() => setShowReadingMenu((v) => !v)}
             >
-              Aa
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M1 8 C3 4, 13 4, 15 8 C13 12, 3 12, 1 8 Z"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+                <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" fill="none" />
+              </svg>
             </button>
             {showReadingMenu && (
               <ReadingModeMenu
@@ -168,6 +179,10 @@ export function MapToolbar({
                 onPick={(mode) => {
                   onPickReadingMode(mode);
                   setShowReadingMenu(false);
+                }}
+                onPresent={() => {
+                  setShowReadingMenu(false);
+                  onPresent();
                 }}
                 onClose={() => setShowReadingMenu(false)}
               />
@@ -236,18 +251,6 @@ export function MapToolbar({
           {isDiscussionMode ? "⚔" : "✎"}
         </button>
       )}
-      {/* Not owner-gated, unlike the mode toggle above — presenting is a
-          read-only, personal way to view a map, not an edit, so anyone with
-          the map open can step through it. Exempted from the collapse for
-          the same reason the mode toggle is. */}
-      <button
-        type="button"
-        className={`${iconBtn} ${idle}`}
-        title={t.map.toolbar.presentation}
-        onClick={onPresent}
-      >
-        ▶
-      </button>
       {/* A demo session has no dashboard to go back to (see ProtectedRoute) and
           the global Navbar is hidden here, so this is its only way out to the
           login page. Kept outside the collapse, like the mode toggle. */}
