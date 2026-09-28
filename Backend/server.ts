@@ -42,6 +42,21 @@ app.use((req, res, next) => {
 const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim());
 app.use(cors({ origin: allowedOrigins ?? true, credentials: true }));
 
+// "Are we actually running on a real deploy" — NODE_ENV alone isn't reliable
+// for this: Render (unlike some other platforms) does NOT set NODE_ENV to
+// "production" by itself, so relying on it alone silently fell back to dev-
+// mode cookie settings (secure:false, sameSite:"lax") on the real deployed
+// backend. sameSite:"lax" is *not* sent on a cross-site fetch/XHR at all
+// (only top-level navigation) — since the frontend (Vercel) and backend
+// (Render) are different domains, that meant the session cookie was set on
+// login but then silently dropped by the browser on the very next API call,
+// reading as "logs in, then immediately looks logged out again" — the
+// couple of requests that *did* still work right after login were just
+// Chrome's ~2-minute grace period for a freshly-set SameSite-defaulted
+// cookie, not the intended behavior. RENDER=true is a var Render itself
+// always injects (unlike NODE_ENV), so it's the reliable signal here.
+const isProd = process.env.NODE_ENV === "production" || process.env.RENDER === "true";
+
 // Session store: Redis-backed in production, so logging out or blocking a
 // user actually revokes access immediately instead of waiting on a token to
 // expire client-side. createRedisClient() returns null when REDIS_URL isn't
@@ -71,9 +86,8 @@ const sessionMiddleware = session({
     // reliably go through that same rewrite (see realtime/io.ts) and stays
     // genuinely cross-site — COOKIE_SAMESITE=lax is an escape hatch for a
     // future deploy where everything ends up same-origin.
-    secure: process.env.NODE_ENV === "production",
-    sameSite:
-      process.env.NODE_ENV === "production" ? (process.env.COOKIE_SAMESITE === "lax" ? "lax" : "none") : "lax",
+    secure: isProd,
+    sameSite: isProd ? (process.env.COOKIE_SAMESITE === "lax" ? "lax" : "none") : "lax",
   },
 });
 app.use(sessionMiddleware);
@@ -99,7 +113,7 @@ async function run() {
     if (!process.env.MONGO_URI) {
       throw new Error("MONGO_URI is missing!");
     }
-    if (process.env.NODE_ENV === "production") {
+    if (isProd) {
       if (!allowedOrigins || allowedOrigins.length === 0) {
         throw new Error("CORS_ORIGIN is required in production — credentials:true CORS can't use a wildcard.");
       }
@@ -114,7 +128,10 @@ async function run() {
         "⚠️  REDIS_URL not set — sessions are using express-session's in-memory MemoryStore. Fine for local dev/test, never for production.",
       );
     }
-    if (redisClient) await redisClient.connect();
+    if (redisClient) {
+      await redisClient.connect();
+      console.log("✅ Redis connected (session store)");
+    }
 
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ DB Connected");
