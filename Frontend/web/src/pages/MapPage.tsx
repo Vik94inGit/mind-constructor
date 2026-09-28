@@ -1299,6 +1299,7 @@ export function MapPage() {
         const leaderStart = startPositions.get(node.nodeId)!;
         const leaderTarget = avoidOverlap(clamp(leaderStart.x + dx, leaderStart.y + dy), dragObstacles, viewportBounds());
         setGroupDragState((prev) => new Map(prev ?? startPositions).set(node.nodeId, leaderTarget));
+        zoomToEditAt(leaderTarget.x, leaderTarget.y);
 
         const leaderDone = nodesApi
           .updateNode(node.nodeId, { x: leaderTarget.x, y: leaderTarget.y })
@@ -1517,6 +1518,7 @@ export function MapPage() {
             viewportBounds(),
           );
           setActionError(null);
+          zoomToEditAt(placed.x, placed.y);
           try {
             const updated = await nodesApi.updateNode(node.nodeId, {
               x: placed.x,
@@ -1565,6 +1567,7 @@ export function MapPage() {
           viewportBounds(),
         );
         const leftCircle = !!ownCircle && !staysMember;
+        zoomToEditAt(dropped.x, dropped.y);
 
         // Remembered so a failed persist below can put the node back exactly
         // where it actually still is on the server, instead of leaving the
@@ -2139,6 +2142,20 @@ export function MapPage() {
     // Zooming keeps the middle of the screen fixed; bring the nodes that just
     // changed back into it.
     if (centerOn) setTimeout(() => centerOnPoint(centerOn.x, centerOn.y), 250);
+  }
+
+  // After a drag settles, jumps the zoom to 100% if it was below that —
+  // editing a node's text/type reads and hit-targets best at its native
+  // size, and a zoomed-out map is exactly where a drag is most likely to
+  // have happened (more of the canvas fits on screen). Deliberately only
+  // ever zooms *in* to exactly 1, never out and never past 1 if already
+  // zoomed in further — this is a floor for "about to edit," not a reset.
+  // Runs after the drop, not before: zooming mid-drag would fight the
+  // gesture by moving the canvas under the pointer while it's still down.
+  function zoomToEditAt(x: number, y: number) {
+    if (zoom >= 1) return;
+    zoomFromCenter(0, 1);
+    setTimeout(() => centerOnPoint(x, y), 250);
   }
 
   // Brings an arbitrary set of canvas points into view: zooms out just
