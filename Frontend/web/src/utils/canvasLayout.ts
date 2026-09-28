@@ -165,7 +165,7 @@ export function getNodeMinDist() {
 // no-visual-overlap guarantee, only how tightly nodes pack when there's
 // room to.
 export function getCirclePackSpacing() {
-  return CAPTION_WIDTH + (isMobileViewport() ? 15 : 30);
+  return CAPTION_WIDTH + (isMobileViewport() ? 6 : 12);
 }
 
 // A sunflower (golden-angle) spiral, indexed by i — shared by

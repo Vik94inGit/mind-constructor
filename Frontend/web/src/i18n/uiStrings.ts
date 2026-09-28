@@ -36,7 +36,15 @@ export interface UiStrings {
     failed: string;
     nodes: Record<TemplateNodeKey, { title: string; text: string }>;
   };
-  contextMenu: { createBranch: string; update: string; choose: string; delete: string; attack: string };
+  contextMenu: {
+    createBranch: string;
+    edit: string;
+    changeType: string;
+    back: string;
+    choose: string;
+    delete: string;
+    attack: string;
+  };
   selection: {
     tapToChoose: string;
     finishHint: string;
@@ -102,7 +110,6 @@ export interface UiStrings {
     orderPlaceholder: string;
     orderTitle: string;
     orderBadge: (order: number) => string;
-    type: string;
     edit: string;
     editTitle: string;
     pack: string;
@@ -254,6 +261,7 @@ export interface UiStrings {
   };
   minimapTitle: string;
   panelDragHandle: string;
+  panelResizeHandle: string;
   negativeMajorityNotice: string;
   positiveMajorityNotice: string;
   presentation: {
@@ -371,7 +379,15 @@ const en: UiStrings = {
       tryNext2: { title: "Change 2", text: "Another change to try" },
     },
   },
-  contextMenu: { createBranch: "Create branch", update: "Update", choose: "Choose…", delete: "Delete", attack: "Attack" },
+  contextMenu: {
+    createBranch: "Create branch",
+    edit: "Edit",
+    changeType: "Change type",
+    back: "Back",
+    choose: "Choose…",
+    delete: "Delete",
+    attack: "Attack",
+  },
   selection: {
     tapToChoose: "Tap your nodes to choose them",
     finishHint: "A parent brings its whole branch (Shift+tap: only that node). Tap outside or press Enter when done.",
@@ -438,7 +454,6 @@ const en: UiStrings = {
     orderPlaceholder: "1, 2, 3…",
     orderTitle: "Step number — label nodes 1, 2, 3… to describe a process",
     orderBadge: (n) => `Step ${n}`,
-    type: "Type:",
     edit: "Edit",
     editTitle: "Open the canvas's own inline editor (text + type)",
     pack: "Pack…",
@@ -595,6 +610,7 @@ const en: UiStrings = {
   },
   minimapTitle: "Minimap — click or drag to jump around the map",
   panelDragHandle: "Drag to move this panel",
+  panelResizeHandle: "Drag to resize this panel",
   negativeMajorityNotice: "Negative arguments are now the majority — the map has shifted",
   positiveMajorityNotice: "Positive arguments are now the majority — the map has shifted",
   presentation: {
@@ -706,7 +722,15 @@ const cs: UiStrings = {
       tryNext2: { title: "Změna 2", text: "Další změna k vyzkoušení" },
     },
   },
-  contextMenu: { createBranch: "Vytvořit větev", update: "Upravit", choose: "Vybrat…", delete: "Smazat", attack: "Napadnout" },
+  contextMenu: {
+    createBranch: "Vytvořit větev",
+    edit: "Upravit",
+    changeType: "Změnit typ",
+    back: "Zpět",
+    choose: "Vybrat…",
+    delete: "Smazat",
+    attack: "Napadnout",
+  },
   selection: {
     tapToChoose: "Klepnutím na své uzly je vyberete",
     finishHint: "Rodič vezme celou svou větev (Shift+klepnutí: jen tento uzel). Hotovo: klepněte mimo nebo stiskněte Enter.",
@@ -773,7 +797,6 @@ const cs: UiStrings = {
     orderPlaceholder: "1, 2, 3…",
     orderTitle: "Číslo kroku — očíslujte uzly 1, 2, 3… a popište tak postup",
     orderBadge: (n) => `Krok ${n}`,
-    type: "Typ:",
     edit: "Upravit",
     editTitle: "Otevřít vestavěný editor na plátně (text + typ)",
     pack: "Sbalit…",
@@ -930,6 +953,7 @@ const cs: UiStrings = {
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
   panelDragHandle: "Přetažením posunete tento panel",
+  panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
   negativeMajorityNotice: "Negativní argumenty jsou nyní většinou — mapa se přeuspořádala",
   positiveMajorityNotice: "Pozitivní argumenty jsou nyní většinou — mapa se přeuspořádala",
   presentation: {
@@ -1041,7 +1065,15 @@ const uk: UiStrings = {
       tryNext2: { title: "Зміна 2", text: "Ще одна зміна для спроби" },
     },
   },
-  contextMenu: { createBranch: "Створити гілку", update: "Змінити", choose: "Обрати…", delete: "Видалити", attack: "Атакувати" },
+  contextMenu: {
+    createBranch: "Створити гілку",
+    edit: "Редагувати",
+    changeType: "Змінити тип",
+    back: "Назад",
+    choose: "Обрати…",
+    delete: "Видалити",
+    attack: "Атакувати",
+  },
   selection: {
     tapToChoose: "Торкайтеся своїх вузлів, щоб обрати їх",
     finishHint: "Батько бере всю свою гілку (Shift+торкання: лише цей вузол). Готово: торкніться поза вузлами або натисніть Enter.",
@@ -1108,7 +1140,6 @@ const uk: UiStrings = {
     orderPlaceholder: "1, 2, 3…",
     orderTitle: "Номер кроку — пронумеруйте вузли 1, 2, 3…, щоб описати процес",
     orderBadge: (n) => `Крок ${n}`,
-    type: "Тип:",
     edit: "Змінити",
     editTitle: "Відкрити вбудований редактор на полотні (текст + тип)",
     pack: "Згорнути…",
@@ -1265,6 +1296,7 @@ const uk: UiStrings = {
   },
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
+  panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
   negativeMajorityNotice: "Негативні аргументи тепер у більшості — мапа перебудувалася",
   positiveMajorityNotice: "Позитивні аргументи тепер у більшості — мапа перебудувалася",
   presentation: {
@@ -1376,7 +1408,15 @@ const ru: UiStrings = {
       tryNext2: { title: "Изменение 2", text: "Ещё одно изменение для проверки" },
     },
   },
-  contextMenu: { createBranch: "Создать ветку", update: "Изменить", choose: "Выбрать…", delete: "Удалить", attack: "Атаковать" },
+  contextMenu: {
+    createBranch: "Создать ветку",
+    edit: "Изменить",
+    changeType: "Изменить тип",
+    back: "Назад",
+    choose: "Выбрать…",
+    delete: "Удалить",
+    attack: "Атаковать",
+  },
   selection: {
     tapToChoose: "Касайтесь своих узлов, чтобы выбрать их",
     finishHint: "Родитель берёт всю свою ветку (Shift+касание: только этот узел). Готово: коснитесь вне узлов или нажмите Enter.",
@@ -1443,7 +1483,6 @@ const ru: UiStrings = {
     orderPlaceholder: "1, 2, 3…",
     orderTitle: "Номер шага — пронумеруйте узлы 1, 2, 3…, чтобы описать процесс",
     orderBadge: (n) => `Шаг ${n}`,
-    type: "Тип:",
     edit: "Изменить",
     editTitle: "Открыть встроенный редактор на холсте (текст + тип)",
     pack: "Свернуть…",
@@ -1600,6 +1639,7 @@ const ru: UiStrings = {
   },
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
+  panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",
   negativeMajorityNotice: "Негативные аргументы теперь в большинстве — карта перестроилась",
   positiveMajorityNotice: "Позитивные аргументы теперь в большинстве — карта перестроилась",
   presentation: {

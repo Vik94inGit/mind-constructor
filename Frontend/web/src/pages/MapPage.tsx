@@ -1084,11 +1084,10 @@ export function MapPage() {
   // Single entry point for "start editing this node's text/type inline, on
   // its own icon" — always selects (so the side panel shows something,
   // including the locked message when editing isn't allowed), but only
-  // actually turns the inline input on when canEditNode agrees. Reached
-  // from the context menu's "Update" and the side panel's own Edit button —
-  // deliberately not a node double-click any more (see zoom controls below,
-  // which claim that gesture instead), so editing only ever starts from an
-  // explicit, hard-to-fat-finger control.
+  // actually turns the inline input on when canEditNode agrees. Reached from
+  // a node double-click and the side panel's own Edit button. The context
+  // menu's own "Edit" item is a different, separate action now — it just
+  // opens the panel (see handleNodeClick below), not this inline editor.
   async function startInlineEdit(node: NodeDoc) {
     setContextMenu(null);
     setPendingCreate(null);
@@ -1182,6 +1181,21 @@ export function MapPage() {
       const attackers = nodes.filter((n) => n.isWeapon && nodeRefId(n.targetNodeId) === node.nodeId);
       const latestAttacker = attackers[attackers.length - 1];
       if (latestAttacker) triggerWeaponShot(latestAttacker.nodeId);
+    }
+  }
+
+  // The context menu's own "Change type" submenu — a third path to the same
+  // field the inline editor's icon-click cycling and the node panel's own
+  // (now removed) type dropdown used to cover, for picking a type without
+  // opening either of those. Owner-only, same as every other context-menu
+  // action on someone else's node (see NodeContextMenu's own isOwner gate).
+  async function handleChangeNodeType(node: NodeDoc, type: NodeType) {
+    setActionError(null);
+    try {
+      const updated = await nodesApi.updateNode(node.nodeId, { type });
+      upsertNode(updated);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.type);
     }
   }
 
@@ -2541,10 +2555,15 @@ export function MapPage() {
 
       {contextMenu && (
         <NodeContextMenu
+          // Remounts fresh (back to the root menu, not stuck on whatever
+          // submenu the previous node's menu was showing) whenever the
+          // target node changes.
+          key={contextMenu.node.nodeId}
           x={contextMenu.x}
           y={contextMenu.y}
           isOwner={isOwnNode(contextMenu.node)}
           canAttack={canAttackNode(contextMenu.node)}
+          nodeType={contextMenu.node.type}
           onClose={() => setContextMenu(null)}
           onCreate={() => {
             const anchor = contextMenu.node;
@@ -2560,7 +2579,8 @@ export function MapPage() {
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: anchor.nodeId });
           }}
-          onUpdate={() => startInlineEdit(contextMenu.node)}
+          onEdit={() => handleNodeClick(contextMenu.node)}
+          onChangeType={(type) => handleChangeNodeType(contextMenu.node, type)}
           onDelete={() => {
             const node = contextMenu.node;
             setContextMenu(null);
