@@ -114,7 +114,19 @@ describe("useCanvasFraming", () => {
   });
 
   describe("fitZoomForDisplay", () => {
-    it("does not zoom when nothing is drawn in an expanded (non-actual) mode", () => {
+    it("does not zoom when icon-mode nodes already clear each other's footprint", () => {
+      const nodes = [makeNode({ nodeId: "a" }), makeNode({ nodeId: "b" })];
+      const positions = new Map([
+        ["a", { x: 0, y: 0 }],
+        ["b", { x: 300, y: 0 }],
+      ]);
+      const { api, zoomFromCenter, showNotice } = setup({ visibleNodes: nodes, positions, zoom: 1 });
+      api.fitZoomForDisplay({}, "actual");
+      expect(zoomFromCenter).not.toHaveBeenCalled();
+      expect(showNotice).not.toHaveBeenCalled();
+    });
+
+    it("zooms in for crowded icon-mode nodes too, not just expanded text modes", () => {
       const nodes = [makeNode({ nodeId: "a" }), makeNode({ nodeId: "b" })];
       const positions = new Map([
         ["a", { x: 0, y: 0 }],
@@ -122,8 +134,20 @@ describe("useCanvasFraming", () => {
       ]);
       const { api, zoomFromCenter, showNotice } = setup({ visibleNodes: nodes, positions, zoom: 1 });
       api.fitZoomForDisplay({}, "actual");
+      expect(zoomFromCenter).toHaveBeenCalledTimes(1);
+      expect(showNotice).toHaveBeenCalledWith("STILL_OVERLAP");
+    });
+
+    it("never counts a weapon/protection node against its own deliberately-overlapped target", () => {
+      const target = makeNode({ nodeId: "target", x: 0, y: 0 });
+      const shield = makeNode({ nodeId: "shield", x: 5, y: 0, isProtection: true });
+      const positions = new Map([
+        ["target", { x: 0, y: 0 }],
+        ["shield", { x: 5, y: 0 }],
+      ]);
+      const { api, zoomFromCenter } = setup({ visibleNodes: [target, shield], positions, zoom: 1 });
+      api.fitZoomForDisplay({}, "actual");
       expect(zoomFromCenter).not.toHaveBeenCalled();
-      expect(showNotice).not.toHaveBeenCalled();
     });
 
     it("zooms in (capped at MAX_ZOOM) and warns when even that can't separate everything", () => {

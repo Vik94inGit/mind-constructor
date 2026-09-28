@@ -52,7 +52,21 @@ export function computeBasePositions(nodes: NodeDoc[]): Map<string, Pt> {
       // comment (canvasLayout.ts) for why it's shaped the way it is.
       // Spacing is derived from getNodeMinDist() so the base layout gets
       // the room placement elsewhere already enforces.
-      map.set(n.nodeId, spiralPoint(i, { x: CANVAS_W / 2, y: CANVAS_H / 2 }));
+      //
+      // Nudged clear of every node already placed earlier in this same
+      // loop (avoidOverlap, same obstacle radius as everywhere else) —
+      // the naive spiral point alone knows nothing about where anything
+      // else on the map actually is, stored position or an earlier
+      // spiral placement alike, so without this a node with no stored
+      // x/y could land squarely inside an existing cluster/zone with no
+      // spacing at all. Same order-dependent, best-effort contract
+      // placeCompanionNode below already accepts for weapon/protection
+      // nodes: only obstacles already in `map` (nodes earlier in this
+      // array) are seen, not ones that place later — real in practice
+      // only for a pathologically-ordered node list, not worth a second
+      // pass over the whole map to close.
+      const desired = spiralPoint(i, { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+      map.set(n.nodeId, avoidOverlap(desired, nodeObstacles(Array.from(map.values()))));
     }
   });
   weapons.forEach((n) => {

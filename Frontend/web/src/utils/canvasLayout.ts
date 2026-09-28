@@ -145,6 +145,29 @@ export function getNodeMinDist() {
   return CAPTION_WIDTH + (isMobileViewport() ? 50 : 100);
 }
 
+// A tighter nominal spacing for nodes *deliberately* fanned around a shared
+// root — a template's own branch, "Create circle"'s two starter children,
+// the sunflower-spiral fallback a freshly-loaded/templated node with no
+// stored x/y lands on (see nodePositions.ts). getNodeMinDist()'s own margin
+// is tuned for two *unrelated* nodes that happen to land near each other by
+// chance (a drag, a quick-add) — generous on purpose, so a coincidence never
+// reads as crowded. A circle's own members are the opposite case: they're
+// meant to read as one tight family, and the zone drawn through them (see
+// computeNodeGroups) only ever gets as big as its members are spread out —
+// so the old getNodeMinDist()-based spacing here was what made a
+// brand-new, plain 3-node circle already spread almost 300px wide before
+// anything else even happened. Still comfortably past CAPTION_WIDTH itself
+// (a caption can't touch its neighbor's), just without the extra
+// coincidental-collision margin that spacing carries for its own reason.
+// This is only ever the *nominal* target spacing a placement aims for —
+// avoidOverlap's own obstacle radius (see its call sites) stays at the
+// full getNodeMinDist() everywhere, so nothing here ever weakens the actual
+// no-visual-overlap guarantee, only how tightly nodes pack when there's
+// room to.
+export function getCirclePackSpacing() {
+  return CAPTION_WIDTH + (isMobileViewport() ? 15 : 30);
+}
+
 // A sunflower (golden-angle) spiral, indexed by i — shared by
 // computeBasePositions' own fallback layout (nodePositions.ts, for a node
 // with no stored x/y at all) and computeNegativeMajoritySwap below (for

@@ -54,7 +54,7 @@ import {
   CANVAS_H,
   ZOOM_STEP,
   computeLinkedNeighborIds,
-  getNodeMinDist,
+  getCirclePackSpacing,
   pickNonOverlappingPosition,
   nodeObstacles,
   avoidOverlap,
@@ -922,6 +922,21 @@ export function MapPage() {
     zoomedToFitNotice: t.ui.display.zoomedToFit,
   });
 
+  // A map that's already crowded the moment it's opened gets the same
+  // "zoom in to make room" treatment a reading-mode change triggers —
+  // without this, a map that stays in the default icon view the whole time
+  // has no way to ever surface this at all, however crowded loading it left
+  // the canvas (see fitZoomForDisplay's own doc comment: it now checks
+  // icon-mode footprints too, not just text modes). Runs once, right as the
+  // initial load settles — keyed on `loading` alone, not on positions/nodes,
+  // so a node moving near another one mid-drag doesn't zoom the screen in
+  // on its own, fighting the gesture that caused it.
+  useEffect(() => {
+    if (loading) return;
+    fitZoomForDisplay(nodeDisplay, readingMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   // What any node creation/drag has to steer clear of so it never lands
   // inside a big group backdrop — the group's own members are exempt
   // (excludeRootIds), since they belong there and are what the backdrop is
@@ -1767,8 +1782,11 @@ export function MapPage() {
 
       // Two children fanned either side of straight up from the root —
       // same angle-from-vertical idea QuickAddGhosts' own ring uses, just
-      // two fixed slots instead of one per node type.
-      const radius = getNodeMinDist() + 40;
+      // two fixed slots instead of one per node type. getCirclePackSpacing
+      // (not getNodeMinDist), same reasoning as layoutTemplate's own switch
+      // — these two are deliberately fanned around a shared root, not two
+      // unrelated nodes that happened to land near each other.
+      const radius = getCirclePackSpacing();
       const children = await Promise.all(
         [-50, 50].map(async (deg) => {
           const angle = (-90 + deg) * (Math.PI / 180);

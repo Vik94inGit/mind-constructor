@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   avoidOverlap,
+  CAPTION_WIDTH,
   computeDominantSentiment,
   computeLinkCycles,
   computeNodeGroups,
+  getCirclePackSpacing,
+  getNodeMinDist,
   isDescendant,
 } from "./canvasLayout";
 import type { EdgeDoc, NodeDoc, NodeType } from "../types";
@@ -164,5 +167,14 @@ describe("computeNodeGroups", () => {
     ]);
     const groups = computeNodeGroups(nodes, nodes, positions);
     expect(groups[0].sentiment).toBe("neutral");
+  });
+});
+
+describe("getCirclePackSpacing", () => {
+  it("is tighter than the general node-to-node spacing floor, but never below the caption's own width", () => {
+    const packed = getCirclePackSpacing();
+    const general = getNodeMinDist();
+    expect(packed).toBeLessThan(general);
+    expect(packed).toBeGreaterThanOrEqual(CAPTION_WIDTH);
   });
 });

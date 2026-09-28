@@ -1,4 +1,4 @@
-import { CANVAS_H, CANVAS_W, getNodeMinDist, spiralPoint } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
 import type { MapKind, NodeType } from "../types";
 
 // Ready-made branches a node's owner can grow from it in one click. Each one
@@ -166,7 +166,11 @@ function flatten(tree: TemplateNode[]): { node: TemplateNode; parentKey: Templat
 // computeMajoritySwap) — reused as-is rather than a bespoke ring just for
 // this, so the two read as the same visual language.
 export function layoutTemplate(kind: TemplateKind, root: { x: number; y: number }): PlacedTemplateNode[] {
-  const spacing = getNodeMinDist();
+  // The tighter "deliberately fanned around a shared root" spacing (see its
+  // own doc comment) — a growing template branch is exactly that case, and
+  // the old getNodeMinDist()-based spacing here was what made even a small
+  // template spread out far wider than its own node count actually needed.
+  const spacing = getCirclePackSpacing();
   return flatten(TEMPLATES[kind]).map(({ node, parentKey }, i) => {
     // i+1, not i: spiralPoint(0, root) is root's own position, and this
     // template's root is a real, already-existing node — every placed node
