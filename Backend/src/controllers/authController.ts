@@ -24,12 +24,29 @@ const regenerateSession = (req: Request): Promise<void> =>
     req.session.regenerate((err) => (err ? reject(err) : resolve()));
   });
 
+// Promisified req.session.save. Explicit, not left to express-session's own
+// implicit save-on-response-finish — confirmed in production that combining
+// that implicit path with regenerate() (rotating the session id right
+// before responding, for the fixation hygiene above) let the response go
+// out with a 200 and the right user in the body, but *no* Set-Cookie header
+// at all: express-session's "was this session modified" bookkeeping is
+// keyed off the session's state at the *start* of the request, and
+// regenerate() swaps in a whole new session object mid-request, which some
+// versions don't reliably reconcile with a bare "res.end() triggers a save"
+// hook. Saving explicitly and awaiting it before responding sidesteps that
+// entirely — this is also express-session's own documented workaround.
+const saveSession = (req: Request): Promise<void> =>
+  new Promise((resolve, reject) => {
+    req.session.save((err) => (err ? reject(err) : resolve()));
+  });
+
 // ========== REGISTER ==========
 export const register = async (req: Request, res: Response) => {
   try {
     const { user } = await registerAbl(req.body);
     await regenerateSession(req);
     req.session.userId = user._id.toString();
+    await saveSession(req);
 
     return res.status(201).json({
       success: true,
@@ -57,6 +74,7 @@ export const login = async (req: Request, res: Response) => {
     const { user } = await loginAbl(req.body);
     await regenerateSession(req);
     req.session.userId = user._id.toString();
+    await saveSession(req);
 
     return res.status(200).json({
       success: true,
@@ -88,6 +106,7 @@ export const googleAuth = async (req: Request, res: Response) => {
     const { user } = await googleAuthAbl(req.body);
     await regenerateSession(req);
     req.session.userId = user._id.toString();
+    await saveSession(req);
 
     return res.status(200).json({
       success: true,
@@ -121,6 +140,7 @@ export const demoAuth = async (req: Request, res: Response) => {
     const { user, map } = await createDemoSessionAbl();
     await regenerateSession(req);
     req.session.userId = user._id.toString();
+    await saveSession(req);
 
     return res.status(201).json({
       success: true,
