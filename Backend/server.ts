@@ -25,6 +25,19 @@ console.log(
 const app: Express = express();
 const PORT: number = Number(process.env.PORT) || 3000;
 
+// Render (like most PaaS hosts) terminates TLS at its own edge and forwards
+// plain HTTP internally, with an X-Forwarded-Proto header saying what the
+// original request actually was. Without this, Express's req.secure is
+// always false regardless of the real connection, since it never looks at
+// that header — and express-session silently *refuses* to send Set-Cookie
+// for a cookie configured secure:true (correctly, in production — see the
+// isProd cookie config below) when req.secure reads false, on the reasoning
+// that it'd be sending a "secure" cookie over what looks like plain HTTP.
+// That produced a real, hard-to-spot bug: a 200 response with the right
+// user in the body, but *no* Set-Cookie header at all, no error anywhere —
+// this is what "trust proxy" exists to fix.
+app.set("trust proxy", 1);
+
 console.log("DEBUG: Script is starting...");
 
 app.use((req, res, next) => {
