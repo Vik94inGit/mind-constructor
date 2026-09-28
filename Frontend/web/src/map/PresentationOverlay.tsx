@@ -1,5 +1,6 @@
 import { useI18n } from "../i18n/I18nContext";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
+import { NodeTypeIcon } from "./NodeTypeIcon";
 import type { NodeDoc } from "../types";
 
 interface Props {
@@ -37,6 +38,15 @@ export function PresentationOverlay({ slides, index, onIndexChange, onExit }: Pr
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-8 py-6 text-center">
+        {/* The node's own type icon, large — a slide used to be text-only
+            (type name + headline), which read as flat compared to the
+            crowned, colored icons the same node wears on the canvas. */}
+        <div
+          className="flex h-16 w-16 items-center justify-center rounded-full border-2"
+          style={{ borderColor: NODE_TYPE_COLORS[node.type] }}
+        >
+          <NodeTypeIcon type={node.type} size={34} />
+        </div>
         <span
           className="text-[1rem] font-bold tracking-[0.05em] uppercase"
           style={{ color: NODE_TYPE_COLORS[node.type] }}

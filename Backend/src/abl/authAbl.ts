@@ -1,6 +1,5 @@
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import {
   createUserDao,
@@ -52,11 +51,6 @@ const googleAuthSchema = z.object({
   idToken: z.string().min(1, "idToken is required"),
 });
 
-const generateToken = (userId: string) =>
-  jwt.sign({ id: userId }, process.env.JWT_SECRET as string, {
-    expiresIn: "7d",
-  });
-
 // One client, reused across requests — verifyIdToken doesn't need a fresh
 // instance per call, and the OAuth2Client constructor is what caches
 // Google's public signing keys internally.
@@ -85,9 +79,8 @@ export const registerAbl = async (input: unknown) => {
   if (existing) throw new EmailAlreadyInUseError();
 
   const user = await createUserDao({ username, email, password });
-  const token = generateToken(user._id.toString());
 
-  return { user, token };
+  return { user };
 };
 
 export const loginAbl = async (input: unknown) => {
@@ -111,9 +104,7 @@ export const loginAbl = async (input: unknown) => {
   // merely guesses/knows the email, without proving they own it.
   if (user.isBlocked) throw new AccountBlockedError();
 
-  const token = generateToken(user._id.toString());
-
-  return { user, token };
+  return { user };
 };
 
 // Registration and login by Google account collapse into this one entry
@@ -163,9 +154,7 @@ export const googleAuthAbl = async (input: unknown) => {
   // used to fish for "is this account blocked?" either.
   if (user.isBlocked) throw new AccountBlockedError();
 
-  const token = generateToken(user._id.toString());
-
-  return { user, token };
+  return { user };
 };
 
 // Same accent orange used by index.css's own --accent — no color picker for
@@ -182,11 +171,10 @@ const DEMO_OWNER_COLOR = "#b5651d";
 // own copy, not a shared one others could disrupt.
 export const createDemoSessionAbl = async () => {
   const user = await createDemoUserDao();
-  const token = generateToken(user._id.toString());
   const map = await createMapAbl(
     { name: "Demo map", ownerColor: DEMO_OWNER_COLOR, template: "demo" },
     user._id.toString(),
   );
 
-  return { user, token, map };
+  return { user, map };
 };

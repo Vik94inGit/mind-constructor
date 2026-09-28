@@ -1,9 +1,8 @@
-import { apiRequest, setToken, setDemoMapId, clearToken } from "./client";
+import { apiRequest, setDemoMapId, clearDemoMapId } from "./client";
 import type { User } from "../types";
 
 interface AuthResponse {
   success: boolean;
-  token: string;
   user: Pick<User, "_id" | "username" | "email" | "role" | "isDemo">;
 }
 
@@ -11,9 +10,7 @@ export async function register(username: string, email: string, password: string
   const res = await apiRequest<AuthResponse>("/api/auth/register", {
     method: "POST",
     body: { username, email, password },
-    auth: false,
   });
-  setToken(res.token);
   return res.user;
 }
 
@@ -21,9 +18,7 @@ export async function login(email: string, password: string) {
   const res = await apiRequest<AuthResponse>("/api/auth/login", {
     method: "POST",
     body: { email, password },
-    auth: false,
   });
-  setToken(res.token);
   return res.user;
 }
 
@@ -31,9 +26,7 @@ export async function googleLogin(idToken: string) {
   const res = await apiRequest<AuthResponse>("/api/auth/google", {
     method: "POST",
     body: { idToken },
-    auth: false,
   });
-  setToken(res.token);
   return res.user;
 }
 
@@ -48,9 +41,7 @@ interface DemoAuthResponse extends AuthResponse {
 export async function tryDemo() {
   const res = await apiRequest<DemoAuthResponse>("/api/auth/demo", {
     method: "POST",
-    auth: false,
   });
-  setToken(res.token);
   setDemoMapId(res.map.mapId);
   return { user: res.user, mapId: res.map.mapId };
 }
@@ -59,7 +50,21 @@ export async function logout() {
   try {
     await apiRequest("/api/auth/logout", { method: "POST" });
   } finally {
-    clearToken();
+    clearDemoMapId();
+  }
+}
+
+// Who the current session cookie belongs to — used by AuthContext on
+// mount, in place of the old "decode the JWT's id claim, then cross-
+// reference the user list" dance, which no longer has a token to decode.
+// Swallows any failure (no session, network) into null rather than
+// throwing, since "not logged in" is an expected, common outcome here.
+export async function me(): Promise<User | null> {
+  try {
+    const res = await apiRequest<{ success: boolean; user: User }>("/api/auth/me");
+    return res.user;
+  } catch {
+    return null;
   }
 }
 

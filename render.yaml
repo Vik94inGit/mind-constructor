@@ -1,7 +1,12 @@
 # Render Blueprint for the backend service. On render.com: New -> Blueprint,
 # point it at this repo, and it picks this file up automatically. MONGO_URI,
-# JWT_SECRET, and CORS_ORIGIN are marked sync:false so Render prompts for
-# them in the dashboard instead of expecting real secrets in this file.
+# SESSION_SECRET, CORS_ORIGIN and GOOGLE_CLIENT_ID are marked sync:false so
+# Render prompts for them in the dashboard instead of expecting a real
+# secret in this file — all are required for the server to boot in
+# production (see server.ts's own startup checks). REDIS_URL is *not*
+# sync:false: it's wired automatically (below) to the Key Value instance
+# this same Blueprint provisions, so redeploying it needs no manual
+# connection-string copy-paste at all.
 services:
   - type: web
     name: mind-constructor-backend
@@ -13,9 +18,24 @@ services:
     envVars:
       - key: MONGO_URI
         sync: false
-      - key: JWT_SECRET
+      - key: SESSION_SECRET
         sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: mind-constructor-redis
+          property: connectionString
       - key: CORS_ORIGIN
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
+
+  # Session store (see Backend/src/config/redis.ts) — Render's own free-tier
+  # Redis-compatible Key Value store. ipAllowList: [] keeps it reachable only
+  # over Render's private network, i.e. only from mind-constructor-backend
+  # above, never from the public internet.
+  - type: keyvalue
+    name: mind-constructor-redis
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru

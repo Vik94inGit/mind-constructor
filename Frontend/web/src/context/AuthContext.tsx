@@ -1,8 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import * as authApi from "../api/auth";
-import { getToken, clearToken } from "../api/client";
-import { decodeJwtId } from "../utils/jwt";
 import type { User } from "../types";
 
 interface AuthContextValue {
@@ -28,25 +26,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    const id = decodeJwtId(token);
-    if (!id) {
-      clearToken();
-      setLoading(false);
-      return;
-    }
+    // Relies purely on the mc_sid cookie (sent automatically, see
+    // api/client.ts's credentials:"include") — nothing left here to decode
+    // or store client-side; authApi.me() itself swallows a 401 into null.
     authApi
-      .listUsers()
-      .then((all) => {
-        const self = all.find((u) => u._id === id);
-        if (self) setUser(self);
-        else clearToken();
-      })
-      .catch(() => clearToken())
+      .me()
+      .then(setUser)
       .finally(() => setLoading(false));
   }, []);
 

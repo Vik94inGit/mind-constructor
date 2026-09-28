@@ -5,8 +5,8 @@
 // open tab sees the same node/edge/attack update the actor's own tab does
 // from its optimistic local state — without polling.
 import type { Server as HTTPServer } from "http";
+import type { RequestHandler } from "express";
 import { Server as SocketIOServer, type Socket } from "socket.io";
-import jwt from "jsonwebtoken";
 import { findUserByIdDao } from "../dao/userDao.js";
 import { getMapByIdDao } from "../dao/mapsDao.js";
 import { anyPublicNodeHiddenDao } from "../dao/visibilityDao.js";
@@ -17,30 +17,40 @@ const roomFor = (publicMapId: string) => `map:${publicMapId}`;
 // The map owner also sits in this room, which gets the events about branches hidden from everyone else.
 const ownerRoomFor = (publicMapId: string) => `map:${publicMapId}:owner`;
 
-export function initRealtime(httpServer: HTTPServer): SocketIOServer {
+// sessionMiddleware: the *same* express-session instance server.ts builds
+// and mounts on the REST API — sharing it (rather than each side building
+// its own) is what lets a browser's mc_sid cookie authenticate the socket
+// handshake against the same Redis-backed session store the REST API reads.
+export function initRealtime(httpServer: HTTPServer, sessionMiddleware: RequestHandler): SocketIOServer {
   // Mirrors the REST API's own cors() in server.ts: CORS_ORIGIN (comma-
   // separated) narrows both to a specific frontend domain in production;
   // unset, both stay wide open ("*"), which is fine for local dev.
+  // credentials: true is required too — without it the handshake's
+  // polling/XHR requests won't carry the session cookie cross-site even
+  // with the client's own withCredentials: true.
   const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim());
   io = new SocketIOServer(httpServer, {
-    cors: { origin: allowedOrigins ?? "*" },
+    cors: { origin: allowedOrigins ?? "*", credentials: true },
   });
 
-  // Same JWT the REST `protect` middleware checks — a socket that never
-  // sends a valid token never finishes connecting.
+  // Runs sessionMiddleware against the handshake's underlying HTTP request,
+  // so socket.request.session below is the same session object protect()
+  // reads for a plain REST call — the documented way to share an Express
+  // session with Socket.IO (io.engine.use, available since Socket.IO 4.6+).
+  io.engine.use(sessionMiddleware);
+
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth?.token as string | undefined;
-      if (!token) return next(new Error("Not authorized – no token"));
+      const userId = (socket.request as { session?: { userId?: string } }).session?.userId;
+      if (!userId) return next(new Error("Not authorized – no session"));
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string };
-      const user = await findUserByIdDao(decoded.id);
+      const user = await findUserByIdDao(userId);
       if (!user || user.isBlocked) return next(new Error("Not authorized"));
 
       socket.data.userId = user._id.toString();
       next();
     } catch {
-      next(new Error("Not authorized – invalid token"));
+      next(new Error("Not authorized"));
     }
   });
 

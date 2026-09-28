@@ -58,8 +58,6 @@ import {
   nodeObstacles,
   avoidOverlap,
   footprintObstacles,
-  zoneAngleGuard,
-  leavingPinchesZone,
   isDescendant,
   computeNodeGroups,
   computeLinkCycles,
@@ -75,10 +73,6 @@ import type { AttackIndicator, EdgeDoc, LineDoc, MapDoc, NodeDoc, NodeType, Sele
 // unsolvedProblemIds below) only if it's one of these — a plain Problem or
 // Fail child piled on top doesn't count as a proposal.
 const ADDRESSES_PROBLEM_TYPES = new Set<NodeType>(["Success", "Option", "Solution"]);
-
-// Stand-in id for a node that doesn't exist yet, when checking where it may go
-// (see zoneAngleGuard).
-const NEW_NODE_ID = "__new__";
 
 // Group-drag "follow the leader" catch-up — see onNodePointerDown's group-
 // drag branch. Only the pointer-downed node ("the leader") tracks the
@@ -102,6 +96,11 @@ const GROUP_FOLLOW_STAGGER_MS = 90;
 const MAJORITY_SWAP_STEPS = 5;
 const MAJORITY_SWAP_STEP_DELAY_MS = 160;
 const MAJORITY_SWAP_STAGGER_MS = 70;
+
+// applyTemplate's own reveal pace — long enough that each node in a growing
+// template branch reads as its own discrete step (plus its celebrate burst),
+// not a flash of everything at once.
+const TEMPLATE_NODE_STAGGER_MS = 250;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -174,6 +173,14 @@ export function MapPage() {
   // not a full-screen takeover with its own slide index.
   const [presenting, setPresenting] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
+  // Which nodes a presentation is scoped to — null means the whole map.
+  // Captured once, in enterPresentation, from whatever was chosen at that
+  // moment (multiSelectIds or a stabilized zone/circle — see its own doc
+  // comment) rather than read live off that selection state throughout the
+  // presentation: entering also clears the selection UI itself (so its own
+  // bottom bar doesn't render behind the presentation overlay), which would
+  // otherwise erase the very scope slideNodes needs to keep filtering by.
+  const [presentationScopeIds, setPresentationScopeIds] = useState<Set<string> | null>(null);
   // How this viewer reads the map (see utils/readingMode.ts) — remembered per
   // browser, never shared with the map's other members.
   const [readingMode, setReadingModeState] = useState<ReadingMode>(loadReadingMode);
@@ -730,17 +737,28 @@ export function MapPage() {
   // see computeSlideOrder/computeGeometrizedPositions (utils/presentation.ts)
   // and the enter/exitPresentation functions below. `visibleNodes` already
   // strips packed-away members; also drops weapon/protection decorator
-  // nodes and anything the owner has hidden from members — a presentation
-  // is for showing, not attack/defense bookkeeping or a branch deliberately
-  // kept out of sight. Empty (not just skipped) while `presenting` is
-  // false, so nothing here does real work between presentations.
+  // nodes, anything the owner has hidden from members (a presentation is for
+  // showing, not attack/defense bookkeeping or a branch deliberately kept
+  // out of sight), and — since GET /:mapId/nodes omits a node's own `text`
+  // until something backfills it (see ensureNodeText) — any node whose
+  // caption is still genuinely empty (no title either) once that backfill
+  // has run: a slide with nothing to read on it is worse than not showing
+  // it at all. presentationScopeIds (see its own doc comment) narrows the
+  // whole map down to a chosen node selection or zone when set. Empty (not
+  // just skipped) while `presenting` is false, so nothing here does real
+  // work between presentations.
   const slideNodes = useMemo(() => {
     if (!presenting) return [];
     const eligible = visibleNodes.filter(
-      (n) => !n.isWeapon && !n.isProtection && !hiddenBranchIds.has(n.nodeId),
+      (n) =>
+        !n.isWeapon &&
+        !n.isProtection &&
+        !hiddenBranchIds.has(n.nodeId) &&
+        (!presentationScopeIds || presentationScopeIds.has(n.nodeId)) &&
+        (n.title || n.text),
     );
     return computeSlideOrder(eligible);
-  }, [presenting, visibleNodes, hiddenBranchIds]);
+  }, [presenting, visibleNodes, hiddenBranchIds, presentationScopeIds]);
 
   const geometrizedPositions = useMemo(
     () => (presenting && slideNodes.length > 0 ? computeGeometrizedPositions(slideNodes) : null),
@@ -768,26 +786,77 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presenting, slideIndex, slideNodes, geometrizeBlend.blend]);
 
-  // Guards an empty map (nothing eligible to present) rather than entering
-  // a blank slideshow; computes the same way slideNodes' own memo would,
-  // but eagerly — this runs once, on the toolbar click itself, well before
-  // `presenting` flips true and that memo would otherwise recompute.
+  // Every id reachable from `rootIds` by walking parentId forward
+  // (children, grandchildren, ...) within `pool` — used to expand a chosen
+  // zone's own [rootId, ...directChildIds] (see SelectedCircle) into its
+  // *whole* branch for presenting, since a zone's stabilized membership only
+  // ever lists the root's direct children, not deeper descendants. A plain
+  // multi-select (the other way to scope a presentation, see
+  // enterPresentation) is left exactly as picked instead — those ids were
+  // chosen by hand, one at a time, so there's no "the rest of the branch"
+  // to imply the way a zone's own subtree does.
+  function collectDescendants(rootIds: Set<string>, pool: NodeDoc[]): Set<string> {
+    const result = new Set(rootIds);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const n of pool) {
+        if (result.has(n.nodeId)) continue;
+        const parentId = nodeRefId(n.parentId);
+        if (parentId && result.has(parentId)) {
+          result.add(n.nodeId);
+          grew = true;
+        }
+      }
+    }
+    return result;
+  }
+
+  // Guards an empty selection (nothing eligible to present) rather than
+  // entering a blank slideshow; computes the eligible set eagerly, on the
+  // toolbar click itself, well before `presenting` flips true and
+  // slideNodes' own memo would otherwise recompute it. Also the one place
+  // that decides *what* a presentation is scoped to (see
+  // presentationScopeIds' own doc comment): whatever's multi-selected wins
+  // first, then a stabilized zone/circle, else the whole map — the same
+  // "nodes or zones" choice the canvas' own selection tools already offer,
+  // reused here rather than inventing a separate picker.
   function enterPresentation() {
+    const scopeIds =
+      multiSelectIds.size > 0
+        ? multiSelectIds
+        : map?.selectedCircle?.nodeIds?.length
+          ? collectDescendants(new Set(map.selectedCircle.nodeIds), visibleNodes)
+          : null;
     const eligible = visibleNodes.filter(
-      (n) => !n.isWeapon && !n.isProtection && !hiddenBranchIds.has(n.nodeId),
+      (n) =>
+        !n.isWeapon &&
+        !n.isProtection &&
+        !hiddenBranchIds.has(n.nodeId) &&
+        (!scopeIds || scopeIds.has(n.nodeId)),
     );
     if (eligible.length === 0) {
       setActionError(t.ui.presentation.empty);
       return;
     }
-    setSlideIndex(0);
-    setSelectedId(null);
-    dispatchMode({ type: "reset" });
-    setPresenting(true);
+    // Text is lazily backfilled (see ensureNodeText) — a node the caption
+    // list never happened to show yet would otherwise arrive here with an
+    // empty n.text, reading as a blank slide until this resolves. Awaited
+    // before presenting flips on, so slideNodes' own memo never computes
+    // against half-loaded data.
+    void ensureNodeText(eligible.map((n) => n.nodeId)).then(() => {
+      setPresentationScopeIds(scopeIds);
+      setMultiSelectIds(new Set());
+      setSlideIndex(0);
+      setSelectedId(null);
+      dispatchMode({ type: "reset" });
+      setPresenting(true);
+    });
   }
   function exitPresentation() {
     setPresenting(false);
     setSlideIndex(0);
+    setPresentationScopeIds(null);
   }
 
   // How many nodes are currently packed into each container — NodeCard's
@@ -914,13 +983,16 @@ export function MapPage() {
   // What any node creation/drag has to steer clear of so it never lands
   // inside a big group backdrop — the group's own members are exempt
   // (excludeRootIds), since they belong there and are what the backdrop is
-  // even drawn around. Clearance is the backdrop's own radius plus a
-  // node's normal footprint, so a placed node's icon+caption clears the
-  // backdrop's edge, not just its center.
+  // even drawn around. Clearance is the backdrop's own radius plus a small
+  // fixed buffer (not a fraction of getNodeMinDist() any more — that put a
+  // ~150px empty ring of dead space around every zone on top of the radius'
+  // own +70 built-in padding, reading as an overly spread-out, uncompact
+  // map instead of a clear-but-tight boundary). Just enough for a node's own
+  // icon+caption to clear the backdrop's edge, not its full spacing margin.
   function bigNodeObstacles(excludeRootIds: Set<string> = new Set()): Obstacle[] {
     return nodeGroups
       .filter((g) => !excludeRootIds.has(g.rootId))
-      .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + getNodeMinDist() * 0.6 }));
+      .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 40 }));
   }
 
   // Any closed loop in the Link graph reads as a "figure" and gets colored
@@ -1443,7 +1515,6 @@ export function MapPage() {
             { x, y },
             footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
             viewportBounds(),
-            zoneAngleGuard(node.nodeId, target.nodeId, visibleNodes, positions),
           );
           setActionError(null);
           try {
@@ -1475,15 +1546,16 @@ export function MapPage() {
         // backdrop disappears on its own, no separate cleanup needed here.
         const parentId = nodeRefId(node.parentId);
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
-        // Still a member at the raw drop point? Then that circle's corners
-        // are what the drop is checked against (see zoneAngleGuard); a node
-        // being pulled out no longer shapes it.
+        // Still a member at the raw drop point?
         const staysMember = !!ownCircle && Math.hypot(x - ownCircle.cx, y - ownCircle.cy) <= ownCircle.r;
-        // Every other circle's backdrop is now a real obstacle here too (not
+        // Every other circle's backdrop is a real obstacle here too (not
         // just at creation time) — a plain reposition drop used to be able to
         // land a node's icon right on top of a zone it doesn't belong to.
         // Its own circle is excluded (staysMember only) so this never pushes
-        // a node out of the zone it's still a member of.
+        // a node out of the zone it's still a member of. No corner-angle
+        // check any more (see MIN_ZONE_ANGLE's own removal) — a zone is free
+        // to pack as tight as its own members' footprints allow, as long as
+        // it doesn't cross into a *different* zone's territory.
         const dropped = avoidOverlap(
           { x, y },
           [
@@ -1491,18 +1563,8 @@ export function MapPage() {
             ...bigNodeObstacles(staysMember && ownCircle ? new Set([ownCircle.rootId]) : undefined),
           ],
           viewportBounds(),
-          zoneAngleGuard(node.nodeId, staysMember ? (parentId ?? null) : null, visibleNodes, positions),
         );
-        // Judged at the raw drop point, not at `dropped` — nudging a drop off
-        // another node or into a wider corner mustn't be what pulls it out.
         const leftCircle = !!ownCircle && !staysMember;
-        if (leftCircle && parentId && leavingPinchesZone(node.nodeId, parentId, visibleNodes, positions)) {
-          // Leaving would squeeze the circle it's leaving into a sliver.
-          // Nothing was persisted (only dragState moved), so simply not
-          // saving anything snaps the node back where it started.
-          setActionError(t.ui.errors.pullOut);
-          return;
-        }
 
         // Remembered so a failed persist below can put the node back exactly
         // where it actually still is on the server, instead of leaving the
@@ -1986,7 +2048,6 @@ export function MapPage() {
       pos,
       footprintObstacles(obstaclePoints()),
       viewportBounds(),
-      zoneAngleGuard(NEW_NODE_ID, parent.nodeId, visibleNodes, positions),
     );
     setInlineEditId(null);
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId });
@@ -1994,13 +2055,19 @@ export function MapPage() {
 
   // Grows a template branch (see utils/templates.ts) from `root`: every node
   // is a real node with its prompt as title + text, created parents-first so
-  // each one can hang from the previous.
+  // each one can hang from the previous, geometrized in a ring around `root`
+  // (layoutTemplate's own "around the king" placement) rather than appearing
+  // all at once — each one gets its own celebrate burst (same creation
+  // effect confirmPendingCreate uses) and a deliberate pause before the
+  // next, so growing a whole template branch reads as it building itself
+  // step by step instead of popping in as a single flash.
   async function applyTemplate(kind: TemplateKind, root: NodeDoc) {
     if (!mapId) return;
     const rootPos = positions.get(root.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const placed = layoutTemplate(kind, rootPos, obstaclePoints());
+    const placed = layoutTemplate(kind, rootPos);
     const ids = new Map<TemplateNodeKey, string>();
-    for (const p of placed) {
+    for (let i = 0; i < placed.length; i++) {
+      const p = placed[i];
       const copy = t.ui.templates.nodes[p.key];
       const node = await nodesApi.createNode(mapId, {
         text: copy.text,
@@ -2013,7 +2080,12 @@ export function MapPage() {
       });
       ids.set(p.key, node.nodeId);
       upsertNode(node);
+      setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
+      if (i < placed.length - 1) await sleep(TEMPLATE_NODE_STAGGER_MS);
     }
+    // Brings the whole newly-grown ring into view — spiraling out from root
+    // can easily land later nodes past whatever's currently on-screen.
+    showNodes(Array.from(ids.values()));
     showNotice(t.ui.templates.created(placed.length));
   }
 
@@ -3358,7 +3430,6 @@ export function MapPage() {
               posFor(anchor),
               footprintObstacles(obstaclePoints()),
               viewportBounds(),
-              zoneAngleGuard(NEW_NODE_ID, anchor.nodeId, visibleNodes, positions),
             );
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: anchor.nodeId });

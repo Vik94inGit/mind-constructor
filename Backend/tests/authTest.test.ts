@@ -14,8 +14,12 @@ describe("Auth", () => {
     await mongoose.disconnect();
   });
 
-  it("registers a new user", async () => {
-    const res = await request(app).post("/api/auth/register").send({
+  it("registers a new user and the session cookie authenticates a follow-up request", async () => {
+    // A single agent (not bare `request(app)`) persists Set-Cookie across
+    // calls — the session is a cookie now, not an echoed token, so proving
+    // it round-trips means actually using it on a second request.
+    const agent = request.agent(app);
+    const res = await agent.post("/api/auth/register").send({
       username: "testuser",
       email: "test@example.com",
       password: "secret123",
@@ -23,18 +27,26 @@ describe("Auth", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
-    expect(res.body.token).toBeDefined();
+    expect(res.body.token).toBeUndefined();
     expect(res.body.user.email).toBe("test@example.com");
+
+    const me = await agent.get("/api/auth/me");
+    expect(me.status).toBe(200);
+    expect(me.body.user.email).toBe("test@example.com");
   });
 
   it("logs in an existing user", async () => {
-    const res = await request(app).post("/api/auth/login").send({
+    const agent = request.agent(app);
+    const res = await agent.post("/api/auth/login").send({
       email: "test@example.com",
       password: "secret123",
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.token).toBeDefined();
+    expect(res.body.token).toBeUndefined();
+
+    const me = await agent.get("/api/auth/me");
+    expect(me.status).toBe(200);
   });
 
   it("rejects wrong password", async () => {
@@ -44,5 +56,19 @@ describe("Auth", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+
+  it("logout ends the session", async () => {
+    const agent = request.agent(app);
+    await agent.post("/api/auth/login").send({
+      email: "test@example.com",
+      password: "secret123",
+    });
+
+    const logoutRes = await agent.post("/api/auth/logout");
+    expect(logoutRes.status).toBe(200);
+
+    const me = await agent.get("/api/auth/me");
+    expect(me.status).toBe(401);
   });
 });

@@ -1,4 +1,4 @@
-import { CANVAS_H, CANVAS_W, CAPTION_WIDTH } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, getNodeMinDist, spiralPoint } from "./canvasLayout";
 import type { MapKind, NodeType } from "../types";
 
 // Ready-made branches a node's owner can grow from it in one click. Each one
@@ -136,55 +136,49 @@ export interface PlacedTemplateNode {
   y: number;
 }
 
-const COLUMN = CAPTION_WIDTH + 20;
-const ROW = 170;
 const EDGE = 120;
 
-const leaves = (n: TemplateNode): number =>
-  n.children?.length ? n.children.reduce((sum, c) => sum + leaves(c), 0) : 1;
+// Parent-before-child walk of the whole tree into one flat list — same order
+// a template used to be *created* in (parents have to exist before a child
+// can point its parentId at them), now also the order it's *placed* in: an
+// early branch and its own children land in neighboring, inner turns of the
+// spiral below before a later branch's, the closest a single flat ordering
+// can read as "still grouped by branch" alongside a plain index sequence.
+function flatten(tree: TemplateNode[]): { node: TemplateNode; parentKey: TemplateNodeKey | null }[] {
+  const out: { node: TemplateNode; parentKey: TemplateNodeKey | null }[] = [];
+  const walk = (nodes: TemplateNode[], parentKey: TemplateNodeKey | null) => {
+    for (const n of nodes) {
+      out.push({ node: n, parentKey });
+      if (n.children) walk(n.children, n.key);
+    }
+  };
+  walk(tree, null);
+  return out;
+}
 
-const depthOf = (nodes: TemplateNode[]): number =>
-  nodes.reduce((max, n) => Math.max(max, 1 + (n.children ? depthOf(n.children) : 0)), 0);
-
-// Lays a template out as a tree hanging below (or above) `root`, parents
-// before children so they can be created in order. It tries both directions
-// and keeps the one that fits the canvas and lands on fewer existing nodes.
-export function layoutTemplate(
-  kind: TemplateKind,
-  root: { x: number; y: number },
-  existing: { x: number; y: number }[],
-): PlacedTemplateNode[] {
-  const tree = TEMPLATES[kind];
-  const total = tree.reduce((sum, n) => sum + leaves(n), 0);
-  const depth = depthOf(tree);
-  const half = ((total - 1) * COLUMN) / 2;
-  const centerX = Math.min(CANVAS_W - EDGE - half, Math.max(EDGE + half, root.x));
-
-  const build = (direction: 1 | -1): PlacedTemplateNode[] => {
-    const out: PlacedTemplateNode[] = [];
-    const place = (nodes: TemplateNode[], parentKey: TemplateNodeKey | null, left: number, level: number) => {
-      let cursor = left;
-      for (const n of nodes) {
-        const width = leaves(n);
-        const x = cursor + ((width - 1) * COLUMN) / 2;
-        const y = Math.min(CANVAS_H - EDGE, Math.max(EDGE, root.y + direction * level * ROW));
-        out.push({ key: n.key, type: n.type, order: n.order, parentKey, x, y });
-        if (n.children) place(n.children, n.key, cursor, level + 1);
-        cursor += width * COLUMN;
-      }
+// Lays a template out fanned around `root` in a ring — root is the node the
+// template was started on (a circle's own root wears NodeCrown's halo/
+// horns, so this reads as the rest of the branch gathering "around the
+// king"), not another tree hanging in a straight column beneath it. Same
+// sunflower-spiral placement spiralPoint already uses everywhere else a
+// cluster of nodes needs packing in around a center point without stacking
+// on each other (computeBasePositions' own fallback layout,
+// computeMajoritySwap) — reused as-is rather than a bespoke ring just for
+// this, so the two read as the same visual language.
+export function layoutTemplate(kind: TemplateKind, root: { x: number; y: number }): PlacedTemplateNode[] {
+  const spacing = getNodeMinDist();
+  return flatten(TEMPLATES[kind]).map(({ node, parentKey }, i) => {
+    // i+1, not i: spiralPoint(0, root) is root's own position, and this
+    // template's root is a real, already-existing node — every placed node
+    // starts at least one full turn out from it.
+    const p = spiralPoint(i + 1, root, spacing);
+    return {
+      key: node.key,
+      type: node.type,
+      order: node.order,
+      parentKey,
+      x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, p.x)),
+      y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, p.y)),
     };
-    place(tree, null, centerX - half, 1);
-    return out;
-  };
-
-  const score = (placed: PlacedTemplateNode[], direction: 1 | -1) => {
-    const lastY = root.y + direction * depth * ROW;
-    const offCanvas = lastY < EDGE || lastY > CANVAS_H - EDGE ? 1000 : 0;
-    const overlaps = placed.filter((p) => existing.some((e) => Math.hypot(e.x - p.x, e.y - p.y) < 110)).length;
-    return offCanvas + overlaps;
-  };
-
-  const down = build(1);
-  const up = build(-1);
-  return score(down, 1) <= score(up, -1) ? down : up;
+  });
 }

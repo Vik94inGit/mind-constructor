@@ -8,13 +8,17 @@ interface Props {
   onPick: (mode: ReadingMode) => void;
   compact: boolean;
   onToggleCompact: () => void;
+  /** Enters presentation mode — folded into this same "view" dropdown
+   *  rather than its own toolbar button (see MapToolbar's own comment). */
+  onPresent: () => void;
   onClose: () => void;
 }
 
-// The toolbar's "Aa" dropdown — which way the map reads (see
-// utils/readingMode.ts). Same open-downward, dismiss-on-outside-click/Escape
-// pattern as AddMenu, positioned by a `relative` wrapper around its trigger.
-export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, onClose }: Props) {
+// The toolbar's "view" (eye icon) dropdown — which way the map reads (see
+// utils/readingMode.ts), plus the entry point into presentation mode. Same
+// open-downward, dismiss-on-outside-click/Escape pattern as AddMenu,
+// positioned by a `relative` wrapper around its trigger.
+export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, onPresent, onClose }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -71,6 +75,15 @@ export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, onClos
       >
         <span className="flex-1">{t.ui.compact.label}</span>
         {compact && <span aria-hidden>✓</span>}
+      </button>
+      <div className="my-[0.15rem] border-t border-line" />
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
+        onClick={onPresent}
+      >
+        <span aria-hidden>▶</span>
+        <span className="flex-1">{t.map.toolbar.presentation}</span>
       </button>
     </div>
   );
