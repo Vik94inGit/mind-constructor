@@ -1028,6 +1028,14 @@ export function MapPage() {
     const { targets, units } = computeMajoritySwap(nodes, positions, nodeGroups, majoritySentiment);
     if (targets.size === 0) return;
 
+    // The whole point of this being visual is watching it happen — on a
+    // narrow phone viewport, whatever the user happened to be scrolled to
+    // before the sentiment flipped can easily be nowhere near the affected
+    // nodes' start *or* end spot, so the glide plays entirely off-screen and
+    // reads as "nothing happened." Both endpoints of every moving unit go
+    // in, not just the targets, so the camera settles somewhere the whole
+    // glide stays visible rather than just where it lands.
+    showPoints(Array.from(targets.entries()).flatMap(([id, target]) => [positions.get(id)!, target]));
     showNotice(majoritySentiment === "negative" ? t.ui.negativeMajorityNotice : t.ui.positiveMajorityNotice);
     // Seeded with every affected node's own current position (not yet its
     // target) so posFor has a stable value to return the instant this
@@ -2061,12 +2069,13 @@ export function MapPage() {
     if (centerOn) setTimeout(() => centerOnPoint(centerOn.x, centerOn.y), 250);
   }
 
-  // After an action on chosen nodes finishes, brings them into view: zooms out
-  // just enough for all of them to fit on screen (never in), then glides to
-  // their middle.
-  function showNodes(ids: string[]) {
+  // Brings an arbitrary set of canvas points into view: zooms out just
+  // enough for all of them to fit on screen (never in), then glides to their
+  // middle. Shared core of showNodes (below) and the majority-swap effect's
+  // own camera cue — the latter passes both a unit's start *and* end point so
+  // the whole glide stays on-screen, not just wherever it happens to end up.
+  function showPoints(pts: { x: number; y: number }[]) {
     const wrap = wrapRef.current;
-    const pts = ids.map((id) => positions.get(id)).filter((p): p is { x: number; y: number } => !!p);
     if (!wrap || pts.length === 0) return;
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
@@ -2081,6 +2090,13 @@ export function MapPage() {
     } else {
       centerOnPoint(middle.x, middle.y);
     }
+  }
+
+  // After an action on chosen nodes finishes, brings them into view: zooms out
+  // just enough for all of them to fit on screen (never in), then glides to
+  // their middle.
+  function showNodes(ids: string[]) {
+    showPoints(ids.map((id) => positions.get(id)).filter((p): p is { x: number; y: number } => !!p));
   }
 
   // The group bar's "Show as": the chosen nodes take this reading mode (null =
