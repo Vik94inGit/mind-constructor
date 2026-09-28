@@ -59,7 +59,6 @@ describe("authAbl", () => {
       vi.mocked(createUserDao).mockResolvedValue({
         _id: "u1", username: "alice", email: "alice@test.com",
       } as never);
-      process.env.JWT_SECRET = "test-secret";
 
       await registerAbl({ username: "alice", email: "  Alice@Test.com  ", password: "secret123" });
 
@@ -68,12 +67,11 @@ describe("authAbl", () => {
       });
     });
 
-    it("creates the user and issues a token", async () => {
+    it("creates the user", async () => {
       vi.mocked(findUserByEmailDao).mockResolvedValue(null as never);
       vi.mocked(createUserDao).mockResolvedValue({
         _id: "u1", username: "alice", email: "alice@test.com",
       } as never);
-      process.env.JWT_SECRET = "test-secret";
 
       const result = await registerAbl({
         username: "alice", email: "alice@test.com", password: "secret123",
@@ -83,7 +81,6 @@ describe("authAbl", () => {
         username: "alice", email: "alice@test.com", password: "secret123",
       });
       expect(result.user._id).toBe("u1");
-      expect(typeof result.token).toBe("string");
     });
   });
 
@@ -101,7 +98,6 @@ describe("authAbl", () => {
       vi.mocked(findUserByEmailDao).mockResolvedValue({
         _id: "u1", username: "alice", email: "alice@test.com", passwordHash: hash,
       } as never);
-      process.env.JWT_SECRET = "test-secret";
 
       await loginAbl({ email: "Alice@Test.com", password: "secret123" });
 
@@ -124,12 +120,10 @@ describe("authAbl", () => {
       vi.mocked(findUserByEmailDao).mockResolvedValue({
         _id: "u1", username: "alice", email: "alice@test.com", passwordHash: hash,
       } as never);
-      process.env.JWT_SECRET = "test-secret";
 
       const result = await loginAbl({ email: "alice@test.com", password: "secret123" });
 
       expect(result.user._id).toBe("u1");
-      expect(typeof result.token).toBe("string");
     });
 
     it("rejects a blocked user even with the correct password", async () => {
@@ -137,7 +131,6 @@ describe("authAbl", () => {
       vi.mocked(findUserByEmailDao).mockResolvedValue({
         _id: "u1", username: "alice", email: "alice@test.com", passwordHash: hash, isBlocked: true,
       } as never);
-      process.env.JWT_SECRET = "test-secret";
 
       await expect(
         loginAbl({ email: "alice@test.com", password: "secret123" }),

@@ -43,8 +43,10 @@ npx vitest run -t "test name substring"     # single test by name
 npm run admin:promote -- someone@example.com  # promote a user to admin (no in-app endpoint for this, by design)
 ```
 
-Requires a `.env` with `PORT`, `MONGO_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID` (the OAuth client id
-"Sign in with Google" ID tokens are verified against — see `authAbl.ts`'s `googleAuthAbl`).
+Requires a `.env` with `PORT`, `MONGO_URI`, `SESSION_SECRET`, `REDIS_URL`, `GOOGLE_CLIENT_ID` (the
+OAuth client id "Sign in with Google" ID tokens are verified against — see `authAbl.ts`'s
+`googleAuthAbl`). `REDIS_URL` may be left unset locally (sessions fall back to an in-memory store —
+see `server.ts`), but is required in production.
 `test-db.ts` is a standalone connectivity check (`npx tsx test-db.ts`), not part of the test suite.
 
 Tests mock the DAO layer with `vi.mock(...)` (see any file in `tests/`) rather than hitting a real
@@ -90,10 +92,16 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (
 
 Cross-cutting pieces:
 
-- **`src/middleware/auth.ts`** — `protect` verifies the JWT, loads the user, rejects blocked users
-  (checked per-request, not just at login), attaches `req.user`. `requireAdmin` must run after it.
-- **`src/realtime/io.ts`** — Socket.IO server sharing the same HTTP server and the same JWT as the
-  REST API. One room per map, keyed by the map's public id. `broadcastToMap(publicMapId, event,
+- **`src/middleware/auth.ts`** — `protect` reads `req.session.userId` (a Redis-backed, cookie-based
+  session — see `server.ts`'s `express-session`/`connect-redis` setup, `mc_sid` cookie), loads the
+  user, rejects blocked users (checked per-request, not just at login), attaches `req.user`.
+  `requireAdmin` must run after it. `POST /api/auth/logout` (`authController.ts`) now actually
+  destroys the session server-side — unlike the JWT version this replaced, blocking or logging out
+  a user revokes access immediately rather than waiting for a token to expire client-side.
+- **`src/realtime/io.ts`** — Socket.IO server sharing the same HTTP server *and the same
+  express-session middleware instance* as the REST API (`io.engine.use(sessionMiddleware)`), so a
+  browser's `mc_sid` cookie authenticates the socket handshake against the same session store. One
+  room per map, keyed by the map's public id. `broadcastToMap(publicMapId, event,
 payload)` is the one function controllers call after a mutation commits; it's a no-op if `io`
   was never initialized (true under the test app), so it's safe to call unconditionally.
 - **`src/abl/errors.ts`** — shared `ValidationError` + `parseOrThrow`.
@@ -110,9 +118,9 @@ payload)` is the one function controllers call after a mutation commits; it's a 
   `createDemoUserDao`) and a real, already-seeded `Map` for it via `mapAbl.ts`'s own `createMapAbl`
   (the `"demo"` `MAP_TEMPLATES` entry — a Problem with two Option children, each with its own
   Success/Fail child, so it's already an auto-detected circle). Isolated per visitor, not a shared
-  map — every call creates a brand-new account+map pair. Returns the same `{ token, user }` shape
-  every other auth endpoint does, plus `{ map: { mapId } }` so the frontend can navigate straight
-  there. No cleanup job for these accounts exists yet.
+  map — every call creates a brand-new account+map pair. Returns the same `{ user }` shape every
+  other auth endpoint does (plus `{ map: { mapId } }` so the frontend can navigate straight there)
+  and signs the caller in via the same session cookie. No cleanup job for these accounts exists yet.
 - **`src/abl/circleAbl.ts`** — a "circle" is a node with 2+ direct `parentId`-children (the
   parentId "star" a frontend draws as a plain translucent, sentiment-colored backdrop — positive-
   majority halo color vs. negative-majority horns color, no actual halo/horns/wings artwork).

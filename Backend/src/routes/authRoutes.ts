@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, login, googleAuth, demoAuth, logout } from "../controllers/authController.js";
+import { register, login, googleAuth, demoAuth, logout, me } from "../controllers/authController.js";
 import { protect, requireAdmin } from "../middleware/auth.js";
 import {
   getAllUsers,
@@ -15,6 +15,9 @@ router.post("/login", login);
 router.post("/google", googleAuth);
 router.post("/demo", demoAuth);
 router.post("/logout", logout);
+// Who the current session cookie belongs to — see authController.ts's own
+// doc comment on `me`.
+router.get("/me", protect, me);
 
 // Any signed-in user can list users — needed to look up an id to invite to
 // a map. Everything below is admin-only.

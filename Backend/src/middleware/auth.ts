@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import { findUserByIdDao } from "../dao/userDao.js";
 import type { UserRole } from "../models/User.js";
 
@@ -12,6 +11,7 @@ declare global {
         username: string;
         email: string;
         role: UserRole;
+        isDemo: boolean;
       };
     }
   }
@@ -23,22 +23,15 @@ export const protect = async (
   next: NextFunction,
 ) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const userId = req.session.userId;
+    if (!userId) {
       return res.status(401).json({
         success: false,
-        error: "Not authorized – no token",
+        error: "Not authorized – no session",
       });
     }
 
-    const token = authHeader.split(" ")[1];
-
-    // Verify token (replace process.env.JWT_SECRET with your real secret)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
-      id: string;
-    };
-
-    const user = await findUserByIdDao(decoded.id);
+    const user = await findUserByIdDao(userId);
 
     if (!user) {
       return res.status(401).json({
@@ -48,8 +41,9 @@ export const protect = async (
     }
 
     // Checked on every request (not just at login), so blocking someone
-    // takes effect immediately — unlike logout, this doesn't need to wait
-    // for their token to expire.
+    // takes effect immediately — logout is now a real revocation too (see
+    // authController.ts's logout), but a still-blocked user's *own* session
+    // shouldn't need to wait for anyone to explicitly log them out.
     if (user.isBlocked) {
       return res.status(403).json({
         success: false,
@@ -63,6 +57,7 @@ export const protect = async (
       username: user.username,
       email: user.email,
       role: user.role,
+      isDemo: user.isDemo,
     };
 
     next();
@@ -70,7 +65,7 @@ export const protect = async (
     console.error("Auth error:", error);
     return res.status(401).json({
       success: false,
-      error: "Not authorized – invalid token",
+      error: "Not authorized",
     });
   }
 };

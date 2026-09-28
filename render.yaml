@@ -1,7 +1,11 @@
 # Render Blueprint for the backend service. On render.com: New -> Blueprint,
-# point it at this repo, and it picks this file up automatically. MONGO_URI,
-# JWT_SECRET, and CORS_ORIGIN are marked sync:false so Render prompts for
-# them in the dashboard instead of expecting real secrets in this file.
+# point it at this repo, and it picks this file up automatically. Every var
+# below is marked sync:false so Render prompts for it in the dashboard
+# instead of expecting a real secret in this file. MONGO_URI, SESSION_SECRET,
+# REDIS_URL and CORS_ORIGIN are all required for the server to boot in
+# production (see server.ts's own startup checks) — REDIS_URL comes from a
+# separately-provisioned Redis instance (Upstash free tier, or Render's own
+# Key Value add-on), not from this Blueprint.
 services:
   - type: web
     name: mind-constructor-backend
@@ -13,7 +17,9 @@ services:
     envVars:
       - key: MONGO_URI
         sync: false
-      - key: JWT_SECRET
+      - key: SESSION_SECRET
+        sync: false
+      - key: REDIS_URL
         sync: false
       - key: CORS_ORIGIN
         sync: false
