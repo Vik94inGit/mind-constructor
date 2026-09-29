@@ -18,7 +18,8 @@ import {
   WEAPON_PARTICLE_COLORS,
 } from "../utils/particles";
 import { hashSeed } from "../utils/canvasLayout";
-import type { AttackIndicator, NodeDoc, NodeType, SizeTier } from "../types";
+import type { AttackIndicator, NodeDoc, NodeType } from "../types";
+import { nodeSizeMultiplier } from "../utils/nodePriority";
 import type { ReadingMode } from "../utils/readingMode";
 
 // A stable "which direction did this weapon fly in from" per node, derived
@@ -54,15 +55,6 @@ function seededRandoms(seed: string, count: number): number[] {
 // (Both this and NodeTypeIcon's size prop below are 0.8x their original
 // 32/26 — see MapPage's getNodeMinDist for the matching spacing shrink.)
 const OUTCOME_BADGE_SIZE = 26;
-
-// See Node.sizeTier's own doc comment (backend + types/index.ts) for the
-// null-vs-1 "never touched" contract — this is just the *visual* scale each
-// tier renders at. `node.sizeTier ?? 1` (never a bare `node.sizeTier`) is
-// the one correct way to read this anywhere in this component.
-const SIZE_MULTIPLIERS: Record<SizeTier, number> = { 1: 1, 2: 1.15, 3: 1.3 };
-
-// The simplified view shrinks every icon to this share of its normal size.
-const COMPACT_SCALE = 0.8;
 
 // Reading modes (see utils/readingMode.ts). A classic-mode text box is as wide
 // as its text wants up to this — far past the 148px caption chip, since the
@@ -131,6 +123,12 @@ interface Props {
   celebrate?: boolean;
   /** Dimmed because some other node's quick-add ghosts are active — still clickable. */
   muted?: boolean;
+  /** Has a visible child (utils/nodePriority.ts) — paints above every non-parent node, so nothing a child draws covers it. */
+  isParent?: boolean;
+  /** A child nobody is looking at right now — drawn faded so its parent reads first; full strength again on hover. */
+  quiet?: boolean;
+  /** This node's caption would lie over a parent's caption, so it's left out. */
+  hideCaption?: boolean;
   /** How many nodes are currently packed into this one (MapPage's packedCountByContainer) — undefined/0 renders no badge. See the corner-badge markup below. */
   packedCount?: number;
   /** True for a Problem-type node with no Success/Option/Solution child yet — nothing proposed against it. Pulses a persistent danger-colored ring (see index.css's own unsolved-problem-pulse) until that changes. Ignored for every other type. */
@@ -173,6 +171,9 @@ export const NodeCard = memo(function NodeCard({
   discussionMode,
   celebrate,
   muted,
+  isParent,
+  quiet,
+  hideCaption,
   packedCount,
   unsolved,
   dropHighlight,
@@ -243,8 +244,7 @@ export const NodeCard = memo(function NodeCard({
   // inverseScaleStyle below) — otherwise a 130% node's wider icon/caption
   // would visually spill out of a hit-target box that never actually grew,
   // leaving the extra 30% unclickable/unhoverable.
-  const sizeMultiplier =
-    (isCircleParent ? SIZE_MULTIPLIERS[3] : SIZE_MULTIPLIERS[node.sizeTier ?? 1]) * (compact ? COMPACT_SCALE : 1);
+  const sizeMultiplier = nodeSizeMultiplier(node, isCircleParent, compact);
   const style: CSSProperties = { left: x, top: y, width: 74 * sizeMultiplier };
 
   // A weapon/attack node carries a real type now (Problem/Problematic
@@ -305,7 +305,8 @@ export const NodeCard = memo(function NodeCard({
   // node mid-edit falls back to the icon + input either way (see `classic`).
   const classic = readingMode === "classic" && !inlineEditing;
   const iconText = readingMode === "iconText";
-  const showCaption = classic ? false : iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle;
+  const showCaption =
+    !hideCaption && (classic ? false : iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle);
   // What the caption says: the node's own title if it has one, otherwise the
   // start of its text (the line-clamp on the chip is what cuts it off, so
   // "first words" needs no separate truncation here).
@@ -324,7 +325,16 @@ export const NodeCard = memo(function NodeCard({
   // — the chosen node and its quick-add ghosts are meant to be the one
   // clear center of attention on screen while they're up; everything else
   // needs to properly recede, not just slightly fade.
-  const opacityClass = node.defeated ? "opacity-55" : dragging ? "opacity-85" : muted ? "opacity-16" : "";
+  // quiet (a child no one is looking at) ranks last: any stronger fade wins.
+  const opacityClass = node.defeated
+    ? "opacity-55"
+    : dragging
+      ? "opacity-85"
+      : muted
+        ? "opacity-16"
+        : quiet
+          ? "opacity-50 hover:opacity-100"
+          : "";
   const filterClass = muted ? "grayscale-[65%]" : "";
   const cursorClass = readonly ? "cursor-default" : dragging ? "cursor-grabbing" : "cursor-grab";
   // Position updates (left/top, applied via inline style) need to be
@@ -356,10 +366,9 @@ export const NodeCard = memo(function NodeCard({
   // MapPage's full-screen NodePanel backdrop (z-30) — added there to dim
   // the canvas and close the panel on an outside tap, which without this
   // otherwise also swallows every tap meant for a node, a ghost, or the
-  // pending-create input while a node is selected. z-32 while actively
-  // dragged keeps the dragged node above every other node too, same as
-  // before.
-  const zIndexClass = dragging ? "z-[32]" : "z-[31]";
+  // pending-create input while a node is selected. A parent sits one layer over the rest (z-32), so a child's icon or caption never paints over its parent's
+  // icon or caption; a dragged node (z-33) is above everything.
+  const zIndexClass = dragging ? "z-[33]" : isParent ? "z-[32]" : "z-[31]";
   const classes = [
     // Plain `transform: translate(-50%, -50%)` via an arbitrary value, not
     // Tailwind's -translate-x-1/2 utility — Tailwind v4's translate

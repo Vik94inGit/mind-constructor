@@ -13,6 +13,8 @@ import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
+import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } from "../utils/nodePriority";
+import type { CaptionSpec } from "../utils/nodePriority";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
 import { NodeCard } from "../map/NodeCard";
@@ -1984,6 +1986,52 @@ export function MapPage() {
   const btnSmGhost =
     "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50";
 
+  // Parents first (utils/nodePriority.ts): a node with a visible child paints
+  // above the rest, every other child is faded until someone looks at it
+  // (it, or its parent, is selected, it's in the chosen circle, being
+  // dragged or edited), and a child's caption that would lie over a
+  // parent's caption is left out.
+  const parentIds = computeParentIds(visibleNodes);
+  const nodeDragged = (n: NodeDoc) => dragState?.nodeId === n.nodeId || groupDragState?.has(n.nodeId) === true;
+  const childIsQuiet = (n: NodeDoc) => {
+    const parentId = nodeRefId(n.parentId);
+    if (!parentId || !parentIds.has(parentId) || parentIds.has(n.nodeId)) return false;
+    return !(
+      selectedId === n.nodeId ||
+      selectedId === parentId ||
+      multiSelectIds.has(n.nodeId) ||
+      spotlightedNodeIds?.includes(n.nodeId) ||
+      inlineEditId === n.nodeId ||
+      nodeDragged(n)
+    );
+  };
+  const hiddenChildCaptions = (() => {
+    const captionSpec = (n: NodeDoc): CaptionSpec => {
+      const isCircleParent = circleRootSentimentByNode.has(n.nodeId);
+      return {
+        pos: posFor(n),
+        sizeMultiplier: nodeSizeMultiplier(n, isCircleParent, compactView),
+        lines: (nodeDisplay[n.nodeId] ?? readingMode) === "iconText" ? 4 : 2,
+        namedZone: isCircleParent && !!n.zoneName && !compactView,
+      };
+    };
+    // A parent's caption is up unless its text box *is* the node (classic
+    // reading mode) or it's selected/being edited (NodeCard drops it then).
+    const shownParents = visibleNodes.filter(
+      (n) =>
+        parentIds.has(n.nodeId) &&
+        (nodeDisplay[n.nodeId] ?? readingMode) !== "classic" &&
+        selectedId !== n.nodeId &&
+        inlineEditId !== n.nodeId,
+    );
+    if (shownParents.length === 0) return new Set<string>();
+    const children = new Map<string, CaptionSpec>();
+    for (const n of visibleNodes) {
+      if (!parentIds.has(n.nodeId)) children.set(n.nodeId, captionSpec(n));
+    }
+    return childCaptionsCoveringParents(children, shownParents.map(captionSpec), zoom);
+  })();
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {notice && (
@@ -2193,7 +2241,7 @@ export function MapPage() {
                   zoom={zoom}
                   selected={selectedId === node.nodeId}
                   multiSelected={multiSelectIds.has(node.nodeId)}
-                  dragging={dragState?.nodeId === node.nodeId || groupDragState?.has(node.nodeId) === true}
+                  dragging={nodeDragged(node)}
                   // Drags off a bare pointer-down only actually happen when
                   // moveMode is on, or the node is already part of an
                   // active 2+-node multi-selection (that path stays live
@@ -2225,6 +2273,9 @@ export function MapPage() {
                       (!!searchMatches && !searchMatches.has(node.nodeId))) &&
                     !unmutedAttackNodeIds?.has(node.nodeId)
                   }
+                  isParent={parentIds.has(node.nodeId)}
+                  quiet={childIsQuiet(node)}
+                  hideCaption={hiddenChildCaptions.has(node.nodeId) && inlineEditId !== node.nodeId}
                   dropHighlight={dropTarget?.nodeId === node.nodeId ? (dropTarget.valid ? "valid" : "invalid") : undefined}
                   inlineEditing={editingThis}
                   onInlineConfirm={(text, type) => confirmInlineEdit(node, text, type)}
