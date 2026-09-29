@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { layoutTemplate } from "./templates";
 import { CANVAS_H, CANVAS_W, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
+import type { Obstacle } from "./canvasLayout";
 
 const EDGE = 120;
 
@@ -34,6 +35,21 @@ describe("layoutTemplate", () => {
     expect(resultPositive?.parentKey).toBe("plan");
     const subProblem1 = placed.find((p) => p.key === "subProblem1");
     expect(subProblem1?.parentKey).toBeNull();
+  });
+
+  it("steers a placed node clear of an obstacle already sitting where its raw spiral point would land", () => {
+    // Regression test: layoutTemplate used to place every node purely off
+    // spiralPoint, with zero awareness of anything already on the canvas —
+    // a second template (or just a crowded spot) grown near an existing
+    // node/zone could spiral straight on top of it. existingObstacles is
+    // what MapPage's own applyTemplate now feeds in (every visible node
+    // plus every zone backdrop).
+    const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const rawFirst = spiralPoint(1, root, getCirclePackSpacing());
+    const obstacle: Obstacle = { x: rawFirst.x, y: rawFirst.y, minDist: 200 };
+    const placed = layoutTemplate("retry", root, [obstacle]);
+    const dist = Math.hypot(placed[0].x - obstacle.x, placed[0].y - obstacle.y);
+    expect(dist).toBeGreaterThanOrEqual(obstacle.minDist - 1);
   });
 
   it("places one entry per node across every template kind, in parent-before-child order", () => {

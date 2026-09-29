@@ -1,4 +1,5 @@
-import { CANVAS_H, CANVAS_W, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, avoidOverlap, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
+import type { Obstacle } from "./canvasLayout";
 import type { MapKind, NodeType } from "../types";
 
 // Ready-made branches a node's owner can grow from it in one click. Each one
@@ -165,24 +166,39 @@ function flatten(tree: TemplateNode[]): { node: TemplateNode; parentKey: Templat
 // on each other (computeBasePositions' own fallback layout,
 // computeMajoritySwap) — reused as-is rather than a bespoke ring just for
 // this, so the two read as the same visual language.
-export function layoutTemplate(kind: TemplateKind, root: { x: number; y: number }): PlacedTemplateNode[] {
+export function layoutTemplate(
+  kind: TemplateKind,
+  root: { x: number; y: number },
+  existingObstacles: Obstacle[] = [],
+): PlacedTemplateNode[] {
   // The tighter "deliberately fanned around a shared root" spacing (see its
   // own doc comment) — a growing template branch is exactly that case, and
   // the old getNodeMinDist()-based spacing here was what made even a small
   // template spread out far wider than its own node count actually needed.
   const spacing = getCirclePackSpacing();
+  // Every node placed so far — both this template's own earlier nodes and
+  // whatever the caller already had on the canvas near `root` — becomes an
+  // obstacle for the next one. The spiral's own golden-angle spacing keeps
+  // a template's nodes clear of *each other* by construction, but nothing
+  // about it knew what else was already sitting on the canvas: a second
+  // template grown from a nearby root (or just an already-crowded spot)
+  // used to spiral its nodes straight on top of whatever was already there,
+  // with zero awareness of it.
+  const obstacles: Obstacle[] = [...existingObstacles];
   return flatten(TEMPLATES[kind]).map(({ node, parentKey }, i) => {
     // i+1, not i: spiralPoint(0, root) is root's own position, and this
     // template's root is a real, already-existing node — every placed node
     // starts at least one full turn out from it.
-    const p = spiralPoint(i + 1, root, spacing);
+    const desired = spiralPoint(i + 1, root, spacing);
+    const placed = avoidOverlap(desired, obstacles);
+    obstacles.push({ x: placed.x, y: placed.y, minDist: spacing });
     return {
       key: node.key,
       type: node.type,
       order: node.order,
       parentKey,
-      x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, p.x)),
-      y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, p.y)),
+      x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, placed.x)),
+      y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, placed.y)),
     };
   });
 }

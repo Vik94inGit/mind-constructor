@@ -1548,7 +1548,15 @@ export function MapPage() {
   async function applyTemplate(kind: TemplateKind, root: NodeDoc) {
     if (!mapId) return;
     const rootPos = positions.get(root.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const placed = layoutTemplate(kind, rootPos);
+    // Same obstacle set createCircle's own children-fanning uses (plain
+    // nodes, root included explicitly, plus every existing zone backdrop) —
+    // without it, layoutTemplate had no idea what else was already on the
+    // canvas near root and could spiral its nodes straight on top of it.
+    const placed = layoutTemplate(
+      kind,
+      rootPos,
+      [...nodeObstacles([...obstaclePoints(), rootPos]), ...bigNodeObstacles()],
+    );
     const ids = new Map<TemplateNodeKey, string>();
     for (let i = 0; i < placed.length; i++) {
       const p = placed[i];

@@ -20,9 +20,11 @@ const OUT_FRACTION = 0.5;
 const EDGE_CLEARANCE = 40;
 
 const OUT_DURATION_S = 1.7;
-const DWELL_S = 0.5;
 const RETURN_DURATION_S = 1.3;
-const TOTAL_DURATION_S = OUT_DURATION_S + DWELL_S + RETURN_DURATION_S;
+// No dwell between them — straight out, straight back, one continuous
+// motion. A flat pause at the peak read as a stepped, mechanical "stop —
+// hold — resume" instead of a single fluid swim out and back.
+const TOTAL_DURATION_S = OUT_DURATION_S + RETURN_DURATION_S;
 // How long a user-triggered skip takes to settle back to real positions —
 // short and snappy, not the reveal's own unhurried return leg.
 const SKIP_RETURN_S = 0.4;
@@ -33,8 +35,21 @@ const SKIP_RETURN_S = 0.4;
 // choppier migration than the full frame rate would have looked.
 const UPDATE_INTERVAL_MS = 1000 / 30;
 
-function easeInOutCubic(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+// "Arrow" technique, same shape this codebase's own weapon-arrow-fly CSS
+// animation already uses for a launched projectile (see index.css): ease
+// *in* — accelerating from a standstill — for the outward leg, so a node
+// reads as launched rather than just drifting off; ease *out* —
+// decelerating into a soft landing — for the way back, so it settles into
+// its real position instead of snapping to a stop. Both curves run fastest
+// right at the shared peak between them (ease-in's velocity maxes out
+// exactly where ease-out's starts at its own max), which is what keeps the
+// two legs reading as one continuous swoop through the turn instead of two
+// separate motions glued together.
+function easeInCubic(t: number) {
+  return t * t * t;
+}
+function easeOutCubic(t: number) {
+  return 1 - (1 - t) ** 3;
 }
 
 // The distance from `from`, heading along the unit vector `dir`, to the
@@ -53,9 +68,11 @@ function distanceToEdge(from: Pt, dir: Pt, canvasW: number, canvasH: number): nu
 /**
  * The map's own one-time "reveal" on open: every node (positive types
  * pulled toward the canvas center, negative types pushed toward the
- * nearest edge, "unknown"/neutral left alone — see sentimentOf) drifts out
- * from its real position, dwells, and eases back — once, not a loop. Zones
- * and edges never get their own copy of this: they're drawn straight off
+ * nearest edge, "unknown"/neutral left alone — see sentimentOf) swims out
+ * from its real position and eases straight back — once, not a loop, and
+ * no pause at the peak (see easeInCubic/easeOutCubic's own doc comment) —
+ * one continuous out-and-back motion, not a launch, a held stop, and a
+ * separate return. Zones and edges never get their own copy of this: they're drawn straight off
  * `posFor` elsewhere in MapPage, so feeding this hook's offsets into that
  * same function is what makes a zone polygon visibly stretch/migrate along
  * with whichever of its members are mid-reveal, entirely as a side effect
@@ -159,7 +176,7 @@ export function useMapReveal(
       const skip = skippedAtRef.current;
       if (skip) {
         const skipT = Math.min(1, (now - skip.realNow) / SKIP_RETURN_S);
-        s = skip.sAtSkip * (1 - easeInOutCubic(skipT));
+        s = skip.sAtSkip * (1 - easeOutCubic(skipT));
         if (skipT >= 1) {
           setActive(false);
           setOffsets(new Map());
@@ -197,8 +214,7 @@ export function useMapReveal(
 }
 
 function revealAmountAt(t: number): number {
-  if (t < OUT_DURATION_S) return easeInOutCubic(t / OUT_DURATION_S);
-  if (t < OUT_DURATION_S + DWELL_S) return 1;
-  if (t < TOTAL_DURATION_S) return 1 - easeInOutCubic((t - OUT_DURATION_S - DWELL_S) / RETURN_DURATION_S);
+  if (t < OUT_DURATION_S) return easeInCubic(t / OUT_DURATION_S);
+  if (t < TOTAL_DURATION_S) return 1 - easeOutCubic((t - OUT_DURATION_S) / RETURN_DURATION_S);
   return 0;
 }
