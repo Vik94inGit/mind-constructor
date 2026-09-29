@@ -174,11 +174,10 @@ export const MiniMap = memo(function MiniMap({
     const miniY = Math.min(Math.max(0, clientY - rect.top), MINIMAP_H);
     const canvasX = miniX / scaleX;
     const canvasY = miniY / scaleY;
-    // (canvasW + hScrollMargin*2)/(canvasH + vScrollMargin*2): wrap's real
-    // scrollable range now, same padded size MapPage's own centerOnNode
-    // clamps against (see its own doc comment) — not just canvasW/canvasH.
-    const maxLeft = Math.max(0, (canvasW + hScrollMargin * 2) * zoom - wrap.clientWidth);
-    const maxTop = Math.max(0, (canvasH + vScrollMargin * 2) * zoom - wrap.clientHeight);
+    // wrap's real scrollable range — the padded canvas, whose bottom margin
+    // also grows while the bottom sheet is open — not just canvasW/canvasH.
+    const maxLeft = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+    const maxTop = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
     // + hScrollMargin/+ vScrollMargin: canvasX/canvasY are real canvas
     // coordinates; scrollLeft/scrollTop are screen pixels within the
     // *padded* canvas — same conversion MapPage's own centerOnNode uses.
