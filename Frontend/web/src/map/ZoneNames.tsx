@@ -53,7 +53,13 @@ export function ZoneNames({ wrapRef, zones, positions, zoom, hScrollMargin, vScr
   if (visible.length === 0) return null;
 
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-[45] flex max-w-[45%] flex-col gap-1">
+    // Fixed cap, not a viewport percentage — names arriving here are already
+    // hard-truncated to ~22 chars (see MapPage's own ZONE_NAME_MAX), so a
+    // width sized for a whole untruncated sentence just left a lot of empty
+    // pill on wide screens. `truncate` below still guards the rare case
+    // (very wide characters, a locale that renders longer) where even that
+    // capped text doesn't quite fit.
+    <div className="pointer-events-none absolute bottom-3 left-3 z-[45] flex max-w-[11rem] flex-col gap-1">
       {visible.map((z) => (
         <div
           key={z.rootId}
