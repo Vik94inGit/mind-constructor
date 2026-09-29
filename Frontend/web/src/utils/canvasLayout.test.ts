@@ -154,6 +154,33 @@ describe("computeNodeGroups", () => {
     expect(computeNodeGroups(nodes, nodes, positions)).toEqual([]);
   });
 
+  it("keeps a member attached to its zone no matter how far it's dragged — only clearing parentId disconnects it", () => {
+    // Zone membership is a pure parentId relationship, recomputed fresh from
+    // current positions every render — never a proximity check. A member
+    // (or, per the map-open reveal, every member at once) drifting far from
+    // the rest of its circle still traces the zone's own outline right out
+    // to it; only an explicit parentId change — the "dragged clear of its
+    // own circle's backdrop" disconnect useNodeDragAndDrop's own drop logic
+    // does — actually drops it.
+    const nodes: NodeDoc[] = [
+      makeNode({ nodeId: "root", type: "unknown" }),
+      makeNode({ nodeId: "c1", type: "Success", parentId: "root" }),
+      makeNode({ nodeId: "c2", type: "Option", parentId: "root" }),
+    ];
+    const farPositions = new Map([
+      ["root", { x: 0, y: 0 }],
+      ["c1", { x: 2000, y: 1500 }],
+      ["c2", { x: -100, y: 0 }],
+    ]);
+    const groups = computeNodeGroups(nodes, nodes, farPositions);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].members.map((m) => m.nodeId).sort()).toEqual(["c1", "c2", "root"]);
+
+    const disconnected = nodes.map((n) => (n.nodeId === "c1" ? { ...n, parentId: null } : n));
+    // root is left with only one child — no longer enough to form a group.
+    expect(computeNodeGroups(disconnected, disconnected, farPositions)).toEqual([]);
+  });
+
   it("votes neutral on a tied or all-unknown circle rather than leaning either way", () => {
     const nodes: NodeDoc[] = [
       makeNode({ nodeId: "root", type: "unknown" }),
