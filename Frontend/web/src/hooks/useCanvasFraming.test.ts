@@ -81,7 +81,7 @@ describe("useCanvasFraming", () => {
         { x: 120, y: 100 },
       ]);
       expect(zoomFromCenter).not.toHaveBeenCalled();
-      expect(centerOnPoint).toHaveBeenCalledWith(110, 100);
+      expect(centerOnPoint).toHaveBeenCalledWith(110, 100, undefined);
     });
 
     it("zooms out to fit a spread-out set of points, then centers on their middle after a delay", () => {
@@ -97,7 +97,15 @@ describe("useCanvasFraming", () => {
       expect(centerOnPoint).not.toHaveBeenCalled();
 
       vi.advanceTimersByTime(260);
-      expect(centerOnPoint).toHaveBeenCalledWith(2000, 400);
+      expect(centerOnPoint).toHaveBeenCalledWith(2000, 400, undefined);
+    });
+  });
+
+  describe("showPoints options", () => {
+    it("passes its centering options through to centerOnPoint", () => {
+      const { api, centerOnPoint } = setup({ zoom: 1 });
+      api.showPoints([{ x: 100, y: 100 }], { aboveSheet: false });
+      expect(centerOnPoint).toHaveBeenCalledWith(100, 100, { aboveSheet: false });
     });
   });
 
@@ -109,7 +117,7 @@ describe("useCanvasFraming", () => {
       ]);
       const { api, centerOnPoint } = setup({ positions, zoom: 1 });
       api.showNodes(["a", "b", "missing"]);
-      expect(centerOnPoint).toHaveBeenCalledWith(150, 100);
+      expect(centerOnPoint).toHaveBeenCalledWith(150, 100, undefined);
     });
   });
 

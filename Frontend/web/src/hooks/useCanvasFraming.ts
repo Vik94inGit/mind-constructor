@@ -14,7 +14,7 @@ interface Params {
   circleRootSentimentByNode: Map<string, Sentiment>;
   zoom: number;
   zoomFromCenter: (delta: number, to?: number) => void;
-  centerOnPoint: (x: number, y: number) => void;
+  centerOnPoint: (x: number, y: number, opts?: { aboveSheet?: boolean }) => void;
   wrapRef: RefObject<HTMLDivElement | null>;
   showNotice: (message: string) => void;
   mapId: string | undefined;
@@ -98,7 +98,8 @@ export function useCanvasFraming({
   // own camera cue — the latter passes both a unit's start *and* end point
   // so the whole glide stays on-screen, not just wherever it happens to end
   // up.
-  function showPoints(pts: Pt[]) {
+  // `opts` is passed through to centerOnPoint.
+  function showPoints(pts: Pt[], opts?: { aboveSheet?: boolean }) {
     const wrap = wrapRef.current;
     if (!wrap || pts.length === 0) return;
     const xs = pts.map((p) => p.x);
@@ -110,9 +111,9 @@ export function useCanvasFraming({
     const target = Math.max(MIN_ZOOM, Math.min(zoom, wrap.clientWidth / width, wrap.clientHeight / height));
     if (target < zoom - 0.005) {
       zoomFromCenter(0, target);
-      setTimeout(() => centerOnPoint(middle.x, middle.y), 260);
+      setTimeout(() => centerOnPoint(middle.x, middle.y, opts), 260);
     } else {
-      centerOnPoint(middle.x, middle.y);
+      centerOnPoint(middle.x, middle.y, opts);
     }
   }
 

@@ -18,12 +18,12 @@ interface Props {
   zoom: number;
   hScrollMargin: number;
   vScrollMargin: number;
-  /** A name was clicked: go to that zone's parent node. */
+  /** A name was clicked: center the view on that zone. */
   onGo: (rootId: string) => void;
 }
 
 // Every zone's name, listed in the map's bottom-left corner as links: a click
-// goes to the zone's parent node. Zones whose parent is on screen right now
+// centers the view on that zone. Zones whose parent is on screen right now
 // are drawn at full strength, the rest a little faded. Easier to read than
 // names squeezed onto the minimap.
 export function ZoneNames({ wrapRef, zones, positions, zoom, hScrollMargin, vScrollMargin, onGo }: Props) {

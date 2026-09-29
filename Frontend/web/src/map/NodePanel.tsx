@@ -80,6 +80,20 @@ const PANEL_DRAG_MIN_VISIBLE_PX = 48;
 // resets per node): this is a standing size preference, not per-node UI state.
 const PANEL_HEIGHT_STORAGE_KEY = "mc_node_panel_height_px";
 const MIN_PANEL_HEIGHT_PX = 200;
+// The Info tab's text box grows and shrinks with the panel while it's being
+// resized, and keeps that size — remembered the same way as the panel's.
+const TEXT_HEIGHT_STORAGE_KEY = "mc_node_panel_text_height_px";
+const MIN_TEXT_HEIGHT_PX = 128; // min-h-[8rem]
+
+function readStoredPx(key: string): number | null {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 // Left clear at the top so the resize handle (and whatever's behind it) never
 // becomes fully unreachable by dragging the sheet to fill the entire screen.
 const PANEL_RESIZE_TOP_MARGIN_PX = 72;
@@ -197,6 +211,8 @@ export function NodePanel({
   // or half-typed; parsed on save.
   const [orderDraft, setOrderDraft] = useState(node.order != null ? String(node.order) : "");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // A non-owner's read-only text block, which resizes along with the panel too.
+  const readonlyTextRef = useRef<HTMLDivElement>(null);
   // Transient "Copied!" confirmation on the Info tab's own Copy button —
   // auto-clears, same pattern the mobile-focused parts of this file already
   // favor over a persistent status line for a one-off confirmation.
@@ -231,15 +247,10 @@ export function NodePanel({
   // (34dvh/50dvh) still applies, same as before this existed. Once someone
   // drags the resize handle, this becomes a literal height that replaces
   // that cap and sticks around (see the storage effect right below).
-  const [panelHeight, setPanelHeight] = useState<number | null>(() => {
-    try {
-      const raw = localStorage.getItem(PANEL_HEIGHT_STORAGE_KEY);
-      const parsed = raw ? Number(raw) : NaN;
-      return Number.isFinite(parsed) ? parsed : null;
-    } catch {
-      return null;
-    }
-  });
+  const [panelHeight, setPanelHeight] = useState<number | null>(() => readStoredPx(PANEL_HEIGHT_STORAGE_KEY));
+  // null until the panel is first resized with the Info tab open; the box's
+  // own CSS size (min-h-[8rem], capped at 40vh) applies until then.
+  const [textHeight, setTextHeight] = useState<number | null>(() => readStoredPx(TEXT_HEIGHT_STORAGE_KEY));
   const draggingHeightRef = useRef(false);
 
   function onResizeHandlePointerDown(e: ReactPointerEvent) {
@@ -249,6 +260,10 @@ export function NodePanel({
     const startClientY = e.clientY;
     const startHeight = panelRef.current?.getBoundingClientRect().height ?? MIN_PANEL_HEIGHT_PX;
     const maxHeight = window.innerHeight - PANEL_RESIZE_TOP_MARGIN_PX;
+    // The text box (when the Info tab is showing) takes every pixel the
+    // panel gains or gives up, so the extra room goes to the text.
+    const textBox = textareaRef.current ?? readonlyTextRef.current;
+    const startText = textBox?.offsetHeight ?? null;
 
     function onMove(ev: PointerEvent) {
       if (!draggingHeightRef.current) return;
@@ -257,6 +272,7 @@ export function NodePanel({
       // dragOffset's own minY/maxY above have to account for.
       const next = Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT_PX, startHeight + (startClientY - ev.clientY)));
       setPanelHeight(next);
+      if (startText != null) setTextHeight(Math.max(MIN_TEXT_HEIGHT_PX, startText + (next - startHeight)));
     }
     function onUp() {
       draggingHeightRef.current = false;
@@ -278,6 +294,14 @@ export function NodePanel({
       // reload; nothing here depends on the write actually landing.
     }
   }, [panelHeight]);
+  useEffect(() => {
+    if (textHeight == null) return;
+    try {
+      localStorage.setItem(TEXT_HEIGHT_STORAGE_KEY, String(textHeight));
+    } catch {
+      // Same as the panel height: the size just won't survive a reload.
+    }
+  }, [textHeight]);
 
   function onGripPointerDown(e: ReactPointerEvent) {
     e.stopPropagation();
@@ -315,28 +339,6 @@ export function NodePanel({
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   }
-
-  // A <textarea>'s own rendered height is CSS/rows-driven, not content-
-  // driven — removing max-height above (the `expanded` class swap) doesn't
-  // by itself make the box taller, it only lifts the *cap*, same way
-  // dropping a `max-width` doesn't widen an element that was never asked
-  // to grow in the first place. This is the actual growing: set to its own
-  // scrollHeight (the height its content would need with no scrollbar) the
-  // moment expanded turns on, and again on every keystroke while it stays
-  // on, so typing more keeps growing the box instead of re-introducing an
-  // inner scrollbar. Collapsing clears the inline height back off entirely
-  // so the CSS class's own rows/min-height takes back over, same as if
-  // this effect had never touched it.
-  useEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    if (expanded) {
-      ta.style.height = "auto";
-      ta.style.height = `${ta.scrollHeight}px`;
-    } else {
-      ta.style.height = "";
-    }
-  }, [expanded, textDraft]);
 
   // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
   // surfaced as a "Points at" link in the Info tab below, and used by
@@ -407,6 +409,30 @@ export function NodePanel({
     "history",
   ];
   const [tab, setTab] = useState<Tab>("info");
+
+  // A <textarea>'s own rendered height is CSS/rows-driven, not content-
+  // driven — removing max-height above (the `expanded` class swap) doesn't
+  // by itself make the box taller, it only lifts the *cap*, same way
+  // dropping a `max-width` doesn't widen an element that was never asked
+  // to grow in the first place. This is the actual growing: set to its own
+  // scrollHeight (the height its content would need with no scrollbar) the
+  // moment expanded turns on, and again on every keystroke while it stays
+  // on, so typing more keeps growing the box instead of re-introducing an
+  // inner scrollbar. Collapsing goes back to the height the panel resize
+  // gave it, or clears the inline height so the CSS class's own
+  // rows/min-height takes back over.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    if (expanded) {
+      ta.style.height = "auto";
+      ta.style.height = `${ta.scrollHeight}px`;
+    } else {
+      // Back to the size the panel resize gave it, if any.
+      ta.style.height = textHeight != null ? `${textHeight}px` : "";
+    }
+    // `tab`: the textarea remounts whenever the Info tab is reopened.
+  }, [expanded, textDraft, textHeight, tab]);
 
   // Someone (the owner) flipped Discussion/Personal mode while this panel
   // was already open on the Attack or Protect tab — that tab's own button
@@ -871,11 +897,13 @@ export function NodePanel({
                 // (insert a newline) is exactly what's wanted here.
               }}
               onBlur={() => void handleTextSave()}
-              className={`min-h-[8rem] w-full resize-y rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent ${expanded ? "max-h-none" : "max-h-[40vh]"}`}
+              className={`min-h-[8rem] w-full resize-y rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
             />
           ) : (
             <div
-              className={`min-h-[8rem] w-full overflow-y-auto rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded ? "max-h-none" : "max-h-[40vh]"}`}
+              ref={readonlyTextRef}
+              className={`min-h-[8rem] w-full overflow-y-auto rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
+              style={!expanded && textHeight != null ? { height: textHeight } : undefined}
             >
               {node.text}
             </div>

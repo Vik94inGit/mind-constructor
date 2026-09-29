@@ -2448,9 +2448,15 @@ export function MapPage() {
                 zoom={zoom}
                 hScrollMargin={hScrollMargin}
                 vScrollMargin={vScrollMargin}
+                // Centers the view on the whole zone (zooming out only if it
+                // doesn't fit), without selecting anything.
                 onGo={(rootId) => {
-                  const root = nodes.find((n) => n.nodeId === rootId);
-                  if (root) handleNodeClick(root);
+                  const group = nodeGroups.find((g) => g.rootId === rootId);
+                  if (!group) return;
+                  const pts = [group.rootId, ...group.members.map((m) => m.nodeId)]
+                    .map((id) => positions.get(id))
+                    .filter((p): p is { x: number; y: number } => !!p);
+                  showPoints(pts, { aboveSheet: false });
                 }}
               />
 
