@@ -2375,10 +2375,17 @@ export function MapPage() {
                   // An owner-given zoneName wins when set; otherwise every
                   // zone still gets *some* label rather than none at all —
                   // same title-falls-back-to-text the node's own caption
-                  // uses elsewhere (see e.g. PresentationOverlay).
+                  // uses elsewhere (see e.g. PresentationOverlay). Capped
+                  // the same way other short node-text previews already are
+                  // elsewhere (see e.g. CreateEdgeModal's own .slice(0, 24))
+                  // — the raw text fallback especially can run to a whole
+                  // sentence, which read as far too wide a pill for a
+                  // corner legend meant to be skimmed at a glance.
+                  const ZONE_NAME_MAX = 22;
                   const name = root?.zoneName || root?.title || root?.text;
-                  return name
-                    ? [{ rootId: g.rootId, name, sentiment: g.sentiment, variant: !!root!.parentId }]
+                  const shortName = name && name.length > ZONE_NAME_MAX ? `${name.slice(0, ZONE_NAME_MAX)}…` : name;
+                  return shortName
+                    ? [{ rootId: g.rootId, name: shortName, sentiment: g.sentiment, variant: !!root!.parentId }]
                     : [];
                 })}
                 positions={positions}

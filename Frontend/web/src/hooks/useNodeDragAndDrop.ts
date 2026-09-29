@@ -505,19 +505,33 @@ export function useNodeDragAndDrop({
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
         // Still a member at the raw drop point?
         const staysMember = !!ownCircle && Math.hypot(x - ownCircle.cx, y - ownCircle.cy) <= ownCircle.r;
+        // A circle's *root* is never excluded by the staysMember check above
+        // (its own parentId points at whatever *it* hangs from, if
+        // anything — never at the circle it's the root of), so without this
+        // its own zone — which its own drag is what's reshaping — counted as
+        // an obstacle to itself. For a large/irregular zone (see the
+        // group-drag branch above, which already excludes every dragged
+        // member's own root the same unconditional way) that could push the
+        // root wherever the nearest clear edge happened to be, nowhere near
+        // where it was actually dropped.
+        const ownRootCircle = nodeGroups.find((g) => g.rootId === node.nodeId);
+        const excludedRootIds = new Set<string>();
+        if (staysMember && ownCircle) excludedRootIds.add(ownCircle.rootId);
+        if (ownRootCircle) excludedRootIds.add(ownRootCircle.rootId);
         // Every other circle's backdrop is a real obstacle here too (not
         // just at creation time) — a plain reposition drop used to be able to
         // land a node's icon right on top of a zone it doesn't belong to.
-        // Its own circle is excluded (staysMember only) so this never pushes
-        // a node out of the zone it's still a member of. No corner-angle
-        // check any more (see MIN_ZONE_ANGLE's own removal) — a zone is free
-        // to pack as tight as its own members' footprints allow, as long as
-        // it doesn't cross into a *different* zone's territory.
+        // Its own circle(s) are excluded (see excludedRootIds above) so this
+        // never pushes a node out of a zone it's still part of, whether as a
+        // member or as the root. No corner-angle check any more (see
+        // MIN_ZONE_ANGLE's own removal) — a zone is free to pack as tight as
+        // its own members' footprints allow, as long as it doesn't cross
+        // into a *different* zone's territory.
         const dropped = avoidOverlap(
           { x, y },
           [
             ...footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
-            ...bigNodeObstacles(staysMember && ownCircle ? new Set([ownCircle.rootId]) : undefined),
+            ...bigNodeObstacles(excludedRootIds),
           ],
           viewportBounds(),
         );
