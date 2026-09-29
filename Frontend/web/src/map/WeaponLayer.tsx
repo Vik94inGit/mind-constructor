@@ -47,7 +47,8 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: P
           const activeProtector = visibleNodes.find(
             (n) => n.isProtection && !n.defeated && nodeRefId(n.protectsNodeId) === targetId,
           );
-          const b = posFor(activeProtector ?? targetNode);
+          const aimedAt = activeProtector ?? targetNode;
+          const b = posFor(aimedAt);
           // A weapon node can carry any outcome type now, not just
           // the negative-framed ones (see Backend's attackAbl.ts —
           // retaliation especially is naturally a positive claim,
@@ -58,8 +59,14 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: P
           // var(--n-option) blue instead.
           const bowColor = ringKindFor(weaponNode.type) === "halo" ? "var(--n-option)" : "var(--danger)";
           return (
-            <WeaponMark
+            <g
               key={`weapon-${weaponNode.nodeId}`}
+              // The sentiment show stretches the bow and its arrows between
+              // the weapon and whatever it's aimed at (see applyRevealFrame).
+              data-reveal-seg={`${weaponNode.nodeId} ${aimedAt.nodeId}`}
+              data-base={`${a.x} ${a.y} ${b.x} ${b.y}`}
+            >
+            <WeaponMark
               x={a.x}
               y={a.y}
               targetX={b.x}
@@ -69,6 +76,7 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: P
               celebrate={celebrateIds.has(weaponNode.nodeId)}
               replayNonce={shotState?.id === weaponNode.nodeId ? shotState.nonce : 0}
             />
+            </g>
           );
         })}
     </svg>

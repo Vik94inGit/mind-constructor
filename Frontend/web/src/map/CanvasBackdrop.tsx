@@ -82,10 +82,16 @@ export function CanvasBackdrop({
         // group, if any, is currently stabilized.
         const isStabilized = selectedCircle?.rootId === g.rootId;
         const dimmed = !!selectedCircle && !isStabilized;
+        const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
         return (
           <polygon
             key={`zone-${g.rootId}`}
-            points={g.outline.map((p) => `${p.x},${p.y}`).join(" ")}
+            points={zonePoints}
+            // Tagged for the sentiment show (see applyRevealFrame): each
+            // corner follows its own node, so the zone stretches and shrinks
+            // as they move and is redrawn from data-base when they're home.
+            data-reveal-points={g.outlineIds?.join(" ")}
+            data-base={zonePoints}
             fill={color}
             fillOpacity={dimmed ? 0.06 : 0.14}
             stroke={color}
@@ -129,6 +135,8 @@ export function CanvasBackdrop({
               key={`manual-zone-${n.nodeId}`}
               cx={p.x}
               cy={p.y}
+              data-reveal-at={n.nodeId}
+              data-base={`${p.x} ${p.y}`}
               r={55}
               fill={color}
               fillOpacity={0.14}
@@ -158,6 +166,8 @@ export function CanvasBackdrop({
               key={`circle-parent-ring-${n.nodeId}`}
               cx={p.x}
               cy={p.y}
+              data-reveal-at={n.nodeId}
+              data-base={`${p.x} ${p.y}`}
               r={34}
               fill={color}
               fillOpacity={0.16}
@@ -177,15 +187,18 @@ export function CanvasBackdrop({
         // drops out of the shape entirely (same as the plain Edge
         // lines below), rather than a figure still tracing a vertex
         // at a node nobody can see any more.
-        const pts = cycle
+        const members = cycle
           .map((id) => visibleNodes.find((n) => n.nodeId === id))
-          .filter((n): n is NodeDoc => !!n)
-          .map((n) => posFor(n));
+          .filter((n): n is NodeDoc => !!n);
+        const pts = members.map((n) => posFor(n));
         if (pts.length < 3) return null;
+        const figurePoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
         return (
           <polygon
             key={`figure-${cycle.slice().sort().join("-")}`}
-            points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+            points={figurePoints}
+            data-reveal-points={members.map((n) => n.nodeId).join(" ")}
+            data-base={figurePoints}
             fill="var(--accent)"
             fillOpacity={0.1}
             stroke="var(--accent)"
@@ -260,6 +273,8 @@ export function CanvasBackdrop({
             // clicked (see handleCircleBackdropClick, same handler
             // the old backdrop circle used), so it has to explicitly
             // opt back in; an ungrouped one stays inert.
+            data-reveal-line={`${parentId} ${node.nodeId}`}
+            data-base={`${a.x} ${a.y} ${b.x} ${b.y}`}
             style={group && interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
             onClick={
               group
@@ -334,6 +349,8 @@ export function CanvasBackdrop({
             y1={a.y}
             x2={b.x}
             y2={b.y}
+            data-reveal-line={`${fromId} ${toId}`}
+            data-base={`${a.x} ${a.y} ${b.x} ${b.y}`}
             stroke={color}
             strokeWidth={2}
             strokeOpacity={dimmed ? 0.06 : highlighted ? 0.9 : 0.55}
@@ -421,6 +438,8 @@ export function CanvasBackdrop({
             key={`pending-${n.nodeId}`}
             cx={p.x}
             cy={p.y}
+            data-reveal-at={n.nodeId}
+            data-base={`${p.x} ${p.y}`}
             r={18}
             fill="none"
             stroke="var(--accent)"
