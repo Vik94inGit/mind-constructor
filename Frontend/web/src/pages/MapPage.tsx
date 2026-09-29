@@ -320,6 +320,7 @@ export function MapPage() {
     zoom,
     hScrollMargin,
     vScrollMargin,
+    vScrollMarginBottom,
     selectionSettled,
     screenToCanvas,
     zoomAt,
@@ -2094,7 +2095,7 @@ export function MapPage() {
             style={{
               position: "relative",
               width: CANVAS_W + hScrollMargin * 2,
-              height: CANVAS_H + vScrollMargin * 2,
+              height: CANVAS_H + vScrollMargin + vScrollMarginBottom,
               transform: `scale(${zoom})`,
               transformOrigin: "0 0",
               // The blind zone: everything in this wrapper *outside* the
@@ -2447,6 +2448,10 @@ export function MapPage() {
                 zoom={zoom}
                 hScrollMargin={hScrollMargin}
                 vScrollMargin={vScrollMargin}
+                onGo={(rootId) => {
+                  const root = nodes.find((n) => n.nodeId === rootId);
+                  if (root) handleNodeClick(root);
+                }}
               />
 
               <MapToolbar
