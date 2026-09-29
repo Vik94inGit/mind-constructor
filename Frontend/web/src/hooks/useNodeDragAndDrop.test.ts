@@ -53,7 +53,6 @@ function fakePointerDownEvent(opts: { clientX: number; clientY: number; pointerT
 function setup(overrides: Partial<Parameters<typeof useNodeDragAndDrop>[0]> = {}) {
   const isOwnNode = vi.fn().mockReturnValue(true);
   const handleNodeClick = vi.fn();
-  const cancelMajoritySwap = vi.fn();
   const zoomToEditAt = vi.fn();
   const upsertNode = vi.fn();
   const setActionError = vi.fn();
@@ -74,7 +73,6 @@ function setup(overrides: Partial<Parameters<typeof useNodeDragAndDrop>[0]> = {}
       moveMode: true,
       isOwnNode,
       handleNodeClick,
-      cancelMajoritySwap,
       posFor: (n: NodeDoc) => ({ x: n.x ?? 0, y: n.y ?? 0 }),
       screenToCanvas: (x: number, y: number) => ({ x, y }),
       viewportBounds: () => ({ minX: 0, minY: 0, maxX: 2400, maxY: 1600 }),
@@ -96,7 +94,6 @@ function setup(overrides: Partial<Parameters<typeof useNodeDragAndDrop>[0]> = {}
     result,
     isOwnNode,
     handleNodeClick,
-    cancelMajoritySwap,
     zoomToEditAt,
     upsertNode,
     setActionError,
@@ -115,13 +112,6 @@ describe("useNodeDragAndDrop", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-  });
-
-  it("always preempts the majority-swap effect, even before any other check", () => {
-    const { result, cancelMajoritySwap } = setup({ chooseMode: true });
-    const node = makeNode({ nodeId: "a" });
-    act(() => result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 0, clientY: 0 })));
-    expect(cancelMajoritySwap).toHaveBeenCalled();
   });
 
   it("does nothing while choosing, packing or drawing", () => {

@@ -163,8 +163,8 @@ function flatten(tree: TemplateNode[]): { node: TemplateNode; parentKey: Templat
 // king"), not another tree hanging in a straight column beneath it. Same
 // sunflower-spiral placement spiralPoint already uses everywhere else a
 // cluster of nodes needs packing in around a center point without stacking
-// on each other (computeBasePositions' own fallback layout,
-// computeMajoritySwap) — reused as-is rather than a bespoke ring just for
+// on each other (computeBasePositions' own fallback layout) — reused as-is
+// rather than a bespoke ring just for
 // this, so the two read as the same visual language.
 export function layoutTemplate(
   kind: TemplateKind,

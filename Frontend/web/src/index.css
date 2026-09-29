@@ -161,6 +161,18 @@
   --animate-unsolved-pulse: unsolved-problem-pulse 1.6s ease-in-out infinite;
 }
 
+/* The sentiment show's single animated number (see useSentimentShow and
+   utils/sentimentShow.ts). Registering it as a <number> is what lets a CSS
+   transition interpolate it smoothly — an unregistered custom property can
+   only flip discretely — and `inherits: true` hands the in-flight value to
+   every node, zone, link and bow on the canvas, which each turn it into
+   their own offset with calc(). */
+@property --reveal-s {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 /* Keyframes have no "inline in a component" form in any CSS-based styling
    system — Tailwind's animate-* utilities (registered above) still just
    reference a named @keyframes block. This is the one piece of visual

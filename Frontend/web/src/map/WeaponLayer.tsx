@@ -3,6 +3,7 @@ import { nodeRefId } from "../utils/nodeType";
 import { ringKindFor } from "./OutcomeBadge";
 import { WeaponMark } from "./WeaponMark";
 import type { NodeDoc } from "../types";
+import { revealSegmentStyle } from "../utils/sentimentShow";
 
 interface Props {
   visibleNodes: NodeDoc[];
@@ -10,6 +11,8 @@ interface Props {
   celebrateIds: Set<string>;
   /** Which weapon just had its arrows re-fired (see MapPage's triggerWeaponShot). */
   shotState: { id: string; nonce: number } | null;
+  /** Each node's travel for a running sentiment show, or null — the bow and its arrows stretch between their two moving ends (see revealSegmentStyle). */
+  revealVectorFor: (nodeId: string) => { x: number; y: number } | null;
 }
 
 // Weapon marks get their own SVG layer, painted after every NodeCard rather
@@ -23,7 +26,7 @@ interface Props {
 // this is the permanent bow facing whatever it targeted, plus the volley of
 // transient arrows (see WeaponMark) that fires when the attack lands and
 // again on demand when either end gets clicked.
-export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: Props) {
+export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState, revealVectorFor }: Props) {
   return (
     <svg
       className="pointer-events-none absolute inset-0 z-[34] h-full w-full"
@@ -47,7 +50,8 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: P
           const activeProtector = visibleNodes.find(
             (n) => n.isProtection && !n.defeated && nodeRefId(n.protectsNodeId) === targetId,
           );
-          const b = posFor(activeProtector ?? targetNode);
+          const aimedAt = activeProtector ?? targetNode;
+          const b = posFor(aimedAt);
           // A weapon node can carry any outcome type now, not just
           // the negative-framed ones (see Backend's attackAbl.ts —
           // retaliation especially is naturally a positive claim,
@@ -58,8 +62,11 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: P
           // var(--n-option) blue instead.
           const bowColor = ringKindFor(weaponNode.type) === "halo" ? "var(--n-option)" : "var(--danger)";
           return (
-            <WeaponMark
+            <g
               key={`weapon-${weaponNode.nodeId}`}
+              style={revealSegmentStyle(a, revealVectorFor(weaponNode.nodeId), b, revealVectorFor(aimedAt.nodeId))}
+            >
+            <WeaponMark
               x={a.x}
               y={a.y}
               targetX={b.x}
@@ -69,6 +76,7 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: P
               celebrate={celebrateIds.has(weaponNode.nodeId)}
               replayNonce={shotState?.id === weaponNode.nodeId ? shotState.nonce : 0}
             />
+            </g>
           );
         })}
     </svg>

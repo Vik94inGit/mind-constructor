@@ -18,6 +18,7 @@ import {
   WEAPON_PARTICLE_COLORS,
 } from "../utils/particles";
 import { hashSeed } from "../utils/canvasLayout";
+import { revealTranslate } from "../utils/sentimentShow";
 import type { AttackIndicator, NodeDoc, NodeType, SizeTier } from "../types";
 import type { ReadingMode } from "../utils/readingMode";
 
@@ -141,6 +142,8 @@ interface Props {
   inlineEditing?: boolean;
   /** Weapon nodes only: the direction (in px, already scaled to the desired flight distance) it should appear to fly in from — the vector from its target's position to its own resting spot, so the entrance animation reads as "launched from what it hit". Falls back to a random per-node direction (flightOffset below) when there's no resolvable target. */
   flightVector?: { x: number; y: number };
+  /** The sentiment show's travel for this node (see useSentimentShow) — how far it moves at the show's peak. Null/absent while no show is running. */
+  revealVector?: { x: number; y: number } | null;
   /** Fired once on blur/Enter with a non-empty, actually-changed draft. */
   onInlineConfirm?: (text: string, type: NodeType) => void;
   /** Fired on Escape, or on blur/Enter when the draft is empty or unchanged. */
@@ -178,6 +181,7 @@ export const NodeCard = memo(function NodeCard({
   dropHighlight,
   inlineEditing,
   flightVector,
+  revealVector,
   onInlineConfirm,
   onInlineCancel,
   onPointerDown,
@@ -587,7 +591,12 @@ export const NodeCard = memo(function NodeCard({
   return (
     <div
       className={`${classes} ${flying ? "animate-weapon-fly-in" : ""}`}
-      style={{ ...style, ...flightStyle, ...chaosCss }}
+      // The sentiment show rides on the individual CSS `translate` property,
+      // not `transform`: `transform` here is already owned by the centering
+      // translate(-50%,-50%) and by the chaos-drift/weapon-fly-in keyframes,
+      // which replace it wholesale while they play. `translate` composes
+      // with all of them instead of being overridden by them.
+      style={{ ...style, ...flightStyle, ...chaosCss, ...(revealVector ? { translate: revealTranslate(revealVector) } : undefined) }}
       onPointerDown={onPointerDown}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}

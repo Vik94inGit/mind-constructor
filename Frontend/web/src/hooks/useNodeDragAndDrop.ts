@@ -33,9 +33,6 @@ interface Params {
   moveMode: boolean;
   isOwnNode: (node: NodeDoc) => boolean;
   handleNodeClick: (node: NodeDoc, shiftKey?: boolean) => void;
-  // Preempts the majority-swap auto-reposition effect the instant a real
-  // gesture starts on any node — see hooks/useMajoritySwap.ts.
-  cancelMajoritySwap: () => void;
   posFor: (node: NodeDoc) => Pt;
   screenToCanvas: (clientX: number, clientY: number) => Pt;
   viewportBounds: () => ViewportBounds;
@@ -71,7 +68,6 @@ export function useNodeDragAndDrop({
   moveMode,
   isOwnNode,
   handleNodeClick,
-  cancelMajoritySwap,
   posFor,
   screenToCanvas,
   viewportBounds,
@@ -136,12 +132,6 @@ export function useNodeDragAndDrop({
   }
 
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
-    // A real interaction with any node always preempts the majority-swap
-    // auto-reposition effect outright (see hooks/useMajoritySwap.ts).
-    // Unconditional, ahead of every other early return below: the effect
-    // fighting a user's own gesture for the same node(s) would be far worse
-    // than just stopping early here.
-    cancelMajoritySwap();
     if (chooseMode || packMode || drawMode) return;
     if (!isOwnNode(node)) return;
 

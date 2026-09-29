@@ -5,6 +5,7 @@ import type { NodeGroup } from "../utils/canvasLayout";
 import { nodeRefId, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
+import { REVEAL_FADE_OPACITY, revealPointStyle, revealSegmentStyle } from "../utils/sentimentShow";
 
 interface Props {
   nodeGroups: NodeGroup[];
@@ -30,6 +31,8 @@ interface Props {
   compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
   drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
+  /** Each node's travel for a running sentiment show (see useSentimentShow), or null. Every shape here that's attached to a node follows it with the same CSS-driven offset, so zones, rings and links move with their nodes. */
+  revealVectorFor: (nodeId: string) => { x: number; y: number } | null;
 }
 
 // Everything drawn *behind* the node cards: zone polygons, manual zones and
@@ -52,6 +55,7 @@ export function CanvasBackdrop({
   onLineClick,
   interactive,
   drawing,
+  revealVectorFor,
   compact = false,
 }: Props) {
   const { t } = useI18n();
@@ -96,7 +100,13 @@ export function CanvasBackdrop({
             // NodeCard div sitting underneath) — a zone is one of
             // the few things in it that's actually meant to be
             // clicked, so it has to explicitly opt back in.
-            style={interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
+            // A circle travels as one rigid body in the sentiment show (see
+            // computeSentimentShowVectors), so the root's own vector is every
+            // member's too — the polygon moves exactly with its nodes.
+            style={{
+              ...revealPointStyle(revealVectorFor(g.rootId)),
+              ...(interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined),
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onCircleClick(g.rootId);
@@ -129,6 +139,7 @@ export function CanvasBackdrop({
               key={`manual-zone-${n.nodeId}`}
               cx={p.x}
               cy={p.y}
+              style={revealPointStyle(revealVectorFor(n.nodeId))}
               r={55}
               fill={color}
               fillOpacity={0.14}
@@ -158,6 +169,7 @@ export function CanvasBackdrop({
               key={`circle-parent-ring-${n.nodeId}`}
               cx={p.x}
               cy={p.y}
+              style={revealPointStyle(revealVectorFor(n.nodeId))}
               r={34}
               fill={color}
               fillOpacity={0.16}
@@ -177,14 +189,24 @@ export function CanvasBackdrop({
         // drops out of the shape entirely (same as the plain Edge
         // lines below), rather than a figure still tracing a vertex
         // at a node nobody can see any more.
-        const pts = cycle
+        const members = cycle
           .map((id) => visibleNodes.find((n) => n.nodeId === id))
-          .filter((n): n is NodeDoc => !!n)
-          .map((n) => posFor(n));
+          .filter((n): n is NodeDoc => !!n);
+        const pts = members.map((n) => posFor(n));
         if (pts.length < 3) return null;
+        // During a sentiment show: one shared vector means the figure's
+        // corners all travel together, so it just moves with them; corners
+        // on different bodies can't be followed by any single transform of
+        // a many-cornered shape, so the figure fades out for the trip and
+        // back in as everything lands home.
+        const vs = members.map((n) => revealVectorFor(n.nodeId));
+        const moving = vs.some(Boolean);
+        const rigid = vs.every((v) => v?.x === vs[0]?.x && v?.y === vs[0]?.y);
+        const figureStyle = !moving ? undefined : rigid ? revealPointStyle(vs[0]) : { opacity: REVEAL_FADE_OPACITY };
         return (
           <polygon
             key={`figure-${cycle.slice().sort().join("-")}`}
+            style={figureStyle}
             points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
             fill="var(--accent)"
             fillOpacity={0.1}
@@ -260,7 +282,15 @@ export function CanvasBackdrop({
             // clicked (see handleCircleBackdropClick, same handler
             // the old backdrop circle used), so it has to explicitly
             // opt back in; an ungrouped one stays inert.
-            style={group && interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
+            // Both ends follow their own node through a sentiment show, even
+            // when they're on different travelling bodies (see
+            // revealSegmentStyle); non-scaling-stroke keeps the stroke from
+            // stretching along with the line.
+            vectorEffect="non-scaling-stroke"
+            style={{
+              ...revealSegmentStyle(a, revealVectorFor(parentId), b, revealVectorFor(node.nodeId)),
+              ...(group && interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined),
+            }}
             onClick={
               group
                 ? (e) => {
@@ -334,6 +364,8 @@ export function CanvasBackdrop({
             y1={a.y}
             x2={b.x}
             y2={b.y}
+            vectorEffect="non-scaling-stroke"
+            style={revealSegmentStyle(a, revealVectorFor(fromId), b, revealVectorFor(toId))}
             stroke={color}
             strokeWidth={2}
             strokeOpacity={dimmed ? 0.06 : highlighted ? 0.9 : 0.55}
@@ -421,6 +453,7 @@ export function CanvasBackdrop({
             key={`pending-${n.nodeId}`}
             cx={p.x}
             cy={p.y}
+            style={revealPointStyle(revealVectorFor(n.nodeId))}
             r={18}
             fill="none"
             stroke="var(--accent)"
