@@ -523,19 +523,24 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   // used to center a circle/cluster the moment it becomes the chosen one,
   // which has no single "the node" the way an ordinary selection does. Same
   // target-rectangle math as centerOnNode, without its ghost/settle machinery:
-  // a chosen cluster has no ghosts fanning off it.
-  function centerOnPoint(x: number, y: number) {
+  // a chosen cluster has no ghosts fanning off it. It assumes the bottom
+  // sheet is (about to be) open unless `aboveSheet: false` says to use the
+  // sheet's real current state — for a pan that doesn't open anything.
+  function centerOnPoint(x: number, y: number, { aboveSheet = true }: { aboveSheet?: boolean } = {}) {
     const zoom = zoomRef.current;
     const hScrollMargin = hMarginRef.current;
     const vScrollMargin = vMarginRef.current;
     const wrap = wrapRef.current;
     if (!wrap) return;
-    const visibleH = Math.max(150, wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport())));
+    const reserveSheet = aboveSheet || sheetOpen;
+    const visibleH = reserveSheet
+      ? Math.max(150, wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport())))
+      : wrap.clientHeight;
     const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
     // Sized for the sheet being open, as it will be by the time the glide
     // runs: this is called in the same click that opens it, before the
     // bottom margin has grown for it.
-    const bottomMargin = (deadZonePx() + wrap.clientHeight * panelReserveFrac(isMobileViewport())) / zoom;
+    const bottomMargin = (deadZonePx() + (reserveSheet ? wrap.clientHeight * panelReserveFrac(isMobileViewport()) : 0)) / zoom;
     const maxTop = Math.max(0, (CANVAS_H + vScrollMargin + bottomMargin) * zoom - wrap.clientHeight);
     const targetLeft = Math.min(maxLeft, Math.max(0, (x + hScrollMargin) * zoom - wrap.clientWidth / 2));
     const targetTop = Math.min(maxTop, Math.max(0, (y + vScrollMargin) * zoom - visibleH / 2));

@@ -48,7 +48,7 @@ describe("ZoneNames", () => {
     expect(screen.getByRole("button", { name: /Far zone/ }).className).toContain("opacity-60");
   });
 
-  it("goes to the zone's parent node when a name is clicked", async () => {
+  it("asks to center on the zone when its name is clicked", async () => {
     const onGo = renderNames();
     await userEvent.setup().click(screen.getByRole("button", { name: /Far zone/ }));
     expect(onGo).toHaveBeenCalledWith("far");
