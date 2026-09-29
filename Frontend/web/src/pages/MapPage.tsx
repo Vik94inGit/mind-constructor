@@ -621,8 +621,8 @@ export function MapPage() {
     const grouped = groupDragState?.get(node.nodeId);
     if (grouped) return grouped;
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
-    // Always the real position — the sentiment show's travel is applied on
-    // top of this purely in CSS (see useSentimentShow), never through here.
+    // Always the real position — the sentiment show's travel is drawn on top
+    // of this directly on the canvas DOM (see useSentimentShow), never here.
     const own = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
     // Presentation mode's own org-chart blend — checked ahead of the radial
     // selection ring below since the two are mutually exclusive in practice
@@ -988,15 +988,15 @@ export function MapPage() {
   }, [nodes]);
 
   // The sentiment show (see hooks/useSentimentShow.ts): on open, and on every
-  // majority swing, positive bodies travel toward the center and negative
-  // ones toward the edge, hold, and come back. Purely CSS on top of the real
-  // positions — canvasStyle carries the one animated number, vectorFor each
-  // node's travel; skip is wired to any pointer-down on the canvas.
+  // majority swing, the majority type's nodes travel toward the center and
+  // the minority's toward the edge, one after another, hold, and come back.
+  // Drawn straight onto the canvas DOM on top of the real positions (posFor
+  // never sees it); skip is wired to any pointer-down on the canvas.
   const sentimentShow = useSentimentShow({
     nodes,
     visibleNodes,
     positions,
-    nodeGroups,
+    canvasRef,
     draftType: pendingCreate?.type,
     showPoints,
     showNotice,
@@ -2091,7 +2091,6 @@ export function MapPage() {
               // not border) so it never eats into the 2400x1600 coordinate
               // space every node position is expressed in.
               outline: "3px solid color-mix(in srgb, var(--ink) 55%, transparent)",
-              ...sentimentShow.canvasStyle,
             }}
             // Capture phase, so any press anywhere on the canvas — empty
             // space, a node, a zone, a link — cuts the sentiment show short,
@@ -2128,7 +2127,6 @@ export function MapPage() {
           >
             <CanvasBackdrop
               nodeGroups={nodeGroups}
-              revealVectorFor={sentimentShow.vectorFor}
               selectedCircle={map?.selectedCircle}
               visibleNodes={visibleNodes}
               edges={edges}
@@ -2192,7 +2190,6 @@ export function MapPage() {
                   node={node}
                   x={pos.x}
                   y={pos.y}
-                  revealVector={sentimentShow.vectorFor(node.nodeId)}
                   zoom={zoom}
                   selected={selectedId === node.nodeId}
                   multiSelected={multiSelectIds.has(node.nodeId)}
@@ -2272,7 +2269,6 @@ export function MapPage() {
             <WeaponLayer
               visibleNodes={visibleNodes}
               posFor={posFor}
-              revealVectorFor={sentimentShow.vectorFor}
               celebrateIds={celebrateIds}
               shotState={shotState}
             />

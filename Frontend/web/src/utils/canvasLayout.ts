@@ -466,6 +466,8 @@ export interface NodeGroup {
   cy: number;
   r: number;
   outline: { x: number; y: number }[];
+  /** The nodeId at each corner of `outline`, in the same order. */
+  outlineIds?: string[];
 }
 
 // Any node with 2+ direct parentId-children reads as a group ("circle") —
@@ -510,10 +512,12 @@ export function computeNodeGroups(
     // obstacle avoidance, "dragged clear of its circle" — treat as still
     // being part of the zone.
     const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
-    const outline = pts
-      .slice()
-      .sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-    groups.push({ rootId, members, sentiment, cx, cy, r, outline });
+    const corners = members
+      .map((m, i) => ({ id: m.nodeId, p: pts[i] }))
+      .sort((a, b) => Math.atan2(a.p.y - cy, a.p.x - cx) - Math.atan2(b.p.y - cy, b.p.x - cx));
+    const outline = corners.map((c) => c.p);
+    const outlineIds = corners.map((c) => c.id);
+    groups.push({ rootId, members, sentiment, cx, cy, r, outline, outlineIds });
   }
   return groups;
 }

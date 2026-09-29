@@ -3,7 +3,6 @@ import { nodeRefId } from "../utils/nodeType";
 import { ringKindFor } from "./OutcomeBadge";
 import { WeaponMark } from "./WeaponMark";
 import type { NodeDoc } from "../types";
-import { revealSegmentStyle } from "../utils/sentimentShow";
 
 interface Props {
   visibleNodes: NodeDoc[];
@@ -11,8 +10,6 @@ interface Props {
   celebrateIds: Set<string>;
   /** Which weapon just had its arrows re-fired (see MapPage's triggerWeaponShot). */
   shotState: { id: string; nonce: number } | null;
-  /** Each node's travel for a running sentiment show, or null — the bow and its arrows stretch between their two moving ends (see revealSegmentStyle). */
-  revealVectorFor: (nodeId: string) => { x: number; y: number } | null;
 }
 
 // Weapon marks get their own SVG layer, painted after every NodeCard rather
@@ -26,7 +23,7 @@ interface Props {
 // this is the permanent bow facing whatever it targeted, plus the volley of
 // transient arrows (see WeaponMark) that fires when the attack lands and
 // again on demand when either end gets clicked.
-export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState, revealVectorFor }: Props) {
+export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: Props) {
   return (
     <svg
       className="pointer-events-none absolute inset-0 z-[34] h-full w-full"
@@ -64,7 +61,10 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState, rev
           return (
             <g
               key={`weapon-${weaponNode.nodeId}`}
-              style={revealSegmentStyle(a, revealVectorFor(weaponNode.nodeId), b, revealVectorFor(aimedAt.nodeId))}
+              // The sentiment show stretches the bow and its arrows between
+              // the weapon and whatever it's aimed at (see applyRevealFrame).
+              data-reveal-seg={`${weaponNode.nodeId} ${aimedAt.nodeId}`}
+              data-base={`${a.x} ${a.y} ${b.x} ${b.y}`}
             >
             <WeaponMark
               x={a.x}

@@ -1,130 +1,117 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { RefObject } from "react";
 import { computeDominantSentiment } from "../utils/canvasLayout";
-import type { NodeGroup } from "../utils/canvasLayout";
-import { computeSentimentShowVectors, REVEAL_VAR } from "../utils/sentimentShow";
+import {
+  applyRevealFrame,
+  computeSentimentShowPlan,
+  easeOutCubic,
+  revealAmount,
+  showEndMs,
+  SKIP_MS,
+} from "../utils/sentimentShow";
+import type { ShowPlan } from "../utils/sentimentShow";
 import type { NodeDoc, NodeType } from "../types";
 
 type Pt = { x: number; y: number };
-
-// Travel out, then hold at the peak until HOLD_UNTIL_MS after the start,
-// then travel home — about five seconds end to end.
-export const OUT_S = 1.8;
-export const HOLD_UNTIL_MS = 4000;
-export const BACK_S = 1.2;
-// A click anywhere cuts it short with a quick settle home instead.
-export const SKIP_S = 0.45;
-// Gentle launch, soft landing — the whole trip stays visible rather than
-// front-loading the motion into the first few frames.
-const EASE = "cubic-bezier(0.45, 0, 0.25, 1)";
-const SKIP_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
-
-type Phase = "idle" | "prep" | "out" | "back" | "skip";
 
 interface Params {
   nodes: NodeDoc[];
   visibleNodes: NodeDoc[];
   positions: Map<string, Pt>;
-  nodeGroups: NodeGroup[];
   // An open pending-create card's armed type counts toward the tally live,
   // so cycling a draft's type can tip the map's majority on its own.
   draftType: NodeType | undefined;
+  /** The canvas element every node/zone/link is rendered inside. */
+  canvasRef: RefObject<HTMLElement | null>;
   showPoints: (pts: Pt[]) => void;
   showNotice: (message: string) => void;
   positiveMajorityNotice: string;
   negativeMajorityNotice: string;
 }
 
+interface Running {
+  plan: ShowPlan;
+  startedAt: number;
+  skip: { at: number; from: Map<string, number> } | null;
+}
+
 /**
- * The map's sentiment show: when a map opens (and again whenever its
- * positive-vs-negative majority swings), positive bodies travel toward the
- * center and negative ones toward the edge, hold there, then return to
- * exactly where they really are — nothing is ever persisted.
+ * The map's sentiment show: when a map opens (and whenever its majority
+ * swings to the other side), every node of the majority type travels toward
+ * the center and every node of the minority type toward the edge, one after
+ * another; they hold, then from 4s come back one after another. Zones and
+ * links are drawn through their nodes, so they stretch and shrink as the
+ * nodes go and end in exactly their original shape. Nothing is persisted.
  *
- * Same technique the attack arrows use (weapon-arrow-fly/weapon-fly-in in
- * index.css): a CSS animation of `transform`, eased by the browser itself,
- * not React state stepped through a few discrete hops. Here it's a single
- * registered custom property (REVEAL_VAR) transitioned on the canvas, which
- * every node, zone, ring, link and bow reads through calc() — so all of them
- * move on one clock, frame-perfectly in sync, with no per-frame JS at all.
- * This hook only flips that one number at four moments (start, out, back,
- * done) and hands out each node's travel vector.
+ * Driven like the attack arrows — smooth eased motion at the display's own
+ * frame rate — by a requestAnimationFrame loop that writes each frame
+ * straight onto the canvas DOM (applyRevealFrame), never through React
+ * state, so there are no stepped hops and no whole-map re-renders.
  */
 export function useSentimentShow({
   nodes,
   visibleNodes,
   positions,
-  nodeGroups,
   draftType,
+  canvasRef,
   showPoints,
   showNotice,
   positiveMajorityNotice,
   negativeMajorityNotice,
 }: Params) {
-  const [vectors, setVectors] = useState<Map<string, Pt> | null>(null);
-  const [phase, setPhase] = useState<Phase>("idle");
-  const phaseRef = useRef<Phase>("idle");
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const rafs = useRef<number[]>([]);
+  const [active, setActive] = useState(false);
+  const running = useRef<Running | null>(null);
+  const raf = useRef(0);
 
-  function go(next: Phase) {
-    phaseRef.current = next;
-    setPhase(next);
-  }
-
-  function clearScheduled() {
-    timers.current.forEach(clearTimeout);
-    rafs.current.forEach(cancelAnimationFrame);
-    timers.current = [];
-    rafs.current = [];
-  }
-
-  function finish() {
-    clearScheduled();
-    setVectors(null);
-    go("idle");
-  }
-
-  function start(next: Map<string, Pt>) {
-    if (phaseRef.current !== "idle") return;
-    setVectors(next);
-    // Vectors land first with the number still at 0 (nothing visibly moves),
-    // then it flips to 1 two frames later — the transition needs a committed
-    // "before" value to animate from.
-    go("prep");
-    const startedAt = performance.now();
-    rafs.current.push(
-      requestAnimationFrame(() => {
-        rafs.current.push(
-          requestAnimationFrame(() => {
-            go("out");
-            const backIn = Math.max(0, HOLD_UNTIL_MS - (performance.now() - startedAt));
-            timers.current.push(
-              setTimeout(() => {
-                go("back");
-                timers.current.push(setTimeout(finish, BACK_S * 1000 + 50));
-              }, backIn),
-            );
-          }),
-        );
-      }),
-    );
-  }
-
-  /** Cut the show short: everything settles home quickly from wherever it is. */
-  function skip() {
-    const p = phaseRef.current;
-    if (p === "idle" || p === "skip") return;
-    clearScheduled();
-    if (p === "prep") {
-      finish();
-      return;
+  function amount(r: Running, id: string, now: number): number {
+    if (r.skip) {
+      const tau = Math.min(1, (now - r.skip.at) / SKIP_MS);
+      return (r.skip.from.get(id) ?? 0) * (1 - easeOutCubic(tau));
     }
-    go("skip");
-    timers.current.push(setTimeout(finish, SKIP_S * 1000 + 50));
+    return revealAmount(now - r.startedAt, r.plan.delays.get(id) ?? 0);
   }
 
-  useEffect(() => () => clearScheduled(), []);
+  function stop() {
+    cancelAnimationFrame(raf.current);
+    const root = canvasRef.current;
+    if (root) applyRevealFrame(root, () => null);
+    running.current = null;
+    setActive(false);
+  }
+
+  function tick() {
+    const r = running.current;
+    const root = canvasRef.current;
+    if (!r || !root) return;
+    const now = performance.now();
+    applyRevealFrame(root, (id) => {
+      const v = r.plan.vectors.get(id);
+      if (!v) return null;
+      const s = amount(r, id, now);
+      return s > 0 ? { x: v.x * s, y: v.y * s } : null;
+    });
+    const done = r.skip ? now - r.skip.at >= SKIP_MS : now - r.startedAt >= showEndMs(r.plan);
+    if (done) stop();
+    else raf.current = requestAnimationFrame(tick);
+  }
+
+  /** Cut the show short: every node settles home quickly from wherever it is. */
+  function skip() {
+    const r = running.current;
+    if (!r || r.skip) return;
+    const now = performance.now();
+    const from = new Map<string, number>();
+    for (const id of r.plan.vectors.keys()) from.set(id, amount(r, id, now));
+    r.skip = { at: now, from };
+  }
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(raf.current);
+      running.current = null;
+    },
+    [],
+  );
 
   const dominantSentiment = useMemo(
     () => computeDominantSentiment(draftType ? [...nodes, { type: draftType }] : nodes),
@@ -140,41 +127,24 @@ export function useSentimentShow({
     prevSentimentRef.current = dominantSentiment;
     const opening = !openedRef.current;
     openedRef.current = true;
-    const swung = dominantSentiment !== prev && dominantSentiment !== "tie";
-    if (!opening && !swung) return;
-    if (swung) showNotice(dominantSentiment === "negative" ? negativeMajorityNotice : positiveMajorityNotice);
-    if (phaseRef.current !== "idle") return;
-    const next = computeSentimentShowVectors(visibleNodes, positions, nodeGroups);
-    if (next.size === 0) return;
+    if (dominantSentiment === "tie") return; // no majority, nothing to show
+    if (!opening && dominantSentiment === prev) return;
+    showNotice(dominantSentiment === "negative" ? negativeMajorityNotice : positiveMajorityNotice);
+    if (running.current) return;
+    const plan = computeSentimentShowPlan(visibleNodes, positions, dominantSentiment);
+    if (plan.vectors.size === 0) return;
     // Both ends of every trip in view, so the show never plays off-screen.
     showPoints(
-      Array.from(next.entries()).flatMap(([id, v]) => {
+      Array.from(plan.vectors.entries()).flatMap(([id, v]) => {
         const p = positions.get(id)!;
         return [p, { x: p.x + v.x, y: p.y + v.y }];
       }),
     );
-    start(next);
+    running.current = { plan, startedAt: performance.now(), skip: null };
+    setActive(true);
+    raf.current = requestAnimationFrame(tick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dominantSentiment, loaded]);
 
-  const canvasStyle = useMemo<CSSProperties>(() => {
-    const value = phase === "out" ? 1 : 0;
-    const transition =
-      phase === "out"
-        ? `${REVEAL_VAR} ${OUT_S}s ${EASE}`
-        : phase === "back"
-          ? `${REVEAL_VAR} ${BACK_S}s ${EASE}`
-          : phase === "skip"
-            ? `${REVEAL_VAR} ${SKIP_S}s ${SKIP_EASE}`
-            : "none";
-    return { [REVEAL_VAR]: value, transition } as CSSProperties;
-  }, [phase]);
-
-  return {
-    /** This node's travel vector for the running show, or null when it isn't moving. */
-    vectorFor: (nodeId: string): Pt | null => vectors?.get(nodeId) ?? null,
-    canvasStyle,
-    skip,
-    active: phase !== "idle",
-  };
+  return { skip, active };
 }

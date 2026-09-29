@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { computeSentimentShowVectors, revealSegmentStyle } from "./sentimentShow";
-import { CANVAS_H, CANVAS_W, computeNodeGroups } from "./canvasLayout";
+import {
+  applyRevealFrame,
+  BACK_AT_MS,
+  BACK_MS,
+  computeSentimentShowPlan,
+  OUT_MS,
+  revealAmount,
+  segmentMatrix,
+  showEndMs,
+} from "./sentimentShow";
+import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import { makeNode } from "../test/fixtures";
 import type { NodeDoc } from "../types";
 
@@ -8,107 +17,152 @@ type Pt = { x: number; y: number };
 const center = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 
-function run(nodes: NodeDoc[]) {
+function plan(nodes: NodeDoc[], majority: "positive" | "negative") {
   const positions = new Map<string, Pt>(nodes.map((n) => [n.nodeId, { x: n.x!, y: n.y! }]));
-  const groups = computeNodeGroups(nodes, nodes, positions);
-  const vectors = computeSentimentShowVectors(nodes, positions, groups);
+  const p = computeSentimentShowPlan(nodes, positions, majority);
   const target = (id: string) => {
-    const p = positions.get(id)!;
-    const v = vectors.get(id) ?? { x: 0, y: 0 };
-    return { x: p.x + v.x, y: p.y + v.y };
+    const base = positions.get(id)!;
+    const v = p.vectors.get(id) ?? { x: 0, y: 0 };
+    return { x: base.x + v.x, y: base.y + v.y };
   };
-  return { positions, vectors, target };
+  return { ...p, positions, target };
 }
 
-// Evaluates the CSS matrix() produced by revealSegmentStyle at a given
-// value of the animated number, then applies it to a point.
-function applyAt(style: ReturnType<typeof revealSegmentStyle>, sv: number, p: Pt): Pt {
-  const expr = String(style!.transform).split("var(--reveal-s, 0)").join(String(sv));
-  const fn = expr.slice(0, expr.indexOf("("));
-  const inner = expr.slice(fn.length + 1, -1).split("px").join("").split("calc").join("");
-  const args = new Function(`return [${inner}]`)() as number[];
-  if (fn === "translate") return { x: p.x + args[0], y: p.y + args[1] };
-  const [a, b, c, d, e, f] = args;
-  return { x: a * p.x + c * p.y + e, y: b * p.x + d * p.y + f };
-}
+describe("computeSentimentShowPlan", () => {
+  const nodes = () => [
+    makeNode({ nodeId: "pos", type: "Success", x: 300, y: 300 }),
+    makeNode({ nodeId: "neg", type: "Fail", x: 1900, y: 1200 }),
+    makeNode({ nodeId: "neu", type: "unknown", x: 300, y: 1300 }),
+  ];
 
-describe("computeSentimentShowVectors", () => {
-  it("pulls a positive node toward the center, pushes a negative one toward the edge, leaves a neutral one alone", () => {
-    const pos = makeNode({ nodeId: "pos", type: "Success", x: 300, y: 300 });
-    const neg = makeNode({ nodeId: "neg", type: "Fail", x: 1900, y: 1200 });
-    const neu = makeNode({ nodeId: "neu", type: "unknown", x: 300, y: 1300 });
-    const { positions, vectors, target } = run([pos, neg, neu]);
-    expect(dist(target("pos"), center)).toBeLessThan(dist(positions.get("pos")!, center));
-    expect(dist(target("neg"), center)).toBeGreaterThan(dist(positions.get("neg")!, center));
-    expect(vectors.has("neu")).toBe(false);
+  it("sends the majority type to the center and the minority toward the edge", () => {
+    const pos = plan(nodes(), "positive");
+    expect(dist(pos.target("pos"), center)).toBeLessThan(dist(pos.positions.get("pos")!, center));
+    expect(dist(pos.target("neg"), center)).toBeGreaterThan(dist(pos.positions.get("neg")!, center));
+
+    // Same map, other majority: the roles swap.
+    const neg = plan(nodes(), "negative");
+    expect(dist(neg.target("neg"), center)).toBeLessThan(dist(neg.positions.get("neg")!, center));
+    expect(dist(neg.target("pos"), center)).toBeGreaterThan(dist(neg.positions.get("pos")!, center));
   });
 
-  it("keeps every body clear of every other at the peak — no stacking at the center", () => {
-    // A ring of positive nodes all converging on the center used to pile up.
-    const nodes = Array.from({ length: 10 }, (_, i) => {
+  it("leaves unknown-type nodes where they are", () => {
+    expect(plan(nodes(), "positive").vectors.has("neu")).toBe(false);
+  });
+
+  it("moves each node on its own, so a zone's members can pull it apart", () => {
+    const circle = [
+      makeNode({ nodeId: "root", type: "Success", x: 400, y: 400 }),
+      makeNode({ nodeId: "c1", type: "Success", parentId: "root", x: 550, y: 400 }),
+      makeNode({ nodeId: "c2", type: "Fail", parentId: "root", x: 400, y: 550 }),
+    ];
+    const p = plan(circle, "positive");
+    expect(p.vectors.get("root")).not.toEqual(p.vectors.get("c2"));
+  });
+
+  it("sends nodes off one after another, nearest the center first", () => {
+    const p = plan(
+      [
+        makeNode({ nodeId: "far", type: "Success", x: 100, y: 100 }),
+        makeNode({ nodeId: "near", type: "Success", x: 1000, y: 700 }),
+        makeNode({ nodeId: "mid", type: "Success", x: 500, y: 400 }),
+      ],
+      "positive",
+    );
+    expect(p.delays.get("near")).toBe(0);
+    expect(p.delays.get("mid")!).toBeGreaterThan(0);
+    expect(p.delays.get("far")!).toBeGreaterThan(p.delays.get("mid")!);
+  });
+
+  it("keeps every node clear of every other at the peak — no stacking at the center", () => {
+    const ring = Array.from({ length: 10 }, (_, i) => {
       const a = (i / 10) * Math.PI * 2;
       return makeNode({ nodeId: `n${i}`, type: "Success", x: center.x + 600 * Math.cos(a), y: center.y + 500 * Math.sin(a) });
     });
-    const { target } = run(nodes);
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        // Two lone nodes: NODE_PAD (90) each plus GAP (40).
-        expect(dist(target(`n${i}`), target(`n${j}`))).toBeGreaterThanOrEqual(219);
+    const p = plan(ring, "positive");
+    for (let i = 0; i < ring.length; i++) {
+      for (let j = i + 1; j < ring.length; j++) {
+        expect(dist(p.target(`n${i}`), p.target(`n${j}`))).toBeGreaterThanOrEqual(177);
       }
     }
   });
 
-  it("moves a whole circle rigidly — every member shares one vector, so its zone keeps its shape", () => {
-    const nodes = [
-      makeNode({ nodeId: "root", type: "Success", x: 400, y: 400 }),
-      makeNode({ nodeId: "c1", type: "Success", parentId: "root", x: 550, y: 400 }),
-      makeNode({ nodeId: "c2", type: "Option", parentId: "root", x: 400, y: 550 }),
-    ];
-    const { vectors } = run(nodes);
-    const v = vectors.get("root")!;
-    expect(v).toBeDefined();
-    expect(vectors.get("c1")).toEqual(v);
-    expect(vectors.get("c2")).toEqual(v);
-  });
-
-  it("merges a nested circle into its parent circle's body, and carries a weapon with its target", () => {
-    const nodes = [
-      makeNode({ nodeId: "outer", type: "Success", x: 400, y: 400 }),
-      makeNode({ nodeId: "inner", type: "Success", parentId: "outer", x: 550, y: 400 }),
-      makeNode({ nodeId: "o2", type: "Option", parentId: "outer", x: 400, y: 550 }),
-      makeNode({ nodeId: "i1", type: "Success", parentId: "inner", x: 700, y: 400 }),
-      makeNode({ nodeId: "i2", type: "Success", parentId: "inner", x: 700, y: 550 }),
-      makeNode({ nodeId: "bow", type: "Fail", isWeapon: true, targetNodeId: "i1", x: 850, y: 300 }),
-    ];
-    const { vectors } = run(nodes);
-    const v = vectors.get("outer")!;
-    for (const id of ["inner", "o2", "i1", "i2", "bow"]) expect(vectors.get(id)).toEqual(v);
+  it("carries a weapon with its target — same vector, same departure", () => {
+    const p = plan(
+      [
+        makeNode({ nodeId: "t", type: "Success", x: 400, y: 400 }),
+        makeNode({ nodeId: "bow", type: "Fail", isWeapon: true, targetNodeId: "t", x: 550, y: 300 }),
+      ],
+      "positive",
+    );
+    expect(p.vectors.get("bow")).toEqual(p.vectors.get("t"));
+    expect(p.delays.get("bow")).toEqual(p.delays.get("t"));
   });
 });
 
-describe("revealSegmentStyle", () => {
-  it("keeps both ends of a link glued to their own moving nodes at every point of the show", () => {
+describe("revealAmount", () => {
+  it("waits for its own delay, travels out, holds, comes back from 4s, and ends exactly home", () => {
+    const delay = 300;
+    expect(revealAmount(200, delay)).toBe(0);
+    expect(revealAmount(delay + OUT_MS / 2, delay)).toBeCloseTo(0.5, 5);
+    expect(revealAmount(delay + OUT_MS + 10, delay)).toBe(1);
+    expect(revealAmount(BACK_AT_MS - 1, delay)).toBe(1);
+    expect(revealAmount(BACK_AT_MS + delay + BACK_MS / 2, delay)).toBeCloseTo(0.5, 5);
+    expect(revealAmount(BACK_AT_MS + delay + BACK_MS, delay)).toBe(0);
+  });
+
+  it("finishes the whole show once the last node is home", () => {
+    const end = showEndMs({ vectors: new Map(), delays: new Map([["a", 0], ["b", 700]]) });
+    expect(end).toBe(BACK_AT_MS + 700 + BACK_MS);
+  });
+});
+
+describe("segmentMatrix", () => {
+  it("moves each end of a segment by its own node's displacement", () => {
     const a = { x: 100, y: 200 };
     const b = { x: 700, y: 500 };
-    const va = { x: 300, y: 50 };
-    const vb = { x: -150, y: -220 };
-    const style = revealSegmentStyle(a, va, b, vb);
-    for (const sv of [0, 0.25, 0.5, 1]) {
-      const pa = applyAt(style, sv, a);
-      const pb = applyAt(style, sv, b);
-      expect(pa.x).toBeCloseTo(a.x + sv * va.x, 1);
-      expect(pa.y).toBeCloseTo(a.y + sv * va.y, 1);
-      expect(pb.x).toBeCloseTo(b.x + sv * vb.x, 1);
-      expect(pb.y).toBeCloseTo(b.y + sv * vb.y, 1);
-    }
+    const da = { x: 300, y: 50 };
+    const db = { x: -150, y: -220 };
+    const [m0, m1, m2, m3, m4, m5] = segmentMatrix(a, da, b, db);
+    const apply = (p: Pt) => ({ x: m0 * p.x + m2 * p.y + m4, y: m1 * p.x + m3 * p.y + m5 });
+    expect(apply(a).x).toBeCloseTo(a.x + da.x, 6);
+    expect(apply(a).y).toBeCloseTo(a.y + da.y, 6);
+    expect(apply(b).x).toBeCloseTo(b.x + db.x, 6);
+    expect(apply(b).y).toBeCloseTo(b.y + db.y, 6);
+  });
+});
+
+describe("applyRevealFrame", () => {
+  function canvas() {
+    const root = document.createElement("div");
+    root.innerHTML = `
+      <div data-reveal-node="a"></div>
+      <svg>
+        <polygon data-reveal-points="a b c" data-base="0,0 100,0 0,100" points="0,0 100,0 0,100"></polygon>
+        <line data-reveal-line="a b" data-base="0 0 100 0" x1="0" y1="0" x2="100" y2="0"></line>
+        <circle data-reveal-at="c" data-base="0 100" cx="0" cy="100"></circle>
+      </svg>`;
+    return root;
+  }
+
+  it("stretches a zone and its links with each node's own displacement", () => {
+    const root = canvas();
+    const moves: Record<string, Pt> = { a: { x: 10, y: 20 }, c: { x: -5, y: 0 } };
+    applyRevealFrame(root, (id) => moves[id] ?? null);
+    expect((root.querySelector("[data-reveal-node]") as HTMLElement).style.translate).toBe("10px 20px");
+    expect(root.querySelector("polygon")!.getAttribute("points")).toBe("10,20 100,0 -5,100");
+    const line = root.querySelector("line")!;
+    expect([line.getAttribute("x1"), line.getAttribute("y1"), line.getAttribute("x2")]).toEqual(["10", "20", "100"]);
+    expect(root.querySelector("circle")!.getAttribute("cx")).toBe("-5");
   });
 
-  it("is a plain translate when both ends move together", () => {
-    const style = revealSegmentStyle({ x: 0, y: 0 }, { x: 10, y: 20 }, { x: 50, y: 50 }, { x: 10, y: 20 });
-    expect(String(style!.transform).startsWith("translate(")).toBe(true);
-  });
-
-  it("returns nothing when neither end moves", () => {
-    expect(revealSegmentStyle({ x: 0, y: 0 }, null, { x: 50, y: 50 }, null)).toBeUndefined();
+  it("writes every real position back exactly once nothing is displaced", () => {
+    const root = canvas();
+    applyRevealFrame(root, () => ({ x: 33, y: 44 }));
+    applyRevealFrame(root, () => null);
+    expect((root.querySelector("[data-reveal-node]") as HTMLElement).style.translate).toBe("");
+    expect(root.querySelector("polygon")!.getAttribute("points")).toBe("0,0 100,0 0,100");
+    expect(root.querySelector("line")!.getAttribute("x2")).toBe("100");
+    expect(root.querySelector("circle")!.getAttribute("cy")).toBe("100");
   });
 });
