@@ -1,4 +1,5 @@
 import { memo, useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
@@ -63,7 +64,8 @@ interface Props {
   anchorPos: { x: number; y: number };
   /** The currently-visible rectangle of the canvas, in canvas coordinates — keeps ghosts from fanning out past the edge of the screen. */
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
-  onPick: (type: NodeType, pos: { x: number; y: number }) => void;
+  /** `text` is set when a ghost template (a starter phrase) was clicked rather than the ghost itself. */
+  onPick: (type: NodeType, pos: { x: number; y: number }, text?: string) => void;
   /** An empty map's hint: the ghosts draw in one at a time — icon, then its name — instead of all being there at once. */
   intro?: boolean;
   /** The simplified view: no halo/horns on the ghosts. */
@@ -78,10 +80,12 @@ interface Props {
 const STEP_MS = 1000;
 
 // Half-visible "ghost" previews fanned out around the selected node, one per
-// node type. Clicking a ghost names its type; clicking it again creates a real
-// node of that type at the ghost's spot and auto-links it to the anchor —
-// branching an argument tree becomes two clicks instead of toolbar button ->
-// modal -> manual placement.
+// node type. Clicking a ghost names its type and fans out a few ghost
+// templates — starter phrases for that type — on the ring's outer side;
+// clicking one opens the new node with that phrase, clicking the ghost again
+// opens it blank. Either way it lands at the ghost's spot, linked to the
+// anchor — branching an argument tree becomes two clicks instead of toolbar
+// button -> modal -> manual placement.
 export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick, intro = false, compact = false, zoom = 1 }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
@@ -99,7 +103,8 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   // picked. The first click only tells you which type this is (a one-tap
   // create was easy to trigger by accident on a phone and impossible to
   // preview); a second click on that same ghost creates it.
-  const [armedType, setArmedType] = useState<NodeType | null>(null);
+  const [armed, setArmed] = useState<{ type: NodeType; x: number; y: number; angle: number } | null>(null);
+  const armedType = armed?.type ?? null;
   // Read live, every render — see the doc comment above RADIUS/EDGE_MARGIN's
   // old module-level home for why this can't be hoisted back out to module
   // scope.
@@ -257,7 +262,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
             onClick={(e) => {
               e.stopPropagation();
               if (armedType === type) onPick(type, { x, y });
-              else setArmedType(type);
+              else setArmed({ type, x, y, angle });
             }}
           >
             <div className="relative" style={{ height: ICON_SIZE * k, width: ICON_SIZE * k }}>
@@ -313,6 +318,89 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
           </button>
         );
       })}
+      {armed && (
+        <GhostTemplates
+          key={armed.type}
+          type={armed.type}
+          pos={{ x: armed.x, y: armed.y }}
+          angle={armed.angle}
+          zoom={zoom}
+          phrases={t.ui.node.ghostTemplates[armed.type]}
+          title={t.ui.node.ghostTemplatesTitle}
+          onPick={(text) => onPick(armed.type, { x: armed.x, y: armed.y }, text)}
+        />
+      )}
     </>
   );
 });
+
+// How far (on screen) the phrase column starts from the ghost's center: past
+// the ghost itself sideways, and past its name chip too when it hangs below.
+const TEMPLATE_SIDE_GAP = 34;
+const TEMPLATE_BELOW_GAP = 64;
+const TEMPLATE_ABOVE_GAP = 40;
+
+// The picked ghost's starter phrases, stacked on the side of the ghost that
+// faces away from the anchor node, so they never cover the node or the ring.
+function GhostTemplates({
+  type,
+  pos,
+  angle,
+  zoom,
+  phrases,
+  title,
+  onPick,
+}: {
+  type: NodeType;
+  pos: { x: number; y: number };
+  angle: number;
+  zoom: number;
+  phrases: string[];
+  title: string;
+  onPick: (text: string) => void;
+}) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  // A side ghost gets its column beside it; a top/bottom ghost above/below it.
+  const sideways = Math.abs(cos) > 0.5;
+  const place: CSSProperties = sideways
+    ? {
+        left: cos > 0 ? TEMPLATE_SIDE_GAP : -TEMPLATE_SIDE_GAP,
+        top: 0,
+        transform: `translate(${cos > 0 ? "0" : "-100%"}, -50%)`,
+        alignItems: cos > 0 ? "flex-start" : "flex-end",
+      }
+    : {
+        left: 0,
+        top: sin > 0 ? TEMPLATE_BELOW_GAP : -TEMPLATE_ABOVE_GAP,
+        transform: `translate(-50%, ${sin > 0 ? "0" : "-100%"})`,
+        alignItems: "center",
+      };
+  return (
+    // Drawn in screen pixels: the wrapper undoes the canvas zoom, the same
+    // way the ghosts themselves stay one size on screen.
+    <div
+      className="pointer-events-none absolute z-[34]"
+      style={{ left: pos.x, top: pos.y, transform: `scale(${1 / (zoom || 1)})`, transformOrigin: "0 0" }}
+    >
+      <div className="absolute flex flex-col gap-[0.3rem]" style={place}>
+        {phrases.map((phrase, i) => (
+          <button
+            key={phrase}
+            type="button"
+            className="pointer-events-auto max-w-[11rem] animate-ghost-in cursor-pointer rounded-full border border-dashed bg-surface px-[0.55rem] py-[0.2rem] text-left text-[0.66rem] leading-[1.25] font-medium whitespace-nowrap text-ink opacity-85 shadow-card transition-[opacity,transform] duration-150 hover:scale-[1.05] hover:opacity-100 focus-visible:opacity-100"
+            style={{ borderColor: NODE_TYPE_COLORS[type], animationDelay: `${i * 70}ms`, touchAction: "manipulation" }}
+            title={title}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick(phrase);
+            }}
+          >
+            {phrase}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

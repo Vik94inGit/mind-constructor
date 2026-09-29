@@ -216,6 +216,8 @@ export function MapPage() {
     y: number;
     type: NodeType;
     parentId: string | null;
+    /** A ghost template's starter phrase the input opens with. */
+    text?: string;
   } | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   // The old top toolbar (name, member count, Link/Add/Invite/color/
@@ -1501,7 +1503,7 @@ export function MapPage() {
   // parentId (a tree-lineage arrow, not a sentiment Edge/"link" — those
   // stay reserved for the explicit "Link nodes" flow). Nothing is created
   // until confirmPendingCreate actually fires.
-  function startQuickAdd(type: NodeType, pos: { x: number; y: number }, parent: NodeDoc) {
+  function startQuickAdd(type: NodeType, pos: { x: number; y: number }, parent: NodeDoc, text?: string) {
     setActionError(null);
     // The ghost's slot is a fixed angle around the anchor — it doesn't know
     // about anything else on the canvas, so a crowded area can still land
@@ -1515,7 +1517,7 @@ export function MapPage() {
       viewportBounds(),
     );
     setInlineEditId(null);
-    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId });
+    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text });
   }
 
   // Grows a template branch (see utils/templates.ts) from `root`: every node
@@ -2339,7 +2341,7 @@ export function MapPage() {
                 bounds={settledViewportBounds()}
                 compact={compactView}
                 zoom={zoom}
-                onPick={(type, pos) => startQuickAdd(type, pos, selectedNode)}
+                onPick={(type, pos, text) => startQuickAdd(type, pos, selectedNode, text)}
               />
             )}
 
@@ -2352,9 +2354,9 @@ export function MapPage() {
                 // No bounds to squeeze the ring into: the view opens centered
                 // on this point, so a full round ring fits.
                 bounds={{ minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity }}
-                onPick={(type, pos) => {
+                onPick={(type, pos, text) => {
                   setActionError(null);
-                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null });
+                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, text });
                 }}
               />
             )}
@@ -2364,6 +2366,7 @@ export function MapPage() {
                 x={pendingCreate.x}
                 y={pendingCreate.y}
                 type={pendingCreate.type}
+                initialText={pendingCreate.text}
                 zoom={zoom}
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}
