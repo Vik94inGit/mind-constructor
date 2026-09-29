@@ -30,6 +30,33 @@ function renderNode(overrides: Partial<React.ComponentProps<typeof NodeCard>> & 
 }
 
 describe("NodeCard", () => {
+  describe("parent priority", () => {
+    const root = (container: HTMLElement) => container.querySelector("[data-reveal-node]")!;
+
+    it("stacks a parent above other nodes and a dragged node above both", () => {
+      const node = makeNode({ nodeId: "a", text: "hello" });
+      expect(root(renderNode({ node }).container).className).toContain("z-[31]");
+      expect(root(renderNode({ node, isParent: true }).container).className).toContain("z-[32]");
+      expect(root(renderNode({ node, isParent: true, dragging: true }).container).className).toContain("z-[33]");
+    });
+
+    it("fades a quiet child, but a stronger fade still wins", () => {
+      const node = makeNode({ nodeId: "a", text: "hello" });
+      expect(root(renderNode({ node, quiet: true }).container).className).toContain("opacity-50");
+      const muted = root(renderNode({ node, quiet: true, muted: true }).container).className;
+      expect(muted).toContain("opacity-16");
+      expect(muted).not.toContain("opacity-50");
+    });
+
+    it("leaves out a caption that would cover a parent's", () => {
+      const node = makeNode({ nodeId: "a", text: "caption text" });
+      const shown = renderNode({ node });
+      expect(shown.queryByText("caption text")).not.toBeNull();
+      shown.unmount();
+      expect(renderNode({ node, hideCaption: true }).queryByText("caption text")).toBeNull();
+    });
+  });
+
   it("renders with the node's text as its title attribute", () => {
     const node = makeNode({ nodeId: "a", text: "hello world" });
     const { container } = renderNode({ node });

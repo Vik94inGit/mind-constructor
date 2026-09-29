@@ -141,6 +141,9 @@ export interface UiStrings {
     clickToChangeType: string;
     chooseHint: string;
     ghostAgain: string;
+    /** Starter phrases a ghost offers once it's picked out — click one to open the new node with it. */
+    ghostTemplates: Record<NodeType, string[]>;
+    ghostTemplatesTitle: string;
   };
   attack: {
     intro: string;
@@ -486,6 +489,16 @@ const en: UiStrings = {
     clickToChangeType: "Click to change type",
     chooseHint: "choose?",
     ghostAgain: "click again to add",
+    ghostTemplates: {
+      "Problem": ["What's blocking us?", "Root cause:", "Risk if we do nothing"],
+      "Problematic option": ["Could work, but…", "Hidden cost:", "Weak spot:"],
+      "Solution": ["We'll fix it by…", "First step:", "Who owns this?"],
+      "Option": ["What if we…", "Alternative:", "Quick experiment:"],
+      "Success": ["It worked because…", "Measurable result:", "Keep doing:"],
+      "Fail": ["It failed because…", "Lesson learned:", "Don't repeat:"],
+      "unknown": ["Open question:", "Need more info on…", "Idea:"],
+    },
+    ghostTemplatesTitle: "Start from this phrase",
   },
   attack: {
     intro: "Landing an attack creates a real node with your objection, linked to this one by a weapon arrow.",
@@ -829,6 +842,16 @@ const cs: UiStrings = {
     clickToChangeType: "Klepnutím změníte typ",
     chooseHint: "vybrat?",
     ghostAgain: "klepnutím znovu přidáte",
+    ghostTemplates: {
+      "Problem": ["Co nás blokuje?", "Příčina:", "Riziko, když nic neuděláme"],
+      "Problematic option": ["Mohlo by fungovat, ale…", "Skrytá cena:", "Slabé místo:"],
+      "Solution": ["Vyřešíme to tak, že…", "První krok:", "Kdo za to odpovídá?"],
+      "Option": ["Co kdybychom…", "Alternativa:", "Rychlý experiment:"],
+      "Success": ["Vyšlo to, protože…", "Měřitelný výsledek:", "Pokračovat v:"],
+      "Fail": ["Nevyšlo to, protože…", "Poučení:", "Neopakovat:"],
+      "unknown": ["Otevřená otázka:", "Potřebujeme víc info o…", "Nápad:"],
+    },
+    ghostTemplatesTitle: "Začít touto frází",
   },
   attack: {
     intro: "Útok vytvoří skutečný uzel s vaší námitkou, propojený s tímto uzlem šípem zbraně.",
@@ -1172,6 +1195,16 @@ const uk: UiStrings = {
     clickToChangeType: "Натисніть, щоб змінити тип",
     chooseHint: "обрати?",
     ghostAgain: "натисніть ще раз, щоб додати",
+    ghostTemplates: {
+      "Problem": ["Що нас блокує?", "Першопричина:", "Ризик, якщо нічого не робити"],
+      "Problematic option": ["Може спрацювати, але…", "Прихована ціна:", "Слабке місце:"],
+      "Solution": ["Виправимо це так:", "Перший крок:", "Хто відповідає?"],
+      "Option": ["А що, якби…", "Альтернатива:", "Швидкий експеримент:"],
+      "Success": ["Спрацювало, бо…", "Вимірюваний результат:", "Продовжувати:"],
+      "Fail": ["Не вийшло, бо…", "Урок:", "Не повторювати:"],
+      "unknown": ["Відкрите питання:", "Потрібно більше інформації про…", "Ідея:"],
+    },
+    ghostTemplatesTitle: "Почати з цієї фрази",
   },
   attack: {
     intro: "Атака створює справжній вузол із вашим запереченням, з’єднаний з цим вузлом стрілою зброї.",
@@ -1515,6 +1548,16 @@ const ru: UiStrings = {
     clickToChangeType: "Нажмите, чтобы изменить тип",
     chooseHint: "выбрать?",
     ghostAgain: "нажмите ещё раз, чтобы добавить",
+    ghostTemplates: {
+      "Problem": ["Что нас блокирует?", "Первопричина:", "Риск, если ничего не делать"],
+      "Problematic option": ["Может сработать, но…", "Скрытая цена:", "Слабое место:"],
+      "Solution": ["Исправим это так:", "Первый шаг:", "Кто отвечает?"],
+      "Option": ["А что, если…", "Альтернатива:", "Быстрый эксперимент:"],
+      "Success": ["Сработало, потому что…", "Измеримый результат:", "Продолжать:"],
+      "Fail": ["Не вышло, потому что…", "Урок:", "Не повторять:"],
+      "unknown": ["Открытый вопрос:", "Нужно больше информации о…", "Идея:"],
+    },
+    ghostTemplatesTitle: "Начать с этой фразы",
   },
   attack: {
     intro: "Атака создаёт настоящий узел с вашим возражением, связанный с этим узлом стрелой оружия.",
