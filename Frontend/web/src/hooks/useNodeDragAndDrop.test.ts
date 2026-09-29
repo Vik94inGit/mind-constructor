@@ -374,6 +374,26 @@ describe("useNodeDragAndDrop", () => {
       expect(updater(new Set())).toEqual(new Set(["a"]));
       expect(nodesApi.updateNode).not.toHaveBeenCalled();
     });
+
+    it("does not drag on real movement either — moveMode gates touch the same as mouse now", () => {
+      // Regression test: touch used to bypass moveMode entirely, arming a
+      // live single-node drag regardless of its value — only a *held-still*
+      // long-press toggled multi-select instead. Real movement past the
+      // long-press tolerance now has to stay a no-op too when moveMode is
+      // off, same as a bare mouse pointerdown already was.
+      const node = makeNode({ nodeId: "a", x: 100, y: 100 });
+      const listeners = captureWindowListeners();
+      const { result } = setup({ moveMode: false, nodes: [node], posFor: () => ({ x: 100, y: 100 }) });
+
+      act(() =>
+        result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 0, clientY: 0, pointerType: "touch" })),
+      );
+      act(() => listeners.pointermove({ clientX: 100, clientY: 100 }));
+
+      expect(result.current.dragState).toBeNull();
+      act(() => vi.advanceTimersByTime(500));
+      expect(nodesApi.updateNode).not.toHaveBeenCalled();
+    });
   });
 
   describe("group drag", () => {
