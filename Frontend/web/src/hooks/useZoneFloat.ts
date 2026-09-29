@@ -8,24 +8,23 @@ import { hashSeed } from "../utils/canvasLayout";
 // cycle.
 const AMPLITUDE = 40;
 // Roughly how long each leg (toward center, or back home) takes, randomized
-// per zone (seeded off its own rootId, like NodeCard's chaosStyle) — not a
-// hard deadline, just when the target flips; the actual approach is
-// continuous easing (see NORMAL_TAU below), so a short leg just means it
-// reverses before fully arriving, which reads as drifting rather than
-// snapping to two fixed points.
+// per zone (seeded off its own rootId, like NodeCard's chaosStyle).
 const MIN_LEG_S = 1.6;
 const LEG_SPREAD_S = 1.6;
 const HOME_DWELL_S = 0.3;
 const OUT_DWELL_S = 0.5;
-// How quickly the on-screen offset eases toward its current target — an
-// exponential time constant, not a fixed-duration transition (see the doc
-// comment on the hook itself for why this isn't CSS-transition-driven).
-const NORMAL_TAU_S = 0.9;
-// The tau a click forces every away-from-home zone into for a short burst,
-// so the "coming back" leg reads as a deliberate sprint instead of waiting
-// out its own normal, slower approach.
-const BOOST_TAU_S = 0.18;
-const BOOST_HOLD_S = 0.8;
+// The duration a click forces the current leg into, if a zone isn't home
+// already — a deliberate, snappy sprint back rather than its own normal,
+// slower leg.
+const BOOST_DURATION_S = 0.45;
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}
 
 interface FloatingZone {
   rootId: string;
@@ -34,10 +33,10 @@ interface FloatingZone {
 }
 
 interface ZoneRuntime {
-  offset: { x: number; y: number };
+  from: { x: number; y: number };
   target: { x: number; y: number };
-  /** performance.now(), in seconds — when this zone's target next flips (out<->home). */
-  nextFlipAt: number;
+  /** performance.now(), in seconds — when the *current* leg started. Can be in the past (see the mid-cycle seeding below), which is exactly the point. */
+  legStartAt: number;
   legDuration: number;
 }
 
@@ -49,9 +48,26 @@ interface ZoneRuntime {
  * NodeCard's chaosStyle), just for the whole polygon rather than one small
  * icon.
  *
+ * Each leg is a plain parametric ease (easeInOutCubic over t = elapsed /
+ * legDuration, from a fixed start point to a fixed target — a proper
+ * "launch, glide, land" curve with a definite arrival, not an exponential
+ * decay that only ever asymptotically approaches it) — chosen so the motion
+ * reads as one deliberate, smooth flight per leg rather than a jittery
+ * organic wobble.
+ *
+ * A brand new zone doesn't start frozen at home waiting out its own first
+ * leg before ever visibly moving — legStartAt is seeded *in the past* (see
+ * below), so t is already partway to 1 on the very first frame. This is the
+ * same trick NodeCard's own chaosStyle gets for free from a *negative* CSS
+ * animation-delay (see index.css) — without it, a zone whose members are
+ * already visibly drifting via that CSS animation the instant the map
+ * opens would itself sit motionless for up to a couple of seconds first,
+ * reading as "nodes move, zones don't" right when it matters most: the
+ * first thing anyone sees.
+ *
  * One continuous requestAnimationFrame loop (not per-zone setTimeout
  * chains, and not a CSS `@keyframes`/transition) recomputes every zone's
- * offset from its own always-current target every frame and writes it
+ * offset from its own always-current leg every frame and writes it
  * straight to that zone's <polygon> element via `elementsRef`, bypassing
  * React entirely (no state, no re-render) the same way the CSS-keyframe
  * version this replaced never re-rendered either. Doing the easing in JS
@@ -59,8 +75,9 @@ interface ZoneRuntime {
  * a click (`boostTick`) actually speed up a zone that's already mid-flight:
  * a CSS transition's timing is fixed at the moment it starts, so changing
  * `transition-duration` after the fact has no effect on one already
- * running — there's nothing to "reach into". A per-frame value has no such
- * problem; boosting is just a shorter time constant for a little while.
+ * running — there's nothing to "reach into". A parametric value computed
+ * fresh every frame has no such problem; boosting just swaps in a new,
+ * short leg toward home starting from wherever the offset currently is.
  */
 export function useZoneFloat(
   floatingZones: FloatingZone[],
@@ -78,38 +95,36 @@ export function useZoneFloat(
   });
 
   const runtimesRef = useRef(new Map<string, ZoneRuntime>());
-  const boostUntilRef = useRef(0);
   const isFirstBoost = useRef(true);
 
   // A click anywhere on the canvas — see MapPage's own canvas onClick —
-  // forces every zone currently away from home back onto a home target and
-  // switches everyone to the fast tau for a short burst. Zones already home
-  // just keep gently drifting in place; there's nothing to speed up.
+  // forces every zone currently away from home onto a short, fresh leg back
+  // to it, starting from wherever its offset actually is right now. Zones
+  // already home just keep gently drifting in place; there's nothing to
+  // speed up.
   useEffect(() => {
     if (isFirstBoost.current) {
       isFirstBoost.current = false;
       return;
     }
     const now = performance.now() / 1000;
-    boostUntilRef.current = now + BOOST_HOLD_S;
     for (const runtime of runtimesRef.current.values()) {
+      if (runtime.target.x === 0 && runtime.target.y === 0) continue; // already homeward/home
+      const t = Math.min(1, (now - runtime.legStartAt) / runtime.legDuration);
+      const eased = easeInOutCubic(t);
+      runtime.from = { x: lerp(runtime.from.x, runtime.target.x, eased), y: lerp(runtime.from.y, runtime.target.y, eased) };
       runtime.target = { x: 0, y: 0 };
-      runtime.nextFlipAt = now + runtime.legDuration + OUT_DWELL_S;
+      runtime.legDuration = BOOST_DURATION_S;
+      runtime.legStartAt = now;
     }
   }, [boostTick]);
 
   useEffect(() => {
     let raf = 0;
-    let lastTimeMs = performance.now();
 
     function tick(nowMs: number) {
       raf = requestAnimationFrame(tick);
-      const dt = Math.min((nowMs - lastTimeMs) / 1000, 0.1);
-      lastTimeMs = nowMs;
       const now = nowMs / 1000;
-      const boosting = now < boostUntilRef.current;
-      const tau = boosting ? BOOST_TAU_S : NORMAL_TAU_S;
-      const alpha = 1 - Math.exp(-dt / tau);
 
       const runtimes = runtimesRef.current;
       const elements = elementsRef.current;
@@ -129,38 +144,68 @@ export function useZoneFloat(
       for (const zone of liveZones) {
         let runtime = runtimes.get(zone.rootId);
         if (!runtime) {
-          const [rLeg, rDelay] = hashSeed(zone.rootId, 2);
+          const [rLeg, rPhase] = hashSeed(zone.rootId, 2);
           const legDuration = MIN_LEG_S + rLeg * LEG_SPREAD_S;
-          // Desync each zone's own start so they don't all drift in
-          // lockstep — a random initial wait before its first "go out".
-          runtime = { offset: { x: 0, y: 0 }, target: { x: 0, y: 0 }, legDuration, nextFlipAt: now + rDelay * legDuration };
+          // Seeded already partway through its very first leg (see the
+          // hook's own doc comment) — a fraction, not the whole thing, so
+          // it's still visibly *arriving* somewhere rather than starting
+          // mid-teleport.
+          const startFrac = 0.15 + rPhase * 0.55;
+          runtime = {
+            from: { x: 0, y: 0 },
+            target: { x: 0, y: 0 }, // recomputed below, toward center, the instant this first leg is evaluated
+            legDuration,
+            legStartAt: now - startFrac * legDuration,
+          };
           runtimes.set(zone.rootId, runtime);
         }
 
-        if (now >= runtime.nextFlipAt) {
-          const awayFromHome = runtime.target.x !== 0 || runtime.target.y !== 0;
-          if (awayFromHome) {
-            runtime.target = { x: 0, y: 0 };
-            runtime.nextFlipAt = now + runtime.legDuration + HOME_DWELL_S;
+        let t = (now - runtime.legStartAt) / runtime.legDuration;
+        if (t >= 1) {
+          // This leg finished — start the next one (dwell folded in as
+          // "shift legStartAt forward a bit", so a short pause at each end
+          // is just t staying pinned past the dwell window rather than a
+          // separate state).
+          const overshoot = (t - 1) * runtime.legDuration;
+          // True when the leg that just finished was heading *to* home —
+          // i.e. it just arrived home, not out at the far point.
+          const wasHeadingHome = runtime.target.x === 0 && runtime.target.y === 0;
+          const dwell = wasHeadingHome ? HOME_DWELL_S : OUT_DWELL_S;
+          if (overshoot < dwell) {
+            t = 1; // hold at the arrived position for the dwell window
           } else {
-            // Recomputed fresh on every "go out", not just once — a zone
-            // dragged far from where it started still gets a direction that
-            // actually points at the canvas center right now.
-            const dx = center.x - zone.centroid.x;
-            const dy = center.y - zone.centroid.y;
-            const dist = Math.hypot(dx, dy) || 1;
-            runtime.target = { x: (dx / dist) * AMPLITUDE, y: (dy / dist) * AMPLITUDE };
-            runtime.nextFlipAt = now + runtime.legDuration + OUT_DWELL_S;
+            runtime.from = runtime.target;
+            if (wasHeadingHome) {
+              // Just arrived home — dwell, then head out again. Recomputed
+              // fresh here (not just once at creation) — a zone dragged far
+              // from where it started still gets a direction that actually
+              // points at the canvas center right now.
+              const dx = center.x - zone.centroid.x;
+              const dy = center.y - zone.centroid.y;
+              const dist = Math.hypot(dx, dy) || 1;
+              runtime.target = { x: (dx / dist) * AMPLITUDE, y: (dy / dist) * AMPLITUDE };
+            } else {
+              runtime.target = { x: 0, y: 0 };
+            }
+            runtime.legStartAt = now - (overshoot - dwell);
+            t = Math.min(1, (overshoot - dwell) / runtime.legDuration);
           }
         }
+        // First-ever leg: target is still {0,0}==from, so nothing to head
+        // toward yet — point it at the center right away instead of
+        // waiting for a full arrived-then-flip cycle.
+        if (runtime.target.x === 0 && runtime.target.y === 0 && runtime.from.x === 0 && runtime.from.y === 0) {
+          const dx = center.x - zone.centroid.x;
+          const dy = center.y - zone.centroid.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          runtime.target = { x: (dx / dist) * AMPLITUDE, y: (dy / dist) * AMPLITUDE };
+        }
 
-        runtime.offset = {
-          x: runtime.offset.x + (runtime.target.x - runtime.offset.x) * alpha,
-          y: runtime.offset.y + (runtime.target.y - runtime.offset.y) * alpha,
-        };
+        const eased = easeInOutCubic(Math.max(0, Math.min(1, t)));
+        const offset = { x: lerp(runtime.from.x, runtime.target.x, eased), y: lerp(runtime.from.y, runtime.target.y, eased) };
 
         const el = elements.get(zone.rootId);
-        if (el) el.style.transform = `translate(${runtime.offset.x.toFixed(2)}px, ${runtime.offset.y.toFixed(2)}px)`;
+        if (el) el.style.transform = `translate(${offset.x.toFixed(2)}px, ${offset.y.toFixed(2)}px)`;
       }
     }
 

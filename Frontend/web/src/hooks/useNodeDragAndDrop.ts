@@ -301,22 +301,20 @@ export function useNodeDragAndDrop({
       return;
     }
 
-    // Mouse only: outside explicit move mode, a bare pointer-down on a
-    // single node never arms a reposition/reparent drag — a plain click
-    // falls straight through to NodeCard's own onClick, untouched. Touch no
-    // longer needs the Move toggle at all (see the branch below skipping
-    // this gate for it) — its own long-press-vs-drag disambiguation
-    // (LONG_PRESS_MOVE_TOLERANCE, further down) is what protects against a
-    // stray swipe-while-tapping instead: holding still still toggles
-    // multi-select, only real movement past that tolerance now starts a
-    // drag, so an accidental few px of touch imprecision still can't
-    // relocate a node the way a bare, ungated pointerdown could have.
-    // node.locked still blocks dragging outright, on both input types — a
-    // chosen circle's own members hold their position for good (see the
-    // group-drag branch's own comment above); touch long-press-to-
-    // multiselect still works on one, since picking a locked node into some
-    // other selection doesn't move anything.
-    if ((!moveMode && e.pointerType !== "touch") || node.locked) {
+    // Outside explicit move mode, a bare pointer-down on a single node never
+    // arms a reposition/reparent drag, on either input type — a plain
+    // click/tap falls straight through to NodeCard's own onClick, untouched.
+    // This does NOT apply to the multi-select group drag above, which stays
+    // reachable on touch regardless of moveMode (see its own doc comment) —
+    // dragging an existing selection around is a deliberate, already-
+    // disambiguated-by-multi-select gesture, unlike a bare single-node
+    // pointerdown, which reads as accidental relocation far too easily on
+    // any stray touch. node.locked still blocks dragging outright, on both
+    // input types — a chosen circle's own members hold their position for
+    // good (see the group-drag branch's own comment above); touch long-
+    // press-to-multiselect still works on one, since picking a locked node
+    // into some other selection doesn't move anything.
+    if (!moveMode || node.locked) {
       if (e.pointerType !== "touch") return;
       const touchStartX = e.clientX;
       const touchStartY = e.clientY;
