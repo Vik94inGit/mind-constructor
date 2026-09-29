@@ -43,6 +43,7 @@ import { useCanvasFraming } from "../hooks/useCanvasFraming";
 import { useClipboardActions } from "../hooks/useClipboardActions";
 import { useLineDrawing } from "../hooks/useLineDrawing";
 import { useNodeDragAndDrop } from "../hooks/useNodeDragAndDrop";
+import { useMapReveal } from "../hooks/useMapReveal";
 import { sleep } from "../utils/sleep";
 import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
@@ -120,11 +121,10 @@ export function MapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Bumped on every click on empty canvas — passed down to CanvasBackdrop,
-  // which hands it to useZoneFloat so a click can sprint every currently-
-  // drifting zone back to its real position instead of waiting out its own
-  // normal, slower leg. See useZoneFloat's own doc comment.
-  const [zoneFloatBoostTick, setZoneFloatBoostTick] = useState(0);
+  // Bumped on every click on empty canvas — handed to useMapReveal so a
+  // click can skip the rest of the map-open reveal (see its own doc
+  // comment) instead of waiting it out.
+  const [mapRevealSkipTick, setMapRevealSkipTick] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
@@ -301,6 +301,22 @@ export function MapPage() {
   // zooming viewport onto the canvas — all derived before anything below
   // reads them.
   const positions = useMemo(() => computeBasePositions(nodes), [nodes]);
+  // Filters packed-away members out of every canvas rendering loop. Packing
+  // (packAbl.ts) still exists as a relationship regardless — a container's
+  // own count badge, and its "Packed (N)" unpack list in NodePanel, both
+  // still work off Node.packedIntoNodeId either way — but a packed member
+  // itself is hidden from the canvas. NodePanel still receives plain
+  // `nodes` (not this), since it has to show a packed member in its
+  // container's own unpack list even though the canvas itself doesn't
+  // render it.
+  const visibleNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
+  // The map-open reveal (see useMapReveal's own doc comment) — declared
+  // here, ahead of posFor below, specifically so posFor can fold its
+  // offsets into the position it hands every node/zone/edge on the canvas.
+  // Zones/edges never get an animation of their own: they're drawn
+  // straight off posFor elsewhere in this file, so this is the only place
+  // any of this actually has to be wired in.
+  const mapReveal = useMapReveal(visibleNodes, positions, CANVAS_W, CANVAS_H, mapRevealSkipTick);
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
   // NodePanel/PackPickerPanel's bottom sheet physically covers the bottom
   // third (half on mobile) of the screen while it's open. Skipped for the
@@ -620,7 +636,15 @@ export function MapPage() {
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
     const swapped = majoritySwapState?.get(node.nodeId);
     if (swapped) return swapped;
-    const own = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const base = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    // The map-open reveal (see useMapReveal) — folded in right here, ahead
+    // of every other blend below, so a node/zone/edge mid-reveal is what
+    // every one of those blends itself starts from instead of the two
+    // layering independently. Live drag/group-drag/majority-swap above all
+    // return early before ever reaching this, so an actual in-progress
+    // gesture is never fought over with the reveal.
+    const reveal = mapReveal.offsetFor(node.nodeId);
+    const own = reveal ? { x: base.x + reveal.x, y: base.y + reveal.y } : base;
     // Presentation mode's own org-chart blend — checked ahead of the radial
     // selection ring below since the two are mutually exclusive in practice
     // (there's no NodePanel/selection to ring neighbors around while
@@ -649,16 +673,6 @@ export function MapPage() {
       .map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
   }
 
-
-  // Filters packed-away members out of every canvas rendering loop. Packing
-  // (packAbl.ts) still exists as a relationship regardless — a container's
-  // own count badge, and its "Packed (N)" unpack list in NodePanel, both
-  // still work off Node.packedIntoNodeId either way — but a packed member
-  // itself is hidden from the canvas. NodePanel still receives plain
-  // `nodes` (not this), since it has to show a packed member in its
-  // container's own unpack list even though the canvas itself doesn't
-  // render it.
-  const visibleNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
 
   // Presentation mode's own slide order and org-chart target positions —
   // see computeSlideOrder/computeGeometrizedPositions (utils/presentation.ts)
@@ -2101,8 +2115,8 @@ export function MapPage() {
                 return;
               }
               // Any real click on empty canvas, regardless of mode below —
-              // see zoneFloatBoostTick's own doc comment.
-              setZoneFloatBoostTick((n) => n + 1);
+              // see mapRevealSkipTick's own doc comment.
+              setMapRevealSkipTick((n) => n + 1);
               // Drawing a line: a click places a point (if the spot is free).
               if (drawMode) {
                 addDrawPoint(screenToCanvas(e.clientX, e.clientY));
@@ -2150,7 +2164,6 @@ export function MapPage() {
               onLineClick={handleLineClick}
               interactive={!drawMode}
               compact={compactView}
-              zoneFloatBoostTick={zoneFloatBoostTick}
               drawing={
                 drawMode
                   ? {

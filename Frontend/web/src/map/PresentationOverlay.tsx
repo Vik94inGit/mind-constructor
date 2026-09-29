@@ -37,7 +37,15 @@ export function PresentationOverlay({ slides, index, onIndexChange, onExit }: Pr
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-8 py-6 text-center">
+      {/* min-h-0: without it, a flex child defaults to min-height: auto,
+          which refuses to shrink below its own content's natural height —
+          so overflow-y-auto here never actually kicks in for a long node
+          text, and the header/nav rows above/below (fixed-size flex items
+          in the same column) get pushed past the viewport instead, with
+          nothing to scroll them back into view. Classic flexbox scrolling
+          gotcha, not a text-wrapping issue — neither text element below has
+          any truncate/line-clamp/overflow-hidden of its own. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-8 py-6 text-center">
         {/* The node's own type icon, large — a slide used to be text-only
             (type name + headline), which read as flat compared to the
             crowned, colored icons the same node wears on the canvas. */}
