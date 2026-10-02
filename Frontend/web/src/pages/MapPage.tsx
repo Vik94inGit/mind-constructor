@@ -33,6 +33,8 @@ import { loadCardFills, saveCardFills } from "../utils/cardFill";
 import type { CardFills } from "../utils/cardFill";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
 import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
+import { loadZoneDisplay, saveZoneDisplay, zoneModeByNode } from "../utils/zoneDisplay";
+import type { ZoneDisplay, ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
 import { MapToolbar } from "../map/MapToolbar";
@@ -176,12 +178,16 @@ export function MapPage() {
   function setReadingMode(mode: ReadingMode) {
     setReadingModeState(mode);
     saveReadingMode(mode);
-    if (mode !== "actual") fitZoomForDisplay(nodeDisplay, mode);
+    if (mode !== "actual") fitZoomForDisplay(effectiveDisplay(), mode);
   }
   // Nodes shown in their own reading mode instead of the map's (a chosen group
   // as puzzle cards, say) — per browser and per map, see
   // utils/nodeDisplay.ts.
   const [nodeDisplay, setNodeDisplay] = useState<NodeDisplay>(() => loadNodeDisplay(mapId));
+  // Each zone's own view, so one canvas shows several sides of the map at
+  // once — see utils/zoneDisplay.ts. Below a node's own display (the group
+  // bar's "Show as"), above the map-wide reading mode.
+  const [zoneDisplay, setZoneDisplay] = useState<ZoneDisplay>(() => loadZoneDisplay(mapId));
   // The viewer's own fill per puzzle piece — see utils/cardFill.ts.
   const [cardFills, setCardFills] = useState<CardFills>(() => loadCardFills(mapId));
   function setCardFill(nodeId: string, color: string | null) {
@@ -826,6 +832,44 @@ export function MapPage() {
     [visibleNodes, positions],
   );
 
+  // How each node is drawn: its own display if it has one, else its zone's
+  // view, else the map's reading mode. A zone shown as dots draws its nodes
+  // as dots (and reads as the default look underneath, for everything that
+  // sizes or captions a node).
+  const zoneModes = useMemo(() => zoneModeByNode(nodeGroups, zoneDisplay), [nodeGroups, zoneDisplay]);
+  function modeOf(nodeId: string): ReadingMode {
+    const own = nodeDisplay[nodeId];
+    if (own) return own;
+    const zone = zoneModes.get(nodeId);
+    if (zone) return zone === "dots" ? "actual" : zone;
+    return readingMode;
+  }
+  function dottedByZone(nodeId: string): boolean {
+    return !nodeDisplay[nodeId] && zoneModes.get(nodeId) === "dots";
+  }
+  // Every node whose look differs from the map-wide mode, for the "zoom in
+  // to make room" check (fitZoomForDisplay), which reads a NodeDisplay.
+  function effectiveDisplay(zones: Map<string, ZoneMode> = zoneModes): NodeDisplay {
+    const out: NodeDisplay = {};
+    for (const [id, zone] of zones) out[id] = zone === "dots" ? "actual" : zone;
+    return { ...out, ...nodeDisplay };
+  }
+  function setZoneMode(rootId: string, mode: ZoneMode | null) {
+    const next = { ...zoneDisplay };
+    if (mode) next[rootId] = mode;
+    else delete next[rootId];
+    setZoneDisplay(next);
+    saveZoneDisplay(mapId, next);
+    const group = nodeGroups.find((g) => g.rootId === rootId);
+    if (mode && mode !== "actual" && mode !== "dots") {
+      fitZoomForDisplay(
+        effectiveDisplay(zoneModeByNode(nodeGroups, next)),
+        readingMode,
+        group ? { x: group.cx, y: group.cy } : undefined,
+      );
+    }
+  }
+
   // Puzzle pieces interlock along the map's links — see utils/puzzleLinks.ts.
   const puzzleJoins = useMemo(
     () => computePuzzleJoins(visibleNodes, edges, positions),
@@ -935,11 +979,11 @@ export function MapPage() {
   // backfill above already covers.
   useEffect(() => {
     const ids = visibleNodes
-      .filter((n) => !["actual", "mixed"].includes(nodeDisplay[n.nodeId] ?? readingMode))
+      .filter((n) => !["actual", "mixed"].includes(modeOf(n.nodeId)))
       .map((n) => n.nodeId);
     if (ids.length > 0) ensureNodeText(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readingMode, nodeDisplay, visibleNodes]);
+  }, [readingMode, nodeDisplay, zoneModes, visibleNodes]);
 
   // Every circle member's sentiment, keyed by node id — what NodeCard reads
   // to decide its dashed outline and whether it's eligible to chaotic-drift
@@ -1010,7 +1054,7 @@ export function MapPage() {
   // on its own, fighting the gesture that caused it.
   useEffect(() => {
     if (loading) return;
-    fitZoomForDisplay(nodeDisplay, readingMode);
+    fitZoomForDisplay(effectiveDisplay(), readingMode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
@@ -2146,7 +2190,7 @@ export function MapPage() {
       return {
         pos: posFor(n),
         sizeMultiplier: nodeSizeMultiplier(n, isCircleParent, compactView),
-        lines: (nodeDisplay[n.nodeId] ?? readingMode) === "iconText" ? 4 : 2,
+        lines: modeOf(n.nodeId) === "iconText" ? 4 : 2,
         namedZone: isCircleParent && !!n.zoneName && !compactView,
       };
     };
@@ -2155,7 +2199,8 @@ export function MapPage() {
     const shownParents = visibleNodes.filter(
       (n) =>
         parentIds.has(n.nodeId) &&
-        !["puzzle", "mixed"].includes(nodeDisplay[n.nodeId] ?? readingMode) &&
+        !["puzzle", "mixed"].includes(modeOf(n.nodeId)) &&
+        !dottedByZone(n.nodeId) &&
         selectedId !== n.nodeId &&
         inlineEditId !== n.nodeId,
     );
@@ -2427,7 +2472,7 @@ export function MapPage() {
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
-                  readingMode={nodeDisplay[node.nodeId] ?? readingMode}
+                  readingMode={modeOf(node.nodeId)}
                   compact={compactView}
                   hiddenBranch={hiddenBranchIds.has(node.nodeId)}
                   discussionMode={isDiscussionMode}
@@ -2469,7 +2514,7 @@ export function MapPage() {
                   onContextMenu={(e) => handleNodeContextMenu(node, e)}
                   puzzleJoins={puzzleJoins.get(node.nodeId)}
                   cardFill={cardFills[node.nodeId]}
-                  dotted={zoom <= DOT_ZOOM}
+                  dotted={zoom <= DOT_ZOOM || dottedByZone(node.nodeId)}
                   onConnectStart={
                     isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
                   }
@@ -2630,6 +2675,8 @@ export function MapPage() {
                 vScrollMargin={vScrollMargin}
                 // Centers the view on the whole zone (zooming out only if it
                 // doesn't fit), without selecting anything.
+                modes={zoneDisplay}
+                onSetMode={setZoneMode}
                 onGo={(rootId) => {
                   const group = nodeGroups.find((g) => g.rootId === rootId);
                   if (!group) return;
@@ -2752,7 +2799,7 @@ export function MapPage() {
               <NodePanel
                 node={selectedNode}
                 cardFill={(() => {
-                  const mode = nodeDisplay[selectedNode.nodeId] ?? readingMode;
+                  const mode = modeOf(selectedNode.nodeId);
                   const isCard =
                     mode === "puzzle" || (mode === "mixed" && circleRootSentimentByNode.has(selectedNode.nodeId));
                   return isCard
