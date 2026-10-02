@@ -157,6 +157,8 @@ interface Props {
   cardFill?: string;
   /** Zoomed far out (MapPage's DOT_ZOOM): drawn as a small dot in its type's color, nothing else. */
   dotted?: boolean;
+  /** Puzzle cards only: dragging out of one of this piece's tabs starts a connection to another piece (MapPage's startPuzzleConnect). Unset when this viewer can't link from this node. */
+  onConnectStart?: (e: ReactPointerEvent) => void;
 }
 
 export const NodeCard = memo(function NodeCard({
@@ -196,6 +198,7 @@ export const NodeCard = memo(function NodeCard({
   puzzleJoins,
   cardFill,
   dotted = false,
+  onConnectStart,
 }: Props) {
   const { t } = useI18n();
   const particlesRef = useRef<HTMLDivElement | null>(null);
@@ -754,6 +757,8 @@ export const NodeCard = memo(function NodeCard({
             color={circleBorderColor}
             joins={puzzleJoins}
             fill={cardFill}
+            onConnectStart={onConnectStart}
+            connectHint={t.ui.link.dragToConnect}
             minWidth={96}
             maxWidth={selected ? PUZZLE_SELECTED_MAX_WIDTH : PUZZLE_MAX_WIDTH}
             halo={

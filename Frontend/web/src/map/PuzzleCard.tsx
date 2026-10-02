@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import type { PuzzleJoins } from "../utils/puzzleLinks";
 
 // The puzzle-card reading mode (see utils/readingMode.ts): a node drawn as a
@@ -124,12 +124,27 @@ export interface PuzzleCardProps {
   joins?: PuzzleJoins;
   /** The viewer's own fill for this piece (see utils/cardFill.ts); the theme's node fill when unset. */
   fill?: string;
+  /** Makes every tab a handle: pressing one starts dragging a connection out of this piece (see MapPage's startPuzzleConnect). */
+  onConnectStart?: (e: ReactPointerEvent) => void;
+  /** The handles' tooltip. */
+  connectHint?: string;
   minWidth: number;
   maxWidth: number;
   children: ReactNode;
 }
 
-export function PuzzleCard({ seed, color, halo, joins, fill, minWidth, maxWidth, children }: PuzzleCardProps) {
+export function PuzzleCard({
+  seed,
+  color,
+  halo,
+  joins,
+  fill,
+  onConnectStart,
+  connectHint,
+  minWidth,
+  maxWidth,
+  children,
+}: PuzzleCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   // A sensible first guess so the very first paint already has a piece
   // around it; the observer corrects it straight away.
@@ -214,6 +229,39 @@ export function PuzzleCard({ seed, color, halo, joins, fill, minWidth, maxWidth,
           ),
         )}
       </svg>
+      {/* Connection handles: one on each tab's head. Dragging one onto
+          another piece links the two (MapPage opens the link dialog). */}
+      {onConnectStart &&
+        edges.map((cut, side) => {
+          const r = Math.min(6, size.w / 4, size.h / 4);
+          const len = (side % 2 === 0 ? size.w : size.h) - 2 * r;
+          if (cut !== 1 || len < 26) return null;
+          const reach = PUZZLE_TAB * 0.58; // the head's center, past the edge
+          const at = [
+            { left: size.w / 2, top: -reach },
+            { left: size.w + reach, top: size.h / 2 },
+            { left: size.w / 2, top: size.h + reach },
+            { left: -reach, top: size.h / 2 },
+          ][side];
+          return (
+            <div
+              key={side}
+              role="button"
+              aria-label={connectHint}
+              title={connectHint}
+              data-puzzle-handle
+              className="pointer-events-auto absolute z-[2] h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 cursor-crosshair touch-none rounded-full transition-[box-shadow] duration-150 hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_45%,transparent)]"
+              style={at}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onConnectStart(e);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+            />
+          );
+        })}
       {joins?.complete && (
         <div
           className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full text-[0.6rem] leading-none font-bold text-white"

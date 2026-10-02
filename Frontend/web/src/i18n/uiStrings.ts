@@ -76,6 +76,7 @@ export interface UiStrings {
   };
   link: {
     titleTwo: string;
+    dragToConnect: string;
     titleN: (count: number) => string;
     sentiment: string;
     linking: string;
@@ -422,6 +423,7 @@ const en: UiStrings = {
   },
   link: {
     titleTwo: "Link nodes",
+    dragToConnect: "Drag onto another of your pieces to connect",
     titleN: (n) => `Link ${n} nodes`,
     sentiment: "Sentiment",
     linking: "Linking…",
@@ -777,6 +779,7 @@ const cs: UiStrings = {
   },
   link: {
     titleTwo: "Propojit uzly",
+    dragToConnect: "Přetáhněte na jiný svůj dílek a propojte je",
     titleN: (n) => `Propojit ${csNodes(n)}`,
     sentiment: "Zabarvení",
     linking: "Propojování…",
@@ -1132,6 +1135,7 @@ const uk: UiStrings = {
   },
   link: {
     titleTwo: "З’єднати вузли",
+    dragToConnect: "Перетягніть на інший свій пазл, щоб з’єднати",
     titleN: (n) => `З’єднати ${ukNodes(n)}`,
     sentiment: "Забарвлення",
     linking: "З’єднання…",
@@ -1487,6 +1491,7 @@ const ru: UiStrings = {
   },
   link: {
     titleTwo: "Связать узлы",
+    dragToConnect: "Перетащите на другой свой пазл, чтобы соединить",
     titleN: (n) => `Связать ${ruNodes(n)}`,
     sentiment: "Окраска",
     linking: "Связывание…",

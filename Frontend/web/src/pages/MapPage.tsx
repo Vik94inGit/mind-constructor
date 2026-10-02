@@ -1137,6 +1137,65 @@ export function MapPage() {
     return idOf(node.userId) === user?._id;
   }
 
+  // Connecting puzzle pieces: dragging out of a piece's tab (see PuzzleCard's
+  // handles) draws a line to the pointer; letting go over another of your
+  // own pieces opens the link dialog for the two, like the group bar's Link.
+  // A link needs both ends to be yours (Backend's createEdgeAbl), and a pair
+  // that's already linked can't be linked again.
+  const [puzzleConnect, setPuzzleConnect] = useState<{
+    fromId: string;
+    to: { x: number; y: number };
+    overId: string | null;
+    valid: boolean;
+  } | null>(null);
+  function nodeIdAt(clientX: number, clientY: number): string | null {
+    const el = document.elementFromPoint(clientX, clientY);
+    return el?.closest("[data-reveal-node]")?.getAttribute("data-reveal-node") ?? null;
+  }
+  function canConnect(from: NodeDoc, to: NodeDoc | undefined): to is NodeDoc {
+    if (!to || to.nodeId === from.nodeId || !isOwnNode(to)) return false;
+    return !edges.some((e) => {
+      const a = nodeRefId(e.fromNodeId);
+      const b = nodeRefId(e.toNodeId);
+      return (a === from.nodeId && b === to.nodeId) || (a === to.nodeId && b === from.nodeId);
+    });
+  }
+  function startPuzzleConnect(from: NodeDoc, e: ReactPointerEvent) {
+    setContextMenu(null);
+    const track = (clientX: number, clientY: number) => {
+      const id = nodeIdAt(clientX, clientY);
+      const overId = id && id !== from.nodeId ? id : null;
+      setPuzzleConnect({
+        fromId: from.nodeId,
+        to: screenToCanvas(clientX, clientY),
+        overId,
+        valid: !!overId && canConnect(from, nodes.find((n) => n.nodeId === overId)),
+      });
+    };
+    const onMove = (ev: PointerEvent) => track(ev.clientX, ev.clientY);
+    const finish = (ev: PointerEvent, drop: boolean) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      setPuzzleConnect(null);
+      // The release lands on whatever is under the pointer, which would
+      // otherwise read as a click there (selecting a node, or closing the
+      // panel on bare canvas).
+      const swallow = (ce: MouseEvent) => ce.stopPropagation();
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+      if (!drop) return;
+      const to = nodes.find((n) => n.nodeId === nodeIdAt(ev.clientX, ev.clientY));
+      if (canConnect(from, to)) setPendingLink([from, to]);
+    };
+    const onUp = (ev: PointerEvent) => finish(ev, true);
+    const onCancel = (ev: PointerEvent) => finish(ev, false);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    track(e.clientX, e.clientY);
+  }
+
   // Owner-only — text/type editing isn't otherwise restricted (an earlier
   // version locked it once a node had taken any damage, but that blocked
   // ordinary corrections too aggressively; see NodePanel.tsx's own canEdit).
@@ -2288,6 +2347,37 @@ export function MapPage() {
               }
             />
 
+            {/* The connection being dragged out of a puzzle piece's tab. */}
+            {puzzleConnect &&
+              (() => {
+                const fromNode = visibleNodes.find((n) => n.nodeId === puzzleConnect.fromId);
+                if (!fromNode) return null;
+                const from = posFor(fromNode);
+                const color = puzzleConnect.overId
+                  ? puzzleConnect.valid
+                    ? "var(--success)"
+                    : "var(--danger)"
+                  : "var(--accent)";
+                return (
+                  <svg
+                    className="pointer-events-none absolute inset-0 z-[40] h-full w-full"
+                    viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+                  >
+                    <line
+                      x1={from.x}
+                      y1={from.y}
+                      x2={puzzleConnect.to.x}
+                      y2={puzzleConnect.to.y}
+                      stroke={color}
+                      strokeWidth={3 / zoom}
+                      strokeDasharray={`${8 / zoom} ${6 / zoom}`}
+                      strokeLinecap="round"
+                    />
+                    <circle cx={puzzleConnect.to.x} cy={puzzleConnect.to.y} r={6 / zoom} fill={color} />
+                  </svg>
+                );
+              })()}
+
             {visibleNodes.map((node) => {
               const pos = posFor(node);
               const editingThis = inlineEditId === node.nodeId;
@@ -2353,7 +2443,17 @@ export function MapPage() {
                   isParent={parentIds.has(node.nodeId)}
                   quiet={childIsQuiet(node) || (zoneMutedIds.has(node.nodeId) && selectedId !== node.nodeId)}
                   hideCaption={hiddenChildCaptions.has(node.nodeId) && inlineEditId !== node.nodeId}
-                  dropHighlight={dropTarget?.nodeId === node.nodeId ? (dropTarget.valid ? "valid" : "invalid") : undefined}
+                  dropHighlight={
+                    puzzleConnect?.overId === node.nodeId
+                      ? puzzleConnect.valid
+                        ? "valid"
+                        : "invalid"
+                      : dropTarget?.nodeId === node.nodeId
+                        ? dropTarget.valid
+                          ? "valid"
+                          : "invalid"
+                        : undefined
+                  }
                   inlineEditing={editingThis}
                   onInlineConfirm={(text, type) => confirmInlineEdit(node, text, type)}
                   onInlineCancel={() => setInlineEditId(null)}
@@ -2370,6 +2470,9 @@ export function MapPage() {
                   puzzleJoins={puzzleJoins.get(node.nodeId)}
                   cardFill={cardFills[node.nodeId]}
                   dotted={zoom <= DOT_ZOOM}
+                  onConnectStart={
+                    isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
+                  }
                 />
               );
             })}
