@@ -159,6 +159,10 @@ interface Props {
   dotted?: boolean;
   /** Puzzle cards only: dragging out of one of this piece's tabs starts a connection to another piece (MapPage's startPuzzleConnect). Unset when this viewer can't link from this node. */
   onConnectStart?: (e: ReactPointerEvent) => void;
+  /** Puzzle cards only: locked by its owner (utils/blockLock.ts). */
+  blockLocked?: boolean;
+  /** Puzzle cards only: locks/unlocks this block. Unset when it isn't this viewer's to lock. */
+  onToggleBlockLock?: () => void;
 }
 
 export const NodeCard = memo(function NodeCard({
@@ -199,6 +203,8 @@ export const NodeCard = memo(function NodeCard({
   cardFill,
   dotted = false,
   onConnectStart,
+  blockLocked = false,
+  onToggleBlockLock,
 }: Props) {
   const { t } = useI18n();
   const particlesRef = useRef<HTMLDivElement | null>(null);
@@ -644,10 +650,11 @@ export const NodeCard = memo(function NodeCard({
           title) never looked centered in its own zone. With only the icon
           in flow, x/y is the icon's center for every node, always. */}
       <div className="relative flex w-full flex-col items-center" style={inverseScaleStyle}>
-      {dotted && !selected && !inlineEditing ? (
+      {dotted && !inlineEditing ? (
         // Zoomed far out: just a point in the node's type color — at that
         // distance icons, cards and badges are only noise, and the dots
         // still show where everything is and what kind it is.
+        // The selected node too, ringed by its selection outline.
         <div
           className="pointer-events-auto h-3 w-3 rounded-full border border-surface"
           style={{ background: circleBorderColor, outline: ringStyle.outline, outlineOffset: 2 }}
@@ -761,6 +768,15 @@ export const NodeCard = memo(function NodeCard({
             fill={cardFill}
             onConnectStart={onConnectStart}
             connectHint={t.ui.link.dragToConnect}
+            locked={blockLocked}
+            onToggleLock={onToggleBlockLock}
+            lockLabel={
+              onToggleBlockLock
+                ? blockLocked
+                  ? t.ui.display.unlockBlock
+                  : t.ui.display.lockBlock
+                : t.ui.display.blockLocked
+            }
             minWidth={96}
             maxWidth={selected ? PUZZLE_SELECTED_MAX_WIDTH : PUZZLE_MAX_WIDTH}
             halo={

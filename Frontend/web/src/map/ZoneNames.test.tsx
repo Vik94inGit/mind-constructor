@@ -19,6 +19,7 @@ vi.stubGlobal(
 const zones: NamedZone[] = [
   { rootId: "near", name: "Near zone", sentiment: "positive", variant: false },
   { rootId: "far", name: "Far zone", sentiment: "negative", variant: true },
+  { rootId: "also", name: "Also near", sentiment: "negative", variant: true },
 ];
 
 function renderNames(onGo = vi.fn(), onSetMode?: (rootId: string, mode: string | null) => void) {
@@ -32,6 +33,7 @@ function renderNames(onGo = vi.fn(), onSetMode?: (rootId: string, mode: string |
         new Map([
           ["near", { x: -10, y: -10 }],
           ["far", { x: 2000, y: 1400 }],
+          ["also", { x: -10, y: -10 }],
         ])
       }
       zoom={1}
@@ -47,16 +49,17 @@ function renderNames(onGo = vi.fn(), onSetMode?: (rootId: string, mode: string |
 }
 
 describe("ZoneNames", () => {
-  it("lists every zone, fading the ones whose parent is off screen", () => {
+  it("lists only the zones whose parent is on screen", () => {
     renderNames();
-    expect(screen.getByRole("button", { name: "Near zone" }).className).not.toContain("opacity-60");
-    expect(screen.getByRole("button", { name: "Far zone" }).className).toContain("opacity-60");
+    expect(screen.getByRole("button", { name: "Near zone" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Also near" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Far zone" })).toBeNull();
   });
 
   it("asks to center on the zone when its name is clicked", async () => {
     const onGo = renderNames();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Far zone" }));
-    expect(onGo).toHaveBeenCalledWith("far");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Also near" }));
+    expect(onGo).toHaveBeenCalledWith("also");
   });
 
   it("lets each zone pick its own view", async () => {
@@ -65,8 +68,8 @@ describe("ZoneNames", () => {
     const user = userEvent.setup();
     // The zone with a view shows it on its button; picking one reports it.
     expect(screen.getByRole("button", { name: /Near zone.$/ }).textContent).toBe("•••");
-    await user.click(screen.getByRole("button", { name: /Far zone.$/ }));
+    await user.click(screen.getByRole("button", { name: /Also near.$/ }));
     await user.click(screen.getByRole("menuitemradio", { name: /Puzzle cards/ }));
-    expect(onSetMode).toHaveBeenCalledWith("far", "puzzle");
+    expect(onSetMode).toHaveBeenCalledWith("also", "puzzle");
   });
 });

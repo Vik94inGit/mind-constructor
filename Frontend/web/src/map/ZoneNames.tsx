@@ -39,10 +39,11 @@ const MODE_GLYPH: Record<ZoneMode, string> = {
   dots: "•••",
 };
 
-// Every zone's name, listed in the map's bottom-left corner as links: a click
-// centers the view on that zone. Zones whose parent is on screen right now
-// are drawn at full strength, the rest a little faded. Easier to read than
-// names squeezed onto the minimap.
+// The names of the zones in view (their parent on screen right now), listed
+// as links in a compact column just left of the minimap and no taller than
+// it: a click centers the view on that zone. Zones out of view aren't listed
+// — the minimap still shows where they are. Easier to read than names
+// squeezed onto the minimap itself.
 export function ZoneNames({
   wrapRef,
   zones,
@@ -108,7 +109,8 @@ export function ZoneNames({
     const p = positions.get(z.rootId);
     return !!p && p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
   };
-  if (zones.length === 0) return null;
+  const inView = zones.filter(onScreen);
+  if (inView.length === 0) return null;
 
   return (
     // Fixed cap, not a viewport percentage — names arriving here are already
@@ -119,14 +121,18 @@ export function ZoneNames({
     // capped text doesn't quite fit.
     // Scrolls on its own once there are more zones than fit (max-h), rather
     // than climbing up over the canvas.
-    <div className="pointer-events-none absolute bottom-3 left-3 z-[45] flex max-h-[40vh] max-w-[13.5rem] flex-col gap-1 overflow-y-auto">
-      {zones.map((z) => (
-        <div key={z.rootId} className="flex max-w-full items-center gap-1 self-start">
+    // right: the minimap's own right-3 (0.75rem) plus its 182px (180px +
+    // border), plus a small gap; max-h: the minimap's 122px height, so the
+    // two read as one row. Bottom-aligned (justify-end) like the minimap.
+    <div
+      className="pointer-events-none absolute right-[calc(0.75rem+182px+0.4rem)] bottom-3 z-[45] flex max-h-[122px] max-w-[min(12rem,calc(100vw-0.75rem-182px-1.2rem))] flex-col items-end justify-end gap-[0.2rem] overflow-y-auto"
+      aria-label={t.ui.display.zonesInView}
+    >
+      {inView.map((z) => (
+        <div key={z.rootId} className="flex max-w-full shrink-0 items-center gap-[0.2rem]">
         <button
           type="button"
-          className={`pointer-events-auto flex min-w-0 cursor-pointer items-center gap-[0.35rem] self-start rounded-md border border-line bg-surface px-[0.5rem] py-[0.2rem] text-left text-[0.75rem] font-semibold text-ink shadow-card transition-opacity duration-150 hover:underline hover:opacity-100 focus-visible:opacity-100 ${
-            onScreen(z) ? "" : "opacity-60"
-          }`}
+          className={`pointer-events-auto flex min-w-0 cursor-pointer items-center gap-[0.3rem] rounded-md border border-line bg-surface px-[0.4rem] py-[0.1rem] text-left text-[0.68rem] font-semibold text-ink shadow-card hover:underline`}
           onClick={(e) => {
             e.stopPropagation();
             onGo(z.rootId);
@@ -134,7 +140,7 @@ export function ZoneNames({
           onPointerDown={(e) => e.stopPropagation()}
         >
           <span aria-hidden style={{ color: ZONE_COLORS[z.sentiment] }}>
-            {z.variant ? <KnightHelmet size={16} sentiment={z.sentiment} /> : "👑"}
+            {z.variant ? <KnightHelmet size={13} sentiment={z.sentiment} /> : "👑"}
           </span>
           <span className="truncate" style={{ color: ZONE_COLORS[z.sentiment] }}>
             {z.name}
@@ -144,7 +150,7 @@ export function ZoneNames({
           // This zone's own view — see utils/zoneDisplay.ts.
           <button
             type="button"
-            className={`pointer-events-auto flex h-[1.55rem] min-w-[1.7rem] cursor-pointer items-center justify-center rounded-md border px-1 text-[0.7rem] leading-none font-semibold shadow-card hover:bg-surface-2 ${
+            className={`pointer-events-auto flex h-[1.3rem] min-w-[1.5rem] shrink-0 cursor-pointer items-center justify-center rounded-md border px-1 text-[0.62rem] leading-none font-semibold shadow-card hover:bg-surface-2 ${
               modes[z.rootId] ? "border-accent bg-surface text-accent" : "border-line bg-surface text-ink-soft"
             }`}
             title={t.ui.display.zoneView(z.name)}
@@ -156,7 +162,11 @@ export function ZoneNames({
               e.stopPropagation();
               const r = e.currentTarget.getBoundingClientRect();
               setMenu((cur) =>
-                cur?.rootId === z.rootId ? null : { rootId: z.rootId, left: r.right + 6, bottom: window.innerHeight - r.bottom },
+                cur?.rootId === z.rootId
+                  ? null
+                  : // Opens above the button, kept on screen: the list sits
+                    // right beside the minimap, so there's no room to its side.
+                    { rootId: z.rootId, left: Math.max(8, Math.min(r.left, window.innerWidth - 208)), bottom: window.innerHeight - r.top + 6 },
               );
             }}
           >

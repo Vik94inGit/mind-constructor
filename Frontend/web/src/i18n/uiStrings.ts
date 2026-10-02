@@ -213,7 +213,7 @@ export interface UiStrings {
   };
   loadingMap: string;
   /** Showing the chosen nodes in their own reading mode, zooming in when their text would overlap. */
-  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; dots: string; zoneView: (zone: string) => string };
+  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; dots: string; zoneView: (zone: string) => string; lockBlock: string; unlockBlock: string; blockLocked: string; zonesInView: string };
   /** Separator lines drawn between groups of nodes. */
   lines: {
     toolbar: string;
@@ -575,6 +575,10 @@ const en: UiStrings = {
     cardColor: "Card color",
     cardColorReset: "Default",
     dots: "Dots",
+    lockBlock: "Lock this block",
+    unlockBlock: "Unlock this block",
+    blockLocked: "Locked — unlock to move or edit it",
+    zonesInView: "Zones in view",
     zoneView: (z) => `View of “${z}”`,
     zoomedToFit: "Zoomed in so the nodes don't overlap.",
     stillOverlap: "Zoomed in as far as possible — a few nodes still overlap.",
@@ -933,6 +937,10 @@ const cs: UiStrings = {
     cardColor: "Barva karty",
     cardColorReset: "Výchozí",
     dots: "Tečky",
+    lockBlock: "Zamknout blok",
+    unlockBlock: "Odemknout blok",
+    blockLocked: "Zamčeno — odemkněte pro přesun nebo úpravy",
+    zonesInView: "Zóny v zobrazení",
     zoneView: (z) => `Zobrazení „${z}“`,
     zoomedToFit: "Přiblíženo, aby se uzly nepřekrývaly.",
     stillOverlap: "Přiblíženo na maximum — několik uzlů se stále překrývá.",
@@ -1291,6 +1299,10 @@ const uk: UiStrings = {
     cardColor: "Колір картки",
     cardColorReset: "Типовий",
     dots: "Точки",
+    lockBlock: "Заблокувати блок",
+    unlockBlock: "Розблокувати блок",
+    blockLocked: "Заблоковано — розблокуйте, щоб рухати чи редагувати",
+    zonesInView: "Зони в полі зору",
     zoneView: (z) => `Вигляд «${z}»`,
     zoomedToFit: "Наближено, щоб вузли не перекривалися.",
     stillOverlap: "Наближено до максимуму — кілька вузлів усе ще перекриваються.",
@@ -1649,6 +1661,10 @@ const ru: UiStrings = {
     cardColor: "Цвет карточки",
     cardColorReset: "По умолчанию",
     dots: "Точки",
+    lockBlock: "Заблокировать блок",
+    unlockBlock: "Разблокировать блок",
+    blockLocked: "Заблокировано — разблокируйте, чтобы двигать или править",
+    zonesInView: "Зоны в поле зрения",
     zoneView: (z) => `Вид «${z}»`,
     zoomedToFit: "Приближено, чтобы узлы не перекрывались.",
     stillOverlap: "Приближено до максимума — несколько узлов всё ещё перекрываются.",

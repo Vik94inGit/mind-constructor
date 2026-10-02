@@ -56,6 +56,8 @@ interface Params {
   snapFor?: (node: NodeDoc, x: number, y: number) => Snap | null;
   /** A piece was dropped clicked into another (`snap.partnerId`). */
   onSnapped?: (node: NodeDoc, snap: Snap) => void;
+  /** Its owner locked this text block (utils/blockLock.ts) — held in place like Node.locked. */
+  isBlockLocked?: (nodeId: string) => boolean;
 }
 
 // The node drag/drop system: single-node reposition-or-join-a-circle,
@@ -88,7 +90,11 @@ export function useNodeDragAndDrop({
   t,
   snapFor,
   onSnapped,
+  isBlockLocked,
 }: Params) {
+  // Held in place: a member of the chosen circle (Node.locked), or a text
+  // block its owner locked.
+  const held = (n: NodeDoc) => !!n.locked || !!isBlockLocked?.(n.nodeId);
   // Single-node drag position, group-drag position map, and circle-join
   // drop-target highlight — see hooks/dragUIState.ts.
   const [dragUI, dispatch] = useReducer(dragUIReducer, initialDragUIState);
@@ -158,7 +164,7 @@ export function useNodeDragAndDrop({
     // currently-chosen one, see handleCircleBackdropClick): a chosen
     // cluster holds its position for good, so falls through to the
     // ordinary long-press/tap paths below instead of starting a reposition.
-    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !node.locked) {
+    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !held(node)) {
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       dragMoved.current = false;
@@ -168,7 +174,7 @@ export function useNodeDragAndDrop({
       // isn't itself locked.
       const memberIds = Array.from(multiSelectIds).filter((id) => {
         const n = nodes.find((nn) => nn.nodeId === id);
-        return !!n && isOwnNode(n) && !n.isWeapon && !n.locked;
+        return !!n && isOwnNode(n) && !n.isWeapon && !held(n);
       });
       const followerIds = memberIds.filter((id) => id !== node.nodeId);
       const startPositions = new Map(
@@ -311,7 +317,7 @@ export function useNodeDragAndDrop({
     // good (see the group-drag branch's own comment above); touch long-
     // press-to-multiselect still works on one, since picking a locked node
     // into some other selection doesn't move anything.
-    if (!moveMode || node.locked) {
+    if (!moveMode || held(node)) {
       if (e.pointerType !== "touch") return;
       const touchStartX = e.clientX;
       const touchStartY = e.clientY;
