@@ -35,10 +35,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   its panel's Info tab (per browser). Each zone can also take its own view (puzzle cards, mixed, icons + text, the default look, or
   dots) from the ⋯ button beside its name, so one canvas can show different
   sides of the same map at once (per browser). The ⋯ buttons sit on a compact list, just left of the minimap, of the zones currently in view.
-  Your own puzzle blocks can be locked from the padlock on their corner (per browser): a locked
+  Your own nodes can be locked from the node panel's Info tab, the right-click menu, or the
+  padlock on a puzzle block's corner (per browser): a locked
   block can't be dragged, clicked into another piece or have its text edited until unlocked. Zoomed
-  out to 50%, nodes show as plain dots and the canvas drops its other icons (zone-parent rings,
-  weapon marks, quick-add ghosts); zones near the
+  out to 50%, nodes show as plain dots, the canvas drops its other icons (zone-parent rings,
+  weapon marks, quick-add ghosts) and the view glides to the middle of the map; zones near the
   middle of the view stay at full strength while the rest are muted; selecting a node centers it on
   screen.
 - **Admin** (`/admin`) — visible only if your account's `role` is `admin` (granted with

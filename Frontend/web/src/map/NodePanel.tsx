@@ -160,6 +160,8 @@ interface Props {
   cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
   /** Its owner locked this text block (utils/blockLock.ts): the text reads as for anyone else's node until unlocked. */
   textLocked?: boolean;
+  /** Locks/unlocks this node — owner only. */
+  onToggleLock?: () => void;
 }
 
 export function NodePanel({
@@ -185,6 +187,7 @@ export function NodePanel({
   onExtractText,
   cardFill,
   textLocked = false,
+  onToggleLock,
 }: Props) {
   const { t } = useI18n();
   const isCreator = idOf(node.userId) === currentUserId;
@@ -905,8 +908,22 @@ export function NodePanel({
           {/* The node's title, when it has one — read-only here for
               everyone; the owner edits it under Modify. */}
           {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>}
-          {isCreator && textLocked && (
-            <div className="mb-2 text-[0.75rem] text-ink-soft">🔒 {t.ui.display.blockLocked}</div>
+          {isCreator && onToggleLock && (
+            // Lock/unlock: a locked block can't be moved, clicked into
+            // another piece or have its text edited.
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className={`cursor-pointer rounded-md border px-2 py-[0.2rem] text-[0.75rem] font-semibold hover:bg-surface-2 ${
+                  textLocked ? "border-accent bg-surface-2 text-accent" : "border-line text-ink"
+                }`}
+                aria-pressed={textLocked}
+                onClick={onToggleLock}
+              >
+                {textLocked ? `🔓 ${t.ui.display.unlockBlock}` : `🔒 ${t.ui.display.lockBlock}`}
+              </button>
+              {textLocked && <span className="text-[0.75rem] text-ink-soft">{t.ui.display.blockLocked}</span>}
+            </div>
           )}
           {isCreator && !textLocked ? (
             <textarea
