@@ -1,4 +1,5 @@
 import { io, type Socket } from "socket.io-client";
+import { apiRequest } from "./client";
 
 // Socket.IO's own absolute backend URL — deliberately *not* routed through
 // vercel.json's /api/(.*) rewrite the way plain REST calls are. A Vercel
@@ -14,11 +15,20 @@ function getSocket(): Socket {
   if (!socket) {
     socket = io(SOCKET_URL, {
       autoConnect: false,
-      // The session lives in the mc_sid cookie, not a client-supplied
-      // credential — withCredentials is what makes the handshake's
-      // polling/XHR requests actually carry it across this cross-site
-      // connection (see SOCKET_URL's own comment).
+      // The session lives in the mc_sid cookie — withCredentials is what
+      // makes the handshake carry it across this cross-site connection
+      // where the browser allows that (see SOCKET_URL's own comment).
       withCredentials: true,
+      // Safari never sends a third-party cookie, so the handshake also
+      // carries a short-lived token fetched over the same-origin REST API,
+      // where the cookie *is* sent (Backend's realtime/socketToken.ts).
+      // Called on every connect and reconnect, so it's always fresh. A
+      // failed fetch just connects without one — the cookie may still do.
+      auth: (cb) => {
+        apiRequest<{ token: string }>("/api/auth/socket-token")
+          .then(({ token }) => cb({ token }))
+          .catch(() => cb({}));
+      },
     });
   }
   return socket;

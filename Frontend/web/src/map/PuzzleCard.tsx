@@ -278,9 +278,10 @@ export function PuzzleCard({
             />
           );
         })}
-      {/* Lock — bottom-left corner. Always showing on a locked block; on an
-          unlocked one of your own only while hovered, so it's there when
-          wanted without dotting every card with a padlock. */}
+      {/* Lock — bottom-left corner. Solid on a locked block; faint on an
+          unlocked one of your own (full strength while hovered), so it can
+          be found on a touch screen too without shouting from every card.
+          Also in the node panel and the right-click menu. */}
       {(locked || onToggleLock) && (
         <button
           type="button"
@@ -289,7 +290,7 @@ export function PuzzleCard({
           } ${
             locked
               ? "border-accent bg-accent text-white"
-              : "border-line bg-surface text-ink-soft opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              : "border-line bg-surface text-ink-soft opacity-40 group-hover:opacity-100 focus-visible:opacity-100"
           }`}
           title={lockLabel}
           aria-label={lockLabel}

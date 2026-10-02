@@ -10,6 +10,7 @@ import {
   GoogleTokenInvalidError,
 } from "../abl/authAbl.js";
 import { handleAblError } from "./errorHandling.js";
+import { createSocketToken } from "../realtime/socketToken.js";
 
 // Promisified req.session.regenerate — express-session's own callback shape.
 // Used on login/googleAuth to rotate the session id on every privilege
@@ -169,6 +170,15 @@ export const demoAuth = async (req: Request, res: Response) => {
 // endpoint to ask the server instead.
 export const me = async (req: Request, res: Response) => {
   return res.status(200).json({ success: true, user: req.user });
+};
+
+// A short-lived token for the Socket.IO handshake — see
+// realtime/socketToken.ts for why the socket can't just rely on the session
+// cookie (Safari blocks it on the cross-site socket connection). Behind
+// `protect`, so only a live session can get one.
+export const socketToken = async (req: Request, res: Response) => {
+  const token = createSocketToken(String(req.user!._id), process.env.SESSION_SECRET as string);
+  return res.status(200).json({ success: true, token });
 };
 
 export const logout = async (req: Request, res: Response) => {

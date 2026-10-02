@@ -2890,6 +2890,7 @@ export function MapPage() {
               <NodePanel
                 node={selectedNode}
                 textLocked={!!blockLocks[selectedNode.nodeId]}
+                onToggleLock={isOwnNode(selectedNode) ? () => toggleBlockLock(selectedNode.nodeId) : undefined}
                 cardFill={(() => {
                   const mode = modeOf(selectedNode.nodeId);
                   const isCard =
@@ -2966,6 +2967,8 @@ export function MapPage() {
           y={contextMenu.y}
           isOwner={isOwnNode(contextMenu.node)}
           canAttack={canAttackNode(contextMenu.node)}
+          blockLocked={!!blockLocks[contextMenu.node.nodeId]}
+          onToggleBlockLock={isOwnNode(contextMenu.node) ? () => toggleBlockLock(contextMenu.node.nodeId) : undefined}
           nodeType={contextMenu.node.type}
           onClose={() => setContextMenu(null)}
           onCreate={() => {

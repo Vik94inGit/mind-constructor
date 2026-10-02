@@ -25,6 +25,9 @@ interface Props {
   onDelete: () => void;
   onChoose: () => void;
   onAttack: () => void;
+  /** Owner only: this node is locked (utils/blockLock.ts) — the menu offers Unlock instead of Lock. */
+  blockLocked?: boolean;
+  onToggleBlockLock?: () => void;
   onClose: () => void;
 }
 
@@ -44,6 +47,8 @@ export function NodeContextMenu({
   onChoose,
   onAttack,
   onClose,
+  blockLocked = false,
+  onToggleBlockLock,
 }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -84,7 +89,7 @@ export function NodeContextMenu({
   // "Problematická varianta") wrap inside the root menu's normal 168px.
   const MENU_W = mode === "type" ? 220 : 168;
   const ITEM_H = 34;
-  const rootItemCount = (isOwner ? 5 : 0) + (canAttack ? 1 : 0);
+  const rootItemCount = (isOwner ? 5 + (onToggleBlockLock ? 1 : 0) : 0) + (canAttack ? 1 : 0);
   const itemCount = mode === "type" ? NODE_TYPES.length + 1 : rootItemCount;
   const MENU_H = itemCount * ITEM_H + 10;
   const left = Math.min(x, window.innerWidth - MENU_W - 8);
@@ -115,6 +120,17 @@ export function NodeContextMenu({
           <button className={item} onClick={onChoose}>
             {t.ui.contextMenu.choose}
           </button>
+          {onToggleBlockLock && (
+            <button
+              className={item}
+              onClick={() => {
+                onToggleBlockLock();
+                onClose();
+              }}
+            >
+              {blockLocked ? `🔓 ${t.ui.display.unlockBlock}` : `🔒 ${t.ui.display.lockBlock}`}
+            </button>
+          )}
           <button className={itemDanger} onClick={onDelete}>
             {t.ui.contextMenu.delete}
           </button>

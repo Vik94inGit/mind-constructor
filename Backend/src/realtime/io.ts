@@ -10,6 +10,7 @@ import { Server as SocketIOServer, type Socket } from "socket.io";
 import { findUserByIdDao } from "../dao/userDao.js";
 import { getMapByIdDao } from "../dao/mapsDao.js";
 import { anyPublicNodeHiddenDao } from "../dao/visibilityDao.js";
+import { verifySocketToken } from "./socketToken.js";
 
 let io: SocketIOServer | null = null;
 
@@ -41,7 +42,13 @@ export function initRealtime(httpServer: HTTPServer, sessionMiddleware: RequestH
 
   io.use(async (socket, next) => {
     try {
-      const userId = (socket.request as { session?: { userId?: string } }).session?.userId;
+      // The session cookie when the browser sent one; otherwise the
+      // short-lived token the client fetched over the same-origin REST API
+      // (GET /api/auth/socket-token) — Safari never sends the cookie on this
+      // cross-site connection. See socketToken.ts.
+      const userId =
+        (socket.request as { session?: { userId?: string } }).session?.userId ??
+        verifySocketToken(socket.handshake.auth?.token, process.env.SESSION_SECRET as string);
       if (!userId) return next(new Error("Not authorized – no session"));
 
       const user = await findUserByIdDao(userId);

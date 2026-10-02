@@ -14,14 +14,21 @@ const ZOOM_MS = 240;
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-// The dead zone past each edge of the canvas, in screen pixels: just enough
-// for a node sitting right on an edge to be scrolled clear of the screen's
-// edge with its quick-add ghost ring (radius ~126px plus the ghosts and their
-// labels) still round around it. It used to be half the screen on every side,
-// so a pan could leave most of the view on hatched nothing and the map was
-// easy to lose. The bottom one also covers the bottom sheet while it's open,
-// so a node on the bottom edge can still be brought up above the sheet.
-const deadZonePx = () => (isMobileViewport() ? 170 : 240);
+// The dead zone past each edge of the canvas, in screen pixels: a slim band,
+// enough for a node sitting right on an edge to be scrolled a little clear of
+// the screen's edge (its quick-add ghosts clamp themselves into view anyway).
+// It used to be 240px (and before that half the screen) on every side, which
+// left a lot of hatched nothing around the map. The bottom one also covers
+// the bottom sheet while it's open, so a node on the bottom edge can still be
+// brought up above the sheet.
+const deadZonePx = () => (isMobileViewport() ? 60 : 90);
+
+// The margin on each side of one axis, in screen pixels: the dead zone — or,
+// when the whole canvas fits across the screen that way at this zoom, exactly
+// what centers it (so there's nothing to scroll and no lopsided hatching).
+export function axisMarginPx(viewPx: number, canvasUnits: number, zoom: number): number {
+  return Math.max(deadZonePx(), (viewPx - canvasUnits * zoom) / 2);
+}
 
 // How far above the bottom sheet's top edge a centered node stays, at least,
 // in screen pixels — room for its card or icon and caption.
@@ -177,13 +184,15 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // before the `if (loading) return ...` gate lets the real canvas (and
     // wrapRef) mount — so this has to run again once loading flips to false.
   }, [loading]);
-  const hScrollMargin = viewSize.w ? Math.ceil(deadZonePx() / zoom) : 0;
-  const vScrollMargin = viewSize.h ? Math.ceil(deadZonePx() / zoom) : 0;
+  const hMarginPx = axisMarginPx(viewSize.w, CANVAS_W, zoom);
+  const vMarginPx = axisMarginPx(viewSize.h, CANVAS_H, zoom);
+  const hScrollMargin = viewSize.w ? Math.ceil(hMarginPx / zoom) : 0;
+  const vScrollMargin = viewSize.h ? Math.ceil(vMarginPx / zoom) : 0;
   // Only the bottom edge grows for the sheet. Every scroll<->canvas
   // conversion measures from the top-left, so this changes nothing but how
   // far down the view can go.
   const vScrollMarginBottom = viewSize.h
-    ? Math.ceil((deadZonePx() + (sheetOpen ? viewSize.h * panelReserveFrac(isMobileViewport()) : 0)) / zoom)
+    ? Math.ceil((vMarginPx + (sheetOpen ? viewSize.h * panelReserveFrac(isMobileViewport()) : 0)) / zoom)
     : 0;
   // Latest values for the camera functions below, which can run from a timer
   // or an animation frame after the render that created them.
@@ -366,11 +375,21 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     }
   }
 
-  // The zoom buttons zoom about the middle of what's on screen.
+  // The zoom buttons zoom about the middle of what's on screen. Zooming all
+  // the way out (MIN_ZOOM, 50%) is for seeing the whole map, so once the zoom
+  // lands the view glides to the middle of the canvas, centering it on the
+  // screen instead of leaving it wherever the zoom happened to anchor.
   function zoomFromCenter(delta: number, to?: number) {
     const r = wrapRef.current?.getBoundingClientRect();
     if (!r) return;
+    const before = zoomTargetRef.current;
     zoomAt(r.left + r.width / 2, r.top + r.height / 2, delta, to);
+    const target = zoomTargetRef.current;
+    if (target !== before && target <= MIN_ZOOM + 0.001) {
+      window.setTimeout(() => {
+        if (zoomTargetRef.current === target) centerOnPoint(CANVAS_W / 2, CANVAS_H / 2, { aboveSheet: false });
+      }, (prefersReducedMotion() ? 0 : ZOOM_MS) + 40);
+    }
   }
 
   // The currently-visible rectangle of the canvas, in canvas coordinates —
@@ -490,7 +509,8 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // Sized for the sheet being open, as it will be by the time the glide
     // runs: this is called in the same click that opens it, before the
     // bottom margin has grown for it.
-    const bottomMargin = (deadZonePx() + wrap.clientHeight * panelReserveFrac(isMobileViewport())) / zoom;
+    const bottomMargin =
+      (axisMarginPx(wrap.clientHeight, CANVAS_H, zoom) + wrap.clientHeight * panelReserveFrac(isMobileViewport())) / zoom;
     const maxTop = Math.max(0, (CANVAS_H + vScrollMargin + bottomMargin) * zoom - wrap.clientHeight);
     // + hScrollMargin/+ vScrollMargin: pos.x/y are real canvas coordinates;
     // scrollTo deals in screen pixels within the *padded* canvasRef (see
@@ -548,7 +568,10 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // Sized for the sheet being open, as it will be by the time the glide
     // runs: this is called in the same click that opens it, before the
     // bottom margin has grown for it.
-    const bottomMargin = (deadZonePx() + (reserveSheet ? wrap.clientHeight * panelReserveFrac(isMobileViewport()) : 0)) / zoom;
+    const bottomMargin =
+      (axisMarginPx(wrap.clientHeight, CANVAS_H, zoom) +
+        (reserveSheet ? wrap.clientHeight * panelReserveFrac(isMobileViewport()) : 0)) /
+      zoom;
     const maxTop = Math.max(0, (CANVAS_H + vScrollMargin + bottomMargin) * zoom - wrap.clientHeight);
     const targetLeft = Math.min(maxLeft, Math.max(0, (x + hScrollMargin) * zoom - wrap.clientWidth / 2));
     const targetTop = Math.min(maxTop, Math.max(0, (y + vScrollMargin) * zoom - visibleH / 2));
