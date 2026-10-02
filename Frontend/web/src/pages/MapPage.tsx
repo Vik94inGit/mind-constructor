@@ -29,6 +29,15 @@ import { MiniMap } from "../map/MiniMap";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { loadNodeDisplay } from "../utils/nodeDisplay";
+import { loadCardFills, saveCardFills } from "../utils/cardFill";
+import type { CardFills } from "../utils/cardFill";
+import { computePuzzleJoins } from "../utils/puzzleLinks";
+import { findSnap } from "../utils/puzzleSnap";
+import type { Snap, SnapPiece } from "../utils/puzzleSnap";
+import { pieceEdges } from "../map/PuzzleCard";
+import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
+import { loadZoneDisplay, saveZoneDisplay, zoneModeByNode } from "../utils/zoneDisplay";
+import type { ZoneDisplay, ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
 import { MapToolbar } from "../map/MapToolbar";
@@ -55,6 +64,7 @@ import {
   CANVAS_W,
   CANVAS_H,
   ZOOM_STEP,
+  DOT_ZOOM,
   computeLinkedNeighborIds,
   getCirclePackSpacing,
   pickNonOverlappingPosition,
@@ -87,6 +97,10 @@ const TEMPLATE_NODE_STAGGER_MS = 250;
 // field rather than touching one of these in place.
 const EMPTY_STRING_SET: Set<string> = new Set();
 const EMPTY_POINTS: { x: number; y: number }[] = [];
+
+// How close (in screen pixels) a dragged puzzle piece has to come to a fitting
+// one before it clicks in.
+const SNAP_REACH_PX = 36;
 
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
@@ -171,12 +185,27 @@ export function MapPage() {
   function setReadingMode(mode: ReadingMode) {
     setReadingModeState(mode);
     saveReadingMode(mode);
-    if (mode !== "actual") fitZoomForDisplay(nodeDisplay, mode);
+    if (mode !== "actual") fitZoomForDisplay(effectiveDisplay(), mode);
   }
   // Nodes shown in their own reading mode instead of the map's (a chosen group
   // as puzzle cards, say) — per browser and per map, see
   // utils/nodeDisplay.ts.
   const [nodeDisplay, setNodeDisplay] = useState<NodeDisplay>(() => loadNodeDisplay(mapId));
+  // Each zone's own view, so one canvas shows several sides of the map at
+  // once — see utils/zoneDisplay.ts. Below a node's own display (the group
+  // bar's "Show as"), above the map-wide reading mode.
+  const [zoneDisplay, setZoneDisplay] = useState<ZoneDisplay>(() => loadZoneDisplay(mapId));
+  // The viewer's own fill per puzzle piece — see utils/cardFill.ts.
+  const [cardFills, setCardFills] = useState<CardFills>(() => loadCardFills(mapId));
+  function setCardFill(nodeId: string, color: string | null) {
+    setCardFills((prev) => {
+      const next = { ...prev };
+      if (color) next[nodeId] = color;
+      else delete next[nodeId];
+      saveCardFills(mapId, next);
+      return next;
+    });
+  }
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
   // group selection (multiSelectIds — the same one shift+click and the marquee
   // build), instead of opening that node's panel. The group bar then offers
@@ -810,6 +839,97 @@ export function MapPage() {
     [visibleNodes, positions],
   );
 
+  // How each node is drawn: its own display if it has one, else its zone's
+  // view, else the map's reading mode. A zone shown as dots draws its nodes
+  // as dots (and reads as the default look underneath, for everything that
+  // sizes or captions a node).
+  const zoneModes = useMemo(() => zoneModeByNode(nodeGroups, zoneDisplay), [nodeGroups, zoneDisplay]);
+  function modeOf(nodeId: string): ReadingMode {
+    const own = nodeDisplay[nodeId];
+    if (own) return own;
+    const zone = zoneModes.get(nodeId);
+    if (zone) return zone === "dots" ? "actual" : zone;
+    return readingMode;
+  }
+  function dottedByZone(nodeId: string): boolean {
+    return !nodeDisplay[nodeId] && zoneModes.get(nodeId) === "dots";
+  }
+  // Every node whose look differs from the map-wide mode, for the "zoom in
+  // to make room" check (fitZoomForDisplay), which reads a NodeDisplay.
+  function effectiveDisplay(zones: Map<string, ZoneMode> = zoneModes): NodeDisplay {
+    const out: NodeDisplay = {};
+    for (const [id, zone] of zones) out[id] = zone === "dots" ? "actual" : zone;
+    return { ...out, ...nodeDisplay };
+  }
+  function setZoneMode(rootId: string, mode: ZoneMode | null) {
+    const next = { ...zoneDisplay };
+    if (mode) next[rootId] = mode;
+    else delete next[rootId];
+    setZoneDisplay(next);
+    saveZoneDisplay(mapId, next);
+    const group = nodeGroups.find((g) => g.rootId === rootId);
+    if (mode && mode !== "actual" && mode !== "dots") {
+      fitZoomForDisplay(
+        effectiveDisplay(zoneModeByNode(nodeGroups, next)),
+        readingMode,
+        group ? { x: group.cx, y: group.cy } : undefined,
+      );
+    }
+  }
+
+  // Puzzle pieces interlock along the map's links — see utils/puzzleLinks.ts.
+  const puzzleJoins = useMemo(
+    () => computePuzzleJoins(visibleNodes, edges, positions),
+    [visibleNodes, edges, positions],
+  );
+
+  // The zones near the middle of the screen stay at full strength and the
+  // rest are muted (see utils/zoneFocus.ts), recomputed as the view pans and
+  // zooms. Off while a circle is stabilized — that spotlight already says
+  // which zone matters.
+  const [focusedZones, setFocusedZones] = useState<Set<string> | null>(null);
+  const zoneFocusInputs = useRef({ nodeGroups, zoom, hScrollMargin, vScrollMargin });
+  zoneFocusInputs.current = { nodeGroups, zoom, hScrollMargin, vScrollMargin };
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    let frame: number | null = null;
+    const update = () => {
+      frame = null;
+      const { nodeGroups, zoom, hScrollMargin, vScrollMargin } = zoneFocusInputs.current;
+      const center = {
+        x: (wrap.scrollLeft + wrap.clientWidth / 2) / zoom - hScrollMargin,
+        y: (wrap.scrollTop + wrap.clientHeight / 2) / zoom - vScrollMargin,
+      };
+      // A quarter of the smaller screen side, in canvas units.
+      const reach = (Math.min(wrap.clientWidth, wrap.clientHeight) / 4) / zoom;
+      const next = focusedZoneIds(nodeGroups, center, reach);
+      setFocusedZones((prev) => (sameIds(prev, next) ? prev : next));
+    };
+    const schedule = () => {
+      if (frame == null) frame = requestAnimationFrame(update);
+    };
+    update();
+    wrap.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      wrap.removeEventListener("scroll", schedule);
+      if (frame != null) cancelAnimationFrame(frame);
+    };
+  }, [loading, nodeGroups, zoom, hScrollMargin, vScrollMargin, wrapRef]);
+  const activeFocusedZones = map?.selectedCircle ? null : focusedZones;
+  // Nodes that belong only to zones out of focus.
+  const zoneMutedIds = useMemo(() => {
+    const out = new Set<string>();
+    if (!activeFocusedZones) return out;
+    const inFocus = new Set<string>();
+    for (const g of nodeGroups) {
+      const focused = activeFocusedZones.has(g.rootId);
+      for (const m of g.members) (focused ? inFocus : out).add(m.nodeId);
+    }
+    for (const id of inFocus) out.delete(id);
+    return out;
+  }, [activeFocusedZones, nodeGroups]);
+
   // Circle-parent nodes always show their caption (see NodeCard's
   // showCaption) — this backfills their real text the moment a node becomes
   // one, rather than waiting on some other trigger (opening its panel, an
@@ -861,12 +981,16 @@ export function MapPage() {
   }, [selectedId]);
 
   // The two text-heavy reading modes draw every node's text, so all of it is
-  // needed up front (one bulk request for whatever hasn't loaded yet).
+  // needed up front (one bulk request for whatever hasn't loaded yet). The
+  // mixed mode only shows circle parents' text, which the circle-root
+  // backfill above already covers.
   useEffect(() => {
-    const ids = visibleNodes.filter((n) => (nodeDisplay[n.nodeId] ?? readingMode) !== "actual").map((n) => n.nodeId);
+    const ids = visibleNodes
+      .filter((n) => !["actual", "mixed"].includes(modeOf(n.nodeId)))
+      .map((n) => n.nodeId);
     if (ids.length > 0) ensureNodeText(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readingMode, nodeDisplay, visibleNodes]);
+  }, [readingMode, nodeDisplay, zoneModes, visibleNodes]);
 
   // Every circle member's sentiment, keyed by node id — what NodeCard reads
   // to decide its dashed outline and whether it's eligible to chaotic-drift
@@ -937,7 +1061,7 @@ export function MapPage() {
   // on its own, fighting the gesture that caused it.
   useEffect(() => {
     if (loading) return;
-    fitZoomForDisplay(nodeDisplay, readingMode);
+    fitZoomForDisplay(effectiveDisplay(), readingMode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
@@ -1036,6 +1160,8 @@ export function MapPage() {
     setMultiSelectIds,
     suppressNextClick,
     t,
+    snapFor: puzzleSnapFor,
+    onSnapped: linkSnappedPieces,
   });
 
   // Same condition that gates the quick-add ghost ring below — reused
@@ -1062,6 +1188,120 @@ export function MapPage() {
   // request straight to the API, just the UI paths.
   function isOwnNode(node: NodeDoc) {
     return idOf(node.userId) === user?._id;
+  }
+
+  // Connecting puzzle pieces: dragging out of a piece's tab (see PuzzleCard's
+  // handles) draws a line to the pointer; letting go over another of your
+  // own pieces opens the link dialog for the two, like the group bar's Link.
+  // A link needs both ends to be yours (Backend's createEdgeAbl), and a pair
+  // that's already linked can't be linked again.
+  const [puzzleConnect, setPuzzleConnect] = useState<{
+    fromId: string;
+    to: { x: number; y: number };
+    overId: string | null;
+    valid: boolean;
+  } | null>(null);
+  function nodeIdAt(clientX: number, clientY: number): string | null {
+    const el = document.elementFromPoint(clientX, clientY);
+    return el?.closest("[data-reveal-node]")?.getAttribute("data-reveal-node") ?? null;
+  }
+  function canConnect(from: NodeDoc, to: NodeDoc | undefined): to is NodeDoc {
+    if (!to || to.nodeId === from.nodeId || !isOwnNode(to)) return false;
+    return !edges.some((e) => {
+      const a = nodeRefId(e.fromNodeId);
+      const b = nodeRefId(e.toNodeId);
+      return (a === from.nodeId && b === to.nodeId) || (a === to.nodeId && b === from.nodeId);
+    });
+  }
+  // Clicking pieces together (utils/puzzleSnap.ts): a puzzle card dragged
+  // close to another one whose facing side has the opposite cut (a tab to a
+  // blank) jumps flush into it. Measured off the cards as drawn, so the fit
+  // matches what's on screen at any zoom. Only between pieces actually
+  // drawn as cards — not dots, not icons.
+  function drawnAsCard(n: NodeDoc): boolean {
+    if (zoom <= DOT_ZOOM || dottedByZone(n.nodeId)) return false;
+    const m = modeOf(n.nodeId);
+    return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
+  }
+  function snapPiece(n: NodeDoc, at: { x: number; y: number }): SnapPiece | null {
+    const el = document.querySelector(`[data-reveal-node="${CSS.escape(n.nodeId)}"] [data-puzzle-card]`);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      id: n.nodeId,
+      x: at.x,
+      y: at.y,
+      w: r.width / zoom,
+      h: r.height / zoom,
+      edges: pieceEdges(n.nodeId, puzzleJoins.get(n.nodeId)),
+    };
+  }
+  function puzzleSnapFor(node: NodeDoc, x: number, y: number): Snap | null {
+    if (!drawnAsCard(node)) return null;
+    const me = snapPiece(node, { x, y });
+    if (!me) return null;
+    // Only pieces near enough to possibly fit are measured.
+    const near = (SNAP_REACH_PX + 600) / zoom;
+    const others = visibleNodes.flatMap((n) => {
+      if (n.nodeId === node.nodeId || !drawnAsCard(n)) return [];
+      const p = posFor(n);
+      if (Math.abs(p.x - x) > near || Math.abs(p.y - y) > near) return [];
+      const piece = snapPiece(n, p);
+      return piece ? [piece] : [];
+    });
+    return findSnap(me, others, SNAP_REACH_PX / zoom);
+  }
+  // Pieces dropped clicked together are linked — from the piece whose tab
+  // went in to the one whose blank took it, so the fit stays the way it's
+  // drawn — when both are yours (a link needs both ends to be) and they
+  // aren't linked yet.
+  async function linkSnappedPieces(_node: NodeDoc, snap: Snap) {
+    const from = nodes.find((n) => n.nodeId === snap.from);
+    const to = nodes.find((n) => n.nodeId === snap.to);
+    if (!from || !mapId || !isOwnNode(from) || !canConnect(from, to)) return;
+    if (nodeRefId(from.parentId) === to.nodeId || nodeRefId(to.parentId) === from.nodeId) return;
+    try {
+      upsertEdge(await edgesApi.createEdge(mapId, { fromNodeId: from.nodeId, toNodeId: to.nodeId, sentiment: "neutral" }));
+      refreshInsights(mapId);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.link.failed);
+    }
+  }
+
+  function startPuzzleConnect(from: NodeDoc, e: ReactPointerEvent) {
+    setContextMenu(null);
+    const track = (clientX: number, clientY: number) => {
+      const id = nodeIdAt(clientX, clientY);
+      const overId = id && id !== from.nodeId ? id : null;
+      setPuzzleConnect({
+        fromId: from.nodeId,
+        to: screenToCanvas(clientX, clientY),
+        overId,
+        valid: !!overId && canConnect(from, nodes.find((n) => n.nodeId === overId)),
+      });
+    };
+    const onMove = (ev: PointerEvent) => track(ev.clientX, ev.clientY);
+    const finish = (ev: PointerEvent, drop: boolean) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      setPuzzleConnect(null);
+      // The release lands on whatever is under the pointer, which would
+      // otherwise read as a click there (selecting a node, or closing the
+      // panel on bare canvas).
+      const swallow = (ce: MouseEvent) => ce.stopPropagation();
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+      if (!drop) return;
+      const to = nodes.find((n) => n.nodeId === nodeIdAt(ev.clientX, ev.clientY));
+      if (canConnect(from, to)) setPendingLink([from, to]);
+    };
+    const onUp = (ev: PointerEvent) => finish(ev, true);
+    const onCancel = (ev: PointerEvent) => finish(ev, false);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    track(e.clientX, e.clientY);
   }
 
   // Owner-only — text/type editing isn't otherwise restricted (an earlier
@@ -2014,7 +2254,7 @@ export function MapPage() {
       return {
         pos: posFor(n),
         sizeMultiplier: nodeSizeMultiplier(n, isCircleParent, compactView),
-        lines: (nodeDisplay[n.nodeId] ?? readingMode) === "iconText" ? 4 : 2,
+        lines: modeOf(n.nodeId) === "iconText" ? 4 : 2,
         namedZone: isCircleParent && !!n.zoneName && !compactView,
       };
     };
@@ -2023,7 +2263,8 @@ export function MapPage() {
     const shownParents = visibleNodes.filter(
       (n) =>
         parentIds.has(n.nodeId) &&
-        (nodeDisplay[n.nodeId] ?? readingMode) !== "puzzle" &&
+        !["puzzle", "mixed"].includes(modeOf(n.nodeId)) &&
+        !dottedByZone(n.nodeId) &&
         selectedId !== n.nodeId &&
         inlineEditId !== n.nodeId,
     );
@@ -2179,6 +2420,7 @@ export function MapPage() {
             <CanvasBackdrop
               nodeGroups={nodeGroups}
               selectedCircle={map?.selectedCircle}
+              focusedZones={activeFocusedZones}
               visibleNodes={visibleNodes}
               edges={edges}
               posFor={posFor}
@@ -2213,6 +2455,37 @@ export function MapPage() {
                   : null
               }
             />
+
+            {/* The connection being dragged out of a puzzle piece's tab. */}
+            {puzzleConnect &&
+              (() => {
+                const fromNode = visibleNodes.find((n) => n.nodeId === puzzleConnect.fromId);
+                if (!fromNode) return null;
+                const from = posFor(fromNode);
+                const color = puzzleConnect.overId
+                  ? puzzleConnect.valid
+                    ? "var(--success)"
+                    : "var(--danger)"
+                  : "var(--accent)";
+                return (
+                  <svg
+                    className="pointer-events-none absolute inset-0 z-[40] h-full w-full"
+                    viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+                  >
+                    <line
+                      x1={from.x}
+                      y1={from.y}
+                      x2={puzzleConnect.to.x}
+                      y2={puzzleConnect.to.y}
+                      stroke={color}
+                      strokeWidth={3 / zoom}
+                      strokeDasharray={`${8 / zoom} ${6 / zoom}`}
+                      strokeLinecap="round"
+                    />
+                    <circle cx={puzzleConnect.to.x} cy={puzzleConnect.to.y} r={6 / zoom} fill={color} />
+                  </svg>
+                );
+              })()}
 
             {visibleNodes.map((node) => {
               const pos = posFor(node);
@@ -2263,7 +2536,7 @@ export function MapPage() {
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
-                  readingMode={nodeDisplay[node.nodeId] ?? readingMode}
+                  readingMode={modeOf(node.nodeId)}
                   compact={compactView}
                   hiddenBranch={hiddenBranchIds.has(node.nodeId)}
                   discussionMode={isDiscussionMode}
@@ -2277,9 +2550,19 @@ export function MapPage() {
                     !unmutedAttackNodeIds?.has(node.nodeId)
                   }
                   isParent={parentIds.has(node.nodeId)}
-                  quiet={childIsQuiet(node)}
+                  quiet={childIsQuiet(node) || (zoneMutedIds.has(node.nodeId) && selectedId !== node.nodeId)}
                   hideCaption={hiddenChildCaptions.has(node.nodeId) && inlineEditId !== node.nodeId}
-                  dropHighlight={dropTarget?.nodeId === node.nodeId ? (dropTarget.valid ? "valid" : "invalid") : undefined}
+                  dropHighlight={
+                    puzzleConnect?.overId === node.nodeId
+                      ? puzzleConnect.valid
+                        ? "valid"
+                        : "invalid"
+                      : dropTarget?.nodeId === node.nodeId
+                        ? dropTarget.valid
+                          ? "valid"
+                          : "invalid"
+                        : undefined
+                  }
                   inlineEditing={editingThis}
                   onInlineConfirm={(text, type) => confirmInlineEdit(node, text, type)}
                   onInlineCancel={() => setInlineEditId(null)}
@@ -2293,6 +2576,12 @@ export function MapPage() {
                   }}
                   onDoubleClick={() => startInlineEdit(node)}
                   onContextMenu={(e) => handleNodeContextMenu(node, e)}
+                  puzzleJoins={puzzleJoins.get(node.nodeId)}
+                  cardFill={cardFills[node.nodeId]}
+                  dotted={zoom <= DOT_ZOOM || dottedByZone(node.nodeId)}
+                  onConnectStart={
+                    isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
+                  }
                 />
               );
             })}
@@ -2450,6 +2739,8 @@ export function MapPage() {
                 vScrollMargin={vScrollMargin}
                 // Centers the view on the whole zone (zooming out only if it
                 // doesn't fit), without selecting anything.
+                modes={zoneDisplay}
+                onSetMode={setZoneMode}
                 onGo={(rootId) => {
                   const group = nodeGroups.find((g) => g.rootId === rootId);
                   if (!group) return;
@@ -2571,6 +2862,17 @@ export function MapPage() {
                   what would be mostly just visual dimming. */}
               <NodePanel
                 node={selectedNode}
+                cardFill={(() => {
+                  const mode = modeOf(selectedNode.nodeId);
+                  const isCard =
+                    mode === "puzzle" || (mode === "mixed" && circleRootSentimentByNode.has(selectedNode.nodeId));
+                  return isCard
+                    ? {
+                        value: cardFills[selectedNode.nodeId],
+                        onChange: (c: string | null) => setCardFill(selectedNode.nodeId, c),
+                      }
+                    : null;
+                })()}
                 nodes={nodes}
                 edges={edges}
                 currentUserId={user._id}

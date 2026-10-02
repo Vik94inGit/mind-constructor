@@ -11,6 +11,7 @@ import { ringKindFor } from "./OutcomeBadge";
 import { MANUAL_ZONE_COLORS, NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
+import { CARD_FILL_COLORS } from "../utils/cardFill";
 
 // Same 100%/115%/130% scale NodeCard's own SIZE_MULTIPLIERS uses, just for
 // the button labels here — kept as a separate literal rather than imported
@@ -155,6 +156,8 @@ interface Props {
   isClusterParent: boolean;
   /** Asks MapPage to open a text export scoped to this node's own cluster — plus, recursively, any cluster rooted at one of its children (see MapPage's collectClusterSubtree). Only ever called when isClusterParent is true. */
   onExtractText: () => void;
+  /** Set while this node is drawn as a puzzle card: its fill (the viewer's own, see utils/cardFill.ts) and how to change it. */
+  cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
 }
 
 export function NodePanel({
@@ -178,6 +181,7 @@ export function NodePanel({
   onUnpacked,
   isClusterParent,
   onExtractText,
+  cardFill,
 }: Props) {
   const { t } = useI18n();
   const isCreator = idOf(node.userId) === currentUserId;
@@ -855,6 +859,34 @@ export function NodePanel({
 
       {tab === "info" && (
         <div className="mt-4">
+          {cardFill && (
+            // The puzzle card's own fill — the viewer's choice, not shared.
+            <div className="mb-3 flex flex-wrap items-center gap-[0.4rem]">
+              <span className="mr-1 text-[0.75rem] font-semibold text-ink-soft">{t.ui.display.cardColor}</span>
+              {CARD_FILL_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`h-[22px] w-[22px] cursor-pointer rounded-full border-2 border-line${
+                    cardFill.value === c ? " outline outline-2 outline-offset-2 outline-accent" : ""
+                  }`}
+                  style={{ background: c }}
+                  aria-label={c}
+                  aria-pressed={cardFill.value === c}
+                  onClick={() => cardFill.onChange(c)}
+                />
+              ))}
+              <button
+                type="button"
+                className={`cursor-pointer rounded-md border border-line px-2 py-[0.1rem] text-[0.72rem] hover:bg-surface-2 ${
+                  cardFill.value ? "text-ink" : "font-semibold text-accent"
+                }`}
+                onClick={() => cardFill.onChange(null)}
+              >
+                {t.ui.display.cardColorReset}
+              </button>
+            </div>
+          )}
           {/* Just the text — extendable (a generous min-height so even a
               short claim doesn't look cramped) and scrollable (capped at
               max-h so a long one scrolls in place instead of pushing the

@@ -9,6 +9,7 @@ import { sleep } from "../utils/sleep";
 import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
+import type { Snap } from "../utils/puzzleSnap";
 
 type Pt = { x: number; y: number };
 
@@ -51,6 +52,10 @@ interface Params {
   // which this hook now owns outright (see hooks/dragUIState.ts).
   suppressNextClick: MutableRefObject<boolean>;
   t: Translation;
+  /** Puzzle cards click together (utils/puzzleSnap.ts): where `node` dragged to (x,y) snaps to, if a fitting piece is close. */
+  snapFor?: (node: NodeDoc, x: number, y: number) => Snap | null;
+  /** A piece was dropped clicked into another (`snap.partnerId`). */
+  onSnapped?: (node: NodeDoc, snap: Snap) => void;
 }
 
 // The node drag/drop system: single-node reposition-or-join-a-circle,
@@ -81,6 +86,8 @@ export function useNodeDragAndDrop({
   setMultiSelectIds,
   suppressNextClick,
   t,
+  snapFor,
+  onSnapped,
 }: Params) {
   // Single-node drag position, group-drag position map, and circle-join
   // drop-target highlight — see hooks/dragUIState.ts.
@@ -408,12 +415,26 @@ export function useNodeDragAndDrop({
       };
     }
 
+    // The piece the dragged one is currently clicked into, if any.
+    let snappedTo: string | null = null;
     function onMove(ev: PointerEvent) {
       cancelLongPressIfMoved?.(ev);
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
       dragMoved.current = true;
+      // Close to a fitting puzzle piece: jump flush into it, and light the
+      // partner up. A clicked-in piece isn't joining a circle, so the drop
+      // target search is skipped.
+      const snap = snapFor?.(node, x, y);
+      if (snap) {
+        if (snappedTo !== snap.partnerId) navigator.vibrate?.(10);
+        snappedTo = snap.partnerId;
+        dispatch({ type: "dragSet", nodeId: node.nodeId, x: snap.x, y: snap.y });
+        dispatch({ type: "dropTargetSet", nodeId: snap.partnerId, valid: true });
+        return;
+      }
+      snappedTo = null;
       dispatch({ type: "dragSet", nodeId: node.nodeId, x, y });
       const found = findDropTarget(node, x, y);
       dispatch(
@@ -435,6 +456,24 @@ export function useNodeDragAndDrop({
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
+      const snap = dragMoved.current ? snapFor?.(node, x, y) : null;
+      if (snap) {
+        // Dropped clicked into another piece: it stays exactly there, flush
+        // against its partner (no overlap nudging — sitting right against it
+        // is the point), and the caller links the two.
+        dispatch({ type: "reset" });
+        const before = { x: node.x, y: node.y };
+        setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, x: snap.x, y: snap.y } : n)));
+        navigator.vibrate?.(20);
+        onSnapped?.(node, snap);
+        try {
+          upsertNode(await nodesApi.updateNode(node.nodeId, { x: snap.x, y: snap.y }));
+        } catch (err) {
+          setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
+          setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
+        }
+        return;
+      }
       const found = dragMoved.current ? findDropTarget(node, x, y) : null;
       dispatch({ type: "reset" });
       if (dragMoved.current) {

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { PuzzleJoins } from "../utils/puzzleLinks";
 
 // The puzzle-card reading mode (see utils/readingMode.ts): a node drawn as a
 // jigsaw piece — a card whose four edges each carry a tab sticking out, a
@@ -39,6 +40,11 @@ export function puzzleEdgesFor(seed: string): PuzzleEdges {
   return edges;
 }
 
+/** A piece's cut as drawn: its seeded cut, with the sides joined to linked nodes overriding it. */
+export function pieceEdges(seed: string, joins?: PuzzleJoins): PuzzleEdges {
+  return puzzleEdgesFor(seed).map((e, i) => joins?.cuts[i] ?? e) as PuzzleEdges;
+}
+
 type Pt = { x: number; y: number };
 
 // One edge, from `from` along `dir` for `len`, with its tab/blank bulging
@@ -72,22 +78,44 @@ function edgePath(from: Pt, dir: Pt, out: Pt, len: number, cut: PuzzleEdge): str
   ].join(" ");
 }
 
-/** The whole piece's outline for a `w`×`h` card whose top-left corner is at (`x`, `y`). */
-export function puzzlePath(x: number, y: number, w: number, h: number, edges: PuzzleEdges): string {
+// Each side's own stretch of outline, top/right/bottom/left, each starting
+// at its own first point (so one can be drawn on its own, as a joined side
+// is) — the straight runs between the rounded corners.
+function sideRuns(x: number, y: number, w: number, h: number, edges: PuzzleEdges) {
   const r = Math.min(6, w / 4, h / 4); // corner radius
   const [top, right, bottom, left] = edges;
+  return {
+    r,
+    runs: [
+      { start: { x: x + r, y }, path: edgePath({ x: x + r, y }, { x: 1, y: 0 }, { x: 0, y: -1 }, w - 2 * r, top) },
+      { start: { x: x + w, y: y + r }, path: edgePath({ x: x + w, y: y + r }, { x: 0, y: 1 }, { x: 1, y: 0 }, h - 2 * r, right) },
+      { start: { x: x + w - r, y: y + h }, path: edgePath({ x: x + w - r, y: y + h }, { x: -1, y: 0 }, { x: 0, y: 1 }, w - 2 * r, bottom) },
+      { start: { x, y: y + h - r }, path: edgePath({ x, y: y + h - r }, { x: 0, y: -1 }, { x: -1, y: 0 }, h - 2 * r, left) },
+    ],
+  };
+}
+
+/** The whole piece's outline for a `w`×`h` card whose top-left corner is at (`x`, `y`). */
+export function puzzlePath(x: number, y: number, w: number, h: number, edges: PuzzleEdges): string {
+  const { r, runs } = sideRuns(x, y, w, h, edges);
   return [
     `M ${x + r} ${y}`,
-    edgePath({ x: x + r, y }, { x: 1, y: 0 }, { x: 0, y: -1 }, w - 2 * r, top),
+    runs[0].path,
     `Q ${x + w} ${y} ${x + w} ${y + r}`,
-    edgePath({ x: x + w, y: y + r }, { x: 0, y: 1 }, { x: 1, y: 0 }, h - 2 * r, right),
+    runs[1].path,
     `Q ${x + w} ${y + h} ${x + w - r} ${y + h}`,
-    edgePath({ x: x + w - r, y: y + h }, { x: -1, y: 0 }, { x: 0, y: 1 }, w - 2 * r, bottom),
+    runs[2].path,
     `Q ${x} ${y + h} ${x} ${y + h - r}`,
-    edgePath({ x, y: y + h - r }, { x: 0, y: -1 }, { x: -1, y: 0 }, h - 2 * r, left),
+    runs[3].path,
     `Q ${x} ${y} ${x + r} ${y}`,
     "Z",
   ].join(" ");
+}
+
+/** One side's outline on its own (0 top, 1 right, 2 bottom, 3 left). */
+export function puzzleSidePath(x: number, y: number, w: number, h: number, edges: PuzzleEdges, side: number): string {
+  const run = sideRuns(x, y, w, h, edges).runs[side];
+  return `M ${run.start.x.toFixed(2)} ${run.start.y.toFixed(2)} ${run.path}`;
 }
 
 export interface PuzzleCardProps {
@@ -97,12 +125,31 @@ export interface PuzzleCardProps {
   color: string;
   /** A ring drawn around the piece's outline (selection, drop target…), or none. */
   halo?: { color: string; dashed?: boolean; pulse?: boolean } | null;
+  /** Sides interlocked with a linked node (see utils/puzzleLinks.ts): their cut overrides the seeded one and is drawn heavier. */
+  joins?: PuzzleJoins;
+  /** The viewer's own fill for this piece (see utils/cardFill.ts); the theme's node fill when unset. */
+  fill?: string;
+  /** Makes every tab a handle: pressing one starts dragging a connection out of this piece (see MapPage's startPuzzleConnect). */
+  onConnectStart?: (e: ReactPointerEvent) => void;
+  /** The handles' tooltip. */
+  connectHint?: string;
   minWidth: number;
   maxWidth: number;
   children: ReactNode;
 }
 
-export function PuzzleCard({ seed, color, halo, minWidth, maxWidth, children }: PuzzleCardProps) {
+export function PuzzleCard({
+  seed,
+  color,
+  halo,
+  joins,
+  fill,
+  onConnectStart,
+  connectHint,
+  minWidth,
+  maxWidth,
+  children,
+}: PuzzleCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   // A sensible first guess so the very first paint already has a piece
   // around it; the observer corrects it straight away.
@@ -122,7 +169,7 @@ export function PuzzleCard({ seed, color, halo, minWidth, maxWidth, children }: 
     return () => ro.disconnect();
   }, []);
 
-  const edges = puzzleEdgesFor(seed);
+  const edges = pieceEdges(seed, joins);
   // Room around the card for tabs, the outline's stroke and the halo.
   const pad = PUZZLE_TAB + 6;
   const d = puzzlePath(pad, pad, size.w, size.h, edges);
@@ -134,6 +181,8 @@ export function PuzzleCard({ seed, color, halo, minWidth, maxWidth, children }: 
   return (
     <div
       ref={ref}
+      // Found by MapPage's snapping (utils/puzzleSnap.ts) to measure the piece.
+      data-puzzle-card
       className="relative box-border text-left"
       style={{
         width: "max-content",
@@ -161,17 +210,79 @@ export function PuzzleCard({ seed, color, halo, minWidth, maxWidth, children }: 
         )}
         <path
           d={d}
-          fill="var(--node-fill)"
+          fill={fill ?? "var(--node-fill)"}
           stroke={color}
           strokeWidth={2}
           strokeLinejoin="round"
           style={{ filter: "drop-shadow(0 1px 2px rgb(0 0 0 / 0.18))" }}
         />
-        {/* A faint wash of the type's color over the fill, so pieces of
-            different types read apart at a glance, not only by their outline. */}
-        <path d={d} fill={color} opacity={0.1} />
+        {/* A faint wash of the type's color over the theme's fill, so pieces
+            of different types read apart at a glance, not only by their
+            outline — stronger once the piece is complete. A fill the viewer
+            picked is shown as picked. */}
+        {!fill && <path d={d} fill={color} opacity={joins?.complete ? 0.2 : 0.1} />}
+        {/* Joined sides: the cut that fits a linked neighbour, drawn heavier. */}
+        {joins?.cuts.map((c, i) =>
+          c === undefined ? null : (
+            <path
+              key={i}
+              d={puzzleSidePath(pad, pad, size.w, size.h, edges, i)}
+              fill="none"
+              stroke={color}
+              strokeWidth={4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ),
+        )}
       </svg>
-      <div className="relative">{children}</div>
+      {/* Connection handles: one on each tab's head. Dragging one onto
+          another piece links the two (MapPage opens the link dialog). */}
+      {onConnectStart &&
+        edges.map((cut, side) => {
+          const r = Math.min(6, size.w / 4, size.h / 4);
+          const len = (side % 2 === 0 ? size.w : size.h) - 2 * r;
+          if (cut !== 1 || len < 26) return null;
+          const reach = PUZZLE_TAB * 0.58; // the head's center, past the edge
+          const at = [
+            { left: size.w / 2, top: -reach },
+            { left: size.w + reach, top: size.h / 2 },
+            { left: size.w / 2, top: size.h + reach },
+            { left: -reach, top: size.h / 2 },
+          ][side];
+          return (
+            <div
+              key={side}
+              role="button"
+              aria-label={connectHint}
+              title={connectHint}
+              data-puzzle-handle
+              className="pointer-events-auto absolute z-[2] h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 cursor-crosshair touch-none rounded-full transition-[box-shadow] duration-150 hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_45%,transparent)]"
+              style={at}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onConnectStart(e);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+            />
+          );
+        })}
+      {joins?.complete && (
+        <div
+          className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full text-[0.6rem] leading-none font-bold text-white"
+          style={{ background: color }}
+          aria-hidden="true"
+        >
+          ✓
+        </div>
+      )}
+      {/* A custom fill is always a light swatch, so its text stays dark
+          whatever the theme. */}
+      <div className="relative" style={fill ? { color: "#1f2937" } : undefined}>
+        {children}
+      </div>
     </div>
   );
 }

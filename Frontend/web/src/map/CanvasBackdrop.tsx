@@ -10,6 +10,8 @@ interface Props {
   nodeGroups: NodeGroup[];
   /** The chosen (stabilized) circle, if any — every other zone/branch dims against it. */
   selectedCircle: SelectedCircle | null | undefined;
+  /** The zones near the middle of the view (MapPage's focusedZones) — every other zone is drawn muted. null when nothing is muted. */
+  focusedZones?: Set<string> | null;
   visibleNodes: NodeDoc[];
   edges: EdgeDoc[];
   posFor: (node: NodeDoc) => { x: number; y: number };
@@ -39,6 +41,7 @@ interface Props {
 export function CanvasBackdrop({
   nodeGroups,
   selectedCircle,
+  focusedZones = null,
   visibleNodes,
   edges,
   posFor,
@@ -81,7 +84,7 @@ export function CanvasBackdrop({
         // minimap's own zones) use — one shared signal for which
         // group, if any, is currently stabilized.
         const isStabilized = selectedCircle?.rootId === g.rootId;
-        const dimmed = !!selectedCircle && !isStabilized;
+        const dimmed = selectedCircle ? !isStabilized : !!focusedZones && !focusedZones.has(g.rootId);
         const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
         return (
           <polygon
@@ -242,7 +245,8 @@ export function CanvasBackdrop({
         // clearly against everything else (see NodeCard's matching
         // `muted` computation and the plain-Edge dimming just below).
         const isStabilized = !!group && selectedCircle?.rootId === group.rootId;
-        const circleDimmed = !!group && !!selectedCircle && !isStabilized;
+        const circleDimmed =
+          !!group && (selectedCircle ? !isStabilized : !!focusedZones && !focusedZones.has(group.rootId));
         const chosenDimmed =
           !!chosenNodeIds && !chosenNodeIds.has(parentId) && !chosenNodeIds.has(node.nodeId);
         const dimmed = circleDimmed || chosenDimmed;

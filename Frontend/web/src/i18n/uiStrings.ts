@@ -76,6 +76,7 @@ export interface UiStrings {
   };
   link: {
     titleTwo: string;
+    dragToConnect: string;
     titleN: (count: number) => string;
     sentiment: string;
     linking: string;
@@ -212,7 +213,7 @@ export interface UiStrings {
   };
   loadingMap: string;
   /** Showing the chosen nodes in their own reading mode, zooming in when their text would overlap. */
-  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string };
+  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; dots: string; zoneView: (zone: string) => string };
   /** Separator lines drawn between groups of nodes. */
   lines: {
     toolbar: string;
@@ -422,6 +423,7 @@ const en: UiStrings = {
   },
   link: {
     titleTwo: "Link nodes",
+    dragToConnect: "Drag onto another of your pieces to connect",
     titleN: (n) => `Link ${n} nodes`,
     sentiment: "Sentiment",
     linking: "Linking…",
@@ -570,6 +572,10 @@ const en: UiStrings = {
   display: {
     header: "Show chosen nodes as",
     followMap: "Same as the map",
+    cardColor: "Card color",
+    cardColorReset: "Default",
+    dots: "Dots",
+    zoneView: (z) => `View of “${z}”`,
     zoomedToFit: "Zoomed in so the nodes don't overlap.",
     stillOverlap: "Zoomed in as far as possible — a few nodes still overlap.",
   },
@@ -775,6 +781,7 @@ const cs: UiStrings = {
   },
   link: {
     titleTwo: "Propojit uzly",
+    dragToConnect: "Přetáhněte na jiný svůj dílek a propojte je",
     titleN: (n) => `Propojit ${csNodes(n)}`,
     sentiment: "Zabarvení",
     linking: "Propojování…",
@@ -923,6 +930,10 @@ const cs: UiStrings = {
   display: {
     header: "Zobrazit vybrané uzly jako",
     followMap: "Stejně jako mapa",
+    cardColor: "Barva karty",
+    cardColorReset: "Výchozí",
+    dots: "Tečky",
+    zoneView: (z) => `Zobrazení „${z}“`,
     zoomedToFit: "Přiblíženo, aby se uzly nepřekrývaly.",
     stillOverlap: "Přiblíženo na maximum — několik uzlů se stále překrývá.",
   },
@@ -1128,6 +1139,7 @@ const uk: UiStrings = {
   },
   link: {
     titleTwo: "З’єднати вузли",
+    dragToConnect: "Перетягніть на інший свій пазл, щоб з’єднати",
     titleN: (n) => `З’єднати ${ukNodes(n)}`,
     sentiment: "Забарвлення",
     linking: "З’єднання…",
@@ -1276,6 +1288,10 @@ const uk: UiStrings = {
   display: {
     header: "Показати вибрані вузли як",
     followMap: "Так само, як мапа",
+    cardColor: "Колір картки",
+    cardColorReset: "Типовий",
+    dots: "Точки",
+    zoneView: (z) => `Вигляд «${z}»`,
     zoomedToFit: "Наближено, щоб вузли не перекривалися.",
     stillOverlap: "Наближено до максимуму — кілька вузлів усе ще перекриваються.",
   },
@@ -1481,6 +1497,7 @@ const ru: UiStrings = {
   },
   link: {
     titleTwo: "Связать узлы",
+    dragToConnect: "Перетащите на другой свой пазл, чтобы соединить",
     titleN: (n) => `Связать ${ruNodes(n)}`,
     sentiment: "Окраска",
     linking: "Связывание…",
@@ -1629,6 +1646,10 @@ const ru: UiStrings = {
   display: {
     header: "Показать выбранные узлы как",
     followMap: "Так же, как карта",
+    cardColor: "Цвет карточки",
+    cardColorReset: "По умолчанию",
+    dots: "Точки",
+    zoneView: (z) => `Вид «${z}»`,
     zoomedToFit: "Приближено, чтобы узлы не перекрывались.",
     stillOverlap: "Приближено до максимума — несколько узлов всё ещё перекрываются.",
   },
