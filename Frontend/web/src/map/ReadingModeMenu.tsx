@@ -38,7 +38,7 @@ export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, onPres
   }, [onClose]);
 
   const label: Record<ReadingMode, string> = {
-    classic: t.map.toolbar.readingClassic,
+    puzzle: t.map.toolbar.readingPuzzle,
     iconText: t.map.toolbar.readingIconText,
     actual: t.map.toolbar.readingActual,
   };

@@ -25,8 +25,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   with the quick-add ghosts or the toolbar, link nodes explicitly, draw separator lines, attack
   other members' nodes with the three combat weapons, shield your own, pack nodes into a
   container, group nodes into a chosen circle, choose a node (and optionally its whole branch) to
-  link/copy/number/delete together, and switch how nodes read (icons only, icons + text, or a
-  classical mind map) for the whole map or just the chosen nodes.
+  link/copy/number/delete together, and switch how nodes read (icons only, icons + text, or
+  puzzle cards — each node a jigsaw-piece card with its whole text) for the whole map or just the
+  chosen nodes.
 - **Admin** (`/admin`) — visible only if your account's `role` is `admin` (granted with
   `npm run admin:promote` in `Backend/`, never through the app itself). Block/unblock/delete
   users, wipe the database.

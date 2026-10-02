@@ -2,15 +2,16 @@
 // with other members of the map), so it lives in localStorage rather than on
 // the map itself.
 //
-//  - classic:  a classical mind map — no icons, each node is a text box showing
-//              its whole text (and title), with far fewer limits on length.
+//  - puzzle:   puzzle cards — no icons, each node is a jigsaw-piece card
+//              showing its whole text (and title), with far fewer limits on
+//              length.
 //  - iconText: the usual icon, with its text always shown beside it.
 //  - actual:   the app's own default — icons, with captions only where the
 //              zone/selection rules say to show them.
-export type ReadingMode = "classic" | "iconText" | "actual";
+export type ReadingMode = "puzzle" | "iconText" | "actual";
 
 // Menu order: the most text-heavy first.
-export const READING_MODES: ReadingMode[] = ["classic", "iconText", "actual"];
+export const READING_MODES: ReadingMode[] = ["puzzle", "iconText", "actual"];
 
 import { isMobileViewport } from "./canvasLayout";
 
@@ -20,7 +21,9 @@ const COMPACT_KEY = "mc_compact_view";
 export function loadReadingMode(): ReadingMode {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (v === "classic" || v === "iconText" || v === "actual") return v;
+    if (v === "puzzle" || v === "iconText" || v === "actual") return v;
+    // The puzzle cards replaced the old "classical mind map" mode.
+    if (v === "classic") return "puzzle";
   } catch {
     // storage blocked or unavailable — fall through to the default
   }

@@ -158,7 +158,7 @@ describe("MapToolbar", () => {
     });
 
     it("is highlighted once a non-default reading mode is active", () => {
-      renderToolbar({ readingMode: "classic" });
+      renderToolbar({ readingMode: "puzzle" });
       const btn = screen.getByTitle(t.map.toolbar.readingMode);
       expect(btn.className).toContain("border-accent");
     });

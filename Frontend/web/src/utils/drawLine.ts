@@ -8,11 +8,11 @@ type Pt = { x: number; y: number };
 // something, that is the user's call.
 
 // A node's clickable/visible footprint around its position: the icon, with its
-// crown above and its caption below. Wider and taller in the classic mind-map
-// reading mode, where a node is a text box. Deliberately a little generous, so
+// crown above and its caption below. Wider and taller in the puzzle-card
+// reading mode, where a node is a jigsaw-piece card. Deliberately a little generous, so
 // a point never lands right against a node's edge.
-function nodeBox(classic: boolean) {
-  return classic
+function nodeBox(puzzle: boolean) {
+  return puzzle
     ? { left: 135, right: 135, top: 55, bottom: 95 }
     : { left: CAPTION_WIDTH / 2 + 10, right: CAPTION_WIDTH / 2 + 10, top: 42, bottom: 78 };
 }
@@ -40,12 +40,12 @@ export interface DrawObstacles {
   polygons: Pt[][];
   /** Manually placed zone rings, centered on their node. */
   circles: Pt[];
-  classic: boolean;
+  puzzle: boolean;
 }
 
 export function isPointFree(p: Pt, obstacles: DrawObstacles): boolean {
   if (p.x < EDGE_MARGIN || p.y < EDGE_MARGIN || p.x > CANVAS_W - EDGE_MARGIN || p.y > CANVAS_H - EDGE_MARGIN) return false;
-  const box = nodeBox(obstacles.classic);
+  const box = nodeBox(obstacles.puzzle);
   for (const n of obstacles.nodes) {
     if (p.x >= n.x - box.left && p.x <= n.x + box.right && p.y >= n.y - box.top && p.y <= n.y + box.bottom) return false;
   }
