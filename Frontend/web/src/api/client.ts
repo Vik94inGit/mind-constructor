@@ -4,7 +4,14 @@
 // cross-site one for the bulk of the app's traffic. Local dev sets
 // VITE_API_URL explicitly (see .env.example) since there's no such proxy
 // running locally.
-const API_URL: string = import.meta.env.VITE_API_URL || "";
+//
+// A production build ignores VITE_API_URL unless VITE_API_DIRECT is "true":
+// pointing REST straight at the backend's own domain makes the session cookie
+// third-party, which Safari (iPhone, iPad and Mac) blocks outright — signing
+// in "works", then every request after it fails as "Not authorized". Chrome
+// still allowed it, which is how that setting could go unnoticed.
+const API_URL: string =
+  import.meta.env.PROD && import.meta.env.VITE_API_DIRECT !== "true" ? "" : import.meta.env.VITE_API_URL || "";
 
 // The one map a demo session (see api/auth.ts's tryDemo) is ever allowed
 // onto — ProtectedRoute reads this to bounce a demo user's own dashboard/
