@@ -33,8 +33,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   pieces to link them; with Move on, a piece dragged close to another whose facing side fits — a
   tab to a slot — clicks in flush against it, and two of your pieces clicked together get linked), and each piece's fill color can be changed in
   its panel's Info tab (per browser). Each zone can also take its own view (puzzle cards, mixed, icons + text, the default look, or
-  dots) from the ⋯ button beside its name in the bottom-left list, so one canvas can show different
-  sides of the same map at once (per browser). Zoomed out to 50%, nodes show as plain dots; zones near the
+  dots) from the ⋯ button beside its name, so one canvas can show different
+  sides of the same map at once (per browser). The ⋯ buttons sit on a compact list, just left of the minimap, of the zones currently in view.
+  Your own puzzle blocks can be locked from the padlock on their corner (per browser): a locked
+  block can't be dragged, clicked into another piece or have its text edited until unlocked. Zoomed
+  out to 50%, nodes show as plain dots and the canvas drops its other icons (zone-parent rings,
+  weapon marks, quick-add ghosts); zones near the
   middle of the view stay at full strength while the rest are muted; selecting a node centers it on
   screen.
 - **Admin** (`/admin`) — visible only if your account's `role` is `admin` (granted with

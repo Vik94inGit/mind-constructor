@@ -30,6 +30,8 @@ import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { loadNodeDisplay } from "../utils/nodeDisplay";
 import { loadCardFills, saveCardFills } from "../utils/cardFill";
+import { loadBlockLocks, saveBlockLocks } from "../utils/blockLock";
+import type { BlockLocks } from "../utils/blockLock";
 import type { CardFills } from "../utils/cardFill";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
 import { findSnap } from "../utils/puzzleSnap";
@@ -195,6 +197,20 @@ export function MapPage() {
   // once — see utils/zoneDisplay.ts. Below a node's own display (the group
   // bar's "Show as"), above the map-wide reading mode.
   const [zoneDisplay, setZoneDisplay] = useState<ZoneDisplay>(() => loadZoneDisplay(mapId));
+  // Text blocks their owner locked against moving and editing — see
+  // utils/blockLock.ts.
+  const [blockLocks, setBlockLocks] = useState<BlockLocks>(() => loadBlockLocks(mapId));
+  function toggleBlockLock(nodeId: string) {
+    setBlockLocks((prev) => {
+      const next = { ...prev };
+      if (next[nodeId]) delete next[nodeId];
+      else next[nodeId] = true;
+      saveBlockLocks(mapId, next);
+      return next;
+    });
+    // Locking a block mid-edit ends the edit.
+    setInlineEditId((cur) => (cur === nodeId ? null : cur));
+  }
   // The viewer's own fill per puzzle piece — see utils/cardFill.ts.
   const [cardFills, setCardFills] = useState<CardFills>(() => loadCardFills(mapId));
   function setCardFill(nodeId: string, color: string | null) {
@@ -839,6 +855,11 @@ export function MapPage() {
     [visibleNodes, positions],
   );
 
+  // Zoomed out to 50%: no icons anywhere on the canvas — nodes are plain
+  // dots, and the decorations drawn around them (circle-parent rings,
+  // weapon marks, quick-add ghosts) are left out too. A hair of slack so a
+  // zoom that lands a rounding step off 50% still counts.
+  const dotZoom = zoom <= DOT_ZOOM + 0.005;
   // How each node is drawn: its own display if it has one, else its zone's
   // view, else the map's reading mode. A zone shown as dots draws its nodes
   // as dots (and reads as the default look underneath, for everything that
@@ -1162,6 +1183,7 @@ export function MapPage() {
     t,
     snapFor: puzzleSnapFor,
     onSnapped: linkSnappedPieces,
+    isBlockLocked: (id) => !!blockLocks[id],
   });
 
   // Same condition that gates the quick-add ghost ring below — reused
@@ -1219,7 +1241,7 @@ export function MapPage() {
   // matches what's on screen at any zoom. Only between pieces actually
   // drawn as cards — not dots, not icons.
   function drawnAsCard(n: NodeDoc): boolean {
-    if (zoom <= DOT_ZOOM || dottedByZone(n.nodeId)) return false;
+    if (dotZoom || dottedByZone(n.nodeId)) return false;
     const m = modeOf(n.nodeId);
     return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
   }
@@ -1308,7 +1330,7 @@ export function MapPage() {
   // version locked it once a node had taken any damage, but that blocked
   // ordinary corrections too aggressively; see NodePanel.tsx's own canEdit).
   function canEditNode(node: NodeDoc) {
-    return isOwnNode(node);
+    return isOwnNode(node) && !blockLocks[node.nodeId];
   }
 
   // Any node (yours, someone else's, a weapon node, already at 0 health) is a
@@ -2444,7 +2466,7 @@ export function MapPage() {
               canDeleteLine={canDeleteLine}
               onLineClick={handleLineClick}
               interactive={!drawMode}
-              compact={compactView}
+              compact={compactView || dotZoom}
               drawing={
                 drawMode
                   ? {
@@ -2527,6 +2549,7 @@ export function MapPage() {
                   canDrag={
                     isOwnNode(node) &&
                     !node.locked &&
+                    !blockLocks[node.nodeId] &&
                     (moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))
                   }
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
@@ -2543,7 +2566,7 @@ export function MapPage() {
                   celebrate={celebrateIds.has(node.nodeId)}
                   flightVector={flightVector}
                   muted={
-                    ((quickAddActive && node.nodeId !== selectedId) ||
+                    ((quickAddActive && !dotZoom && node.nodeId !== selectedId) ||
                       (!!spotlightedNodeIds && !spotlightedNodeIds.includes(node.nodeId)) ||
                       (!chooseMode && multiSelectIds.size > 0 && !multiSelectIds.has(node.nodeId)) ||
                       (!!searchMatches && !searchMatches.has(node.nodeId))) &&
@@ -2578,7 +2601,9 @@ export function MapPage() {
                   onContextMenu={(e) => handleNodeContextMenu(node, e)}
                   puzzleJoins={puzzleJoins.get(node.nodeId)}
                   cardFill={cardFills[node.nodeId]}
-                  dotted={zoom <= DOT_ZOOM || dottedByZone(node.nodeId)}
+                  dotted={dotZoom || dottedByZone(node.nodeId)}
+                  blockLocked={!!blockLocks[node.nodeId]}
+                  onToggleBlockLock={isOwnNode(node) ? () => toggleBlockLock(node.nodeId) : undefined}
                   onConnectStart={
                     isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
                   }
@@ -2609,12 +2634,14 @@ export function MapPage() {
                   </div>
                 );
               })()}
-            <WeaponLayer
-              visibleNodes={visibleNodes}
-              posFor={posFor}
-              celebrateIds={celebrateIds}
-              shotState={shotState}
-            />
+            {!dotZoom && (
+              <WeaponLayer
+                visibleNodes={visibleNodes}
+                posFor={posFor}
+                celebrateIds={celebrateIds}
+                shotState={shotState}
+              />
+            )}
 
             {/* No separate ShieldMark overlay any more — a protection node
                 already sits exactly on the arrows path between attacker and
@@ -2625,7 +2652,7 @@ export function MapPage() {
                 clutter. NodeCard's own small 🛡️ badge is still the one
                 thing marking a node as a protector, active attacker or not. */}
 
-            {quickAddActive && selectedNode && !pendingCreate && !inlineEditId && (
+            {quickAddActive && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
                 anchorPos={posFor(selectedNode)}
                 bounds={settledViewportBounds()}
@@ -2862,6 +2889,7 @@ export function MapPage() {
                   what would be mostly just visual dimming. */}
               <NodePanel
                 node={selectedNode}
+                textLocked={!!blockLocks[selectedNode.nodeId]}
                 cardFill={(() => {
                   const mode = modeOf(selectedNode.nodeId);
                   const isCard =

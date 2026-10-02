@@ -133,6 +133,12 @@ export interface PuzzleCardProps {
   onConnectStart?: (e: ReactPointerEvent) => void;
   /** The handles' tooltip. */
   connectHint?: string;
+  /** Locked by its owner (utils/blockLock.ts): shows a padlock. */
+  locked?: boolean;
+  /** Locks/unlocks the block — the padlock becomes a button. Unset for someone else's piece. */
+  onToggleLock?: () => void;
+  /** The padlock's tooltip, for its current state. */
+  lockLabel?: string;
   minWidth: number;
   maxWidth: number;
   children: ReactNode;
@@ -146,6 +152,9 @@ export function PuzzleCard({
   fill,
   onConnectStart,
   connectHint,
+  locked = false,
+  onToggleLock,
+  lockLabel,
   minWidth,
   maxWidth,
   children,
@@ -269,6 +278,41 @@ export function PuzzleCard({
             />
           );
         })}
+      {/* Lock — bottom-left corner. Always showing on a locked block; on an
+          unlocked one of your own only while hovered, so it's there when
+          wanted without dotting every card with a padlock. */}
+      {(locked || onToggleLock) && (
+        <button
+          type="button"
+          className={`absolute -bottom-2 -left-2 z-[3] flex h-5 w-5 items-center justify-center rounded-full border text-[0.62rem] leading-none shadow-card transition-opacity duration-150 ${
+            onToggleLock ? "pointer-events-auto cursor-pointer" : "pointer-events-none"
+          } ${
+            locked
+              ? "border-accent bg-accent text-white"
+              : "border-line bg-surface text-ink-soft opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+          }`}
+          title={lockLabel}
+          aria-label={lockLabel}
+          aria-pressed={locked}
+          tabIndex={onToggleLock ? 0 : -1}
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleLock?.();
+          }}
+        >
+          <svg width="10" height="11" viewBox="0 0 10 11" aria-hidden="true">
+            <rect x="1" y="4.6" width="8" height="6" rx="1.2" fill="currentColor" />
+            <path
+              d={locked ? "M2.8 4.8 V3.2 a2.2 2.2 0 0 1 4.4 0 V4.8" : "M2.8 4.8 V3.2 a2.2 2.2 0 0 1 4.3 -0.6"}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+            />
+          </svg>
+        </button>
+      )}
       {joins?.complete && (
         <div
           className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full text-[0.6rem] leading-none font-bold text-white"

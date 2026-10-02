@@ -158,6 +158,8 @@ interface Props {
   onExtractText: () => void;
   /** Set while this node is drawn as a puzzle card: its fill (the viewer's own, see utils/cardFill.ts) and how to change it. */
   cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
+  /** Its owner locked this text block (utils/blockLock.ts): the text reads as for anyone else's node until unlocked. */
+  textLocked?: boolean;
 }
 
 export function NodePanel({
@@ -182,6 +184,7 @@ export function NodePanel({
   isClusterParent,
   onExtractText,
   cardFill,
+  textLocked = false,
 }: Props) {
   const { t } = useI18n();
   const isCreator = idOf(node.userId) === currentUserId;
@@ -902,7 +905,10 @@ export function NodePanel({
           {/* The node's title, when it has one — read-only here for
               everyone; the owner edits it under Modify. */}
           {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>}
-          {isCreator ? (
+          {isCreator && textLocked && (
+            <div className="mb-2 text-[0.75rem] text-ink-soft">🔒 {t.ui.display.blockLocked}</div>
+          )}
+          {isCreator && !textLocked ? (
             <textarea
               id="node-text"
               ref={textareaRef}
