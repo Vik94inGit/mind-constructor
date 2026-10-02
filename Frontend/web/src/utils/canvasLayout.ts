@@ -17,6 +17,9 @@ export const CANVAS_H = 1600;
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 2.5;
 export const ZOOM_STEP = 0.35;
+// Zoomed out this far (or further), nodes draw as plain dots in their type's
+// color instead of icons/cards — see NodeCard's `dotted`.
+export const DOT_ZOOM = 0.5;
 
 // How much of the screen's height NodePanel/PackPickerPanel's bottom sheet
 // is allowed to cover — kept in one function so centerOnNode (which

@@ -9,6 +9,7 @@ import { NodeWings } from "./NodeWings";
 import { KnightHelmet } from "./KnightHelmet";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { PuzzleCard } from "./PuzzleCard";
+import type { PuzzleJoins } from "../utils/puzzleLinks";
 import { CAPTION_WIDTH } from "../utils/canvasLayout";
 import { useI18n } from "../i18n/I18nContext";
 import {
@@ -150,6 +151,12 @@ interface Props {
   /** Double-click/double-tap — starts inline text/type editing (see MapPage's startInlineEdit); the only thing double-clicking a node does. */
   onDoubleClick?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
+  /** Puzzle cards only: the sides interlocked with linked nodes (utils/puzzleLinks.ts). */
+  puzzleJoins?: PuzzleJoins;
+  /** Puzzle cards only: the viewer's own fill for this piece (utils/cardFill.ts). */
+  cardFill?: string;
+  /** Zoomed far out (MapPage's DOT_ZOOM): drawn as a small dot in its type's color, nothing else. */
+  dotted?: boolean;
 }
 
 export const NodeCard = memo(function NodeCard({
@@ -186,6 +193,9 @@ export const NodeCard = memo(function NodeCard({
   onClick,
   onDoubleClick,
   onContextMenu,
+  puzzleJoins,
+  cardFill,
+  dotted = false,
 }: Props) {
   const { t } = useI18n();
   const particlesRef = useRef<HTMLDivElement | null>(null);
@@ -302,12 +312,16 @@ export const NodeCard = memo(function NodeCard({
   // every one of its members shows its caption too — studying a cluster up
   // close is exactly when every member's own text actually matters.
   // Reading modes override that: "icons + text" shows every node's text; the
-  // puzzle cards have no caption at all, the card *is* the node. A
-  // node mid-edit falls back to the icon + input either way (see `puzzle`).
-  const puzzle = readingMode === "puzzle" && !inlineEditing;
+  // puzzle cards have no caption at all, the card *is* the node. The mixed
+  // mode draws only a circle's parent as a card and every other node as a
+  // bare icon with no caption, so a map reads as a few named pieces with
+  // their members around them. A node mid-edit falls back to the icon +
+  // input either way (see `puzzle`).
+  const mixed = readingMode === "mixed";
+  const puzzle = (readingMode === "puzzle" || (mixed && !!parentCrownSentiment)) && !inlineEditing;
   const iconText = readingMode === "iconText";
   const showCaption =
-    !hideCaption && (puzzle ? false : iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle);
+    !hideCaption && !mixed && (puzzle ? false : iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle);
   // What the caption says: the node's own title if it has one, otherwise the
   // start of its text (the line-clamp on the chip is what cuts it off, so
   // "first words" needs no separate truncation here).
@@ -625,6 +639,16 @@ export const NodeCard = memo(function NodeCard({
           title) never looked centered in its own zone. With only the icon
           in flow, x/y is the icon's center for every node, always. */}
       <div className="relative flex w-full flex-col items-center" style={inverseScaleStyle}>
+      {dotted && !selected && !inlineEditing ? (
+        // Zoomed far out: just a point in the node's type color — at that
+        // distance icons, cards and badges are only noise, and the dots
+        // still show where everything is and what kind it is.
+        <div
+          className="pointer-events-auto h-3 w-3 rounded-full border border-surface"
+          style={{ background: circleBorderColor, outline: ringStyle.outline, outlineOffset: 2 }}
+        />
+      ) : (
+      <>
       {/* pointer-events-auto: the one part of this node that takes the
           pointer (the outer div is pointer-events-none — see its class
           list). Handlers all live on that outer div and reach it by
@@ -728,6 +752,8 @@ export const NodeCard = memo(function NodeCard({
           <PuzzleCard
             seed={node.nodeId}
             color={circleBorderColor}
+            joins={puzzleJoins}
+            fill={cardFill}
             minWidth={96}
             maxWidth={selected ? PUZZLE_SELECTED_MAX_WIDTH : PUZZLE_MAX_WIDTH}
             halo={
@@ -745,10 +771,10 @@ export const NodeCard = memo(function NodeCard({
             }
           >
             {trimmedTitle && (
-              <div className="text-[0.78rem] leading-[1.3] font-semibold break-words text-ink">{trimmedTitle}</div>
+              <div className={`text-[0.78rem] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}>{trimmedTitle}</div>
             )}
             <div
-              className={`text-[0.72rem] leading-[1.35] break-words whitespace-pre-wrap text-ink ${selected ? "line-clamp-3" : ""}`}
+              className={`text-[0.72rem] leading-[1.35] break-words whitespace-pre-wrap ${cardFill ? "" : "text-ink"} ${selected ? "line-clamp-3" : ""}`}
             >
               {node.text || (trimmedTitle ? "" : "…")}
             </div>
@@ -912,6 +938,8 @@ export const NodeCard = memo(function NodeCard({
         >
           {t.ui.node.chooseHint}
         </div>
+      )}
+      </>
       )}
       </div>
     </div>

@@ -212,7 +212,7 @@ export interface UiStrings {
   };
   loadingMap: string;
   /** Showing the chosen nodes in their own reading mode, zooming in when their text would overlap. */
-  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string };
+  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string };
   /** Separator lines drawn between groups of nodes. */
   lines: {
     toolbar: string;
@@ -570,6 +570,8 @@ const en: UiStrings = {
   display: {
     header: "Show chosen nodes as",
     followMap: "Same as the map",
+    cardColor: "Card color",
+    cardColorReset: "Default",
     zoomedToFit: "Zoomed in so the nodes don't overlap.",
     stillOverlap: "Zoomed in as far as possible — a few nodes still overlap.",
   },
@@ -923,6 +925,8 @@ const cs: UiStrings = {
   display: {
     header: "Zobrazit vybrané uzly jako",
     followMap: "Stejně jako mapa",
+    cardColor: "Barva karty",
+    cardColorReset: "Výchozí",
     zoomedToFit: "Přiblíženo, aby se uzly nepřekrývaly.",
     stillOverlap: "Přiblíženo na maximum — několik uzlů se stále překrývá.",
   },
@@ -1276,6 +1280,8 @@ const uk: UiStrings = {
   display: {
     header: "Показати вибрані вузли як",
     followMap: "Так само, як мапа",
+    cardColor: "Колір картки",
+    cardColorReset: "Типовий",
     zoomedToFit: "Наближено, щоб вузли не перекривалися.",
     stillOverlap: "Наближено до максимуму — кілька вузлів усе ще перекриваються.",
   },
@@ -1629,6 +1635,8 @@ const ru: UiStrings = {
   display: {
     header: "Показать выбранные узлы как",
     followMap: "Так же, как карта",
+    cardColor: "Цвет карточки",
+    cardColorReset: "По умолчанию",
     zoomedToFit: "Приближено, чтобы узлы не перекрывались.",
     stillOverlap: "Приближено до максимума — несколько узлов всё ещё перекрываются.",
   },

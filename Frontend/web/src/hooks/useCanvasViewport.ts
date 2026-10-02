@@ -23,6 +23,10 @@ const prefersReducedMotion = () =>
 // so a node on the bottom edge can still be brought up above the sheet.
 const deadZonePx = () => (isMobileViewport() ? 170 : 240);
 
+// How far above the bottom sheet's top edge a centered node stays, at least,
+// in screen pixels — room for its card or icon and caption.
+const NODE_CLEAR_OF_SHEET = 150;
+
 interface Params {
   mapId: string | undefined;
   /** The map is still loading — the canvas (and so wrapRef) isn't mounted yet. */
@@ -493,7 +497,11 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // screenToCanvas's own doc comment) — same conversion, just the other
     // direction.
     const targetLeft = Math.min(maxLeft, Math.max(0, (pos.x + hScrollMargin) * zoom - wrap.clientWidth / 2));
-    const targetTop = Math.min(maxTop, Math.max(0, (pos.y + vScrollMargin) * zoom - visibleH / 2));
+    // Dead center of the screen — unless the bottom sheet would then cover
+    // it (a phone's sheet takes half the screen), in which case it sits just
+    // clear above the sheet instead.
+    const screenY = Math.min(wrap.clientHeight / 2, visibleH - NODE_CLEAR_OF_SHEET);
+    const targetTop = Math.min(maxTop, Math.max(0, (pos.y + vScrollMargin) * zoom - Math.max(screenY, visibleH / 2)));
     // See its own doc comment — recorded regardless of which branch below
     // actually runs, since settledViewportBounds() should always reflect
     // the most recent centerOnNode call, not just the ones that had to

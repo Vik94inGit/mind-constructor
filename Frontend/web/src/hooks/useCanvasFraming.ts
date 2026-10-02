@@ -63,7 +63,9 @@ export function useCanvasFraming({
       if (n.isWeapon || n.isProtection) return [];
       const pos = positions.get(n.nodeId);
       if (!pos) return [];
-      const mode = display[n.nodeId] ?? globalMode;
+      let mode = display[n.nodeId] ?? globalMode;
+      // Mixed: a circle's parent is a card, everything else a bare icon.
+      if (mode === "mixed") mode = circleRootSentimentByNode.has(n.nodeId) ? "puzzle" : "actual";
       const tier = circleRootSentimentByNode.has(n.nodeId) ? 3 : (n.sizeTier ?? 1);
       const multiplier = tier === 3 ? 1.3 : tier === 2 ? 1.15 : 1;
       return [{ x: pos.x, y: pos.y, ...nodeFootprint(n, mode, multiplier) }];

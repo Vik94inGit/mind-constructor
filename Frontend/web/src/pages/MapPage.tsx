@@ -29,6 +29,10 @@ import { MiniMap } from "../map/MiniMap";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { loadNodeDisplay } from "../utils/nodeDisplay";
+import { loadCardFills, saveCardFills } from "../utils/cardFill";
+import type { CardFills } from "../utils/cardFill";
+import { computePuzzleJoins } from "../utils/puzzleLinks";
+import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
 import { MapToolbar } from "../map/MapToolbar";
@@ -55,6 +59,7 @@ import {
   CANVAS_W,
   CANVAS_H,
   ZOOM_STEP,
+  DOT_ZOOM,
   computeLinkedNeighborIds,
   getCirclePackSpacing,
   pickNonOverlappingPosition,
@@ -177,6 +182,17 @@ export function MapPage() {
   // as puzzle cards, say) — per browser and per map, see
   // utils/nodeDisplay.ts.
   const [nodeDisplay, setNodeDisplay] = useState<NodeDisplay>(() => loadNodeDisplay(mapId));
+  // The viewer's own fill per puzzle piece — see utils/cardFill.ts.
+  const [cardFills, setCardFills] = useState<CardFills>(() => loadCardFills(mapId));
+  function setCardFill(nodeId: string, color: string | null) {
+    setCardFills((prev) => {
+      const next = { ...prev };
+      if (color) next[nodeId] = color;
+      else delete next[nodeId];
+      saveCardFills(mapId, next);
+      return next;
+    });
+  }
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
   // group selection (multiSelectIds — the same one shift+click and the marquee
   // build), instead of opening that node's panel. The group bar then offers
@@ -810,6 +826,59 @@ export function MapPage() {
     [visibleNodes, positions],
   );
 
+  // Puzzle pieces interlock along the map's links — see utils/puzzleLinks.ts.
+  const puzzleJoins = useMemo(
+    () => computePuzzleJoins(visibleNodes, edges, positions),
+    [visibleNodes, edges, positions],
+  );
+
+  // The zones near the middle of the screen stay at full strength and the
+  // rest are muted (see utils/zoneFocus.ts), recomputed as the view pans and
+  // zooms. Off while a circle is stabilized — that spotlight already says
+  // which zone matters.
+  const [focusedZones, setFocusedZones] = useState<Set<string> | null>(null);
+  const zoneFocusInputs = useRef({ nodeGroups, zoom, hScrollMargin, vScrollMargin });
+  zoneFocusInputs.current = { nodeGroups, zoom, hScrollMargin, vScrollMargin };
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    let frame: number | null = null;
+    const update = () => {
+      frame = null;
+      const { nodeGroups, zoom, hScrollMargin, vScrollMargin } = zoneFocusInputs.current;
+      const center = {
+        x: (wrap.scrollLeft + wrap.clientWidth / 2) / zoom - hScrollMargin,
+        y: (wrap.scrollTop + wrap.clientHeight / 2) / zoom - vScrollMargin,
+      };
+      // A quarter of the smaller screen side, in canvas units.
+      const reach = (Math.min(wrap.clientWidth, wrap.clientHeight) / 4) / zoom;
+      const next = focusedZoneIds(nodeGroups, center, reach);
+      setFocusedZones((prev) => (sameIds(prev, next) ? prev : next));
+    };
+    const schedule = () => {
+      if (frame == null) frame = requestAnimationFrame(update);
+    };
+    update();
+    wrap.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      wrap.removeEventListener("scroll", schedule);
+      if (frame != null) cancelAnimationFrame(frame);
+    };
+  }, [loading, nodeGroups, zoom, hScrollMargin, vScrollMargin, wrapRef]);
+  const activeFocusedZones = map?.selectedCircle ? null : focusedZones;
+  // Nodes that belong only to zones out of focus.
+  const zoneMutedIds = useMemo(() => {
+    const out = new Set<string>();
+    if (!activeFocusedZones) return out;
+    const inFocus = new Set<string>();
+    for (const g of nodeGroups) {
+      const focused = activeFocusedZones.has(g.rootId);
+      for (const m of g.members) (focused ? inFocus : out).add(m.nodeId);
+    }
+    for (const id of inFocus) out.delete(id);
+    return out;
+  }, [activeFocusedZones, nodeGroups]);
+
   // Circle-parent nodes always show their caption (see NodeCard's
   // showCaption) — this backfills their real text the moment a node becomes
   // one, rather than waiting on some other trigger (opening its panel, an
@@ -861,9 +930,13 @@ export function MapPage() {
   }, [selectedId]);
 
   // The two text-heavy reading modes draw every node's text, so all of it is
-  // needed up front (one bulk request for whatever hasn't loaded yet).
+  // needed up front (one bulk request for whatever hasn't loaded yet). The
+  // mixed mode only shows circle parents' text, which the circle-root
+  // backfill above already covers.
   useEffect(() => {
-    const ids = visibleNodes.filter((n) => (nodeDisplay[n.nodeId] ?? readingMode) !== "actual").map((n) => n.nodeId);
+    const ids = visibleNodes
+      .filter((n) => !["actual", "mixed"].includes(nodeDisplay[n.nodeId] ?? readingMode))
+      .map((n) => n.nodeId);
     if (ids.length > 0) ensureNodeText(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readingMode, nodeDisplay, visibleNodes]);
@@ -2023,7 +2096,7 @@ export function MapPage() {
     const shownParents = visibleNodes.filter(
       (n) =>
         parentIds.has(n.nodeId) &&
-        (nodeDisplay[n.nodeId] ?? readingMode) !== "puzzle" &&
+        !["puzzle", "mixed"].includes(nodeDisplay[n.nodeId] ?? readingMode) &&
         selectedId !== n.nodeId &&
         inlineEditId !== n.nodeId,
     );
@@ -2179,6 +2252,7 @@ export function MapPage() {
             <CanvasBackdrop
               nodeGroups={nodeGroups}
               selectedCircle={map?.selectedCircle}
+              focusedZones={activeFocusedZones}
               visibleNodes={visibleNodes}
               edges={edges}
               posFor={posFor}
@@ -2277,7 +2351,7 @@ export function MapPage() {
                     !unmutedAttackNodeIds?.has(node.nodeId)
                   }
                   isParent={parentIds.has(node.nodeId)}
-                  quiet={childIsQuiet(node)}
+                  quiet={childIsQuiet(node) || (zoneMutedIds.has(node.nodeId) && selectedId !== node.nodeId)}
                   hideCaption={hiddenChildCaptions.has(node.nodeId) && inlineEditId !== node.nodeId}
                   dropHighlight={dropTarget?.nodeId === node.nodeId ? (dropTarget.valid ? "valid" : "invalid") : undefined}
                   inlineEditing={editingThis}
@@ -2293,6 +2367,9 @@ export function MapPage() {
                   }}
                   onDoubleClick={() => startInlineEdit(node)}
                   onContextMenu={(e) => handleNodeContextMenu(node, e)}
+                  puzzleJoins={puzzleJoins.get(node.nodeId)}
+                  cardFill={cardFills[node.nodeId]}
+                  dotted={zoom <= DOT_ZOOM}
                 />
               );
             })}
@@ -2571,6 +2648,17 @@ export function MapPage() {
                   what would be mostly just visual dimming. */}
               <NodePanel
                 node={selectedNode}
+                cardFill={(() => {
+                  const mode = nodeDisplay[selectedNode.nodeId] ?? readingMode;
+                  const isCard =
+                    mode === "puzzle" || (mode === "mixed" && circleRootSentimentByNode.has(selectedNode.nodeId));
+                  return isCard
+                    ? {
+                        value: cardFills[selectedNode.nodeId],
+                        onChange: (c: string | null) => setCardFill(selectedNode.nodeId, c),
+                      }
+                    : null;
+                })()}
                 nodes={nodes}
                 edges={edges}
                 currentUserId={user._id}

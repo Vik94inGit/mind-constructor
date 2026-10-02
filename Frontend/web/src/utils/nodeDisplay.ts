@@ -17,7 +17,7 @@ export function loadNodeDisplay(mapId: string | undefined): NodeDisplay {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const out: NodeDisplay = {};
     for (const [id, mode] of Object.entries(parsed)) {
-      if (mode === "puzzle" || mode === "iconText" || mode === "actual") out[id] = mode;
+      if (mode === "puzzle" || mode === "mixed" || mode === "iconText" || mode === "actual") out[id] = mode;
       else if (mode === "classic") out[id] = "puzzle"; // the old classical mind map
     }
     return out;
