@@ -30,7 +30,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   cards, everything else a bare icon) for the whole map or just the chosen nodes. Puzzle pieces
   interlock along links (a tab toward a child or an edge's far end, a matching blank on the other
   piece; a piece joined on all four sides gets a ✓; drag out of one of your piece's tabs onto another of your
-  pieces to link them), and each piece's fill color can be changed in
+  pieces to link them; with Move on, a piece dragged close to another whose facing side fits — a
+  tab to a slot — clicks in flush against it, and two of your pieces clicked together get linked), and each piece's fill color can be changed in
   its panel's Info tab (per browser). Each zone can also take its own view (puzzle cards, mixed, icons + text, the default look, or
   dots) from the ⋯ button beside its name in the bottom-left list, so one canvas can show different
   sides of the same map at once (per browser). Zoomed out to 50%, nodes show as plain dots; zones near the

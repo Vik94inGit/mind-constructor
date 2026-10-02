@@ -32,6 +32,9 @@ import { loadNodeDisplay } from "../utils/nodeDisplay";
 import { loadCardFills, saveCardFills } from "../utils/cardFill";
 import type { CardFills } from "../utils/cardFill";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
+import { findSnap } from "../utils/puzzleSnap";
+import type { Snap, SnapPiece } from "../utils/puzzleSnap";
+import { pieceEdges } from "../map/PuzzleCard";
 import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
 import { loadZoneDisplay, saveZoneDisplay, zoneModeByNode } from "../utils/zoneDisplay";
 import type { ZoneDisplay, ZoneMode } from "../utils/zoneDisplay";
@@ -94,6 +97,10 @@ const TEMPLATE_NODE_STAGGER_MS = 250;
 // field rather than touching one of these in place.
 const EMPTY_STRING_SET: Set<string> = new Set();
 const EMPTY_POINTS: { x: number; y: number }[] = [];
+
+// How close (in screen pixels) a dragged puzzle piece has to come to a fitting
+// one before it clicks in.
+const SNAP_REACH_PX = 36;
 
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
@@ -1153,6 +1160,8 @@ export function MapPage() {
     setMultiSelectIds,
     suppressNextClick,
     t,
+    snapFor: puzzleSnapFor,
+    onSnapped: linkSnappedPieces,
   });
 
   // Same condition that gates the quick-add ghost ring below — reused
@@ -1204,6 +1213,61 @@ export function MapPage() {
       return (a === from.nodeId && b === to.nodeId) || (a === to.nodeId && b === from.nodeId);
     });
   }
+  // Clicking pieces together (utils/puzzleSnap.ts): a puzzle card dragged
+  // close to another one whose facing side has the opposite cut (a tab to a
+  // blank) jumps flush into it. Measured off the cards as drawn, so the fit
+  // matches what's on screen at any zoom. Only between pieces actually
+  // drawn as cards — not dots, not icons.
+  function drawnAsCard(n: NodeDoc): boolean {
+    if (zoom <= DOT_ZOOM || dottedByZone(n.nodeId)) return false;
+    const m = modeOf(n.nodeId);
+    return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
+  }
+  function snapPiece(n: NodeDoc, at: { x: number; y: number }): SnapPiece | null {
+    const el = document.querySelector(`[data-reveal-node="${CSS.escape(n.nodeId)}"] [data-puzzle-card]`);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      id: n.nodeId,
+      x: at.x,
+      y: at.y,
+      w: r.width / zoom,
+      h: r.height / zoom,
+      edges: pieceEdges(n.nodeId, puzzleJoins.get(n.nodeId)),
+    };
+  }
+  function puzzleSnapFor(node: NodeDoc, x: number, y: number): Snap | null {
+    if (!drawnAsCard(node)) return null;
+    const me = snapPiece(node, { x, y });
+    if (!me) return null;
+    // Only pieces near enough to possibly fit are measured.
+    const near = (SNAP_REACH_PX + 600) / zoom;
+    const others = visibleNodes.flatMap((n) => {
+      if (n.nodeId === node.nodeId || !drawnAsCard(n)) return [];
+      const p = posFor(n);
+      if (Math.abs(p.x - x) > near || Math.abs(p.y - y) > near) return [];
+      const piece = snapPiece(n, p);
+      return piece ? [piece] : [];
+    });
+    return findSnap(me, others, SNAP_REACH_PX / zoom);
+  }
+  // Pieces dropped clicked together are linked — from the piece whose tab
+  // went in to the one whose blank took it, so the fit stays the way it's
+  // drawn — when both are yours (a link needs both ends to be) and they
+  // aren't linked yet.
+  async function linkSnappedPieces(_node: NodeDoc, snap: Snap) {
+    const from = nodes.find((n) => n.nodeId === snap.from);
+    const to = nodes.find((n) => n.nodeId === snap.to);
+    if (!from || !mapId || !isOwnNode(from) || !canConnect(from, to)) return;
+    if (nodeRefId(from.parentId) === to.nodeId || nodeRefId(to.parentId) === from.nodeId) return;
+    try {
+      upsertEdge(await edgesApi.createEdge(mapId, { fromNodeId: from.nodeId, toNodeId: to.nodeId, sentiment: "neutral" }));
+      refreshInsights(mapId);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.link.failed);
+    }
+  }
+
   function startPuzzleConnect(from: NodeDoc, e: ReactPointerEvent) {
     setContextMenu(null);
     const track = (clientX: number, clientY: number) => {

@@ -297,7 +297,9 @@ export const NodeCard = memo(function NodeCard({
     !dragging &&
     !selected &&
     !multiSelected &&
-    !inlineEditing;
+    !inlineEditing &&
+    // Puzzle cards hold still, so pieces clicked together stay fitted.
+    !(readingMode === "puzzle" && !dotted);
   const readonly = !canDrag;
   // Captions are hidden by default now — a whole map's worth of text
   // labels competing for attention read as clutter, same reasoning

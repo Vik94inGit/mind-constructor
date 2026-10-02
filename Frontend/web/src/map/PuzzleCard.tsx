@@ -40,6 +40,11 @@ export function puzzleEdgesFor(seed: string): PuzzleEdges {
   return edges;
 }
 
+/** A piece's cut as drawn: its seeded cut, with the sides joined to linked nodes overriding it. */
+export function pieceEdges(seed: string, joins?: PuzzleJoins): PuzzleEdges {
+  return puzzleEdgesFor(seed).map((e, i) => joins?.cuts[i] ?? e) as PuzzleEdges;
+}
+
 type Pt = { x: number; y: number };
 
 // One edge, from `from` along `dir` for `len`, with its tab/blank bulging
@@ -164,7 +169,7 @@ export function PuzzleCard({
     return () => ro.disconnect();
   }, []);
 
-  const edges = puzzleEdgesFor(seed).map((e, i) => joins?.cuts[i] ?? e) as PuzzleEdges;
+  const edges = pieceEdges(seed, joins);
   // Room around the card for tabs, the outline's stroke and the halo.
   const pad = PUZZLE_TAB + 6;
   const d = puzzlePath(pad, pad, size.w, size.h, edges);
@@ -176,6 +181,8 @@ export function PuzzleCard({
   return (
     <div
       ref={ref}
+      // Found by MapPage's snapping (utils/puzzleSnap.ts) to measure the piece.
+      data-puzzle-card
       className="relative box-border text-left"
       style={{
         width: "max-content",
