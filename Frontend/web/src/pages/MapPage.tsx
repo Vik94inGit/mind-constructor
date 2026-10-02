@@ -174,7 +174,7 @@ export function MapPage() {
     if (mode !== "actual") fitZoomForDisplay(nodeDisplay, mode);
   }
   // Nodes shown in their own reading mode instead of the map's (a chosen group
-  // as a classical mind map, say) — per browser and per map, see
+  // as puzzle cards, say) — per browser and per map, see
   // utils/nodeDisplay.ts.
   const [nodeDisplay, setNodeDisplay] = useState<NodeDisplay>(() => loadNodeDisplay(mapId));
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
@@ -2018,12 +2018,12 @@ export function MapPage() {
         namedZone: isCircleParent && !!n.zoneName && !compactView,
       };
     };
-    // A parent's caption is up unless its text box *is* the node (classic
+    // A parent's caption is up unless its card *is* the node (puzzle
     // reading mode) or it's selected/being edited (NodeCard drops it then).
     const shownParents = visibleNodes.filter(
       (n) =>
         parentIds.has(n.nodeId) &&
-        (nodeDisplay[n.nodeId] ?? readingMode) !== "classic" &&
+        (nodeDisplay[n.nodeId] ?? readingMode) !== "puzzle" &&
         selectedId !== n.nodeId &&
         inlineEditId !== n.nodeId,
     );

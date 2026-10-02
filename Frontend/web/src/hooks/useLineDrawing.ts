@@ -112,7 +112,7 @@ export function useLineDrawing({
         ),
       ],
       circles: visibleNodes.filter((n) => n.manualZone).map((n) => posFor(n)),
-      classic: readingMode === "classic",
+      puzzle: readingMode === "puzzle",
     };
   }
 

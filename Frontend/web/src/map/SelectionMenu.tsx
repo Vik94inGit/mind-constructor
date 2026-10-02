@@ -82,8 +82,8 @@ export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onNumber
       <button className={item} onClick={() => onDisplay("iconText")}>
         {t.map.toolbar.readingIconText}
       </button>
-      <button className={item} onClick={() => onDisplay("classic")}>
-        {t.map.toolbar.readingClassic}
+      <button className={item} onClick={() => onDisplay("puzzle")}>
+        {t.map.toolbar.readingPuzzle}
       </button>
       <button className={item} onClick={() => onDisplay(null)}>
         {t.ui.display.followMap}

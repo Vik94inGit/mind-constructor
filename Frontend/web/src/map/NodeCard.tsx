@@ -8,6 +8,7 @@ import { NodeCrown } from "./NodeCrown";
 import { NodeWings } from "./NodeWings";
 import { KnightHelmet } from "./KnightHelmet";
 import { NodeTypeIcon } from "./NodeTypeIcon";
+import { PuzzleCard } from "./PuzzleCard";
 import { CAPTION_WIDTH } from "../utils/canvasLayout";
 import { useI18n } from "../i18n/I18nContext";
 import {
@@ -56,12 +57,12 @@ function seededRandoms(seed: string, count: number): number[] {
 // 32/26 — see MapPage's getNodeMinDist for the matching spacing shrink.)
 const OUTCOME_BADGE_SIZE = 26;
 
-// Reading modes (see utils/readingMode.ts). A classic-mode text box is as wide
+// Reading modes (see utils/readingMode.ts). A puzzle card is as wide
 // as its text wants up to this — far past the 148px caption chip, since the
 // point of the mode is reading whole nodes — and only a selected node
 // (whose ghost ring and panel already surround it) is held to the compact one.
-const CLASSIC_MAX_WIDTH = 240;
-const CLASSIC_SELECTED_MAX_WIDTH = 180;
+const PUZZLE_MAX_WIDTH = 240;
+const PUZZLE_SELECTED_MAX_WIDTH = 180;
 // iconText captions: a little wider and taller than the default chip.
 const ICON_TEXT_CAPTION_WIDTH = 176;
 
@@ -301,12 +302,12 @@ export const NodeCard = memo(function NodeCard({
   // every one of its members shows its caption too — studying a cluster up
   // close is exactly when every member's own text actually matters.
   // Reading modes override that: "icons + text" shows every node's text; the
-  // classic mind map has no caption at all, the text box *is* the node. A
-  // node mid-edit falls back to the icon + input either way (see `classic`).
-  const classic = readingMode === "classic" && !inlineEditing;
+  // puzzle cards have no caption at all, the card *is* the node. A
+  // node mid-edit falls back to the icon + input either way (see `puzzle`).
+  const puzzle = readingMode === "puzzle" && !inlineEditing;
   const iconText = readingMode === "iconText";
   const showCaption =
-    !hideCaption && (classic ? false : iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle);
+    !hideCaption && (puzzle ? false : iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle);
   // What the caption says: the node's own title if it has one, otherwise the
   // start of its text (the line-clamp on the chip is what cuts it off, so
   // "first words" needs no separate truncation here).
@@ -628,7 +629,7 @@ export const NodeCard = memo(function NodeCard({
           pointer (the outer div is pointer-events-none — see its class
           list). Handlers all live on that outer div and reach it by
           bubbling from here. */}
-      <div className={`pointer-events-auto relative ${classic ? "" : "h-[48px] w-[48px]"}`}>
+      <div className={`pointer-events-auto relative ${puzzle ? "" : "h-[48px] w-[48px]"}`}>
         {indicator && (
           <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
             {indicator.incomingNegativeEdges}
@@ -703,36 +704,45 @@ export const NodeCard = memo(function NodeCard({
         {/* Halo/horns — see NodeCrown's own doc comment; shared with
             QuickAddGhosts so a ghost previews this too, not just the bare
             symbol. */}
-        {!classic && !compact && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
+        {!puzzle && !compact && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
         {/* Wings — see NodeWings's own doc comment for why this is a
             separate, never-resized overlay rather than living inside
             OutcomeBadge. Placed before the bordered circle below in DOM
             order (both z-index:auto) so the circle paints over the
             wings' own base, same "flanking the head, not stamped on top
             of it" look the wings always had. */}
-        {!classic && !compact && <NodeWings type={displayType} show={selected} symbolOverride={node.symbolOverride} />}
+        {!puzzle && !compact && <NodeWings type={displayType} show={selected} symbolOverride={node.symbolOverride} />}
         {/* No weapon-type badge here — which weapon landed shows via the
             pointer MapPage draws between this node and its target (see
             the weapon-mark <g> there), not a corner label: an attack node
             otherwise renders exactly like any other node of its type, and
             the pointer alone carries "this is an attack, aimed at that". */}
         <div className="pointer-events-none absolute inset-0 z-[5] overflow-visible" ref={particlesRef} />
-        {classic ? (
-          // Classical mind map: no icon — a text box with the node's whole
-          // text (and title), bordered in its type's color with a heavier
-          // left edge. A thin health bar shows for the selected node in place
-          // of the round health ring.
-          <div
-            className={`relative box-border rounded-lg border-2 bg-[var(--node-fill)] px-[0.7rem] py-[0.5rem] text-left ${ringStateClass || "shadow-card"}`}
-            style={{
-              borderColor: circleBorderColor,
-              borderLeftWidth: 6,
-              width: "max-content",
-              minWidth: 96,
-              maxWidth: selected ? CLASSIC_SELECTED_MAX_WIDTH : CLASSIC_MAX_WIDTH,
-              outline: ringStyle.outline,
-              outlineOffset: 2,
-            }}
+        {puzzle ? (
+          // Puzzle cards: no icon — a jigsaw piece with the node's whole
+          // text (and title), outlined in its type's color. The halo stands
+          // in for the round icon's selection outline and drop/unsolved
+          // glows, which as box-shadows wouldn't follow the piece's cut. A
+          // thin health bar shows for the selected node in place of the
+          // round health ring.
+          <PuzzleCard
+            seed={node.nodeId}
+            color={circleBorderColor}
+            minWidth={96}
+            maxWidth={selected ? PUZZLE_SELECTED_MAX_WIDTH : PUZZLE_MAX_WIDTH}
+            halo={
+              dropHighlight === "valid"
+                ? { color: "var(--success)", pulse: true }
+                : dropHighlight === "invalid"
+                  ? { color: "var(--danger)", pulse: true }
+                  : selected
+                    ? { color: "var(--accent)" }
+                    : multiSelected
+                      ? { color: "var(--accent)", dashed: true }
+                      : unsolved
+                        ? { color: "var(--danger)", pulse: true }
+                        : null
+            }
           >
             {trimmedTitle && (
               <div className="text-[0.78rem] leading-[1.3] font-semibold break-words text-ink">{trimmedTitle}</div>
@@ -750,7 +760,7 @@ export const NodeCard = memo(function NodeCard({
                 />
               </div>
             )}
-          </div>
+          </PuzzleCard>
         ) : (
         <div
           className={`flex h-full w-full items-center justify-center rounded-full p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
@@ -857,7 +867,7 @@ export const NodeCard = memo(function NodeCard({
           // than the spacing getNodeMinDist() budgets for (CAPTION_WIDTH),
           // and wide enough to run into its own children. The chip stays
           // CAPTION_WIDTH on screen at every size.
-          className={`absolute top-full left-1/2 ${isNamedZone && !classic && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink ${iconText ? "line-clamp-4" : "line-clamp-2"}`}
+          className={`absolute top-full left-1/2 ${isNamedZone && !puzzle && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink ${iconText ? "line-clamp-4" : "line-clamp-2"}`}
           style={{
             width: iconText ? ICON_TEXT_CAPTION_WIDTH : CAPTION_WIDTH,
             // translateX(-50%) centers it under the icon (left-1/2 puts its
@@ -876,7 +886,7 @@ export const NodeCard = memo(function NodeCard({
           )}
         </div>
       )}
-      {isNamedZone && !classic && !compact && !selected && !inlineEditing && (
+      {isNamedZone && !puzzle && !compact && !selected && !inlineEditing && (
         // The zone's name sits right under the parent's icon, with the caption
         // pushed below it (see the caption's own top margin). Undoes the size
         // tier the same way the caption does, so it stays a constant size on

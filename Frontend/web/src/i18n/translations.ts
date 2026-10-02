@@ -110,7 +110,7 @@ export interface Translation {
       zoomIn: string;
       expandToolbar: string;
       readingMode: string;
-      readingClassic: string;
+      readingPuzzle: string;
       readingIconText: string;
       readingActual: string;
     };
@@ -242,7 +242,7 @@ const en: Translation = {
       zoomIn: "Zoom in",
       expandToolbar: "Show toolbar",
       readingMode: "Reading mode",
-      readingClassic: "Classical mind map",
+      readingPuzzle: "Puzzle cards",
       readingIconText: "Icons + text",
       readingActual: "Actual",
     },
@@ -364,7 +364,7 @@ const cs: Translation = {
       zoomIn: "Přiblížit",
       expandToolbar: "Zobrazit panel nástrojů",
       readingMode: "Režim čtení",
-      readingClassic: "Klasická myšlenková mapa",
+      readingPuzzle: "Karty puzzle",
       readingIconText: "Ikony + text",
       readingActual: "Aktuální",
     },
@@ -486,7 +486,7 @@ const uk: Translation = {
       zoomIn: "Збільшити",
       expandToolbar: "Показати панель інструментів",
       readingMode: "Режим читання",
-      readingClassic: "Класична ментальна карта",
+      readingPuzzle: "Картки-пазли",
       readingIconText: "Іконки + текст",
       readingActual: "Поточний",
     },
@@ -608,7 +608,7 @@ const ru: Translation = {
       zoomIn: "Увеличить",
       expandToolbar: "Показать панель инструментов",
       readingMode: "Режим чтения",
-      readingClassic: "Классическая ментальная карта",
+      readingPuzzle: "Карточки-пазлы",
       readingIconText: "Иконки + текст",
       readingActual: "Текущий",
     },

@@ -3,7 +3,7 @@ import type { ReadingMode } from "./readingMode";
 
 // Per-node display: which of the reading modes (see readingMode.ts) a
 // particular node is drawn in, overriding the map-wide one — so a chosen group
-// can be read as a classical mind map while the rest of the map stays as it is.
+// can be read as puzzle cards while the rest of the map stays as it is.
 // Kept per browser and per map (a viewer's own way of looking, not something
 // shared with the map's other members).
 export type NodeDisplay = Record<string, ReadingMode>;
@@ -17,7 +17,8 @@ export function loadNodeDisplay(mapId: string | undefined): NodeDisplay {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const out: NodeDisplay = {};
     for (const [id, mode] of Object.entries(parsed)) {
-      if (mode === "classic" || mode === "iconText" || mode === "actual") out[id] = mode;
+      if (mode === "puzzle" || mode === "iconText" || mode === "actual") out[id] = mode;
+      else if (mode === "classic") out[id] = "puzzle"; // the old classical mind map
     }
     return out;
   } catch {
@@ -40,8 +41,8 @@ export function saveNodeDisplay(mapId: string | undefined, display: NodeDisplay)
 // — which is what makes zoom the way to stop expanded nodes overlapping.
 //
 // Rough by design: the default look is a fixed icon-plus-caption box; the two
-// text modes are estimated from the text's length (a card is up to ~240px wide
-// and wraps at about 36 characters a line). Deliberately a little generous.
+// text modes are estimated from the text's length (a puzzle card is up to ~240px wide,
+// plus its jigsaw tabs, and wraps at about 36 characters a line). Deliberately a little generous.
 // The box is centered on the node's position, so where a caption hangs below
 // the icon the height is doubled to cover it.
 export function nodeFootprint(node: NodeDoc, mode: ReadingMode, sizeMultiplier: number): { w: number; h: number } {
@@ -51,10 +52,11 @@ export function nodeFootprint(node: NodeDoc, mode: ReadingMode, sizeMultiplier: 
   const chars = Math.max(12, title.length + textLength);
   let w: number;
   let h: number;
-  if (mode === "classic") {
+  if (mode === "puzzle") {
     const lines = Math.ceil(chars / 36) + (title ? 1 : 0);
-    w = Math.min(240, Math.max(110, Math.min(chars, 36) * 6.4 + 26));
-    h = 24 + lines * 16;
+    // + 30: the jigsaw tabs stick out up to 15px past the card on each side.
+    w = Math.min(240, Math.max(110, Math.min(chars, 36) * 6.4 + 26)) + 30;
+    h = 24 + lines * 16 + 30;
   } else if (mode === "iconText") {
     const lines = Math.min(4, Math.ceil(chars / 30));
     w = 180;

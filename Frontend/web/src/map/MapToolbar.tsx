@@ -148,7 +148,7 @@ export function MapToolbar({
               <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
             </svg>
           </button>
-          {/* "View" — the reading-mode picker (Aa: classic mind map / icons +
+          {/* "View" — the reading-mode picker (Aa: puzzle cards / icons +
               text / actual) plus presentation mode both live behind this one
               plain-eye icon now, instead of each getting their own toolbar
               slot. Highlighted whenever reading mode isn't the default look,

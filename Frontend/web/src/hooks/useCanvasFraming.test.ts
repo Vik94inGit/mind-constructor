@@ -165,7 +165,7 @@ describe("useCanvasFraming", () => {
         ["b", { x: 10, y: 0 }],
       ]);
       const { api, zoomFromCenter, showNotice } = setup({ visibleNodes: nodes, positions, zoom: 1 });
-      api.fitZoomForDisplay({}, "classic");
+      api.fitZoomForDisplay({}, "puzzle");
       expect(zoomFromCenter).toHaveBeenCalledTimes(1);
       const [, target] = zoomFromCenter.mock.calls[0];
       expect(target).toBe(2.5); // MAX_ZOOM
@@ -179,7 +179,7 @@ describe("useCanvasFraming", () => {
         ["b", { x: 80, y: 0 }],
       ]);
       const { api, zoomFromCenter, showNotice } = setup({ visibleNodes: nodes, positions, zoom: 1 });
-      api.fitZoomForDisplay({}, "classic");
+      api.fitZoomForDisplay({}, "puzzle");
       expect(zoomFromCenter).toHaveBeenCalledTimes(1);
       const [, target] = zoomFromCenter.mock.calls[0];
       expect(target).toBeGreaterThan(1);
@@ -194,7 +194,7 @@ describe("useCanvasFraming", () => {
         ["b", { x: 80, y: 0 }],
       ]);
       const { api, centerOnPoint } = setup({ visibleNodes: nodes, positions, zoom: 1 });
-      api.fitZoomForDisplay({}, "classic", { x: 85, y: 0 });
+      api.fitZoomForDisplay({}, "puzzle", { x: 85, y: 0 });
       expect(centerOnPoint).not.toHaveBeenCalled();
       vi.advanceTimersByTime(250);
       expect(centerOnPoint).toHaveBeenCalledWith(85, 0);
@@ -204,12 +204,12 @@ describe("useCanvasFraming", () => {
   describe("setDisplayForChosen", () => {
     it("does nothing with no chosen nodes", () => {
       const { api, setNodeDisplay } = setup({ multiSelectIds: new Set() });
-      api.setDisplayForChosen("classic");
+      api.setDisplayForChosen("puzzle");
       expect(setNodeDisplay).not.toHaveBeenCalled();
     });
 
     it("sets the chosen ids to the given mode, merged with whatever else was already overridden", () => {
-      const nodeDisplay: NodeDisplay = { z: "classic" };
+      const nodeDisplay: NodeDisplay = { z: "puzzle" };
       const { api, setNodeDisplay } = setup({
         multiSelectIds: new Set(["a", "b"]),
         nodeDisplay,
@@ -217,11 +217,11 @@ describe("useCanvasFraming", () => {
         positions: new Map(),
       });
       api.setDisplayForChosen("iconText");
-      expect(setNodeDisplay).toHaveBeenCalledWith({ z: "classic", a: "iconText", b: "iconText" });
+      expect(setNodeDisplay).toHaveBeenCalledWith({ z: "puzzle", a: "iconText", b: "iconText" });
     });
 
     it("clears the chosen ids back to the map default when given null", () => {
-      const nodeDisplay: NodeDisplay = { a: "classic", b: "classic", z: "iconText" };
+      const nodeDisplay: NodeDisplay = { a: "puzzle", b: "puzzle", z: "iconText" };
       const { api, setNodeDisplay } = setup({
         multiSelectIds: new Set(["a", "b"]),
         nodeDisplay,
@@ -234,8 +234,8 @@ describe("useCanvasFraming", () => {
 
     it("persists the new display to storage under the current map", () => {
       const { api } = setup({ multiSelectIds: new Set(["a"]), mapId: "map-42" });
-      api.setDisplayForChosen("classic");
-      expect(localStorage.getItem("mc_node_display:map-42")).toBe(JSON.stringify({ a: "classic" }));
+      api.setDisplayForChosen("puzzle");
+      expect(localStorage.getItem("mc_node_display:map-42")).toBe(JSON.stringify({ a: "puzzle" }));
     });
   });
 });
