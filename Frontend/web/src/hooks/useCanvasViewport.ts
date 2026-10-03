@@ -14,16 +14,21 @@ const ZOOM_MS = 240;
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-// The margin on each side of one axis, in screen pixels. There's no dead zone
-// past the canvas's edges any more — it runs right up to the screen's edge
-// (it used to be a hatched 60/90px band, and before that 240px, then half the
-// screen; a node on an edge doesn't need it, its quick-add ghosts clamp
-// themselves into view anyway). Only when the whole canvas fits across the
-// screen at this zoom is there a margin: exactly what centers it. The bottom
-// edge still grows for the bottom sheet (vScrollMarginBottom below), so a node
-// on the bottom edge can still be brought up above the sheet.
+// How close to the canvas's edge a node can sit, in canvas units: a drag is
+// held this far in (useNodeDragAndDrop), a new node further still.
+const NODE_EDGE_INSET = 60;
+
+// The margin on each side of one axis, in screen pixels: the dead zone past
+// the canvas's edge. Just wide enough that a node as close to the edge as one
+// can sit still scrolls to the middle of the screen, so a chosen node is
+// always centered and the quick-add ghosts around it all stay on screen —
+// and no wider. (It was briefly cut to nothing, which pinned edge nodes to
+// the screen's edge with half their ghosts clamped or off screen.) When the
+// whole canvas fits across the screen at this zoom, it's whatever centers
+// the canvas instead, if that's more. The bottom edge also grows for the
+// bottom sheet (vScrollMarginBottom below).
 export function axisMarginPx(viewPx: number, canvasUnits: number, zoom: number): number {
-  return Math.max(0, (viewPx - canvasUnits * zoom) / 2);
+  return Math.max(0, viewPx / 2 - NODE_EDGE_INSET * zoom, (viewPx - canvasUnits * zoom) / 2);
 }
 
 // How far above the bottom sheet's top edge a centered node stays, at least,
