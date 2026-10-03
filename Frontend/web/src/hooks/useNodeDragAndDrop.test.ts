@@ -271,11 +271,13 @@ describe("useNodeDragAndDrop", () => {
         { rootId: "root", members: [root, child], sentiment: "neutral", cx: 200, cy: 200, r: 300, outline: [] },
       ];
       const listeners = captureWindowListeners();
+      const onPlaced = vi.fn();
       const { result } = setup({
         nodes,
         positions,
         nodeGroups,
         posFor: (n) => positions.get(n.nodeId)!,
+        onPlaced,
       });
 
       act(() => result.current.onNodePointerDown(root, fakePointerDownEvent({ clientX: 200, clientY: 200 })));
@@ -288,6 +290,8 @@ describe("useNodeDragAndDrop", () => {
       });
 
       expect(nodesApi.updateNode).toHaveBeenCalledWith("root", { x: 250, y: 250 });
+      // Handed on so the caller can nudge any zone the drop now overlaps.
+      expect(onPlaced).toHaveBeenCalledWith([{ ...root, x: 250, y: 250 }]);
     });
 
     it("reverts the optimistic move and reports an error when the save fails", async () => {

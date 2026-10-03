@@ -812,6 +812,18 @@ export function MapPage() {
     setActionError,
     moveError: t.ui.errors.moveNodes,
   });
+  // After a drop: the dropped nodes stay put; any zone they now overlap is
+  // nudged away by just the overlap (see utils/structureLayout.ts).
+  const keepStructureOf = (placed: NodeDoc[]) =>
+    keepStructure(
+      new Map(
+        placed.flatMap((n) =>
+          typeof n.x === "number" && typeof n.y === "number" ? [[n.nodeId, { x: n.x, y: n.y }] as const] : [],
+        ),
+      ),
+      placed,
+    );
+
   // The node drag/drop system: single-node reposition-or-join-a-circle,
   // group ("follow the leader") drag, and touch's own long-press-to-
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
@@ -842,6 +854,7 @@ export function MapPage() {
     onSnapped: linkSnappedPieces,
     clusterFor: puzzleClusterFor,
     isBlockLocked: (id) => !!blockLocks[id],
+    onPlaced: keepStructureOf,
   });
 
   // Same condition that gates the quick-add ghost ring below — reused

@@ -125,3 +125,29 @@ describe("planStructureMoves", () => {
     expect(moved.has("near")).toBe(true);
   });
 });
+
+describe("planStructureMoves after a drop", () => {
+  it("nudges the other zone away by just the overlap, leaving the dropped node and its zone where they are", () => {
+    const nodes = [node("A"), node("a1", "A"), node("a2", "A"), node("B"), node("b1", "B"), node("b2", "B")];
+    const pos = new Map<string, Pt>([
+      ["A", { x: 1000, y: 800 }],
+      ["a1", { x: 900, y: 900 }],
+      // Just dropped: far enough right that A's zone now reaches into B's.
+      ["a2", { x: 1250, y: 900 }],
+      ["B", { x: 1500, y: 800 }],
+      ["b1", { x: 1400, y: 900 }],
+      ["b2", { x: 1600, y: 900 }],
+    ]);
+    const before = computeNodeGroups(nodes, nodes, pos);
+    const overlap = before[0].r + before[1].r + 16 - dist({ x: before[0].cx, y: before[0].cy }, { x: before[1].cx, y: before[1].cy });
+    expect(overlap).toBeGreaterThan(0);
+    const moved = planStructureMoves(nodes, pos, new Set(["a2"]), all);
+    expect(moved.has("a2")).toBe(false);
+    expect(moved.has("A")).toBe(false);
+    const shift = dist(moved.get("B")!, pos.get("B")!);
+    // Minimal: no farther than the overlap itself.
+    expect(shift).toBeLessThanOrEqual(overlap + 1);
+    const after = computeNodeGroups(nodes, nodes, new Map([...pos, ...moved]));
+    expect(dist({ x: after[0].cx, y: after[0].cy }, { x: after[1].cx, y: after[1].cy })).toBeGreaterThanOrEqual(after[0].r + after[1].r);
+  });
+});
