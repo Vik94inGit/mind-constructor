@@ -14,20 +14,16 @@ const ZOOM_MS = 240;
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-// The dead zone past each edge of the canvas, in screen pixels: a slim band,
-// enough for a node sitting right on an edge to be scrolled a little clear of
-// the screen's edge (its quick-add ghosts clamp themselves into view anyway).
-// It used to be 240px (and before that half the screen) on every side, which
-// left a lot of hatched nothing around the map. The bottom one also covers
-// the bottom sheet while it's open, so a node on the bottom edge can still be
-// brought up above the sheet.
-const deadZonePx = () => (isMobileViewport() ? 60 : 90);
-
-// The margin on each side of one axis, in screen pixels: the dead zone — or,
-// when the whole canvas fits across the screen that way at this zoom, exactly
-// what centers it (so there's nothing to scroll and no lopsided hatching).
+// The margin on each side of one axis, in screen pixels. There's no dead zone
+// past the canvas's edges any more — it runs right up to the screen's edge
+// (it used to be a hatched 60/90px band, and before that 240px, then half the
+// screen; a node on an edge doesn't need it, its quick-add ghosts clamp
+// themselves into view anyway). Only when the whole canvas fits across the
+// screen at this zoom is there a margin: exactly what centers it. The bottom
+// edge still grows for the bottom sheet (vScrollMarginBottom below), so a node
+// on the bottom edge can still be brought up above the sheet.
 export function axisMarginPx(viewPx: number, canvasUnits: number, zoom: number): number {
-  return Math.max(deadZonePx(), (viewPx - canvasUnits * zoom) / 2);
+  return Math.max(0, (viewPx - canvasUnits * zoom) / 2);
 }
 
 // How far above the bottom sheet's top edge a centered node stays, at least,

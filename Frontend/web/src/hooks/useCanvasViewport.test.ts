@@ -42,17 +42,17 @@ describe("useCanvasViewport dead zone", () => {
     Object.defineProperty(window, "innerWidth", { value: 1024, configurable: true });
   });
 
-  it("is a narrow fixed band, not half the screen", () => {
+  it("is gone: the canvas runs right up to the screen's edge", () => {
     const { result } = margins(false);
-    // A 1400x900 view used to get 700px/450px+ of dead zone per side.
-    expect(result.current.hScrollMargin).toBeLessThanOrEqual(240);
-    expect(result.current.vScrollMargin).toBeLessThanOrEqual(240);
+    // A 1400x900 view used to get a hatched band (once 700px/450px+) per side.
+    expect(result.current.hScrollMargin).toBe(0);
+    expect(result.current.vScrollMargin).toBe(0);
     expect(result.current.vScrollMarginBottom).toBe(result.current.vScrollMargin);
   });
 
   it("grows only the bottom edge while the bottom sheet is open", () => {
     const { result } = margins(true);
     expect(result.current.vScrollMarginBottom).toBeGreaterThan(result.current.vScrollMargin);
-    expect(result.current.vScrollMargin).toBeLessThanOrEqual(240);
+    expect(result.current.vScrollMargin).toBe(0);
   });
 });

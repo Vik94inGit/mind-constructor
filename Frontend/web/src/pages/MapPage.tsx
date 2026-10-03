@@ -40,6 +40,8 @@ import { DrawLineBar } from "../map/DrawLineBar";
 import { MapBanner } from "../map/MapBanner";
 import { MarqueeRect, PuzzleConnectLine, ZoneLoadingSpinner } from "../map/CanvasOverlays";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
+import { assemblePuzzles } from "../utils/puzzleAssembly";
+import { usePuzzleCardSizes } from "../hooks/usePuzzleCardSizes";
 import { zoneModeByNode } from "../utils/zoneDisplay";
 import type { ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
@@ -154,10 +156,14 @@ export function MapPage() {
     storeReadingMode(mode);
     if (mode !== "actual") fitZoomForDisplay(effectiveDisplay(), mode);
   }
+  // An assembled puzzle locks and unlocks as one: every piece clicked
+  // together with this one (puzzleClusterFor) follows its new state.
   function toggleBlockLock(nodeId: string) {
-    toggleStoredBlockLock(nodeId);
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    const ids = node ? puzzleClusterFor(node) : [nodeId];
+    toggleStoredBlockLock(nodeId, ids);
     // Locking a block mid-edit ends the edit.
-    setInlineEditId((cur) => (cur === nodeId ? null : cur));
+    setInlineEditId((cur) => (cur && ids.includes(cur) ? null : cur));
   }
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
   // group selection (multiSelectIds — the same one shift+click and the marquee
@@ -424,6 +430,9 @@ export function MapPage() {
       const b = geometrizeBlend.blend;
       return { x: own.x + (geo.x - own.x) * b, y: own.y + (geo.y - own.y) * b };
     }
+    // Seated against the puzzle piece it's linked to — see puzzleAssembly.
+    const seated = puzzleAssembly.positions.get(node.nodeId);
+    if (seated) return seated;
     const radial = radialBlend.map?.get(node.nodeId);
     if (!radial) return own;
     const b = radialBlend.blend;
@@ -527,12 +536,6 @@ export function MapPage() {
       );
     }
   }
-
-  // Puzzle pieces interlock along the map's links — see utils/puzzleLinks.ts.
-  const puzzleJoins = useMemo(
-    () => computePuzzleJoins(visibleNodes, edges, positions),
-    [visibleNodes, edges, positions],
-  );
 
   // The zones near the middle of the screen stay at full strength and the
   // rest are muted — see hooks/useZoneFocus.ts.
@@ -739,9 +742,41 @@ export function MapPage() {
     const m = modeOf(n.nodeId);
     return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
   }
+  // Linked puzzle cards are drawn assembled, each seated flush against the
+  // piece it's linked to (utils/puzzleAssembly.ts), and interlock along the
+  // map's links (utils/puzzleLinks.ts) — the seated ones claiming their
+  // sides first, so a tab always meets the blank next to it.
+  const puzzleCardSizes = usePuzzleCardSizes(canvasRef);
+  const puzzleAssembly = useMemo(() => {
+    const ids = visibleNodes.filter((n) => drawnAsCard(n)).map((n) => n.nodeId);
+    const links = [
+      ...visibleNodes.flatMap((n) => {
+        const parent = nodeRefId(n.parentId);
+        return parent ? [{ from: parent, to: n.nodeId }] : [];
+      }),
+      ...edges.flatMap((e) => {
+        const from = nodeRefId(e.fromNodeId);
+        const to = nodeRefId(e.toNodeId);
+        return from && to ? [{ from, to }] : [];
+      }),
+    ];
+    const sizes = new Map(Array.from(puzzleCardSizes, ([id, s]) => [id, { w: s.w / zoom, h: s.h / zoom }]));
+    // A locked block stays assembled: its whole puzzle locks with it, and
+    // nothing in it can be dragged, so only a chosen circle's members are
+    // held where they're stored.
+    const held = new Set(visibleNodes.filter((n) => n.locked).map((n) => n.nodeId));
+    return assemblePuzzles(ids, links, positions, sizes, held);
+    // drawnAsCard reads the display state below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode]);
+  const puzzleJoins = useMemo(() => {
+    const at = new Map(positions);
+    for (const [id, p] of puzzleAssembly.positions) at.set(id, p);
+    return computePuzzleJoins(visibleNodes, edges, at, puzzleAssembly.seated);
+  }, [visibleNodes, edges, positions, puzzleAssembly]);
   // Puzzle pieces: dragging a link out of a piece's tab, and clicking pieces
   // together — see hooks/usePuzzleConnect.ts.
-  const { puzzleConnect, puzzleSnapFor, linkSnappedPieces, startPuzzleConnect } = usePuzzleConnect({
+  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect } = usePuzzleConnect({
     mapId,
     nodes,
     edges,
@@ -789,6 +824,7 @@ export function MapPage() {
     t,
     snapFor: puzzleSnapFor,
     onSnapped: linkSnappedPieces,
+    clusterFor: puzzleClusterFor,
     isBlockLocked: (id) => !!blockLocks[id],
   });
 
