@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
-import * as edgesApi from "../api/edges";
-import * as linesApi from "../api/lines";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
 import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
@@ -42,9 +40,6 @@ import { DrawLineBar } from "../map/DrawLineBar";
 import { MapBanner } from "../map/MapBanner";
 import { MarqueeRect, PuzzleConnectLine, ZoneLoadingSpinner } from "../map/CanvasOverlays";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
-import { findSnap } from "../utils/puzzleSnap";
-import type { Snap, SnapPiece } from "../utils/puzzleSnap";
-import { pieceEdges } from "../map/PuzzleCard";
 import { zoneModeByNode } from "../utils/zoneDisplay";
 import type { ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
@@ -56,29 +51,23 @@ import { MapLegend } from "../map/MapLegend";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId } from "../utils/nodeType";
-import { layoutTemplate } from "../utils/templates";
 import { useRadialBlend } from "../hooks/useRadialBlend";
 import { useSentimentShow } from "../hooks/useSentimentShow";
 import { useCanvasFraming } from "../hooks/useCanvasFraming";
 import { useClipboardActions } from "../hooks/useClipboardActions";
 import { useLineDrawing } from "../hooks/useLineDrawing";
 import { useNodeDragAndDrop } from "../hooks/useNodeDragAndDrop";
-import { sleep } from "../utils/sleep";
 import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
 import {
-  closestToCentroidIndex,
   collectBranchIds,
-  collectDescendants,
   computeAttackPairIds,
   computeHiddenBranchIds,
   computeUnsolvedProblemIds,
   countPackedByContainer,
-  upsertBy,
   weaponFlightVector,
   zoneLabel,
 } from "../utils/mapGraph";
-import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import type { Sentiment } from "../utils/nodeType";
 import {
   CANVAS_W,
@@ -86,18 +75,15 @@ import {
   ZOOM_STEP,
   DOT_ZOOM,
   computeLinkedNeighborIds,
-  getCirclePackSpacing,
   pickNonOverlappingPosition,
-  nodeObstacles,
   avoidOverlap,
   footprintObstacles,
-  isDescendant,
   computeNodeGroups,
   computeLinkCycles,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, EdgeDoc, LineDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
+import type { AttackIndicator, NodeDoc, NodeType } from "../types";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
