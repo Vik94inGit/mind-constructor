@@ -1,19 +1,19 @@
 import * as nodesApi from "../api/nodes";
-import { CANVAS_W } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import { layoutTemplate, MAP_KIND_ROOTS } from "./templates";
 import type { TemplateNodeKey } from "./templates";
 import type { MapKind } from "../types";
 
 // Fills a freshly created map with the starter structure for its kind: a root
-// node in the upper middle of the canvas and the kind's template grown below
-// it, every node carrying its prompt (in the user's language) as title + text.
+// node in the middle of the canvas and the kind's template grown around it
+// (the full ring needs room on every side), every node carrying its prompt (in the user's language) as title + text.
 export async function seedMapKind(
   mapId: string,
   kind: MapKind,
   copy: Record<TemplateNodeKey, { title: string; text: string }>,
 ): Promise<void> {
   const root = MAP_KIND_ROOTS[kind];
-  const rootPos = { x: CANVAS_W / 2, y: 380 };
+  const rootPos = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
   const rootNode = await nodesApi.createNode(mapId, {
     text: copy[root.key].text,
     title: copy[root.key].title,

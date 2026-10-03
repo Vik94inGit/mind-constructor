@@ -60,6 +60,8 @@ interface Params {
   clusterFor?: (node: NodeDoc) => string[];
   /** Its owner locked this text block (utils/blockLock.ts) — held in place like Node.locked. */
   isBlockLocked?: (nodeId: string) => boolean;
+  /** Nodes a drop just saved where they landed — the caller makes room around them. */
+  onPlaced?: (placed: NodeDoc[]) => void;
 }
 
 // The node drag/drop system: single-node reposition-or-join-a-circle,
@@ -94,6 +96,7 @@ export function useNodeDragAndDrop({
   onSnapped,
   clusterFor,
   isBlockLocked,
+  onPlaced,
 }: Params) {
   // Held in place: a member of the chosen circle (Node.locked), or a text
   // block its owner locked.
@@ -265,9 +268,13 @@ export function useNodeDragAndDrop({
         dispatch({ type: "groupSetMember", id: node.nodeId, pos: leaderTarget, fallback: startPositions });
         zoomToEditAt(leaderTarget.x, leaderTarget.y);
 
+        const saved: NodeDoc[] = [];
         const leaderDone = nodesApi
           .updateNode(node.nodeId, { x: leaderTarget.x, y: leaderTarget.y })
-          .then(upsertNode)
+          .then((updated) => {
+            saved.push(updated);
+            upsertNode(updated);
+          })
           .catch((err) => setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes));
 
         // Followers catch up in their own selection order, each one's own
@@ -292,14 +299,20 @@ export function useNodeDragAndDrop({
           }
           try {
             const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
-            if (groupDragToken.current === token) upsertNode(updated);
+            if (groupDragToken.current === token) {
+              saved.push(updated);
+              upsertNode(updated);
+            }
           } catch (err) {
             setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
           }
         });
 
         await Promise.all([leaderDone, ...followerDone]);
-        if (groupDragToken.current === token) dispatch({ type: "groupClear" });
+        if (groupDragToken.current === token) {
+          dispatch({ type: "groupClear" });
+          if (saved.length) onPlaced?.(saved);
+        }
       }
 
       window.addEventListener("pointermove", onGroupMove);
@@ -575,6 +588,7 @@ export function useNodeDragAndDrop({
               parentId: target.nodeId,
             });
             upsertNode(updated);
+            onPlaced?.([updated]);
           } catch (err) {
             setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.joinCircle);
           }
@@ -648,9 +662,11 @@ export function useNodeDragAndDrop({
           if (leftCircle) {
             const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y, parentId: null });
             upsertNode(updated);
+            onPlaced?.([updated]);
           } else {
             const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y });
             upsertNode(updated);
+            onPlaced?.([updated]);
           }
         } catch (err) {
           setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));

@@ -77,6 +77,7 @@ export function CardMenu({ items }: { items: CardMenuItem[] }) {
         createPortal(
           <div
             ref={menuRef}
+            data-panel-keep
             className="fixed z-[60] flex min-w-[160px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
             style={{ left: pos.left, top: pos.top }}
             role="menu"

@@ -63,6 +63,22 @@ describe("NodePanel", () => {
     localStorage.setItem("mc_language", "en");
   });
 
+  it("closes on a click outside the panel, but not on a click inside it or on a node", async () => {
+    const user = userEvent.setup();
+    const outside = document.createElement("button");
+    const nodeCard = document.createElement("div");
+    nodeCard.setAttribute("data-panel-keep", "");
+    document.body.append(outside, nodeCard);
+    const props = renderPanel();
+    await user.click(screen.getByDisplayValue("The claim"));
+    await user.click(nodeCard);
+    expect(props.onClose).not.toHaveBeenCalled();
+    await user.click(outside);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    outside.remove();
+    nodeCard.remove();
+  });
+
   it("opens on Info with the owner's editable text", () => {
     renderPanel();
     expect(screen.getByDisplayValue("The claim")).toBeInTheDocument();

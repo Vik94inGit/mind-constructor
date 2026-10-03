@@ -245,6 +245,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
           <button
             key={type}
             type="button"
+            data-panel-keep
             // z-[33]: above MapPage's full-screen NodePanel backdrop
             // (z-30) — that backdrop dims the canvas and closes the panel
             // on any outside tap, and without outranking it here every tap
@@ -380,6 +381,7 @@ function GhostTemplates({
     // Drawn in screen pixels: the wrapper undoes the canvas zoom, the same
     // way the ghosts themselves stay one size on screen.
     <div
+      data-panel-keep
       className="pointer-events-none absolute z-[34]"
       style={{ left: pos.x, top: pos.y, transform: `scale(${1 / (zoom || 1)})`, transformOrigin: "0 0" }}
     >

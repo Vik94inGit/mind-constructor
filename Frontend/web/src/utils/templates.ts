@@ -1,4 +1,4 @@
-import { CANVAS_H, CANVAS_W, avoidOverlap, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, getNodeMinDist } from "./canvasLayout";
 import type { Obstacle } from "./canvasLayout";
 import type { MapKind, NodeType } from "../types";
 
@@ -139,66 +139,72 @@ export interface PlacedTemplateNode {
 
 const EDGE = 120;
 
-// Parent-before-child walk of the whole tree into one flat list — same order
-// a template used to be *created* in (parents have to exist before a child
-// can point its parentId at them), now also the order it's *placed* in: an
-// early branch and its own children land in neighboring, inner turns of the
-// spiral below before a later branch's, the closest a single flat ordering
-// can read as "still grouped by branch" alongside a plain index sequence.
-function flatten(tree: TemplateNode[]): { node: TemplateNode; parentKey: TemplateNodeKey | null }[] {
-  const out: { node: TemplateNode; parentKey: TemplateNodeKey | null }[] = [];
-  const walk = (nodes: TemplateNode[], parentKey: TemplateNodeKey | null) => {
-    for (const n of nodes) {
-      out.push({ node: n, parentKey });
-      if (n.children) walk(n.children, n.key);
-    }
-  };
-  walk(tree, null);
-  return out;
-}
+// How far apart each template branch's first node sits from the root and from
+// its neighbors, and how wide a node's own children fan out.
+const CHILD_FAN_DEG = 50;
+const ROTATIONS = 24;
 
-// Lays a template out fanned around `root` in a ring — root is the node the
-// template was started on (a circle's own root wears NodeCrown's halo/
-// horns, so this reads as the rest of the branch gathering "around the
-// king"), not another tree hanging in a straight column beneath it. Same
-// sunflower-spiral placement spiralPoint already uses everywhere else a
-// cluster of nodes needs packing in around a center point without stacking
-// on each other (computeBasePositions' own fallback layout) — reused as-is
-// rather than a bespoke ring just for
-// this, so the two read as the same visual language.
+// Lays a template out as a tree around `root`: every top-level branch gets its
+// own slice of a ring around the root, and a branch's children grow outward
+// from their own parent, fanned inside that slice. Each branch (and the zone
+// its children make) stays on its own side of the root instead of being
+// scattered across one shared spiral, which put a parent on one side, its
+// children on the other, and every sub-zone stacked on top of the others.
+//
+// The ring is turned to whichever of a few orientations collides least with
+// `existingObstacles` and the canvas edge; anything still in the way is the
+// caller's to push aside (see structureLayout's planStructureMoves).
 export function layoutTemplate(
   kind: TemplateKind,
   root: { x: number; y: number },
   existingObstacles: Obstacle[] = [],
 ): PlacedTemplateNode[] {
-  // The tighter "deliberately fanned around a shared root" spacing (see its
-  // own doc comment) — a growing template branch is exactly that case, and
-  // the old getNodeMinDist()-based spacing here was what made even a small
-  // template spread out far wider than its own node count actually needed.
-  const spacing = getCirclePackSpacing();
-  // Every node placed so far — both this template's own earlier nodes and
-  // whatever the caller already had on the canvas near `root` — becomes an
-  // obstacle for the next one. The spiral's own golden-angle spacing keeps
-  // a template's nodes clear of *each other* by construction, but nothing
-  // about it knew what else was already sitting on the canvas: a second
-  // template grown from a nearby root (or just an already-crowded spot)
-  // used to spiral its nodes straight on top of whatever was already there,
-  // with zero awareness of it.
-  const obstacles: Obstacle[] = [...existingObstacles];
-  return flatten(TEMPLATES[kind]).map(({ node, parentKey }, i) => {
-    // i+1, not i: spiralPoint(0, root) is root's own position, and this
-    // template's root is a real, already-existing node — every placed node
-    // starts at least one full turn out from it.
-    const desired = spiralPoint(i + 1, root, spacing);
-    const placed = avoidOverlap(desired, obstacles);
-    obstacles.push({ x: placed.x, y: placed.y, minDist: spacing });
-    return {
-      key: node.key,
-      type: node.type,
-      order: node.order,
-      parentKey,
-      x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, placed.x)),
-      y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, placed.y)),
+  const top = TEMPLATES[kind];
+  const gap = getNodeMinDist();
+  const ring = top.length > 1 ? Math.max(gap, gap / (2 * Math.sin(Math.PI / top.length))) : gap;
+  const fan = (CHILD_FAN_DEG * Math.PI) / 180;
+
+  const build = (turn: number) => {
+    const out: PlacedTemplateNode[] = [];
+    const grow = (nodes: TemplateNode[], parentKey: TemplateNodeKey | null, from: { x: number; y: number }, angle: number) => {
+      nodes.forEach((n, j) => {
+        const a = parentKey === null
+          ? angle + (j / nodes.length) * Math.PI * 2
+          : angle + (j - (nodes.length - 1) / 2) * fan;
+        const dist = parentKey === null ? ring : gap;
+        const p = { x: from.x + dist * Math.cos(a), y: from.y + dist * Math.sin(a) };
+        out.push({ key: n.key, type: n.type, order: n.order, parentKey, x: p.x, y: p.y });
+        if (n.children) grow(n.children, n.key, p, a);
+      });
     };
-  });
+    grow(top, null, root, -Math.PI / 2 + turn);
+    return out;
+  };
+
+  const cost = (placed: PlacedTemplateNode[]) => {
+    let c = 0;
+    for (const p of placed) {
+      const cx = Math.min(CANVAS_W - EDGE, Math.max(EDGE, p.x));
+      const cy = Math.min(CANVAS_H - EDGE, Math.max(EDGE, p.y));
+      c += 2 * Math.hypot(p.x - cx, p.y - cy);
+      for (const o of existingObstacles) c += Math.max(0, o.minDist - Math.hypot(o.x - p.x, o.y - p.y));
+    }
+    return c;
+  };
+
+  let best = build(0);
+  let bestCost = cost(best);
+  for (let i = 1; i < ROTATIONS && bestCost > 0; i++) {
+    const candidate = build((i / ROTATIONS) * Math.PI * 2);
+    const c = cost(candidate);
+    if (c < bestCost) {
+      best = candidate;
+      bestCost = c;
+    }
+  }
+  return best.map((p) => ({
+    ...p,
+    x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, p.x)),
+    y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, p.y)),
+  }));
 }

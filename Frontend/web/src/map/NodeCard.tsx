@@ -546,6 +546,7 @@ export const NodeCard = memo(function NodeCard({
 
   return (
     <div
+      data-panel-keep
       className={`${classes} ${flying ? "animate-weapon-fly-in" : ""}`}
       style={{ ...style, ...flightStyle, ...chaosCss }}
       // The sentiment show (see applyRevealFrame) moves this node through
