@@ -53,8 +53,6 @@ interface Params {
   viewportBounds: () => ViewportBounds;
   showNodes: (ids: string[]) => void;
   showNotice: (message: string) => void;
-  /** Pushes whatever the just-placed nodes cover out of their way — see useStructureGuard. */
-  keepStructure?: (pinned: Map<string, Pt>, added?: NodeDoc[]) => Promise<void>;
   t: Translation;
 }
 
@@ -73,7 +71,6 @@ export function useNodeCreation({
   viewportBounds,
   showNodes,
   showNotice,
-  keepStructure,
   t,
 }: Params) {
   // Grows a template branch (see utils/templates.ts) from `root`: every node
@@ -95,22 +92,6 @@ export function useNodeCreation({
       kind,
       rootPos,
       [...nodeObstacles([...obstaclePoints(), rootPos]), ...bigNodeObstacles()],
-    );
-    // The template keeps its shape: anything already sitting where it grows
-    // is moved aside first, so the new branch never lands on top of it.
-    const planId = (key: TemplateNodeKey) => `template:${key}`;
-    await keepStructure?.(
-      new Map([[root.nodeId, rootPos], ...placed.map((p) => [planId(p.key), { x: p.x, y: p.y }] as [string, Pt])]),
-      placed.map(
-        (p) =>
-          ({
-            nodeId: planId(p.key),
-            type: p.type,
-            x: p.x,
-            y: p.y,
-            parentId: p.parentKey ? planId(p.parentKey) : root.nodeId,
-          }) as NodeDoc,
-      ),
     );
     const ids = new Map<TemplateNodeKey, string>();
     for (let i = 0; i < placed.length; i++) {
@@ -147,8 +128,6 @@ export function useNodeCreation({
       const node = await nodesApi.createNode(mapId, { text, type, x, y, parentId });
       upsertNode(node);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-      // The new node stays where it was put; whatever it covers moves aside.
-      void keepStructure?.(new Map([[node.nodeId, { x, y }]]), [node]);
       // Deselect rather than select the freshly-created node — same "close
       // the panel after creating a node" behavior NodePanel's own
       // handleAttack/handleProtect follow, applied to every other
@@ -221,8 +200,6 @@ export function useNodeCreation({
         upsertNode(c);
         setCelebrateIds((prev) => new Set(prev).add(c.nodeId));
       });
-      const circle = [root, ...children];
-      void keepStructure?.(new Map(circle.map((n) => [n.nodeId, { x: n.x ?? rootPos.x, y: n.y ?? rootPos.y }])), circle);
 
       setMultiSelectIds(new Set());
       setSelectedId(root.nodeId);

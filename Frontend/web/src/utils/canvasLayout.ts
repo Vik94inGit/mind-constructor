@@ -256,7 +256,7 @@ export interface Obstacle {
 }
 
 // Icon (48) + gap + a two-row title, roughly — and CAPTION_WIDTH wide.
-export const NODE_FOOTPRINT = { w: CAPTION_WIDTH, h: 90 };
+const NODE_FOOTPRINT = { w: CAPTION_WIDTH, h: 90 };
 
 // Spacing obstacles, one per point — see Obstacle. Deliberately one flat
 // minDist for every point, not per-node-size aware — every call site only

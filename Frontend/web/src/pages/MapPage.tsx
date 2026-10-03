@@ -12,7 +12,6 @@ import { usePuzzleConnect } from "../hooks/usePuzzleConnect";
 import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
-import { useStructureGuard } from "../hooks/useStructureGuard";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
 import { useChosenCircle } from "../hooks/useChosenCircle";
 import { usePackMode } from "../hooks/usePackMode";
@@ -803,27 +802,6 @@ export function MapPage() {
     linkFailedMessage: t.ui.link.failed,
   });
 
-  // Whatever just landed keeps its spot; nodes and zones it covers move aside.
-  const { keepStructure } = useStructureGuard({
-    nodes,
-    setNodes,
-    upsertNode,
-    canMoveNode: (n) => isOwnNode(n) && !n.locked && !blockLocks[n.nodeId],
-    setActionError,
-    moveError: t.ui.errors.moveNodes,
-  });
-  // After a drop: the dropped nodes stay put; any zone they now overlap is
-  // nudged away by just the overlap (see utils/structureLayout.ts).
-  const keepStructureOf = (placed: NodeDoc[]) =>
-    keepStructure(
-      new Map(
-        placed.flatMap((n) =>
-          typeof n.x === "number" && typeof n.y === "number" ? [[n.nodeId, { x: n.x, y: n.y }] as const] : [],
-        ),
-      ),
-      placed,
-    );
-
   // The node drag/drop system: single-node reposition-or-join-a-circle,
   // group ("follow the leader") drag, and touch's own long-press-to-
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
@@ -842,6 +820,7 @@ export function MapPage() {
     screenToCanvas,
     viewportBounds,
     obstaclePoints,
+    bigNodeObstacles,
     zoomToEditAt,
     upsertNode,
     setActionError,
@@ -854,7 +833,6 @@ export function MapPage() {
     onSnapped: linkSnappedPieces,
     clusterFor: puzzleClusterFor,
     isBlockLocked: (id) => !!blockLocks[id],
-    onPlaced: keepStructureOf,
   });
 
   // Same condition that gates the quick-add ghost ring below — reused
@@ -1159,12 +1137,19 @@ export function MapPage() {
   // until confirmPendingCreate actually fires.
   function startQuickAdd(type: NodeType, pos: { x: number; y: number }, parent: NodeDoc, text?: string) {
     setActionError(null);
-    // The new node takes the ghost's slot exactly, keeping the branch's shape
-    // around its parent. Anything already sitting there (a crowded spot, or
-    // the ring squeezed against the canvas border) is moved aside once the
-    // node is created — see keepStructure in confirmPendingCreate.
+    // The ghost's slot is a fixed angle around the anchor — it doesn't know
+    // about anything else on the canvas, so a crowded area can still land
+    // it on top of another node. Nudge clear before opening the input, but
+    // only as far as it takes to stop covering that node (footprint boxes —
+    // see footprintObstacles): the new node should appear where the ghost
+    // was, not a full node-spacing away from it.
+    const placed = avoidOverlap(
+      pos,
+      footprintObstacles(obstaclePoints()),
+      viewportBounds(),
+    );
     setInlineEditId(null);
-    setPendingCreate({ x: pos.x, y: pos.y, type, parentId: parent.nodeId, text });
+    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text });
   }
 
   // ---- Separator lines ----
@@ -1280,7 +1265,6 @@ export function MapPage() {
     viewportBounds,
     showNodes,
     showNotice,
-    keepStructure,
     t,
   });
 

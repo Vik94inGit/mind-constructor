@@ -190,7 +190,6 @@ export function PuzzleCard({
   return (
     <div
       ref={ref}
-      data-panel-keep
       // Found by MapPage's snapping (utils/puzzleSnap.ts) to measure the piece.
       data-puzzle-card
       className="relative box-border text-left"

@@ -214,35 +214,6 @@ export function NodePanel({
   const { panelRef, dragOffset, setDragOffset, panelHeight, textHeight, onResizeHandlePointerDown, onGripPointerDown } =
     usePanelSheet({ textareaRef, readonlyTextRef });
 
-  // A click anywhere outside the panel closes it — the toolbar, a zone, a
-  // link, the page around the map. Not a node, a quick-add ghost or a menu
-  // (anything marked data-panel-keep): those act on the selection themselves.
-  // The press has to start outside too, so letting go of a panel drag or a
-  // text selection past the panel's edge doesn't count.
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-  useEffect(() => {
-    let pressedOutside = false;
-    const outside = (target: EventTarget | null) =>
-      target instanceof Element &&
-      target.isConnected &&
-      !panelRef.current?.contains(target) &&
-      !target.closest("[data-panel-keep]");
-    const onDown = (e: PointerEvent) => {
-      pressedOutside = outside(e.target);
-    };
-    const onClick = (e: MouseEvent) => {
-      if (pressedOutside && outside(e.target)) onCloseRef.current();
-      pressedOutside = false;
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    document.addEventListener("click", onClick);
-    return () => {
-      document.removeEventListener("pointerdown", onDown, true);
-      document.removeEventListener("click", onClick);
-    };
-  }, [panelRef]);
-
   // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
   // surfaced as a "Points at" link in the Info tab below, and used by
   // canAttack right below to decide whether this is a retaliation.
