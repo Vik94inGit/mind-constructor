@@ -8,6 +8,7 @@ import * as linesApi from "../api/lines";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
 import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
+import { useZoneFocus } from "../hooks/useZoneFocus";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
@@ -33,7 +34,6 @@ import { computePuzzleJoins } from "../utils/puzzleLinks";
 import { findSnap } from "../utils/puzzleSnap";
 import type { Snap, SnapPiece } from "../utils/puzzleSnap";
 import { pieceEdges } from "../map/PuzzleCard";
-import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
 import { zoneModeByNode } from "../utils/zoneDisplay";
 import type { ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
@@ -656,51 +656,16 @@ export function MapPage() {
   );
 
   // The zones near the middle of the screen stay at full strength and the
-  // rest are muted (see utils/zoneFocus.ts), recomputed as the view pans and
-  // zooms. Off while a circle is stabilized — that spotlight already says
-  // which zone matters.
-  const [focusedZones, setFocusedZones] = useState<Set<string> | null>(null);
-  const zoneFocusInputs = useRef({ nodeGroups, zoom, hScrollMargin, vScrollMargin });
-  zoneFocusInputs.current = { nodeGroups, zoom, hScrollMargin, vScrollMargin };
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    let frame: number | null = null;
-    const update = () => {
-      frame = null;
-      const { nodeGroups, zoom, hScrollMargin, vScrollMargin } = zoneFocusInputs.current;
-      const center = {
-        x: (wrap.scrollLeft + wrap.clientWidth / 2) / zoom - hScrollMargin,
-        y: (wrap.scrollTop + wrap.clientHeight / 2) / zoom - vScrollMargin,
-      };
-      // A quarter of the smaller screen side, in canvas units.
-      const reach = (Math.min(wrap.clientWidth, wrap.clientHeight) / 4) / zoom;
-      const next = focusedZoneIds(nodeGroups, center, reach);
-      setFocusedZones((prev) => (sameIds(prev, next) ? prev : next));
-    };
-    const schedule = () => {
-      if (frame == null) frame = requestAnimationFrame(update);
-    };
-    update();
-    wrap.addEventListener("scroll", schedule, { passive: true });
-    return () => {
-      wrap.removeEventListener("scroll", schedule);
-      if (frame != null) cancelAnimationFrame(frame);
-    };
-  }, [loading, nodeGroups, zoom, hScrollMargin, vScrollMargin, wrapRef]);
-  const activeFocusedZones = map?.selectedCircle ? null : focusedZones;
-  // Nodes that belong only to zones out of focus.
-  const zoneMutedIds = useMemo(() => {
-    const out = new Set<string>();
-    if (!activeFocusedZones) return out;
-    const inFocus = new Set<string>();
-    for (const g of nodeGroups) {
-      const focused = activeFocusedZones.has(g.rootId);
-      for (const m of g.members) (focused ? inFocus : out).add(m.nodeId);
-    }
-    for (const id of inFocus) out.delete(id);
-    return out;
-  }, [activeFocusedZones, nodeGroups]);
+  // rest are muted — see hooks/useZoneFocus.ts.
+  const { activeFocusedZones, zoneMutedIds } = useZoneFocus({
+    wrapRef,
+    loading,
+    nodeGroups,
+    zoom,
+    hScrollMargin,
+    vScrollMargin,
+    hasSelectedCircle: !!map?.selectedCircle,
+  });
 
   // Circle-parent nodes always show their caption (see NodeCard's
   // showCaption) — this backfills their real text the moment a node becomes
