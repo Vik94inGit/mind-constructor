@@ -1,4 +1,4 @@
-import { CANVAS_H, CANVAS_W, computeNodeGroups, getCirclePackSpacing } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, NODE_FOOTPRINT, computeNodeGroups } from "./canvasLayout";
 import type { NodeGroup } from "./canvasLayout";
 import { nodeRefId } from "./nodeType";
 import type { NodeDoc } from "../types";
@@ -59,7 +59,10 @@ function awayFrom(from: Pt, p: Pt): Pt {
 
 /**
  * Pushes movable nodes off every node in `fixedIds` (and off each other, once
- * moved) until all of them are at least `spacing` apart. Overlaps between two
+ * moved) until none of them sits on another's footprint (icon + caption box,
+ * the same box a drop is kept clear of). A covered node moves straight away
+ * from the one covering it, only as far as it takes to clear the box, so
+ * neighbors stay close. Overlaps between two
  * nodes nothing touched are left alone — that's the user's own arrangement.
  * Returns only what moved.
  */
@@ -67,7 +70,7 @@ export function makeRoom(
   positions: Map<string, Pt>,
   fixedIds: Set<string>,
   canMove: (id: string) => boolean,
-  spacing: number = getCirclePackSpacing(),
+  footprint: { w: number; h: number } = NODE_FOOTPRINT,
 ): Map<string, Pt> {
   const pos = new Map(positions);
   const moved = new Map<string, Pt>();
@@ -80,11 +83,19 @@ export function makeRoom(
         if (a === b || fixedIds.has(b) || !canMove(b)) continue;
         const pa = pos.get(a)!;
         const pb = pos.get(b)!;
-        const d = Math.hypot(pb.x - pa.x, pb.y - pa.y);
-        if (d >= spacing - 0.5) continue;
+        const needX = footprint.w - Math.abs(pb.x - pa.x);
+        const needY = footprint.h - Math.abs(pb.y - pa.y);
+        if (needX <= 0.5 || needY <= 0.5) continue;
         const dir = awayFrom(pa, pb);
-        const need = spacing - d;
-        const next = pushWithin(pb, { x: dir.x * need, y: dir.y * need });
+        // Straight above or below (or exactly stacked, which counts as
+        // below): only a vertical push can free it.
+        const sx = dir.x !== 0 ? Math.sign(dir.x) : 0;
+        const sy = dir.y !== 0 ? Math.sign(dir.y) : -1;
+        // Along the axis it's offset on most (relative to the box), so a node
+        // beside the new one goes sideways and one below it goes down.
+        const sideways = sx !== 0 && Math.abs(pb.x - pa.x) / footprint.w >= Math.abs(pb.y - pa.y) / footprint.h;
+        const delta = sideways ? { x: sx * needX, y: 0 } : { x: 0, y: sy * needY };
+        const next = pushWithin(pb, delta);
         if (Math.hypot(next.x - pb.x, next.y - pb.y) < 0.5) continue;
         pos.set(b, next);
         moved.set(b, next);

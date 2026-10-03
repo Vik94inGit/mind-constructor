@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeRoom, planStructureMoves, separateZones, EDGE_MARGIN } from "./structureLayout";
-import { CANVAS_W, computeNodeGroups, getCirclePackSpacing } from "./canvasLayout";
+import { CANVAS_W, NODE_FOOTPRINT, computeNodeGroups } from "./canvasLayout";
 import type { NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
@@ -8,6 +8,9 @@ const node = (nodeId: string, parentId: string | null = null) =>
   ({ nodeId, parentId, type: "Option" }) as unknown as NodeDoc;
 const all = () => true;
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+// Clear of each other's icon + caption box.
+const clear = (a: Pt, b: Pt) =>
+  Math.abs(a.x - b.x) >= NODE_FOOTPRINT.w - 1 || Math.abs(a.y - b.y) >= NODE_FOOTPRINT.h - 1;
 
 describe("makeRoom", () => {
   it("pushes a node covered by the pinned one out of its way, and leaves the pinned one where it is", () => {
@@ -17,9 +20,9 @@ describe("makeRoom", () => {
     ]);
     const moved = makeRoom(pos, new Set(["new"]), all);
     expect(moved.has("new")).toBe(false);
-    expect(dist(moved.get("old")!, { x: 1000, y: 800 })).toBeGreaterThanOrEqual(getCirclePackSpacing() - 1);
-    // Pushed straight away from the new node.
-    expect(moved.get("old")!.x).toBeGreaterThan(1040);
+    expect(clear(moved.get("old")!, { x: 1000, y: 800 })).toBe(true);
+    // Pushed straight away from the new node, and only just clear of it.
+    expect(moved.get("old")!).toEqual({ x: 1000 + NODE_FOOTPRINT.w, y: 800 });
   });
 
   it("cascades: a pushed node pushes the next one along", () => {
@@ -31,7 +34,7 @@ describe("makeRoom", () => {
     const moved = makeRoom(pos, new Set(["new"]), all);
     const a = moved.get("a")!;
     const b = moved.get("b") ?? pos.get("b")!;
-    expect(dist(a, b)).toBeGreaterThanOrEqual(getCirclePackSpacing() - 1);
+    expect(clear(a, b)).toBe(true);
   });
 
   it("slides a node along the border instead of leaving it on top of the new one", () => {
@@ -43,9 +46,18 @@ describe("makeRoom", () => {
     const moved = makeRoom(pos, new Set(["new"]), all);
     const old = moved.get("old")!;
     expect(old.x).toBeLessThanOrEqual(edgeX);
-    expect(dist(old, pos.get("new")!)).toBeGreaterThanOrEqual(getCirclePackSpacing() - 1);
+    expect(clear(old, pos.get("new")!)).toBe(true);
     // Room was made above.
     expect(old.y).toBeLessThan(800);
+  });
+
+  it("lets nodes sit close as long as their boxes don't touch", () => {
+    const pos = new Map<string, Pt>([
+      ["new", { x: 1000, y: 800 }],
+      ["below", { x: 1000, y: 800 + NODE_FOOTPRINT.h + 2 }],
+      ["beside", { x: 1000 + NODE_FOOTPRINT.w + 2, y: 800 }],
+    ]);
+    expect(makeRoom(pos, new Set(["new"]), all).size).toBe(0);
   });
 
   it("leaves alone overlaps nothing new is involved in, and nodes it may not move", () => {

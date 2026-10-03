@@ -812,14 +812,6 @@ export function MapPage() {
     setActionError,
     moveError: t.ui.errors.moveNodes,
   });
-  const keepStructureOf = (placed: NodeDoc[]) =>
-    keepStructure(
-      new Map(
-        placed.flatMap((n) => (typeof n.x === "number" && typeof n.y === "number" ? [[n.nodeId, { x: n.x, y: n.y }]] : [])) as [string, { x: number; y: number }][],
-      ),
-      placed,
-    );
-
   // The node drag/drop system: single-node reposition-or-join-a-circle,
   // group ("follow the leader") drag, and touch's own long-press-to-
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
@@ -838,7 +830,6 @@ export function MapPage() {
     screenToCanvas,
     viewportBounds,
     obstaclePoints,
-    bigNodeObstacles,
     zoomToEditAt,
     upsertNode,
     setActionError,
@@ -851,7 +842,6 @@ export function MapPage() {
     onSnapped: linkSnappedPieces,
     clusterFor: puzzleClusterFor,
     isBlockLocked: (id) => !!blockLocks[id],
-    onPlaced: keepStructureOf,
   });
 
   // Same condition that gates the quick-add ghost ring below — reused
