@@ -37,6 +37,8 @@ import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
+import { MapBanner } from "../map/MapBanner";
+import { MarqueeRect, PuzzleConnectLine, ZoneLoadingSpinner } from "../map/CanvasOverlays";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
 import { findSnap } from "../utils/puzzleSnap";
 import type { Snap, SnapPiece } from "../utils/puzzleSnap";
@@ -1385,10 +1387,6 @@ export function MapPage() {
     }
   }
 
-  // The error banner's dismiss button.
-  const btnSmGhost =
-    "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50";
-
   // Parents first (utils/nodePriority.ts): a node with a visible child paints
   // above the rest, every other child is faded until someone looks at it
   // (it, or its parent, is selected, it's in the chosen circle, being
@@ -1438,22 +1436,8 @@ export function MapPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {notice && (
-        <div className="mx-4 mt-[0.6rem] flex items-center justify-between gap-3 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">
-          {notice}
-          <button className={btnSmGhost} onClick={dismissNotice}>
-            ✕
-          </button>
-        </div>
-      )}
-      {actionError && (
-        <div className="mx-4 mt-[0.6rem] flex items-center justify-between gap-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">
-          {actionError}
-          <button className={btnSmGhost} onClick={() => setActionError(null)}>
-            ✕
-          </button>
-        </div>
-      )}
+      {notice && <MapBanner tone="success" message={notice} onDismiss={dismissNotice} />}
+      {actionError && <MapBanner tone="danger" message={actionError} onDismiss={() => setActionError(null)} />}
 
       <div className="flex min-h-0 flex-1">
         {/* This extra wrapper exists purely so MiniMap has somewhere to sit
@@ -1620,31 +1604,9 @@ export function MapPage() {
             {puzzleConnect &&
               (() => {
                 const fromNode = visibleNodes.find((n) => n.nodeId === puzzleConnect.fromId);
-                if (!fromNode) return null;
-                const from = posFor(fromNode);
-                const color = puzzleConnect.overId
-                  ? puzzleConnect.valid
-                    ? "var(--success)"
-                    : "var(--danger)"
-                  : "var(--accent)";
-                return (
-                  <svg
-                    className="pointer-events-none absolute inset-0 z-[40] h-full w-full"
-                    viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-                  >
-                    <line
-                      x1={from.x}
-                      y1={from.y}
-                      x2={puzzleConnect.to.x}
-                      y2={puzzleConnect.to.y}
-                      stroke={color}
-                      strokeWidth={3 / zoom}
-                      strokeDasharray={`${8 / zoom} ${6 / zoom}`}
-                      strokeLinecap="round"
-                    />
-                    <circle cx={puzzleConnect.to.x} cy={puzzleConnect.to.y} r={6 / zoom} fill={color} />
-                  </svg>
-                );
+                return fromNode ? (
+                  <PuzzleConnectLine from={posFor(fromNode)} connect={puzzleConnect} zoom={zoom} />
+                ) : null;
               })()}
 
             {visibleNodes.map((node) => {
@@ -1745,22 +1707,9 @@ export function MapPage() {
             {circleLoadingRootId &&
               (() => {
                 const group = nodeGroups.find((g) => g.rootId === circleLoadingRootId);
-                if (!group) return null;
-                return (
-                  <div
-                    className="pointer-events-none absolute z-[35]"
-                    style={{
-                      left: group.cx,
-                      top: group.cy,
-                      transform: `translate(-50%, -50%) scale(${1 / zoom})`,
-                    }}
-                    role="status"
-                    aria-label={t.ui.common.loading}
-                    title={t.ui.common.loading}
-                  >
-                    <div className="h-11 w-11 animate-spin rounded-full border-4 border-accent/25 border-t-accent bg-surface/90 shadow-card" />
-                  </div>
-                );
+                return group ? (
+                  <ZoneLoadingSpinner x={group.cx} y={group.cy} zoom={zoom} label={t.ui.common.loading} />
+                ) : null;
               })()}
             {!dotZoom && (
               <WeaponLayer
@@ -1825,24 +1774,8 @@ export function MapPage() {
               />
             )}
 
-            {/* Rubber-band select rectangle — see onCanvasPointerDown. A
-                plain absolutely-positioned div (not another SVG layer) in
-                the same raw canvas coordinates every NodeCard already uses,
-                so it scales/pans along with the rest of the canvas via the
-                canvas div's own transform, no separate math needed. */}
-            {marquee && (
-              <div
-                className="pointer-events-none absolute z-[20]"
-                style={{
-                  left: Math.min(marquee.x0, marquee.x1),
-                  top: Math.min(marquee.y0, marquee.y1),
-                  width: Math.abs(marquee.x1 - marquee.x0),
-                  height: Math.abs(marquee.y1 - marquee.y0),
-                  border: "1.5px solid var(--accent)",
-                  background: "color-mix(in srgb, var(--accent) 12%, transparent)",
-                }}
-              />
-            )}
+            {/* Rubber-band select rectangle — see useMarqueeSelect. */}
+            {marquee && <MarqueeRect marquee={marquee} />}
           </div>
           </div>
           </div>
