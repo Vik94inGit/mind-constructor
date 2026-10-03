@@ -35,6 +35,8 @@ import type { BlockLocks } from "../utils/blockLock";
 import type { CardFills } from "../utils/cardFill";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
 import { connectedPieces, findSnap } from "../utils/puzzleSnap";
+import { assemblePuzzles } from "../utils/puzzleAssembly";
+import { usePuzzleCardSizes } from "../hooks/usePuzzleCardSizes";
 import type { Snap, SnapPiece } from "../utils/puzzleSnap";
 import { pieceEdges } from "../map/PuzzleCard";
 import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
@@ -685,6 +687,9 @@ export function MapPage() {
       const b = geometrizeBlend.blend;
       return { x: own.x + (geo.x - own.x) * b, y: own.y + (geo.y - own.y) * b };
     }
+    // Seated against the puzzle piece it's linked to — see puzzleAssembly.
+    const seated = puzzleAssembly.positions.get(node.nodeId);
+    if (seated) return seated;
     const radial = radialBlend.map?.get(node.nodeId);
     if (!radial) return own;
     const b = radialBlend.blend;
@@ -898,12 +903,6 @@ export function MapPage() {
     }
   }
 
-  // Puzzle pieces interlock along the map's links — see utils/puzzleLinks.ts.
-  const puzzleJoins = useMemo(
-    () => computePuzzleJoins(visibleNodes, edges, positions),
-    [visibleNodes, edges, positions],
-  );
-
   // The zones near the middle of the screen stay at full strength and the
   // rest are muted (see utils/zoneFocus.ts), recomputed as the view pans and
   // zooms. Off while a circle is stabilized — that spotlight already says
@@ -1049,6 +1048,36 @@ export function MapPage() {
     for (const g of nodeGroups) map.set(g.rootId, g.sentiment);
     return map;
   }, [nodeGroups]);
+
+  // Linked puzzle cards are drawn assembled, each seated flush against the
+  // piece it's linked to (utils/puzzleAssembly.ts), and interlock along the
+  // map's links (utils/puzzleLinks.ts) — the seated ones claiming their
+  // sides first, so a tab always meets the blank next to it.
+  const puzzleCardSizes = usePuzzleCardSizes(canvasRef);
+  const puzzleAssembly = useMemo(() => {
+    const ids = visibleNodes.filter((n) => drawnAsCard(n)).map((n) => n.nodeId);
+    const links = [
+      ...visibleNodes.flatMap((n) => {
+        const parent = nodeRefId(n.parentId);
+        return parent ? [{ from: parent, to: n.nodeId }] : [];
+      }),
+      ...edges.flatMap((e) => {
+        const from = nodeRefId(e.fromNodeId);
+        const to = nodeRefId(e.toNodeId);
+        return from && to ? [{ from, to }] : [];
+      }),
+    ];
+    const sizes = new Map(Array.from(puzzleCardSizes, ([id, s]) => [id, { w: s.w / zoom, h: s.h / zoom }]));
+    const held = new Set(visibleNodes.filter((n) => n.locked || blockLocks[n.nodeId]).map((n) => n.nodeId));
+    return assemblePuzzles(ids, links, positions, sizes, held);
+    // drawnAsCard reads the display state below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, blockLocks, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode]);
+  const puzzleJoins = useMemo(() => {
+    const at = new Map(positions);
+    for (const [id, p] of puzzleAssembly.positions) at.set(id, p);
+    return computePuzzleJoins(visibleNodes, edges, at, puzzleAssembly.seated);
+  }, [visibleNodes, edges, positions, puzzleAssembly]);
 
   // Every camera-framing cue (fit-to-zoom for a text reading mode, the
   // floor-at-100%-for-editing after a drag, bringing a set of nodes into

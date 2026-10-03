@@ -33,6 +33,9 @@ export function computePuzzleJoins(
   nodes: NodeDoc[],
   edges: EdgeDoc[],
   positions: Map<string, Pt>,
+  // Links whose pieces are drawn sitting flush (utils/puzzleAssembly.ts):
+  // they claim their sides first, so the cut matches the piece seated there.
+  seated: { from: string; to: string }[] = [],
 ): Map<string, PuzzleJoins> {
   const out = new Map<string, PuzzleJoins>();
   const get = (id: string) => {
@@ -58,6 +61,7 @@ export function computePuzzleJoins(
     if (jb.cuts[sb] === undefined) jb.cuts[sb] = -1;
   };
   const visible = new Set(nodes.map((n) => n.nodeId));
+  for (const l of seated) link(l.from, l.to);
   for (const n of nodes) {
     const parent = nodeRefId(n.parentId);
     if (parent && visible.has(parent)) link(parent, n.nodeId);
