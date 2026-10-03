@@ -15,6 +15,8 @@ import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
+import { useChosenCircle } from "../hooks/useChosenCircle";
+import { usePackMode } from "../hooks/usePackMode";
 import type { PendingCreate } from "../hooks/useNodeCreation";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
@@ -191,11 +193,6 @@ export function MapPage() {
   // found"-style screen. This is a dismissible banner over the still-live
   // canvas instead.
   const [actionError, setActionError] = useState<string | null>(null);
-  // The circle whose zone was just clicked, while it is still being chosen and
-  // its members' titles/text are still on their way (two round trips: the
-  // choice itself, then the text). Shows a spinner on the zone so the click
-  // visibly registered instead of the canvas looking frozen.
-  const [circleLoadingRootId, setCircleLoadingRootId] = useState<string | null>(null);
   const { notice, showNotice, dismissNotice } = useNotice();
 
   // A node not yet created, still being typed into the inline input — see
@@ -270,6 +267,15 @@ export function MapPage() {
     ensureNodeText,
     refreshInsights,
   } = useMapData({ mapId, setSelectedId, setCelebrateIds, loadErrorMessage: t.ui.errors.loadMap });
+
+  // Choosing ("stabilizing") a circle and letting it go again — see
+  // hooks/useChosenCircle.ts.
+  const {
+    circleLoadingRootId,
+    setCircleLoadingRootId,
+    releaseChosenCircleIfOutside,
+    handleCircleBackdropClick,
+  } = useChosenCircle({ mapId, map, applyCircleSelection, setActionError, t });
 
 
   // dragState/groupDragState/dropTarget (posFor's own overlay inputs, and
@@ -1009,51 +1015,19 @@ export function MapPage() {
     exitChooseMode();
   }
 
-  // Opens the pack picker for containerNode — keyed by one fixed anchor
-  // (packContainerId) instead of a growing list of choices. dispatchMode's
-  // "packStart" replaces whatever mode was active before (choose or draw
-  // included — the three share this same bottom-sheet slot, so only one can
-  // really be "active" at once), but doesn't touch the group selection, which
-  // choose mode also used — clear that explicitly, same as exitChooseMode
-  // would have.
-  function startPackFrom(containerNodeId: string) {
-    setMultiSelectIds(new Set());
-    dispatchMode({ type: "packStart", containerId: containerNodeId });
-  }
-
-  // Backs out of pack mode without packing anything — shared by the picker's
-  // own ✕/Cancel and anything else abandoning a pick in progress.
-  function exitPackMode() {
-    dispatchMode({ type: "reset" });
-  }
-
-  const packContainer = packContainerId ? nodes.find((n) => n.nodeId === packContainerId) : undefined;
-  // The picks resolved to real nodes — a node deleted mid-pick by someone
-  // else just quietly drops out.
-  const packPicks = Array.from(packSelection)
-    .map((id) => nodes.find((n) => n.nodeId === id))
-    .filter((n): n is NodeDoc => !!n);
-
-  // Confirms the current pack selection — packAbl.ts re-validates
-  // eligibility/ownership server-side regardless of what got picked here,
-  // same "don't trust the client" principle every other confirm-style
-  // action in this app already follows.
-  async function confirmPackSelection() {
-    if (!packContainerId || packPicks.length < 1) return;
-    setActionError(null);
-    try {
-      const res = await nodesApi.packNodes(packContainerId, packPicks.map((n) => n.nodeId));
-      upsertNode(res.container);
-      res.members.forEach(upsertNode);
-      // A packed member can't stay "selected" — it just vanished from the
-      // canvas (see visibleNodes below), so NodePanel would be showing a
-      // node nobody can see any more.
-      if (selectedId && res.members.some((m) => m.nodeId === selectedId)) setSelectedId(null);
-      exitPackMode();
-    } catch (err) {
-      dispatchMode({ type: "packSetError", error: err instanceof ApiRequestError ? err.message : t.ui.errors.pack });
-    }
-  }
+  // Packing nodes into a container — see hooks/usePackMode.ts.
+  const { startPackFrom, exitPackMode, packContainer, packPicks, confirmPackSelection } = usePackMode({
+    packContainerId,
+    packSelection,
+    nodes,
+    selectedId,
+    setSelectedId,
+    setMultiSelectIds,
+    dispatchMode,
+    upsertNode,
+    setActionError,
+    packFailedMessage: t.ui.errors.pack,
+  });
 
   // Right-click on empty canvas opens a small type-picker for creating a
   // new, parent-less node right where the click landed (see
@@ -1124,58 +1098,6 @@ export function MapPage() {
     setEdges((prev) => prev.filter((e) => nodeRefId(e.fromNodeId) !== id && nodeRefId(e.toNodeId) !== id));
     setSelectedId(null);
     if (mapId) refreshInsights(mapId);
-  }
-
-  // Shared by the backdrop's own toggle-off click and every "clicked
-  // outside the chosen cluster" path below — one place actually talking to
-  // the API, so both can't ever disagree about what releasing means.
-  async function releaseChosenCircle() {
-    if (!mapId) return;
-    setActionError(null);
-    try {
-      await mapsApi.deselectCircle(mapId);
-      applyCircleSelection(null);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.releaseCircle);
-    }
-  }
-
-  // A click anywhere that isn't the chosen circle itself reads as "done
-  // with it" — empty canvas, or any node that isn't one of its own members
-  // (own members included on purpose: interacting with the cluster you
-  // just chose shouldn't un-choose it). No-ops instantly if nothing's
-  // chosen, so callers don't have to guard that themselves.
-  function releaseChosenCircleIfOutside(clickedNodeId?: string) {
-    const selected = map?.selectedCircle;
-    if (!selected) return;
-    if (clickedNodeId && selected.nodeIds.includes(clickedNodeId)) return;
-    releaseChosenCircle();
-  }
-
-  // Stabilize/Release: clicking a circle's own backdrop on the canvas
-  // chooses it as the one "held still" — every other circle stays free to
-  // drift (see NodeCard's chaotic-drift rendering, keyed off Node.locked).
-  // Clicking the *already-chosen* circle's backdrop again releases it
-  // (toggle), rather than needing a separate control — same as clicking
-  // anywhere outside it now does (see releaseChosenCircleIfOutside).
-  async function handleCircleBackdropClick(rootId: string) {
-    if (!mapId) return;
-    if (map?.selectedCircle?.rootId === rootId) {
-      await releaseChosenCircle();
-      return;
-    }
-    setActionError(null);
-    setCircleLoadingRootId(rootId);
-    try {
-      const selected = await mapsApi.selectCircle(mapId, rootId);
-      applyCircleSelection(selected);
-      // Normally the spinner is cleared once the members' text has loaded (see
-      // the spotlightedNodeIds effect) — with no members there is nothing to wait for.
-      if (!selected || selected.nodeIds.length === 0) setCircleLoadingRootId(null);
-    } catch (err) {
-      setCircleLoadingRootId(null);
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.updateCircle);
-    }
   }
 
   // Quick-add: clicking one of the half-visible type ghosts fanned around
