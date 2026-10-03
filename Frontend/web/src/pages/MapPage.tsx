@@ -7,6 +7,7 @@ import * as edgesApi from "../api/edges";
 import * as linesApi from "../api/lines";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
+import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
@@ -28,18 +29,13 @@ import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
-import { loadNodeDisplay } from "../utils/nodeDisplay";
-import { loadCardFills, saveCardFills } from "../utils/cardFill";
-import { loadBlockLocks, saveBlockLocks } from "../utils/blockLock";
-import type { BlockLocks } from "../utils/blockLock";
-import type { CardFills } from "../utils/cardFill";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
 import { findSnap } from "../utils/puzzleSnap";
 import type { Snap, SnapPiece } from "../utils/puzzleSnap";
 import { pieceEdges } from "../map/PuzzleCard";
 import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
-import { loadZoneDisplay, saveZoneDisplay, zoneModeByNode } from "../utils/zoneDisplay";
-import type { ZoneDisplay, ZoneMode } from "../utils/zoneDisplay";
+import { zoneModeByNode } from "../utils/zoneDisplay";
+import type { ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
 import { MapToolbar } from "../map/MapToolbar";
@@ -90,7 +86,6 @@ import {
   computeLinkCycles,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
-import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
 import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, EdgeDoc, LineDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
 
@@ -169,56 +164,33 @@ export function MapPage() {
   // bottom bar doesn't render behind the presentation overlay), which would
   // otherwise erase the very scope slideNodes needs to keep filtering by.
   const [presentationScopeIds, setPresentationScopeIds] = useState<Set<string> | null>(null);
-  // How this viewer reads the map (see utils/readingMode.ts) — remembered per
-  // browser, never shared with the map's other members.
-  const [readingMode, setReadingModeState] = useState<ReadingMode>(loadReadingMode);
-  // The simplified view (smaller icons, no halo/horns/rings) — on by default on a phone.
   // The ids the node search currently matches (null = no search): everything else dims.
   const [searchMatches, setSearchMatches] = useState<Set<string> | null>(null);
-  const [compactView, setCompactViewState] = useState<boolean>(loadCompactView);
-  function toggleCompactView() {
-    setCompactViewState((v) => {
-      saveCompactView(!v);
-      return !v;
-    });
-  }
+  // This viewer's own, per-browser view of the map — reading mode, compact
+  // view, per-node/per-zone display, block locks, card fills. See
+  // hooks/useMapViewerPrefs.ts.
+  const {
+    readingMode,
+    storeReadingMode,
+    compactView,
+    toggleCompactView,
+    nodeDisplay,
+    setNodeDisplay,
+    zoneDisplay,
+    storeZoneDisplay,
+    blockLocks,
+    toggleBlockLock: toggleStoredBlockLock,
+    cardFills,
+    setCardFill,
+  } = useMapViewerPrefs(mapId);
   function setReadingMode(mode: ReadingMode) {
-    setReadingModeState(mode);
-    saveReadingMode(mode);
+    storeReadingMode(mode);
     if (mode !== "actual") fitZoomForDisplay(effectiveDisplay(), mode);
   }
-  // Nodes shown in their own reading mode instead of the map's (a chosen group
-  // as puzzle cards, say) — per browser and per map, see
-  // utils/nodeDisplay.ts.
-  const [nodeDisplay, setNodeDisplay] = useState<NodeDisplay>(() => loadNodeDisplay(mapId));
-  // Each zone's own view, so one canvas shows several sides of the map at
-  // once — see utils/zoneDisplay.ts. Below a node's own display (the group
-  // bar's "Show as"), above the map-wide reading mode.
-  const [zoneDisplay, setZoneDisplay] = useState<ZoneDisplay>(() => loadZoneDisplay(mapId));
-  // Text blocks their owner locked against moving and editing — see
-  // utils/blockLock.ts.
-  const [blockLocks, setBlockLocks] = useState<BlockLocks>(() => loadBlockLocks(mapId));
   function toggleBlockLock(nodeId: string) {
-    setBlockLocks((prev) => {
-      const next = { ...prev };
-      if (next[nodeId]) delete next[nodeId];
-      else next[nodeId] = true;
-      saveBlockLocks(mapId, next);
-      return next;
-    });
+    toggleStoredBlockLock(nodeId);
     // Locking a block mid-edit ends the edit.
     setInlineEditId((cur) => (cur === nodeId ? null : cur));
-  }
-  // The viewer's own fill per puzzle piece — see utils/cardFill.ts.
-  const [cardFills, setCardFills] = useState<CardFills>(() => loadCardFills(mapId));
-  function setCardFill(nodeId: string, color: string | null) {
-    setCardFills((prev) => {
-      const next = { ...prev };
-      if (color) next[nodeId] = color;
-      else delete next[nodeId];
-      saveCardFills(mapId, next);
-      return next;
-    });
   }
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
   // group selection (multiSelectIds — the same one shift+click and the marquee
@@ -666,8 +638,7 @@ export function MapPage() {
     const next = { ...zoneDisplay };
     if (mode) next[rootId] = mode;
     else delete next[rootId];
-    setZoneDisplay(next);
-    saveZoneDisplay(mapId, next);
+    storeZoneDisplay(next);
     const group = nodeGroups.find((g) => g.rootId === rootId);
     if (mode && mode !== "actual" && mode !== "dots") {
       fitZoomForDisplay(
