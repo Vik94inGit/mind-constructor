@@ -746,7 +746,14 @@ export function MapPage() {
   // piece it's linked to (utils/puzzleAssembly.ts), and interlock along the
   // map's links (utils/puzzleLinks.ts) — the seated ones claiming their
   // sides first, so a tab always meets the blank next to it.
-  const puzzleCardSizes = usePuzzleCardSizes(canvasRef);
+  // Changes whenever the assembly's own inputs do, so a layout that can't
+  // settle (see usePuzzleCardSizes) is held only until the map changes.
+  const puzzleSettleKey = useMemo(
+    () => ({}),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleNodes, edges, positions, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode],
+  );
+  const puzzleCardSizes = usePuzzleCardSizes(canvasRef, puzzleSettleKey);
   const puzzleAssembly = useMemo(() => {
     const ids = visibleNodes.filter((n) => drawnAsCard(n)).map((n) => n.nodeId);
     const links = [
