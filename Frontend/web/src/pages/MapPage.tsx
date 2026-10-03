@@ -202,16 +202,23 @@ export function MapPage() {
   // Text blocks their owner locked against moving and editing — see
   // utils/blockLock.ts.
   const [blockLocks, setBlockLocks] = useState<BlockLocks>(() => loadBlockLocks(mapId));
+  // An assembled puzzle locks and unlocks as one: every piece clicked
+  // together with this one (puzzleClusterFor) follows its new state.
   function toggleBlockLock(nodeId: string) {
+    const node = nodes.find((n) => n.nodeId === nodeId);
+    const ids = node ? puzzleClusterFor(node) : [nodeId];
     setBlockLocks((prev) => {
+      const lock = !prev[nodeId];
       const next = { ...prev };
-      if (next[nodeId]) delete next[nodeId];
-      else next[nodeId] = true;
+      for (const id of ids) {
+        if (lock) next[id] = true;
+        else delete next[id];
+      }
       saveBlockLocks(mapId, next);
       return next;
     });
     // Locking a block mid-edit ends the edit.
-    setInlineEditId((cur) => (cur === nodeId ? null : cur));
+    setInlineEditId((cur) => (cur && ids.includes(cur) ? null : cur));
   }
   // The viewer's own fill per puzzle piece — see utils/cardFill.ts.
   const [cardFills, setCardFills] = useState<CardFills>(() => loadCardFills(mapId));
@@ -1068,11 +1075,14 @@ export function MapPage() {
       }),
     ];
     const sizes = new Map(Array.from(puzzleCardSizes, ([id, s]) => [id, { w: s.w / zoom, h: s.h / zoom }]));
-    const held = new Set(visibleNodes.filter((n) => n.locked || blockLocks[n.nodeId]).map((n) => n.nodeId));
+    // A locked block stays assembled: its whole puzzle locks with it, and
+    // nothing in it can be dragged, so only a chosen circle's members are
+    // held where they're stored.
+    const held = new Set(visibleNodes.filter((n) => n.locked).map((n) => n.nodeId));
     return assemblePuzzles(ids, links, positions, sizes, held);
     // drawnAsCard reads the display state below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, blockLocks, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode]);
+  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode]);
   const puzzleJoins = useMemo(() => {
     const at = new Map(positions);
     for (const [id, p] of puzzleAssembly.positions) at.set(id, p);
@@ -1305,12 +1315,13 @@ export function MapPage() {
   }
   // An assembled puzzle moves as one: every piece clicked together with
   // `node` (linked to it, as a branch or a link, and sitting flush against it
-  // — see connectedPieces), directly or through others. Pieces held in place
-  // aren't part of it.
+  // — see connectedPieces), directly or through others: what drags as one,
+  // and what locks and unlocks as one. A puzzle with any piece held in place
+  // doesn't drag at all (see useNodeDragAndDrop).
   function puzzleClusterFor(node: NodeDoc): string[] {
     if (!drawnAsCard(node)) return [node.nodeId];
     const pieces = visibleNodes.flatMap((n) => {
-      if (!drawnAsCard(n) || n.locked || blockLocks[n.nodeId] || !isOwnNode(n)) return [];
+      if (!drawnAsCard(n) || !isOwnNode(n)) return [];
       const piece = snapPiece(n, posFor(n));
       return piece ? [piece] : [];
     });

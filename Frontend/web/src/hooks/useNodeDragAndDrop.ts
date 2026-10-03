@@ -320,7 +320,14 @@ export function useNodeDragAndDrop({
     // good (see the group-drag branch's own comment above); touch long-
     // press-to-multiselect still works on one, since picking a locked node
     // into some other selection doesn't move anything.
-    if (!moveMode || held(node)) {
+    // Puzzle pieces clicked together drag as one (see clusterFor below), so a
+    // puzzle with any piece held in place is held as a whole.
+    const clusterIds = moveMode && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];
+    const clusterHeld = clusterIds.some((id) => {
+      const n = nodes.find((nn) => nn.nodeId === id);
+      return !!n && held(n);
+    });
+    if (!moveMode || held(node) || clusterHeld) {
       if (e.pointerType !== "touch") return;
       const touchStartX = e.clientX;
       const touchStartY = e.clientY;
@@ -384,7 +391,6 @@ export function useNodeDragAndDrop({
     // carries the whole assembled puzzle along rigidly, every piece keeping
     // its place against the others. Such a drag is a plain move of the lot —
     // no clicking into another piece, joining a circle or leaving one.
-    const clusterIds = clusterFor?.(node) ?? [node.nodeId];
     const clusterStart =
       clusterIds.length > 1
         ? new Map(
