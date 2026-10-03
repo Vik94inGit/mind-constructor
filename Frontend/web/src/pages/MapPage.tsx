@@ -60,6 +60,18 @@ import { sleep } from "../utils/sleep";
 import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
 import { computeSlideOrder, computeGeometrizedPositions } from "../utils/presentation";
+import {
+  closestToCentroidIndex,
+  collectBranchIds,
+  collectDescendants,
+  computeAttackPairIds,
+  computeHiddenBranchIds,
+  computeUnsolvedProblemIds,
+  countPackedByContainer,
+  upsertBy,
+  weaponFlightVector,
+  zoneLabel,
+} from "../utils/mapGraph";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import type { Sentiment } from "../utils/nodeType";
 import {
@@ -81,11 +93,6 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
 import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, EdgeDoc, LineDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
-
-// A Problem-type node's own child counts as "addressing" it (see
-// unsolvedProblemIds below) only if it's one of these — a plain Problem or
-// Fail child piled on top doesn't count as a proposal.
-const ADDRESSES_PROBLEM_TYPES = new Set<NodeType>(["Success", "Option", "Solution"]);
 
 // applyTemplate's own reveal pace — long enough that each node in a growing
 // template branch reads as its own discrete step (plus its celebrate burst),
@@ -385,38 +392,17 @@ export function MapPage() {
   // twice; an upsert keyed by id makes whichever one lands second a
   // harmless no-op instead.
   const upsertNode = useCallback(
-    (incoming: NodeDoc) =>
-      setNodes((prev) => {
-        const idx = prev.findIndex((n) => n.nodeId === incoming.nodeId);
-        if (idx === -1) return [...prev, incoming];
-        const next = prev.slice();
-        next[idx] = incoming;
-        return next;
-      }),
+    (incoming: NodeDoc) => setNodes((prev) => upsertBy(prev, incoming, (n) => n.nodeId)),
     [],
   );
 
   const upsertLine = useCallback(
-    (incoming: LineDoc) =>
-      setLines((prev) => {
-        const idx = prev.findIndex((l) => l.lineId === incoming.lineId);
-        if (idx === -1) return [...prev, incoming];
-        const next = prev.slice();
-        next[idx] = incoming;
-        return next;
-      }),
+    (incoming: LineDoc) => setLines((prev) => upsertBy(prev, incoming, (l) => l.lineId)),
     [],
   );
 
   const upsertEdge = useCallback(
-    (incoming: EdgeDoc) =>
-      setEdges((prev) => {
-        const idx = prev.findIndex((e) => e.edgeId === incoming.edgeId);
-        if (idx === -1) return [...prev, incoming];
-        const next = prev.slice();
-        next[idx] = incoming;
-        return next;
-      }),
+    (incoming: EdgeDoc) => setEdges((prev) => upsertBy(prev, incoming, (e) => e.edgeId)),
     [],
   );
 
@@ -562,21 +548,7 @@ export function MapPage() {
 
   // For the owner: every node in a branch hidden from invited members (a
   // flagged root, and everything hanging from it by parentId).
-  const hiddenBranchIds = useMemo(() => {
-    const out = new Set<string>();
-    if (!nodes.some((n) => n.hiddenFromMembers)) return out;
-    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
-    const isHidden = (id: string, seen: Set<string>): boolean => {
-      const n = byId.get(id);
-      if (!n || seen.has(id)) return false;
-      seen.add(id);
-      if (n.hiddenFromMembers) return true;
-      const parent = nodeRefId(n.parentId);
-      return !!parent && isHidden(parent, seen);
-    };
-    for (const n of nodes) if (isHidden(n.nodeId, new Set())) out.add(n.nodeId);
-    return out;
-  }, [nodes]);
+  const hiddenBranchIds = useMemo(() => computeHiddenBranchIds(nodes), [nodes]);
 
   // Any node "chosen" on the map right now — a multi-select takes priority
   // (it's the more specific state), falling back to the plain single
@@ -611,17 +583,7 @@ export function MapPage() {
   // keeps working for as long as either end stays selected and clears
   // itself the moment selection moves on to something unrelated — no timer
   // to manage.
-  const unmutedAttackNodeIds = useMemo(() => {
-    if (!selectedId) return null;
-    const selected = nodes.find((n) => n.nodeId === selectedId);
-    if (!selected) return null;
-    if (selected.isWeapon) {
-      const targetId = nodeRefId(selected.targetNodeId);
-      return targetId ? new Set([selected.nodeId, targetId]) : null;
-    }
-    const attackers = nodes.filter((n) => n.isWeapon && nodeRefId(n.targetNodeId) === selected.nodeId);
-    return attackers.length > 0 ? new Set([selected.nodeId, ...attackers.map((a) => a.nodeId)]) : null;
-  }, [selectedId, nodes]);
+  const unmutedAttackNodeIds = useMemo(() => computeAttackPairIds(selectedId, nodes), [selectedId, nodes]);
 
 
 
@@ -756,32 +718,6 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presenting, slideIndex, slideNodes, geometrizeBlend.blend]);
 
-  // Every id reachable from `rootIds` by walking parentId forward
-  // (children, grandchildren, ...) within `pool` — used to expand a chosen
-  // zone's own [rootId, ...directChildIds] (see SelectedCircle) into its
-  // *whole* branch for presenting, since a zone's stabilized membership only
-  // ever lists the root's direct children, not deeper descendants. A plain
-  // multi-select (the other way to scope a presentation, see
-  // enterPresentation) is left exactly as picked instead — those ids were
-  // chosen by hand, one at a time, so there's no "the rest of the branch"
-  // to imply the way a zone's own subtree does.
-  function collectDescendants(rootIds: Set<string>, pool: NodeDoc[]): Set<string> {
-    const result = new Set(rootIds);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const n of pool) {
-        if (result.has(n.nodeId)) continue;
-        const parentId = nodeRefId(n.parentId);
-        if (parentId && result.has(parentId)) {
-          result.add(n.nodeId);
-          grew = true;
-        }
-      }
-    }
-    return result;
-  }
-
   // Guards an empty selection (nothing eligible to present) rather than
   // entering a blank slideshow; computes the eligible set eagerly, on the
   // toolbar click itself, well before `presenting` flips true and
@@ -831,15 +767,7 @@ export function MapPage() {
 
   // How many nodes are currently packed into each container — NodeCard's
   // own corner badge reads this by nodeId.
-  const packedCountByContainer = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const n of nodes) {
-      const containerId = nodeRefId(n.packedIntoNodeId);
-      if (!containerId) continue;
-      counts.set(containerId, (counts.get(containerId) ?? 0) + 1);
-    }
-    return counts;
-  }, [nodes]);
+  const packedCountByContainer = useMemo(() => countPackedByContainer(nodes), [nodes]);
 
   // Any node with 2+ direct parentId-children reads as a group ("circle") —
   // general on purpose, same as linkCycles below. See canvasLayout.ts's own
@@ -1115,27 +1043,10 @@ export function MapPage() {
     return map;
   }, [indicators]);
 
-  // A Problem node with no Success/Option/Solution child yet — nothing's
-  // actually been proposed against it — pulses (see NodeCard's own
-  // `unsolved` prop / index.css's unsolved-problem-pulse). "Addresses it"
-  // is deliberately narrow (see ADDRESSES_PROBLEM_TYPES above): a Problem
-  // with only more Problem/Fail children branched off it still counts as
-  // unsolved, same as one with none at all — piling on more problems isn't
-  // a proposal. Built from `nodes`, not visibleNodes: a packed-away child
-  // still counts as "this got addressed", it just doesn't render on the
-  // canvas any more.
-  const unsolvedProblemIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const n of nodes) {
-      if (n.type !== "Problem" || n.isWeapon) continue;
-      const hasAddressingChild = nodes.some(
-        (child) => nodeRefId(child.parentId) === n.nodeId && ADDRESSES_PROBLEM_TYPES.has(child.type),
-      );
-      if (!hasAddressingChild) ids.add(n.nodeId);
-    }
-    return ids;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes]);
+  // A Problem node nothing has been proposed against yet pulses — see
+  // computeUnsolvedProblemIds. Built from `nodes`, not visibleNodes: a
+  // packed-away child still counts as "this got addressed".
+  const unsolvedProblemIds = useMemo(() => computeUnsolvedProblemIds(nodes), [nodes]);
 
   // The sentiment show (see hooks/useSentimentShow.ts): on open, and on every
   // majority swing, the majority type's nodes travel toward the center and
@@ -1484,35 +1395,10 @@ export function MapPage() {
     setMultiSelectIds(new Set([nodeId, ...branchIds(nodeId)]));
   }
 
-  // Every node below `rootId` in the branch tree (parentId) — its children, their
-  // children, and so on — that you can choose: your own, on the canvas, and not
-  // an attack or shield node (those hang off a node by parentId too, but they
-  // aren't part of the argument). In the order a reader would follow it, level
-  // by level from the top, which is also the order "Number in order" numbers
-  // them in.
+  // Every own node below `rootId` in the branch tree, in reading order — see
+  // collectBranchIds.
   function branchIds(rootId: string): string[] {
-    const childrenOf = new Map<string, NodeDoc[]>();
-    for (const n of visibleNodes) {
-      const parent = nodeRefId(n.parentId);
-      if (!parent) continue;
-      if (!childrenOf.has(parent)) childrenOf.set(parent, []);
-      childrenOf.get(parent)!.push(n);
-    }
-    const found: string[] = [];
-    const seen = new Set<string>([rootId]);
-    const queue = [rootId];
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      for (const child of childrenOf.get(current) ?? []) {
-        if (seen.has(child.nodeId)) continue;
-        seen.add(child.nodeId);
-        // Not chosen itself if it's someone else's, an attack or a shield — but
-        // its own children are still reached through it.
-        if (isOwnNode(child) && !child.isWeapon && !child.isProtection) found.push(child.nodeId);
-        queue.push(child.nodeId);
-      }
-    }
-    return found;
+    return collectBranchIds(rootId, visibleNodes, isOwnNode);
   }
 
   // Leaves choose mode and drops the whole group selection — shared by the
@@ -1984,18 +1870,7 @@ export function MapPage() {
       .filter((n): n is NodeDoc => !!n);
     if (selectedNodes.length < 2) return;
     const pts = selectedNodes.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-    let rootIndex = 0;
-    let bestDist = Infinity;
-    pts.forEach((p, i) => {
-      const d = Math.hypot(p.x - cx, p.y - cy);
-      if (d < bestDist) {
-        bestDist = d;
-        rootIndex = i;
-      }
-    });
-    const root = selectedNodes[rootIndex];
+    const root = selectedNodes[closestToCentroidIndex(pts)];
     const others = selectedNodes.filter((n) => n.nodeId !== root.nodeId);
     setActionError(null);
     try {
@@ -2512,23 +2387,13 @@ export function MapPage() {
             {visibleNodes.map((node) => {
               const pos = posFor(node);
               const editingThis = inlineEditId === node.nodeId;
-              // Weapon nodes only: fly in from the direction away from their
-              // target (fixed 150px so a distant attack doesn't launch it
-              // from absurdly far away), so the entrance animation reads as
-              // "just landed from what it hit" instead of an arbitrary
-              // random direction. See NodeCard's flightVector doc comment.
+              // Weapon nodes only: fly in from away from their target — see
+              // weaponFlightVector.
               let flightVector: { x: number; y: number } | undefined;
               if (node.isWeapon) {
                 const targetId = nodeRefId(node.targetNodeId);
                 const target = targetId ? nodes.find((t) => t.nodeId === targetId) : undefined;
-                if (target) {
-                  const targetPos = posFor(target);
-                  const dx = pos.x - targetPos.x;
-                  const dy = pos.y - targetPos.y;
-                  const dist = Math.hypot(dx, dy) || 1;
-                  const scale = 150 / dist;
-                  flightVector = { x: dx * scale, y: dy * scale };
-                }
+                if (target) flightVector = weaponFlightVector(pos, posFor(target));
               }
               return (
                 <NodeCard
@@ -2744,18 +2609,8 @@ export function MapPage() {
                 wrapRef={wrapRef}
                 zones={nodeGroups.flatMap((g) => {
                   const root = nodes.find((n) => n.nodeId === g.rootId);
-                  // An owner-given zoneName wins when set; otherwise every
-                  // zone still gets *some* label rather than none at all —
-                  // same title-falls-back-to-text the node's own caption
-                  // uses elsewhere (see e.g. PresentationOverlay). Capped
-                  // the same way other short node-text previews already are
-                  // elsewhere (see e.g. CreateEdgeModal's own .slice(0, 24))
-                  // — the raw text fallback especially can run to a whole
-                  // sentence, which read as far too wide a pill for a
-                  // corner legend meant to be skimmed at a glance.
-                  const ZONE_NAME_MAX = 22;
-                  const name = root?.zoneName || root?.title || root?.text;
-                  const shortName = name && name.length > ZONE_NAME_MAX ? `${name.slice(0, ZONE_NAME_MAX)}…` : name;
+                  // See zoneLabel: zoneName, else title, else text, capped.
+                  const shortName = zoneLabel(root);
                   return shortName
                     ? [{ rootId: g.rootId, name: shortName, sentiment: g.sentiment, variant: !!root!.parentId }]
                     : [];
