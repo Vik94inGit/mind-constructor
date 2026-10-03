@@ -40,14 +40,8 @@ import { DrawLineBar } from "../map/DrawLineBar";
 import { MapBanner } from "../map/MapBanner";
 import { MarqueeRect, PuzzleConnectLine, ZoneLoadingSpinner } from "../map/CanvasOverlays";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
-import { connectedPieces, findSnap } from "../utils/puzzleSnap";
 import { assemblePuzzles } from "../utils/puzzleAssembly";
 import { usePuzzleCardSizes } from "../hooks/usePuzzleCardSizes";
-import type { Snap, SnapPiece } from "../utils/puzzleSnap";
-import { pieceEdges } from "../map/PuzzleCard";
-import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
-import { loadZoneDisplay, saveZoneDisplay, zoneModeByNode } from "../utils/zoneDisplay";
-import type { ZoneDisplay, ZoneMode } from "../utils/zoneDisplay";
 import { zoneModeByNode } from "../utils/zoneDisplay";
 import type { ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
@@ -162,34 +156,12 @@ export function MapPage() {
     storeReadingMode(mode);
     if (mode !== "actual") fitZoomForDisplay(effectiveDisplay(), mode);
   }
-  // Nodes shown in their own reading mode instead of the map's (a chosen group
-  // as puzzle cards, say) — per browser and per map, see
-  // utils/nodeDisplay.ts.
-  const [nodeDisplay, setNodeDisplay] = useState<NodeDisplay>(() => loadNodeDisplay(mapId));
-  // Each zone's own view, so one canvas shows several sides of the map at
-  // once — see utils/zoneDisplay.ts. Below a node's own display (the group
-  // bar's "Show as"), above the map-wide reading mode.
-  const [zoneDisplay, setZoneDisplay] = useState<ZoneDisplay>(() => loadZoneDisplay(mapId));
-  // Text blocks their owner locked against moving and editing — see
-  // utils/blockLock.ts.
-  const [blockLocks, setBlockLocks] = useState<BlockLocks>(() => loadBlockLocks(mapId));
   // An assembled puzzle locks and unlocks as one: every piece clicked
   // together with this one (puzzleClusterFor) follows its new state.
   function toggleBlockLock(nodeId: string) {
     const node = nodes.find((n) => n.nodeId === nodeId);
     const ids = node ? puzzleClusterFor(node) : [nodeId];
-    setBlockLocks((prev) => {
-      const lock = !prev[nodeId];
-      const next = { ...prev };
-      for (const id of ids) {
-        if (lock) next[id] = true;
-        else delete next[id];
-      }
-      saveBlockLocks(mapId, next);
-      return next;
-    });
-  function toggleBlockLock(nodeId: string) {
-    toggleStoredBlockLock(nodeId);
+    toggleStoredBlockLock(nodeId, ids);
     // Locking a block mid-edit ends the edit.
     setInlineEditId((cur) => (cur && ids.includes(cur) ? null : cur));
   }
@@ -676,39 +648,6 @@ export function MapPage() {
     return map;
   }, [nodeGroups]);
 
-  // Linked puzzle cards are drawn assembled, each seated flush against the
-  // piece it's linked to (utils/puzzleAssembly.ts), and interlock along the
-  // map's links (utils/puzzleLinks.ts) — the seated ones claiming their
-  // sides first, so a tab always meets the blank next to it.
-  const puzzleCardSizes = usePuzzleCardSizes(canvasRef);
-  const puzzleAssembly = useMemo(() => {
-    const ids = visibleNodes.filter((n) => drawnAsCard(n)).map((n) => n.nodeId);
-    const links = [
-      ...visibleNodes.flatMap((n) => {
-        const parent = nodeRefId(n.parentId);
-        return parent ? [{ from: parent, to: n.nodeId }] : [];
-      }),
-      ...edges.flatMap((e) => {
-        const from = nodeRefId(e.fromNodeId);
-        const to = nodeRefId(e.toNodeId);
-        return from && to ? [{ from, to }] : [];
-      }),
-    ];
-    const sizes = new Map(Array.from(puzzleCardSizes, ([id, s]) => [id, { w: s.w / zoom, h: s.h / zoom }]));
-    // A locked block stays assembled: its whole puzzle locks with it, and
-    // nothing in it can be dragged, so only a chosen circle's members are
-    // held where they're stored.
-    const held = new Set(visibleNodes.filter((n) => n.locked).map((n) => n.nodeId));
-    return assemblePuzzles(ids, links, positions, sizes, held);
-    // drawnAsCard reads the display state below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode]);
-  const puzzleJoins = useMemo(() => {
-    const at = new Map(positions);
-    for (const [id, p] of puzzleAssembly.positions) at.set(id, p);
-    return computePuzzleJoins(visibleNodes, edges, at, puzzleAssembly.seated);
-  }, [visibleNodes, edges, positions, puzzleAssembly]);
-
   // Every camera-framing cue (fit-to-zoom for a text reading mode, the
   // floor-at-100%-for-editing after a drag, bringing a set of nodes into
   // view) — see hooks/useCanvasFraming.ts.
@@ -803,9 +742,41 @@ export function MapPage() {
     const m = modeOf(n.nodeId);
     return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
   }
+  // Linked puzzle cards are drawn assembled, each seated flush against the
+  // piece it's linked to (utils/puzzleAssembly.ts), and interlock along the
+  // map's links (utils/puzzleLinks.ts) — the seated ones claiming their
+  // sides first, so a tab always meets the blank next to it.
+  const puzzleCardSizes = usePuzzleCardSizes(canvasRef);
+  const puzzleAssembly = useMemo(() => {
+    const ids = visibleNodes.filter((n) => drawnAsCard(n)).map((n) => n.nodeId);
+    const links = [
+      ...visibleNodes.flatMap((n) => {
+        const parent = nodeRefId(n.parentId);
+        return parent ? [{ from: parent, to: n.nodeId }] : [];
+      }),
+      ...edges.flatMap((e) => {
+        const from = nodeRefId(e.fromNodeId);
+        const to = nodeRefId(e.toNodeId);
+        return from && to ? [{ from, to }] : [];
+      }),
+    ];
+    const sizes = new Map(Array.from(puzzleCardSizes, ([id, s]) => [id, { w: s.w / zoom, h: s.h / zoom }]));
+    // A locked block stays assembled: its whole puzzle locks with it, and
+    // nothing in it can be dragged, so only a chosen circle's members are
+    // held where they're stored.
+    const held = new Set(visibleNodes.filter((n) => n.locked).map((n) => n.nodeId));
+    return assemblePuzzles(ids, links, positions, sizes, held);
+    // drawnAsCard reads the display state below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode]);
+  const puzzleJoins = useMemo(() => {
+    const at = new Map(positions);
+    for (const [id, p] of puzzleAssembly.positions) at.set(id, p);
+    return computePuzzleJoins(visibleNodes, edges, at, puzzleAssembly.seated);
+  }, [visibleNodes, edges, positions, puzzleAssembly]);
   // Puzzle pieces: dragging a link out of a piece's tab, and clicking pieces
   // together — see hooks/usePuzzleConnect.ts.
-  const { puzzleConnect, puzzleSnapFor, linkSnappedPieces, startPuzzleConnect } = usePuzzleConnect({
+  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect } = usePuzzleConnect({
     mapId,
     nodes,
     edges,
@@ -881,143 +852,6 @@ export function MapPage() {
   // request straight to the API, just the UI paths.
   function isOwnNode(node: NodeDoc) {
     return idOf(node.userId) === user?._id;
-  }
-
-  // Connecting puzzle pieces: dragging out of a piece's tab (see PuzzleCard's
-  // handles) draws a line to the pointer; letting go over another of your
-  // own pieces opens the link dialog for the two, like the group bar's Link.
-  // A link needs both ends to be yours (Backend's createEdgeAbl), and a pair
-  // that's already linked can't be linked again.
-  const [puzzleConnect, setPuzzleConnect] = useState<{
-    fromId: string;
-    to: { x: number; y: number };
-    overId: string | null;
-    valid: boolean;
-  } | null>(null);
-  function nodeIdAt(clientX: number, clientY: number): string | null {
-    const el = document.elementFromPoint(clientX, clientY);
-    return el?.closest("[data-reveal-node]")?.getAttribute("data-reveal-node") ?? null;
-  }
-  function canConnect(from: NodeDoc, to: NodeDoc | undefined): to is NodeDoc {
-    if (!to || to.nodeId === from.nodeId || !isOwnNode(to)) return false;
-    return !edges.some((e) => {
-      const a = nodeRefId(e.fromNodeId);
-      const b = nodeRefId(e.toNodeId);
-      return (a === from.nodeId && b === to.nodeId) || (a === to.nodeId && b === from.nodeId);
-    });
-  }
-  // Clicking pieces together (utils/puzzleSnap.ts): a puzzle card dragged
-  // close to another one whose facing side has the opposite cut (a tab to a
-  // blank) jumps flush into it. Measured off the cards as drawn, so the fit
-  // matches what's on screen at any zoom. Only between pieces actually
-  // drawn as cards — not dots, not icons.
-  function drawnAsCard(n: NodeDoc): boolean {
-    if (dotZoom || dottedByZone(n.nodeId)) return false;
-    const m = modeOf(n.nodeId);
-    return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
-  }
-  function snapPiece(n: NodeDoc, at: { x: number; y: number }): SnapPiece | null {
-    const el = document.querySelector(`[data-reveal-node="${CSS.escape(n.nodeId)}"] [data-puzzle-card]`);
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return {
-      id: n.nodeId,
-      x: at.x,
-      y: at.y,
-      w: r.width / zoom,
-      h: r.height / zoom,
-      edges: pieceEdges(n.nodeId, puzzleJoins.get(n.nodeId)),
-    };
-  }
-  function puzzleSnapFor(node: NodeDoc, x: number, y: number): Snap | null {
-    if (!drawnAsCard(node)) return null;
-    const me = snapPiece(node, { x, y });
-    if (!me) return null;
-    // Only pieces near enough to possibly fit are measured.
-    const near = (SNAP_REACH_PX + 600) / zoom;
-    const others = visibleNodes.flatMap((n) => {
-      if (n.nodeId === node.nodeId || !drawnAsCard(n)) return [];
-      const p = posFor(n);
-      if (Math.abs(p.x - x) > near || Math.abs(p.y - y) > near) return [];
-      const piece = snapPiece(n, p);
-      return piece ? [piece] : [];
-    });
-    return findSnap(me, others, SNAP_REACH_PX / zoom);
-  }
-  // An assembled puzzle moves as one: every piece clicked together with
-  // `node` (linked to it, as a branch or a link, and sitting flush against it
-  // — see connectedPieces), directly or through others: what drags as one,
-  // and what locks and unlocks as one. A puzzle with any piece held in place
-  // doesn't drag at all (see useNodeDragAndDrop).
-  function puzzleClusterFor(node: NodeDoc): string[] {
-    if (!drawnAsCard(node)) return [node.nodeId];
-    const pieces = visibleNodes.flatMap((n) => {
-      if (!drawnAsCard(n) || !isOwnNode(n)) return [];
-      const piece = snapPiece(n, posFor(n));
-      return piece ? [piece] : [];
-    });
-    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
-    const linked = (a: string, b: string) =>
-      nodeRefId(byId.get(a)?.parentId) === b ||
-      nodeRefId(byId.get(b)?.parentId) === a ||
-      edges.some((e) => {
-        const from = nodeRefId(e.fromNodeId);
-        const to = nodeRefId(e.toNodeId);
-        return (from === a && to === b) || (from === b && to === a);
-      });
-    return connectedPieces(node.nodeId, pieces, linked, 6);
-  }
-  // Pieces dropped clicked together are linked — from the piece whose tab
-  // went in to the one whose blank took it, so the fit stays the way it's
-  // drawn — when both are yours (a link needs both ends to be) and they
-  // aren't linked yet.
-  async function linkSnappedPieces(_node: NodeDoc, snap: Snap) {
-    const from = nodes.find((n) => n.nodeId === snap.from);
-    const to = nodes.find((n) => n.nodeId === snap.to);
-    if (!from || !mapId || !isOwnNode(from) || !canConnect(from, to)) return;
-    if (nodeRefId(from.parentId) === to.nodeId || nodeRefId(to.parentId) === from.nodeId) return;
-    try {
-      upsertEdge(await edgesApi.createEdge(mapId, { fromNodeId: from.nodeId, toNodeId: to.nodeId, sentiment: "neutral" }));
-      refreshInsights(mapId);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.link.failed);
-    }
-  }
-
-  function startPuzzleConnect(from: NodeDoc, e: ReactPointerEvent) {
-    setContextMenu(null);
-    const track = (clientX: number, clientY: number) => {
-      const id = nodeIdAt(clientX, clientY);
-      const overId = id && id !== from.nodeId ? id : null;
-      setPuzzleConnect({
-        fromId: from.nodeId,
-        to: screenToCanvas(clientX, clientY),
-        overId,
-        valid: !!overId && canConnect(from, nodes.find((n) => n.nodeId === overId)),
-      });
-    };
-    const onMove = (ev: PointerEvent) => track(ev.clientX, ev.clientY);
-    const finish = (ev: PointerEvent, drop: boolean) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onCancel);
-      setPuzzleConnect(null);
-      // The release lands on whatever is under the pointer, which would
-      // otherwise read as a click there (selecting a node, or closing the
-      // panel on bare canvas).
-      const swallow = (ce: MouseEvent) => ce.stopPropagation();
-      window.addEventListener("click", swallow, { capture: true, once: true });
-      setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
-      if (!drop) return;
-      const to = nodes.find((n) => n.nodeId === nodeIdAt(ev.clientX, ev.clientY));
-      if (canConnect(from, to)) setPendingLink([from, to]);
-    };
-    const onUp = (ev: PointerEvent) => finish(ev, true);
-    const onCancel = (ev: PointerEvent) => finish(ev, false);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    track(e.clientX, e.clientY);
   }
 
   // Owner-only — text/type editing isn't otherwise restricted (an earlier

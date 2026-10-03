@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction } from "react";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { findSnap } from "../utils/puzzleSnap";
+import { connectedPieces, findSnap } from "../utils/puzzleSnap";
 import type { Snap, SnapPiece } from "../utils/puzzleSnap";
 import type { PuzzleJoins } from "../utils/puzzleLinks";
 import { pieceEdges } from "../map/PuzzleCard";
@@ -110,6 +110,29 @@ export function usePuzzleConnect({
     });
     return findSnap(me, others, SNAP_REACH_PX / zoom);
   }
+  // An assembled puzzle moves as one: every piece clicked together with
+  // `node` (linked to it, as a branch or a link, and sitting flush against it
+  // — see connectedPieces), directly or through others: what drags as one,
+  // and what locks and unlocks as one. A puzzle with any piece held in place
+  // doesn't drag at all (see useNodeDragAndDrop).
+  function puzzleClusterFor(node: NodeDoc): string[] {
+    if (!drawnAsCard(node)) return [node.nodeId];
+    const pieces = visibleNodes.flatMap((n) => {
+      if (!drawnAsCard(n) || !isOwnNode(n)) return [];
+      const piece = snapPiece(n, posFor(n));
+      return piece ? [piece] : [];
+    });
+    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+    const linked = (a: string, b: string) =>
+      nodeRefId(byId.get(a)?.parentId) === b ||
+      nodeRefId(byId.get(b)?.parentId) === a ||
+      edges.some((e) => {
+        const from = nodeRefId(e.fromNodeId);
+        const to = nodeRefId(e.toNodeId);
+        return (from === a && to === b) || (from === b && to === a);
+      });
+    return connectedPieces(node.nodeId, pieces, linked, 6);
+  }
   // Pieces dropped clicked together are linked — from the piece whose tab
   // went in to the one whose blank took it, so the fit stays the way it's
   // drawn — when both are yours (a link needs both ends to be) and they
@@ -163,5 +186,5 @@ export function usePuzzleConnect({
     track(e.clientX, e.clientY);
   }
 
-  return { puzzleConnect, puzzleSnapFor, linkSnappedPieces, startPuzzleConnect };
+  return { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect };
 }

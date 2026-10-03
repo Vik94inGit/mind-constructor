@@ -42,11 +42,16 @@ export function useMapViewerPrefs(mapId: string | undefined) {
   // Text blocks their owner locked against moving and editing — see
   // utils/blockLock.ts.
   const [blockLocks, setBlockLocks] = useState<BlockLocks>(() => loadBlockLocks(mapId));
-  function toggleBlockLock(nodeId: string) {
+  // `ids` is every block that follows nodeId's new state (an assembled puzzle
+  // locks and unlocks as one); defaults to just nodeId.
+  function toggleBlockLock(nodeId: string, ids: string[] = [nodeId]) {
     setBlockLocks((prev) => {
+      const lock = !prev[nodeId];
       const next = { ...prev };
-      if (next[nodeId]) delete next[nodeId];
-      else next[nodeId] = true;
+      for (const id of ids) {
+        if (lock) next[id] = true;
+        else delete next[id];
+      }
       saveBlockLocks(mapId, next);
       return next;
     });
