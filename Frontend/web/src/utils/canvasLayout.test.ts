@@ -7,6 +7,7 @@ import {
   computeNodeGroups,
   getCirclePackSpacing,
   getNodeMinDist,
+  getZoneReach,
   isDescendant,
 } from "./canvasLayout";
 import type { EdgeDoc, NodeDoc, NodeType } from "../types";
@@ -175,10 +176,33 @@ describe("computeNodeGroups", () => {
     const groups = computeNodeGroups(nodes, nodes, farPositions);
     expect(groups).toHaveLength(1);
     expect(groups[0].members.map((m) => m.nodeId).sort()).toEqual(["c1", "c2", "root"]);
+    // …but the far member doesn't stretch the drawn zone out to it: only
+    // root and c2 are in reach, too few corners for an outline.
+    expect(groups[0].outline).toEqual([]);
 
     const disconnected = nodes.map((n) => (n.nodeId === "c1" ? { ...n, parentId: null } : n));
     // root is left with only one child — no longer enough to form a group.
     expect(computeNodeGroups(disconnected, disconnected, farPositions)).toEqual([]);
+  });
+
+  it("draws the zone only through the root and the children within its reach", () => {
+    const nodes: NodeDoc[] = [
+      makeNode({ nodeId: "root" }),
+      makeNode({ nodeId: "c1", parentId: "root" }),
+      makeNode({ nodeId: "c2", parentId: "root" }),
+      makeNode({ nodeId: "far", parentId: "root" }),
+    ];
+    const positions = new Map([
+      ["root", { x: 500, y: 500 }],
+      ["c1", { x: 600, y: 500 }],
+      ["c2", { x: 500, y: 600 }],
+      ["far", { x: 500 + getZoneReach() + 1, y: 500 }],
+    ]);
+    const [group] = computeNodeGroups(nodes, nodes, positions);
+    expect(group.members.map((m) => m.nodeId).sort()).toEqual(["c1", "c2", "far", "root"]);
+    expect([...(group.outlineIds ?? [])].sort()).toEqual(["c1", "c2", "root"]);
+    // The zone's radius follows the drawn outline, not the far member.
+    expect(group.r).toBeLessThan(getZoneReach());
   });
 
   it("votes neutral on a tied or all-unknown circle rather than leaning either way", () => {

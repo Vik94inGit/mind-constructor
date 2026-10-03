@@ -171,6 +171,15 @@ export function getCirclePackSpacing() {
   return CAPTION_WIDTH + (isMobileViewport() ? 6 : 12);
 }
 
+// How far from its root a circle's child can sit and still be inside the
+// zone — two pack spacings, so a quick-add ring, "Create circle" and a
+// template's spiral all fit, while a child dragged across the map no longer
+// drags the zone with it (see computeNodeGroups and the drop logic in
+// useNodeDragAndDrop, which reads a drop past this as leaving the circle).
+export function getZoneReach() {
+  return getCirclePackSpacing() * 2;
+}
+
 // A sunflower (golden-angle) spiral, indexed by i — shared by
 // computeBasePositions' own fallback layout (nodePositions.ts, for a node
 // with no stored x/y at all) and computeNegativeMajoritySwap below (for
@@ -482,16 +491,20 @@ export interface NodeGroup {
 // list — a root can be visible via its children even if something unusual
 // hid the root node itself.
 //
-// The zone is the polygon through every member — the root and each child at
-// its own stored position, sorted by angle around their centroid so
-// connecting them in order traces a simple (non-self-crossing) outline: a
-// triangle at the 3-member minimum, growing to a quad/pentagon/… as the
-// group grows. Every corner is a member, and nothing is derived or moved:
-// each node is drawn exactly where it is, root included.
+// The zone is the polygon through the root and every child within
+// getZoneReach() of it — each at its own stored position, sorted by angle
+// around their centroid so connecting them in order traces a simple
+// (non-self-crossing) outline: a triangle at the 3-member minimum, growing to
+// a quad/pentagon/… as the group grows. Nothing is derived or moved: each
+// node is drawn exactly where it is, root included. A child farther out is
+// still a member (membership is parentId alone — its branch arrow and color
+// stay), it just doesn't stretch the zone across the map to reach it. With
+// fewer than 3 corners in reach there is no outline at all.
 export function computeNodeGroups(
   visibleNodes: NodeDoc[],
   allNodes: NodeDoc[],
   positions: Map<string, { x: number; y: number }>,
+  reach: number = getZoneReach(),
 ): NodeGroup[] {
   const childrenByParent = new Map<string, NodeDoc[]>();
   for (const n of visibleNodes) {
@@ -507,7 +520,10 @@ export function computeNodeGroups(
     if (!root) continue;
     const members = [root, ...children];
     const sentiment = circleSentiment(members);
-    const pts = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+    const at = (n: NodeDoc) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const rootPos = at(root);
+    const near = [root, ...children.filter((c) => Math.hypot(at(c).x - rootPos.x, at(c).y - rootPos.y) <= reach)];
+    const pts = near.map(at);
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     // +70: the outline runs through the members' own centers, so this is the
@@ -515,9 +531,12 @@ export function computeNodeGroups(
     // obstacle avoidance, "dragged clear of its circle" — treat as still
     // being part of the zone.
     const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
-    const corners = members
-      .map((m, i) => ({ id: m.nodeId, p: pts[i] }))
-      .sort((a, b) => Math.atan2(a.p.y - cy, a.p.x - cx) - Math.atan2(b.p.y - cy, b.p.x - cx));
+    const corners =
+      near.length < 3
+        ? []
+        : near
+            .map((m, i) => ({ id: m.nodeId, p: pts[i] }))
+            .sort((a, b) => Math.atan2(a.p.y - cy, a.p.x - cx) - Math.atan2(b.p.y - cy, b.p.x - cx));
     const outline = corners.map((c) => c.p);
     const outlineIds = corners.map((c) => c.id);
     groups.push({ rootId, members, sentiment, cx, cy, r, outline, outlineIds });
