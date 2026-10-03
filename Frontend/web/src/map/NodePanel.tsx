@@ -3,22 +3,19 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf, ZONE_COLORS } from "../utils/nodeType";
+import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf } from "../utils/nodeType";
 import type { TemplateKind } from "../utils/templates";
-import { isMobileViewport } from "../utils/canvasLayout";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
-import { MANUAL_ZONE_COLORS, NODE_TYPES, PROTECT_NODE_TYPES, SIZE_TIERS, WEAPONS, WEAPON_INFO } from "../types";
+import { NODE_TYPES } from "../types";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
-import { CARD_FILL_COLORS } from "../utils/cardFill";
-
-// Same 100%/115%/130% scale NodeCard's own SIZE_MULTIPLIERS uses, just for
-// the button labels here — kept as a separate literal rather than imported
-// from NodeCard (a map component importing from another map component's
-// internals isn't a pattern this codebase otherwise uses; this pairing is
-// simple enough not to be worth a shared constants file).
-const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "130%" };
+import { InfoTab } from "./nodePanel/InfoTab";
+import { ModifyTab } from "./nodePanel/ModifyTab";
+import { AttackTab } from "./nodePanel/AttackTab";
+import { ProtectTab } from "./nodePanel/ProtectTab";
+import { PackedTab } from "./nodePanel/PackedTab";
+import { HistoryTab } from "./nodePanel/HistoryTab";
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own
@@ -864,666 +861,97 @@ export function NodePanel({
       )}
 
       {tab === "info" && (
-        <div className="mt-4">
-          {cardFill && (
-            // The puzzle card's own fill — the viewer's choice, not shared.
-            <div className="mb-3 flex flex-wrap items-center gap-[0.4rem]">
-              <span className="mr-1 text-[0.75rem] font-semibold text-ink-soft">{t.ui.display.cardColor}</span>
-              {CARD_FILL_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`h-[22px] w-[22px] cursor-pointer rounded-full border-2 border-line${
-                    cardFill.value === c ? " outline outline-2 outline-offset-2 outline-accent" : ""
-                  }`}
-                  style={{ background: c }}
-                  aria-label={c}
-                  aria-pressed={cardFill.value === c}
-                  onClick={() => cardFill.onChange(c)}
-                />
-              ))}
-              <button
-                type="button"
-                className={`cursor-pointer rounded-md border border-line px-2 py-[0.1rem] text-[0.72rem] hover:bg-surface-2 ${
-                  cardFill.value ? "text-ink" : "font-semibold text-accent"
-                }`}
-                onClick={() => cardFill.onChange(null)}
-              >
-                {t.ui.display.cardColorReset}
-              </button>
-            </div>
-          )}
-          {/* Just the text — extendable (a generous min-height so even a
-              short claim doesn't look cramped) and scrollable (capped at
-              max-h so a long one scrolls in place instead of pushing the
-              rest of the sheet, and this whole panel, off-screen, unless
-              expanded — see the Expand/Collapse button below, and its own
-              doc comment on the `expanded` state above for why that's a
-              real button now rather than just this box's native CSS
-              resize handle). Owner gets the same editable textarea
-              NodePanel has always used here (Enter/blur-to-save, mobile's
-              own Enter-inserts-a-newline handling below, unchanged);
-              anyone else gets a plain read-only, same-sized block —
-              reading a node's full text shouldn't require owning it. */}
-          {/* The node's title, when it has one — read-only here for
-              everyone; the owner edits it under Modify. */}
-          {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>}
-          {isCreator && onToggleLock && (
-            // Lock/unlock: a locked block can't be moved, clicked into
-            // another piece or have its text edited.
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className={`cursor-pointer rounded-md border px-2 py-[0.2rem] text-[0.75rem] font-semibold hover:bg-surface-2 ${
-                  textLocked ? "border-accent bg-surface-2 text-accent" : "border-line text-ink"
-                }`}
-                aria-pressed={textLocked}
-                onClick={onToggleLock}
-              >
-                {textLocked ? `🔓 ${t.ui.display.unlockBlock}` : `🔒 ${t.ui.display.lockBlock}`}
-              </button>
-              {textLocked && <span className="text-[0.75rem] text-ink-soft">{t.ui.display.blockLocked}</span>}
-            </div>
-          )}
-          {isCreator && !textLocked ? (
-            <textarea
-              id="node-text"
-              ref={textareaRef}
-              rows={6}
-              value={textDraft}
-              onChange={(e) => setTextDraft(e.target.value)}
-              disabled={busy}
-              onKeyDown={(e) => {
-                // Mobile has no Shift key to reach alongside a virtual
-                // keyboard's Enter/return, so plain Enter has to behave
-                // like a normal textarea there too (insert a newline,
-                // "another row," same as Shift+Enter below) — saving is
-                // onBlur's job only (tapping the visible strip of canvas
-                // outside the panel already does this). Desktop keeps its
-                // existing plain-Enter-saves shortcut, Shift+Enter still
-                // its own newline escape hatch.
-                if (e.key === "Enter" && !e.shiftKey && !isMobileViewport()) {
-                  e.preventDefault();
-                  // Saves, then closes the panel — editing is done.
-                  void handleTextSave().then((ok) => ok && onClose());
-                }
-                // Shift+Enter (desktop), or plain Enter on mobile: no
-                // preventDefault — the textarea's own default behavior
-                // (insert a newline) is exactly what's wanted here.
-              }}
-              onBlur={() => void handleTextSave()}
-              className={`min-h-[8rem] w-full resize-y rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
-            />
-          ) : (
-            <div
-              ref={readonlyTextRef}
-              className={`min-h-[8rem] w-full overflow-y-auto rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
-              style={!expanded && textHeight != null ? { height: textHeight } : undefined}
-            >
-              {node.text}
-            </div>
-          )}
-          <div className="mt-2 flex items-center gap-[0.5rem]">
-            <button
-              className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => setExpanded((v) => !v)}
-              title={expanded ? t.ui.node.collapseTitle : t.ui.node.expandTitle}
-            >
-              {expanded ? t.ui.node.collapse : t.ui.node.expand}
-            </button>
-            {isCreator && (
-              <button
-                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => textareaRef.current?.focus()}
-              >
-                {t.ui.common.edit}
-              </button>
-            )}
-            <button
-              className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={handleCopyText}
-            >
-              {copied ? t.ui.common.copied : t.ui.common.copy}
-            </button>
-            {isCreator && (
-              <button
-                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={handleDelete}
-                disabled={busy}
-              >
-                {t.ui.common.delete}
-              </button>
-            )}
-          </div>
-        {templateKind && (
-          <div className="mt-4 rounded-lg border border-line bg-surface-2 p-3">
-            <div className="text-[0.78rem] font-semibold text-ink-soft">
-              {templateKind === "retry" ? t.ui.templates.retry.title : t.ui.templates.section}
-            </div>
-            <p className="mt-1 text-[0.78rem] text-ink-soft">
-              {templateKind === "problem"
-                ? t.ui.templates.problem.hint
-                : templateKind === "goal"
-                  ? t.ui.templates.goal.hint
-                  : t.ui.templates.retry.hint}
-            </p>
-            <button
-              type="button"
-              className="mt-2 inline-flex cursor-pointer items-center rounded-lg border border-accent bg-accent-soft px-3 py-[0.4rem] text-[0.85rem] font-semibold text-accent-ink disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={busy}
-              onClick={() => handleTemplate(templateKind)}
-            >
-              {templateKind === "problem"
-                ? t.ui.templates.problem.button
-                : templateKind === "goal"
-                  ? t.ui.templates.goal.button
-                  : t.ui.templates.retry.button}
-            </button>
-          </div>
-        )}
-        </div>
+        <InfoTab
+          node={node}
+          isCreator={isCreator}
+          busy={busy}
+          cardFill={cardFill}
+          textLocked={textLocked}
+          onToggleLock={onToggleLock}
+          textareaRef={textareaRef}
+          readonlyTextRef={readonlyTextRef}
+          textDraft={textDraft}
+          setTextDraft={setTextDraft}
+          expanded={expanded}
+          setExpanded={setExpanded}
+          textHeight={textHeight}
+          copied={copied}
+          templateKind={templateKind}
+          onTextSave={handleTextSave}
+          onCopyText={handleCopyText}
+          onDelete={handleDelete}
+          onTemplate={handleTemplate}
+          onClose={onClose}
+        />
       )}
 
       {tab === "links" && (
-        <div className="mt-4">
-          <div className="h-1 overflow-hidden rounded-[3px] bg-surface-2">
-            <div
-              className="h-full transition-[width] duration-200"
-              style={{
-                width: `${Math.max(0, node.health)}%`,
-                background: node.defeated ? "var(--danger)" : "var(--success)",
-              }}
-            />
-          </div>
-          <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-            {t.ui.node.healthLine(node.health, node.defeated)}
-          </p>
-
-          {node.isWeapon && target && (
-            <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
-              {t.ui.node.pointsAt}{" "}
-              <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(target.nodeId)}>
-                {target.text.slice(0, 40)}
-              </a>
-            </p>
-          )}
-
-          {node.isProtection && protectedTarget && (
-            <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
-              🛡️ {t.ui.node.protects}{" "}
-              <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(protectedTarget.nodeId)}>
-                {protectedTarget.text.slice(0, 40)}
-              </a>
-            </p>
-          )}
-
-          {node.isProtection && !!node.blockedDamage && (
-            <p style={{ fontSize: "0.78rem", marginTop: "0.3rem", color: "var(--ink-soft)" }}>
-              {t.ui.node.blocked(node.blockedDamage, protectedTarget ? protectedTarget.text.slice(0, 30) : null)}
-            </p>
-          )}
-
-          {protectors.length > 0 && (
-            <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
-              🛡️ {t.ui.node.protectedBy}{" "}
-              {protectors.map((p, i) => (
-                <span key={p.nodeId}>
-                  {i > 0 && ", "}
-                  <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(p.nodeId)}>
-                    {p.text.slice(0, 24)}
-                  </a>
-                </span>
-              ))}
-            </p>
-          )}
-
-          {/* Optional title — what the canvas shows under the node instead of
-              the start of the text. Saves on blur/Enter. */}
-          {isCreator && (
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
-              <label htmlFor="node-title" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                {t.ui.node.title}
-              </label>
-              <input
-                id="node-title"
-                type="text"
-                maxLength={80}
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                disabled={busy}
-                placeholder={t.ui.node.titlePlaceholder}
-                onKeyDown={(e) => {
-                  // Enter saves, then closes the panel — editing is done.
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleTitleSave().then((ok) => ok && onClose());
-                  }
-                }}
-                onBlur={() => void handleTitleSave()}
-                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-          )}
-
-          {/* Name of the zone this node is the parent of — shown under it on
-              the canvas and on the minimap. Saves on blur/Enter. */}
-          {isCreator && isClusterParent && (
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
-              <label htmlFor="node-zone-name" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                {t.ui.node.zoneName}
-              </label>
-              <input
-                id="node-zone-name"
-                type="text"
-                maxLength={40}
-                value={zoneNameDraft}
-                onChange={(e) => setZoneNameDraft(e.target.value)}
-                disabled={busy}
-                placeholder={t.ui.node.zoneNamePlaceholder}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleZoneNameSave().then((ok) => ok && onClose());
-                  }
-                }}
-                onBlur={() => void handleZoneNameSave()}
-                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-          )}
-
-          {/* The map owner can hide this whole branch from invited members. */}
-          {isMapOwner && (
-            <div className="mt-[0.6rem]">
-              <button
-                type="button"
-                className="inline-flex cursor-pointer items-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={busy}
-                onClick={() => void handleToggleHidden()}
-              >
-                {node.hiddenFromMembers ? t.ui.visibility.show : t.ui.visibility.hide}
-              </button>
-              <p className="mt-1 text-[0.72rem] text-ink-soft">{t.ui.visibility.hint}</p>
-            </div>
-          )}
-
-          {/* Optional step number — a badge on the node, for describing a
-              process by labeling nodes 1, 2, 3… Blank clears it. */}
-          {isCreator && (
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
-              <label htmlFor="node-order" style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                {t.ui.node.order}
-              </label>
-              <input
-                id="node-order"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={9999}
-                step={1}
-                value={orderDraft}
-                onChange={(e) => setOrderDraft(e.target.value)}
-                disabled={busy}
-                placeholder={t.ui.node.orderPlaceholder}
-                title={t.ui.node.orderTitle}
-                onKeyDown={(e) => {
-                  // Enter saves, then closes the panel — same as the title.
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleOrderSave().then((ok) => ok && onClose());
-                  }
-                }}
-                onBlur={() => void handleOrderSave()}
-                className="w-24 rounded-lg border border-line bg-surface px-[0.7rem] py-[0.35rem] text-[0.85rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-          )}
-
-          {isCreator && (
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-              <button
-                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={onEdit}
-                title={t.ui.node.editTitle}
-              >
-                {t.ui.node.edit}
-              </button>
-              <button
-                className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={onStartPack}
-                title={t.ui.node.packTitle}
-              >
-                {t.ui.node.pack}
-              </button>
-            </div>
-          )}
-
-          {isCreator && (
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.size}</span>
-              {SIZE_TIERS.map((tier) => (
-                <button
-                  key={tier}
-                  className={`inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.8rem] font-semibold transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 ${
-                    (node.sizeTier ?? 1) === tier
-                      ? "border-accent bg-accent-soft text-accent-ink"
-                      : "border-line bg-surface text-ink enabled:hover:bg-surface-2"
-                  }`}
-                  onClick={() => handleSetSize(tier)}
-                  disabled={busy}
-                >
-                  {SIZE_TIER_LABEL[tier]}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {isCreator && (
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.zone}</span>
-              {MANUAL_ZONE_COLORS.map((z) => (
-                <button
-                  key={z}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.8rem] font-semibold capitalize transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50"
-                  style={
-                    node.manualZone === z
-                      ? {
-                          borderColor: ZONE_COLORS[z],
-                          // ZONE_COLORS is now a var(--zone-...) reference
-                          // (see its own doc comment), not a bare hex
-                          // literal — can't just append a hex alpha suffix
-                          // to it like "26" any more, so color-mix does the
-                          // same ~15% tint instead.
-                          background: `color-mix(in srgb, ${ZONE_COLORS[z]} 15%, transparent)`,
-                          color: ZONE_COLORS[z],
-                        }
-                      : { borderColor: "var(--line)", background: "var(--surface)", color: "var(--ink)" }
-                  }
-                  onClick={() => handleSetZone(z)}
-                  disabled={busy}
-                  title={t.ui.node.zoneTitle(z)}
-                >
-                  {t.ui.sentiments[z]}
-                </button>
-              ))}
-              {node.manualZone && (
-                <button
-                  className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent px-[0.55rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink-soft transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => handleSetZone(null)}
-                  disabled={busy}
-                  title={t.ui.node.zoneRemoveTitle}
-                >
-                  {t.ui.node.reset}
-                </button>
-              )}
-            </div>
-          )}
-
-          {isCreator && isOutcome && (
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center" }}>
-              <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.symbol}</span>
-              <button
-                className={`inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.85rem] font-semibold transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 ${
-                  node.symbolOverride === "check"
-                    ? "border-accent bg-accent-soft text-accent-ink"
-                    : "border-line bg-surface text-ink enabled:hover:bg-surface-2"
-                }`}
-                onClick={() => handleSetSymbol("check")}
-                disabled={busy}
-                title={t.ui.node.symbolCheckTitle}
-              >
-                ✓
-              </button>
-              <button
-                className={`inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.85rem] font-semibold transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 ${
-                  node.symbolOverride === "cross"
-                    ? "border-accent bg-accent-soft text-accent-ink"
-                    : "border-line bg-surface text-ink enabled:hover:bg-surface-2"
-                }`}
-                onClick={() => handleSetSymbol("cross")}
-                disabled={busy}
-                title={t.ui.node.symbolCrossTitle}
-              >
-                ✗
-              </button>
-              {node.symbolOverride && (
-                <button
-                  className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-transparent bg-transparent px-[0.55rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink-soft transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => handleSetSymbol(null)}
-                  disabled={busy}
-                  title={t.ui.node.symbolResetTitle}
-                >
-                  {t.ui.node.reset}
-                </button>
-              )}
-            </div>
-          )}
-
-          {isCreator && (
-            <div className="mt-4 border-t border-line pt-4">
-              <button
-                className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={onStartChoose}
-                title={t.ui.node.chooseNodesTitle}
-              >
-                {t.ui.node.chooseNodes}
-              </button>
-            </div>
-          )}
-          {connectedEdges.length === 0 ? (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.5rem" }}>{t.ui.node.noLinks}</p>
-          ) : (
-            <div style={{ marginTop: "0.5rem" }}>
-              {connectedEdges.map((e) => {
-                const fromId = nodeRefId(e.fromNodeId)!;
-                const toId = nodeRefId(e.toNodeId)!;
-                const otherId = fromId === node.nodeId ? toId : fromId;
-                const other = nodeById(otherId);
-                const dir = fromId === node.nodeId ? "→" : "←";
-                return (
-                  <div className="flex items-center justify-between py-[0.35rem] text-[0.8rem]" key={e.edgeId}>
-                    <span>
-                      <span
-                        className="inline-flex items-center gap-1 rounded-[20px] border border-line bg-surface-2 px-[0.55rem] py-[0.2rem] text-[0.72rem] text-ink-soft"
-                        style={{
-                          color:
-                            e.sentiment === "negative"
-                              ? "var(--danger)"
-                              : e.sentiment === "positive"
-                                ? "var(--success)"
-                                : "var(--ink-soft)",
-                        }}
-                      >
-                        {t.ui.sentiments[e.sentiment]}
-                      </span>{" "}
-                      {dir} {other ? other.text.slice(0, 24) : "…"}
-                    </span>
-                    <button
-                      className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() => handleDeleteEdge(e.edgeId)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {isClusterParent && (
-            <div className="mt-4 border-t border-line pt-4">
-              <button
-                className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={onExtractText}
-                title={t.ui.node.extractTextTitle}
-              >
-                {t.ui.node.extractText}
-              </button>
-            </div>
-          )}
-        </div>
+        <ModifyTab
+          node={node}
+          isCreator={isCreator}
+          isMapOwner={isMapOwner}
+          isClusterParent={isClusterParent}
+          isOutcome={isOutcome}
+          busy={busy}
+          target={target}
+          protectedTarget={protectedTarget}
+          protectors={protectors}
+          connectedEdges={connectedEdges}
+          nodeById={nodeById}
+          titleDraft={titleDraft}
+          setTitleDraft={setTitleDraft}
+          zoneNameDraft={zoneNameDraft}
+          setZoneNameDraft={setZoneNameDraft}
+          orderDraft={orderDraft}
+          setOrderDraft={setOrderDraft}
+          onTitleSave={handleTitleSave}
+          onZoneNameSave={handleZoneNameSave}
+          onOrderSave={handleOrderSave}
+          onToggleHidden={handleToggleHidden}
+          onSetSize={handleSetSize}
+          onSetZone={handleSetZone}
+          onSetSymbol={handleSetSymbol}
+          onDeleteEdge={handleDeleteEdge}
+          onSelectNode={onSelectNode}
+          onEdit={onEdit}
+          onStartPack={onStartPack}
+          onStartChoose={onStartChoose}
+          onExtractText={onExtractText}
+          onClose={onClose}
+        />
       )}
 
       {tab === "attack" && (
-        <div className="mt-4">
-          <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-            {t.ui.attack.intro}
-            {node.isWeapon && t.ui.attack.introWeapon}
-            {protectors.length > 0 && t.ui.attack.introShielded}
-          </p>
-          <div className="mb-4 flex flex-col gap-[0.35rem]">
-            <label htmlFor="attack-text" className="text-[0.8rem] font-semibold text-ink-soft">
-              {t.ui.attack.objection}
-            </label>
-            <textarea
-              id="attack-text"
-              rows={2}
-              value={attackText}
-              onChange={(e) => setAttackText(e.target.value)}
-              placeholder={t.ui.attack.placeholder}
-              className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
-            />
-          </div>
-          <div className="mb-4 flex flex-col gap-[0.35rem]">
-            <label htmlFor="attack-type" className="text-[0.8rem] font-semibold text-ink-soft">
-              {t.ui.attack.as}
-            </label>
-            <select
-              id="attack-type"
-              value={effectiveAttackType}
-              onChange={(e) => setAttackType(e.target.value as NodeType)}
-              className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
-            >
-              {attackTypes.map((ty) => (
-                <option key={ty} value={ty}>
-                  {t.ui.types[ty]}
-                </option>
-              ))}
-            </select>
-            {attackHint && <p className="text-[0.75rem] text-ink-soft">{attackHint}</p>}
-          </div>
-          {!attackText.trim() && (
-            <p style={{ fontSize: "0.78rem", color: "var(--accent)", fontWeight: 600 }}>
-              {t.ui.attack.writeObjection}
-            </p>
-          )}
-          <div className="flex flex-col gap-2">
-            {WEAPONS.map((w) => {
-              const info = WEAPON_INFO[w];
-              const needsText = !attackText.trim();
-              return (
-                <button
-                  key={w}
-                  className="inline-flex w-full cursor-pointer items-center justify-between gap-[0.4rem] rounded-lg border border-line bg-surface px-4 py-[0.55rem] text-[0.88rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={busy || needsText}
-                  title={needsText ? t.ui.attack.writeFirst : undefined}
-                  onClick={() => handleAttack(w)}
-                >
-                  <span>
-                    {t.ui.attack.weapons[w]} (-{info.damage})
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <AttackTab
+          node={node}
+          busy={busy}
+          protectors={protectors}
+          attackText={attackText}
+          setAttackText={setAttackText}
+          attackTypes={attackTypes}
+          effectiveAttackType={effectiveAttackType}
+          setAttackType={setAttackType}
+          attackHint={attackHint}
+          onAttack={handleAttack}
+        />
       )}
 
       {tab === "protect" && discussionMode && (
-        <div className="mt-4">
-          {isCreator ? (
-            <>
-              <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
-                {t.ui.protect.intro}
-              </p>
-              <div className="mb-4 flex flex-col gap-[0.35rem]">
-                <label htmlFor="protect-text" className="text-[0.8rem] font-semibold text-ink-soft">
-                  {t.ui.protect.why}
-                </label>
-                <textarea
-                  id="protect-text"
-                  rows={2}
-                  value={protectText}
-                  onChange={(e) => setProtectText(e.target.value)}
-                  placeholder={t.ui.protect.placeholder}
-                  className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
-                />
-              </div>
-              <div className="mb-4 flex flex-col gap-[0.35rem]">
-                <label htmlFor="protect-type" className="text-[0.8rem] font-semibold text-ink-soft">
-                  {t.ui.protect.as}
-                </label>
-                <select
-                  id="protect-type"
-                  value={protectType}
-                  onChange={(e) => setProtectType(e.target.value as AttackNodeType)}
-                  className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
-                >
-                  {PROTECT_NODE_TYPES.map((ty) => (
-                    <option key={ty} value={ty}>
-                      {t.ui.types[ty]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                className="inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-accent bg-accent px-[0.65rem] py-[0.55rem] text-[0.88rem] font-semibold text-white transition-opacity duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={busy || !protectText.trim()}
-                title={!protectText.trim() ? t.ui.protect.writeFirst : undefined}
-                onClick={handleProtect}
-              >
-                🛡️ {t.ui.protect.add}
-              </button>
-            </>
-          ) : (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-              {t.ui.protect.onlyOwner(usernameOf(node.userId as any))}
-            </p>
-          )}
-        </div>
+        <ProtectTab
+          node={node}
+          isCreator={isCreator}
+          busy={busy}
+          protectText={protectText}
+          setProtectText={setProtectText}
+          protectType={protectType}
+          setProtectType={setProtectType}
+          onProtect={handleProtect}
+        />
       )}
 
-      {tab === "pack" && (
-        <div className="mt-4">
-          {packedMembers.length === 0 ? (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>{t.ui.packed.empty}</p>
-          ) : (
-            <div style={{ marginTop: "0.5rem" }}>
-              {packedMembers.map((m) => (
-                <div className="flex items-center justify-between py-[0.35rem] text-[0.8rem]" key={m.nodeId}>
-                  <span className="min-w-0 truncate">{m.text.slice(0, 40)}</span>
-                  <button
-                    className="inline-flex flex-shrink-0 cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.55rem] py-[0.25rem] text-[0.76rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={() => handleUnpack(m.nodeId)}
-                    disabled={busy}
-                  >
-                    {t.ui.packed.unpack}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {tab === "pack" && <PackedTab packedMembers={packedMembers} busy={busy} onUnpack={handleUnpack} />}
 
-      {tab === "history" && (
-        <div className="mt-4">
-          {history === null ? (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>{t.ui.history.loading}</p>
-          ) : history.length === 0 ? (
-            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>{t.ui.history.none}</p>
-          ) : (
-            history.map((a, i) => (
-              <div className="flex justify-between border-b border-line py-[0.4rem] text-[0.8rem] last:border-b-0" key={i}>
-                <span>
-                  {usernameOf(a.attackerId as any)} · {t.ui.attack.weapons[a.weapon]}
-                </span>
-                <span>-{a.damage}</span>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+      {tab === "history" && <HistoryTab history={history} />}
     </div>
   );
 }
