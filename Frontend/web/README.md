@@ -19,6 +19,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Auth** (`/login`, `/register`) — email/password or "Sign in with Google" (one endpoint for
   both registering and logging in), JWT stored in `localStorage`. "Try it without an account"
   spins up a throwaway demo account with its own seeded map — nothing to configure to try it.
+- **Think it through** (`/think`) — a guided, writing-first way to start a map, opened from the
+  dashboard's "What's on your mind?" box. Four steps: pick what kind of thinking it is and write the
+  central thought; answer one guiding question at a time (Enter adds a thought, Enter on an empty
+  line moves to the next question) while a live preview of the map grows beside it; check each
+  thought's kind and what it hangs from; then name it, choose Personal or Discussion, and the
+  thoughts are built into a real map. The draft is kept in the browser until then. See
+  `src/pages/ThinkPage.tsx` and `src/utils/thoughtFlow.ts`.
 - **Dashboard** (`/`) — maps you own or were invited to; create/rename/delete, invite members, see
   who's on a map and who owns it, copy a whole map's nodes to paste into another one.
 - **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
