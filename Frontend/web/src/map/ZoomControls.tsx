@@ -21,7 +21,7 @@ const stepBtn =
 export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset }: Props) {
   const { t } = useI18n();
   return (
-    <div data-panel-keep className="absolute bottom-[150px] right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
+    <div className="absolute bottom-[150px] right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
       <button type="button" className={stepBtn} disabled={zoom <= MIN_ZOOM} title={t.map.toolbar.zoomOut} onClick={onZoomOut}>
         −
       </button>

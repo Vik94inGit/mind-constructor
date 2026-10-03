@@ -90,7 +90,6 @@ export function PendingNodeCard({ x, y, type, initialText = "", onConfirm, onCan
 
   return (
     <div
-      data-panel-keep
       className={classes}
       style={{ left: x, top: y, transform: `translate(-50%, -50%) scale(${k})` } as CSSProperties}
       onPointerDown={(e) => e.stopPropagation()}
