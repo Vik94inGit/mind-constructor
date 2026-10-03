@@ -77,7 +77,6 @@ function setup(overrides: Partial<Parameters<typeof useNodeDragAndDrop>[0]> = {}
       screenToCanvas: (x: number, y: number) => ({ x, y }),
       viewportBounds: () => ({ minX: 0, minY: 0, maxX: 2400, maxY: 1600 }),
       obstaclePoints: () => [],
-      bigNodeObstacles: () => [],
       zoomToEditAt,
       upsertNode,
       setActionError,
@@ -257,13 +256,10 @@ describe("useNodeDragAndDrop", () => {
       expect(nodesApi.updateNode).toHaveBeenCalledWith("child", { x: 1000, y: 1000, parentId: null });
     });
 
-    it("never treats a circle's own zone as an obstacle to its own root node", async () => {
-      // Regression test: a circle's root has no parentId pointing at its
-      // own group (only its *members'* parentId does), so the old
-      // staysMember-gated exclusion never covered the root-dragging-itself
-      // case at all — its own (often large) zone counted as a real
-      // obstacle to drag around, which could push it well away from
-      // wherever it was actually dropped.
+    it("lands a drop inside a zone where it was let go instead of pushing it out of the zone", async () => {
+      // Zones used to be obstacles for a drop: a node released anywhere
+      // inside one (even its own circle's root) got pushed past the zone's
+      // whole radius, far from the pointer.
       const root = makeNode({ nodeId: "root", x: 200, y: 200, parentId: null });
       const child = makeNode({ nodeId: "child", parentId: "root", x: 900, y: 900 });
       const nodes = [root, child];
@@ -271,27 +267,20 @@ describe("useNodeDragAndDrop", () => {
         ["root", { x: 200, y: 200 }],
         ["child", { x: 900, y: 900 }],
       ]);
-      // A large zone (r: 300) — the crude bounding-circle obstacle
-      // bigNodeObstacles derives from a group in production (see MapPage's
-      // own bigNodeObstacles: `{ x: g.cx, y: g.cy, minDist: g.r + 20 }`).
       const nodeGroups: NodeGroup[] = [
         { rootId: "root", members: [root, child], sentiment: "neutral", cx: 200, cy: 200, r: 300, outline: [] },
       ];
-      const bigNodeObstacles = (excludeRootIds: Set<string> = new Set()) =>
-        nodeGroups.filter((g) => !excludeRootIds.has(g.rootId)).map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 20 }));
       const listeners = captureWindowListeners();
+      const onPlaced = vi.fn();
       const { result } = setup({
         nodes,
         positions,
         nodeGroups,
-        bigNodeObstacles,
         posFor: (n) => positions.get(n.nodeId)!,
+        onPlaced,
       });
 
       act(() => result.current.onNodePointerDown(root, fakePointerDownEvent({ clientX: 200, clientY: 200 })));
-      // Still well inside the zone's own 320-unit obstacle radius — before
-      // the fix, avoidOverlap would have pushed this out past that radius
-      // instead of landing right here.
       act(() => listeners.pointermove({ clientX: 250, clientY: 250 }));
 
       vi.mocked(nodesApi.updateNode).mockResolvedValue({ ...root, x: 250, y: 250 });
@@ -301,6 +290,8 @@ describe("useNodeDragAndDrop", () => {
       });
 
       expect(nodesApi.updateNode).toHaveBeenCalledWith("root", { x: 250, y: 250 });
+      // Handed on so the caller can nudge any zone the drop now overlaps.
+      expect(onPlaced).toHaveBeenCalledWith([{ ...root, x: 250, y: 250 }]);
     });
 
     it("reverts the optimistic move and reports an error when the save fails", async () => {

@@ -1,20 +1,55 @@
 import { describe, expect, it } from "vitest";
 import { layoutTemplate } from "./templates";
-import { CANVAS_H, CANVAS_W, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, computeNodeGroups, getNodeMinDist } from "./canvasLayout";
+import type { NodeDoc } from "../types";
 import type { Obstacle } from "./canvasLayout";
 
 const EDGE = 120;
 
 describe("layoutTemplate", () => {
-  it("fans nodes around the root using the tighter circle-pack spacing, not the general spacing floor", () => {
+  it("puts every top-level branch on a ring around the root, at least a node-spacing apart", () => {
     const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const placed = layoutTemplate("retry", root);
-    expect(placed.length).toBeGreaterThan(0);
-    // i+1, not i — spiralPoint(0, root) would be root's own position, and
-    // the root is the real, already-existing node the template grows from.
-    const expected = spiralPoint(1, root, getCirclePackSpacing());
-    expect(placed[0].x).toBeCloseTo(expected.x, 5);
-    expect(placed[0].y).toBeCloseTo(expected.y, 5);
+    const placed = layoutTemplate("problem", root).filter((p) => p.parentKey === null);
+    const gap = getNodeMinDist();
+    for (const p of placed) expect(Math.hypot(p.x - root.x, p.y - root.y)).toBeGreaterThanOrEqual(gap - 1);
+    for (let i = 0; i < placed.length; i++) {
+      for (let j = i + 1; j < placed.length; j++) {
+        expect(Math.hypot(placed[i].x - placed[j].x, placed[i].y - placed[j].y)).toBeGreaterThanOrEqual(gap - 1);
+      }
+    }
+  });
+
+  it("grows a branch's children outward from their own parent, not on the far side of the root", () => {
+    const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const placed = layoutTemplate("decision", root);
+    const byKey = new Map(placed.map((p) => [p.key, p]));
+    for (const [parent, kids] of [["optionA", ["advantageA", "riskA"]], ["optionB", ["advantageB", "riskB"]], ["optionC", ["advantageC", "riskC"]]] as const) {
+      const p = byKey.get(parent)!;
+      for (const k of kids) {
+        const c = byKey.get(k)!;
+        // Farther from the root than its parent, and closer to its parent than to the root.
+        expect(Math.hypot(c.x - root.x, c.y - root.y)).toBeGreaterThan(Math.hypot(p.x - root.x, p.y - root.y));
+        expect(Math.hypot(c.x - p.x, c.y - p.y)).toBeLessThan(Math.hypot(c.x - root.x, c.y - root.y));
+      }
+    }
+  });
+
+  it("never lets two sibling branches' zones overlap", () => {
+    const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const placed = layoutTemplate("decision", root);
+    const nodes = [
+      { nodeId: "root", type: "Problem", parentId: null },
+      ...placed.map((p) => ({ nodeId: p.key, type: p.type, parentId: p.parentKey ?? "root" })),
+    ] as unknown as NodeDoc[];
+    const pos = new Map([["root", root], ...placed.map((p) => [p.key, { x: p.x, y: p.y }] as const)]);
+    const zones = computeNodeGroups(nodes, nodes, pos).filter((g) => g.rootId !== "root");
+    expect(zones).toHaveLength(3);
+    for (let i = 0; i < zones.length; i++) {
+      for (let j = i + 1; j < zones.length; j++) {
+        const d = Math.hypot(zones[i].cx - zones[j].cx, zones[i].cy - zones[j].cy);
+        expect(d).toBeGreaterThanOrEqual(zones[i].r + zones[j].r);
+      }
+    }
   });
 
   it("keeps every placed node within the canvas edge margin", () => {
@@ -37,19 +72,14 @@ describe("layoutTemplate", () => {
     expect(subProblem1?.parentKey).toBeNull();
   });
 
-  it("steers a placed node clear of an obstacle already sitting where its raw spiral point would land", () => {
-    // Regression test: layoutTemplate used to place every node purely off
-    // spiralPoint, with zero awareness of anything already on the canvas —
-    // a second template (or just a crowded spot) grown near an existing
-    // node/zone could spiral straight on top of it. existingObstacles is
-    // what MapPage's own applyTemplate now feeds in (every visible node
-    // plus every zone backdrop).
+  it("turns the ring away from what's already sitting next to the root", () => {
     const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const rawFirst = spiralPoint(1, root, getCirclePackSpacing());
-    const obstacle: Obstacle = { x: rawFirst.x, y: rawFirst.y, minDist: 200 };
+    const unturned = layoutTemplate("retry", root);
+    const obstacle: Obstacle = { x: unturned[0].x, y: unturned[0].y, minDist: 200 };
     const placed = layoutTemplate("retry", root, [obstacle]);
-    const dist = Math.hypot(placed[0].x - obstacle.x, placed[0].y - obstacle.y);
-    expect(dist).toBeGreaterThanOrEqual(obstacle.minDist - 1);
+    for (const p of placed) {
+      expect(Math.hypot(p.x - obstacle.x, p.y - obstacle.y)).toBeGreaterThanOrEqual(obstacle.minDist - 1);
+    }
   });
 
   it("places one entry per node across every template kind, in parent-before-child order", () => {

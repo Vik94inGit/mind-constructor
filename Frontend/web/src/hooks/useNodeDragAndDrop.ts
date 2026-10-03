@@ -3,7 +3,7 @@ import type { Dispatch, MutableRefObject, PointerEvent as ReactPointerEvent, Set
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { avoidOverlap, footprintObstacles, CANVAS_H, CANVAS_W, CIRCLE_DROP_RADIUS, isDescendant } from "../utils/canvasLayout";
-import type { NodeGroup, Obstacle, ViewportBounds } from "../utils/canvasLayout";
+import type { NodeGroup, ViewportBounds } from "../utils/canvasLayout";
 import { nodeRefId } from "../utils/nodeType";
 import { sleep } from "../utils/sleep";
 import { dragUIReducer, initialDragUIState } from "./dragUIState";
@@ -38,7 +38,6 @@ interface Params {
   screenToCanvas: (clientX: number, clientY: number) => Pt;
   viewportBounds: () => ViewportBounds;
   obstaclePoints: (exclude?: Set<string>) => Pt[];
-  bigNodeObstacles: (excludeRootIds?: Set<string>) => Obstacle[];
   zoomToEditAt: (x: number, y: number) => void;
   upsertNode: (node: NodeDoc) => void;
   setActionError: (message: string | null) => void;
@@ -60,6 +59,8 @@ interface Params {
   clusterFor?: (node: NodeDoc) => string[];
   /** Its owner locked this text block (utils/blockLock.ts) — held in place like Node.locked. */
   isBlockLocked?: (nodeId: string) => boolean;
+  /** Nodes a drop just saved where they landed — the caller keeps zones from overlapping around them. */
+  onPlaced?: (placed: NodeDoc[]) => void;
 }
 
 // The node drag/drop system: single-node reposition-or-join-a-circle,
@@ -81,7 +82,6 @@ export function useNodeDragAndDrop({
   screenToCanvas,
   viewportBounds,
   obstaclePoints,
-  bigNodeObstacles,
   zoomToEditAt,
   upsertNode,
   setActionError,
@@ -94,6 +94,7 @@ export function useNodeDragAndDrop({
   onSnapped,
   clusterFor,
   isBlockLocked,
+  onPlaced,
 }: Params) {
   // Held in place: a member of the chosen circle (Node.locked), or a text
   // block its owner locked.
@@ -220,17 +221,12 @@ export function useNodeDragAndDrop({
         const dy = p.y - startPt.y;
         setActionError(null);
 
-        // Group drag had zero overlap protection at all before — only the
-        // canvas-bounds clamp. Same nearest-clear-spot settle the single-node
-        // drop now gets: every node NOT in this drag (footprint) and every
-        // zone backdrop the drag isn't itself part of (bigNodeObstacles) is a
-        // real obstacle for where the leader/followers finally land.
+        // Same settle the single-node drop gets: a member only moves off
+        // where it was let go if it would sit on another node (footprint
+        // boxes), and then only by the little it takes to clear it. Zones are
+        // not obstacles — pushing a drop out of a whole zone sent it far away.
         const memberIdSet = new Set(memberIds);
-        const ownGroupRootIds = new Set(nodeGroups.filter((g) => memberIdSet.has(g.rootId)).map((g) => g.rootId));
-        const externalObstacles = [
-          ...footprintObstacles(obstaclePoints(memberIdSet)),
-          ...bigNodeObstacles(ownGroupRootIds),
-        ];
+        const externalObstacles = footprintObstacles(obstaclePoints(memberIdSet));
 
         // Every member's own final target, worked out up front (leader
         // first, then followers in order) rather than each one independently
@@ -265,9 +261,13 @@ export function useNodeDragAndDrop({
         dispatch({ type: "groupSetMember", id: node.nodeId, pos: leaderTarget, fallback: startPositions });
         zoomToEditAt(leaderTarget.x, leaderTarget.y);
 
+        const saved: NodeDoc[] = [];
         const leaderDone = nodesApi
           .updateNode(node.nodeId, { x: leaderTarget.x, y: leaderTarget.y })
-          .then(upsertNode)
+          .then((updated) => {
+            saved.push(updated);
+            upsertNode(updated);
+          })
           .catch((err) => setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes));
 
         // Followers catch up in their own selection order, each one's own
@@ -292,14 +292,20 @@ export function useNodeDragAndDrop({
           }
           try {
             const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
-            if (groupDragToken.current === token) upsertNode(updated);
+            if (groupDragToken.current === token) {
+              saved.push(updated);
+              upsertNode(updated);
+            }
           } catch (err) {
             setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
           }
         });
 
         await Promise.all([leaderDone, ...followerDone]);
-        if (groupDragToken.current === token) dispatch({ type: "groupClear" });
+        if (groupDragToken.current === token) {
+          dispatch({ type: "groupClear" });
+          if (saved.length) onPlaced?.(saved);
+        }
       }
 
       window.addEventListener("pointermove", onGroupMove);
@@ -575,6 +581,7 @@ export function useNodeDragAndDrop({
               parentId: target.nodeId,
             });
             upsertNode(updated);
+            onPlaced?.([updated]);
           } catch (err) {
             setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.joinCircle);
           }
@@ -599,34 +606,9 @@ export function useNodeDragAndDrop({
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
         // Still a member at the raw drop point?
         const staysMember = !!ownCircle && Math.hypot(x - ownCircle.cx, y - ownCircle.cy) <= ownCircle.r;
-        // A circle's *root* is never excluded by the staysMember check above
-        // (its own parentId points at whatever *it* hangs from, if
-        // anything — never at the circle it's the root of), so without this
-        // its own zone — which its own drag is what's reshaping — counted as
-        // an obstacle to itself. For a large/irregular zone (see the
-        // group-drag branch above, which already excludes every dragged
-        // member's own root the same unconditional way) that could push the
-        // root wherever the nearest clear edge happened to be, nowhere near
-        // where it was actually dropped.
-        const ownRootCircle = nodeGroups.find((g) => g.rootId === node.nodeId);
-        const excludedRootIds = new Set<string>();
-        if (staysMember && ownCircle) excludedRootIds.add(ownCircle.rootId);
-        if (ownRootCircle) excludedRootIds.add(ownRootCircle.rootId);
-        // Every other circle's backdrop is a real obstacle here too (not
-        // just at creation time) — a plain reposition drop used to be able to
-        // land a node's icon right on top of a zone it doesn't belong to.
-        // Its own circle(s) are excluded (see excludedRootIds above) so this
-        // never pushes a node out of a zone it's still part of, whether as a
-        // member or as the root. No corner-angle check any more (see
-        // MIN_ZONE_ANGLE's own removal) — a zone is free to pack as tight as
-        // its own members' footprints allow, as long as it doesn't cross
-        // into a *different* zone's territory.
         const dropped = avoidOverlap(
           { x, y },
-          [
-            ...footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
-            ...bigNodeObstacles(excludedRootIds),
-          ],
+          footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
           viewportBounds(),
         );
         const leftCircle = !!ownCircle && !staysMember;
@@ -648,9 +630,11 @@ export function useNodeDragAndDrop({
           if (leftCircle) {
             const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y, parentId: null });
             upsertNode(updated);
+            onPlaced?.([updated]);
           } else {
             const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y });
             upsertNode(updated);
+            onPlaced?.([updated]);
           }
         } catch (err) {
           setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
