@@ -12,6 +12,9 @@ import { useZoneFocus } from "../hooks/useZoneFocus";
 import { usePresentation } from "../hooks/usePresentation";
 import { usePuzzleConnect } from "../hooks/usePuzzleConnect";
 import { useMapKeyboard } from "../hooks/useMapKeyboard";
+import { useSelectionActions } from "../hooks/useSelectionActions";
+import { useNodeCreation } from "../hooks/useNodeCreation";
+import type { PendingCreate } from "../hooks/useNodeCreation";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
@@ -90,11 +93,6 @@ import {
 import type { Obstacle } from "../utils/canvasLayout";
 import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, EdgeDoc, LineDoc, MapDoc, NodeDoc, NodeType, SelectedCircle } from "../types";
-
-// applyTemplate's own reveal pace — long enough that each node in a growing
-// template branch reads as its own discrete step (plus its celebrate burst),
-// not a flash of everything at once.
-const TEMPLATE_NODE_STAGGER_MS = 250;
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -197,21 +195,9 @@ export function MapPage() {
   const [circleLoadingRootId, setCircleLoadingRootId] = useState<string | null>(null);
   const { notice, showNotice, dismissNotice } = useNotice();
 
-  // A node not yet created — its text is still being typed into the inline
-  // input hovering at (x,y), styled with `type`'s icon. Nothing is sent to
-  // the backend until that input confirms with real text (see
-  // PendingNodeCard/confirmPendingCreate). parentId set only when reached
-  // via the right-click menu's "Create branch" or a quick-add ghost; null
-  // (the toolbar's own "+ Add node" button) means a regular, parent-less
-  // node.
-  const [pendingCreate, setPendingCreate] = useState<{
-    x: number;
-    y: number;
-    type: NodeType;
-    parentId: string | null;
-    /** A ghost template's starter phrase the input opens with. */
-    text?: string;
-  } | null>(null);
+  // A node not yet created, still being typed into the inline input — see
+  // PendingCreate (hooks/useNodeCreation.ts).
+  const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   // The old top toolbar (name, member count, Link/Add/Invite/color/
   // discussion-mode…) is gone — replaced by a small floating "+" menu (see
@@ -1275,76 +1261,6 @@ export function MapPage() {
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text });
   }
 
-  // Grows a template branch (see utils/templates.ts) from `root`: every node
-  // is a real node with its prompt as title + text, created parents-first so
-  // each one can hang from the previous, geometrized in a ring around `root`
-  // (layoutTemplate's own "around the king" placement) rather than appearing
-  // all at once — each one gets its own celebrate burst (same creation
-  // effect confirmPendingCreate uses) and a deliberate pause before the
-  // next, so growing a whole template branch reads as it building itself
-  // step by step instead of popping in as a single flash.
-  async function applyTemplate(kind: TemplateKind, root: NodeDoc) {
-    if (!mapId) return;
-    const rootPos = positions.get(root.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    // Same obstacle set createCircle's own children-fanning uses (plain
-    // nodes, root included explicitly, plus every existing zone backdrop) —
-    // without it, layoutTemplate had no idea what else was already on the
-    // canvas near root and could spiral its nodes straight on top of it.
-    const placed = layoutTemplate(
-      kind,
-      rootPos,
-      [...nodeObstacles([...obstaclePoints(), rootPos]), ...bigNodeObstacles()],
-    );
-    const ids = new Map<TemplateNodeKey, string>();
-    for (let i = 0; i < placed.length; i++) {
-      const p = placed[i];
-      const copy = t.ui.templates.nodes[p.key];
-      const node = await nodesApi.createNode(mapId, {
-        text: copy.text,
-        title: copy.title,
-        type: p.type,
-        order: p.order,
-        x: p.x,
-        y: p.y,
-        parentId: p.parentKey ? ids.get(p.parentKey) : root.nodeId,
-      });
-      ids.set(p.key, node.nodeId);
-      upsertNode(node);
-      setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-      if (i < placed.length - 1) await sleep(TEMPLATE_NODE_STAGGER_MS);
-    }
-    // Brings the whole newly-grown ring into view — spiraling out from root
-    // can easily land later nodes past whatever's currently on-screen.
-    showNodes(Array.from(ids.values()));
-    showNotice(t.ui.templates.created(placed.length));
-  }
-
-  // Fires once the inline pending-node input (see PendingNodeCard) actually
-  // confirms with non-empty text — the one place any node-creation path
-  // (toolbar, double-click, "Create branch", quick-add) ends up.
-  async function confirmPendingCreate(text: string, type: NodeType) {
-    if (!pendingCreate || !mapId) return;
-    const { x, y, parentId } = pendingCreate;
-    setActionError(null);
-    try {
-      const node = await nodesApi.createNode(mapId, { text, type, x, y, parentId });
-      upsertNode(node);
-      setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-      // Deselect rather than select the freshly-created node — same "close
-      // the panel after creating a node" behavior NodePanel's own
-      // handleAttack/handleProtect follow, applied to every other
-      // node-creation path (toolbar, double-click, quick-add) that ends up
-      // here too. Used to select it instead, opening its panel right away;
-      // this leaves the canvas clear so the create-flow itself reads as
-      // finished rather than immediately handing you another panel.
-      setSelectedId(null);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
-    } finally {
-      setPendingCreate(null);
-    }
-  }
-
   // ---- Separator lines ----
   // Drawing takes over the canvas clicks and the bottom sheet — see
   // hooks/useLineDrawing.ts.
@@ -1422,103 +1338,44 @@ export function MapPage() {
     t,
   });
 
-  // SelectionMenu's "Delete N nodes" — one bulk DELETE /api/nodes request
-  // (Backend's deleteManyNodesDao) instead of N parallel single-node
-  // DELETEs. Confirms once for the whole batch rather than once per node
-  // (the single-node handleDeleteNode's own confirm() would be absurd N
-  // times in a row here). The backend silently skips any id the caller
-  // doesn't own instead of failing the whole batch, so `deleted` can be a
-  // strict subset of `ids` — local state is reconciled against `deleted`,
-  // not the original selection, so a partial delete doesn't drop nodes that
-  // were never actually removed.
-  async function deleteSelection() {
-    const ids = Array.from(multiSelectIds);
-    if (ids.length === 0) return;
-    if (!confirm(t.ui.selection.deleteConfirm(ids.length))) return;
-    setActionError(null);
-    try {
-      const { deleted } = await nodesApi.deleteManyNodes(ids);
-      const deletedIds = new Set(deleted.map((d) => d.deletedId));
-      // Any protection node in the batch releases its own banked damage
-      // onto whatever it was defending — see Backend's deleteNodeDao.
-      deleted.forEach(({ damagedProtectedNode }) => {
-        if (damagedProtectedNode) upsertNode(damagedProtectedNode);
-      });
-      setNodes((prev) => prev.filter((n) => !deletedIds.has(n.nodeId)));
-      setEdges((prev) =>
-        prev.filter(
-          (e) => !deletedIds.has(nodeRefId(e.fromNodeId) ?? "") && !deletedIds.has(nodeRefId(e.toNodeId) ?? ""),
-        ),
-      );
-      setMultiSelectIds(new Set());
-      if (mapId) refreshInsights(mapId);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.deleteSelected);
-    }
-  }
+  // The group bar's bulk actions on the chosen nodes — see
+  // hooks/useSelectionActions.ts.
+  const { deleteSelection, groupSelectionIntoCircle, numberSelection } = useSelectionActions({
+    mapId,
+    nodes,
+    positions,
+    multiSelectIds,
+    isOwnNode,
+    upsertNode,
+    setNodes,
+    setEdges,
+    setMultiSelectIds,
+    setSelectedId,
+    showNodes,
+    setActionError,
+    refreshInsights,
+    t,
+  });
 
-  // SelectionMenu's "Group into circle" — turns the current multi-selection
-  // into a circle (see circleAbl.ts / the app's own parentId-star mechanism,
-  // same as dragging one node onto another to join its circle): every
-  // selected node except one gets its parentId set to that one, so with
-  // 3+ selected the result is immediately a real circle (nodeGroups needs
-  // 2+ direct children); with exactly 2, it's just a plain branch link
-  // until a third node joins later. The root is picked automatically —
-  // whichever selected node sits closest to the group's own centroid —
-  // since there's no per-node "make this the root" control on this pill.
-  // isDescendant guards each reparent the same way findDropTarget's own
-  // drag-to-join path already does: skip (don't create) a link that would
-  // close the parentId chain into a loop, rather than silently corrupting
-  // the tree.
-  async function groupSelectionIntoCircle() {
-    const selectedNodes = Array.from(multiSelectIds)
-      .map((id) => nodes.find((n) => n.nodeId === id))
-      .filter((n): n is NodeDoc => !!n);
-    if (selectedNodes.length < 2) return;
-    const pts = selectedNodes.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-    const root = selectedNodes[closestToCentroidIndex(pts)];
-    const others = selectedNodes.filter((n) => n.nodeId !== root.nodeId);
-    setActionError(null);
-    try {
-      const results = await Promise.all(
-        others.map(async (n) => {
-          if (isDescendant(root.nodeId, n.nodeId, nodes)) return null;
-          return nodesApi.updateNode(n.nodeId, { parentId: root.nodeId });
-        }),
-      );
-      results.forEach((n) => {
-        if (n) upsertNode(n);
-      });
-      const skipped = results.filter((r) => r === null).length;
-      if (skipped > 0) {
-        setActionError(t.ui.errors.groupPartial(results.length - skipped, others.length, skipped));
-      }
-      setMultiSelectIds(new Set());
-      setSelectedId(root.nodeId);
-      showNodes(selectedNodes.map((n) => n.nodeId));
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.groupCircle);
-    }
-  }
-
-  // The chosen own nodes, numbered 1, 2, 3… in the order they were chosen (or
-  // with the numbers taken off) — a quick way to label a process's steps.
-  async function numberSelection(clear: boolean) {
-    const picks = Array.from(multiSelectIds)
-      .map((id) => nodes.find((n) => n.nodeId === id))
-      .filter((n): n is NodeDoc => !!n && isOwnNode(n));
-    if (picks.length === 0) return;
-    setActionError(null);
-    try {
-      const updated = await Promise.all(
-        picks.map((n, i) => nodesApi.updateNode(n.nodeId, { order: clear ? null : i + 1 })),
-      );
-      updated.forEach(upsertNode);
-      showNodes(picks.map((n) => n.nodeId));
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.numberNodes);
-    }
-  }
+  // Every way a new node gets made — the pending-node input's confirm, a
+  // template branch, "Create circle". See hooks/useNodeCreation.ts.
+  const { confirmPendingCreate, applyTemplate, createCircle } = useNodeCreation({
+    mapId,
+    positions,
+    pendingCreate,
+    setPendingCreate,
+    upsertNode,
+    setCelebrateIds,
+    setSelectedId,
+    setMultiSelectIds,
+    setActionError,
+    obstaclePoints,
+    bigNodeObstacles,
+    viewportBounds,
+    showNodes,
+    showNotice,
+    t,
+  });
 
   // Leaves a demo session for the login page — its account and map are
   // throwaway, so there is no way back to them afterwards. ProtectedRoute
@@ -1526,71 +1383,6 @@ export function MapPage() {
   function exitDemo() {
     if (!confirm(t.ui.demo.exitConfirm)) return;
     void logout();
-  }
-
-  // AddMenu's "Create circle" — a root plus 2 children, parented to it, so
-  // the result is an instant, already-formed circle (nodeGroups needs 2+
-  // direct children) rather than needing to branch twice by hand.
-  // Sequential, not Promise.all: the children's own create calls need the
-  // root's real (server-assigned) nodeId as their parentId, so the root
-  // has to actually finish first.
-  async function createCircle() {
-    if (!mapId) return;
-    setActionError(null);
-    try {
-      const rootPos = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
-      const root = await nodesApi.createNode(mapId, {
-        text: t.ui.canvas.newCircleText,
-        type: "unknown",
-        x: rootPos.x,
-        y: rootPos.y,
-        parentId: null,
-      });
-      upsertNode(root);
-      setCelebrateIds((prev) => new Set(prev).add(root.nodeId));
-
-      // Two children fanned either side of straight up from the root —
-      // same angle-from-vertical idea QuickAddGhosts' own ring uses, just
-      // two fixed slots instead of one per node type. getCirclePackSpacing
-      // (not getNodeMinDist), same reasoning as layoutTemplate's own switch
-      // — these two are deliberately fanned around a shared root, not two
-      // unrelated nodes that happened to land near each other.
-      const radius = getCirclePackSpacing();
-      const children = await Promise.all(
-        [-50, 50].map(async (deg) => {
-          const angle = (-90 + deg) * (Math.PI / 180);
-          const desired = { x: rootPos.x + radius * Math.cos(angle), y: rootPos.y + radius * Math.sin(angle) };
-          const placed = avoidOverlap(
-            desired,
-            [...nodeObstacles([...obstaclePoints(), rootPos]), ...bigNodeObstacles()],
-            viewportBounds(),
-          );
-          return nodesApi.createNode(mapId, {
-            // "Option" (not "unknown", like the root) — an all-"unknown"
-            // trio would still draw a zone now (circleSentiment returns
-            // "neutral" for a tied/no-vote group instead of skipping it —
-            // see nodeGroups' own doc comment), but a flat gray backdrop is
-            // a duller first impression than an actual colored one. Giving
-            // both children a real (positive) type up front means "Create
-            // circle" shows a leaning, halo-colored circle immediately.
-            text: t.ui.canvas.newNodeText,
-            type: "Option",
-            x: placed.x,
-            y: placed.y,
-            parentId: root.nodeId,
-          });
-        }),
-      );
-      children.forEach((c) => {
-        upsertNode(c);
-        setCelebrateIds((prev) => new Set(prev).add(c.nodeId));
-      });
-
-      setMultiSelectIds(new Set());
-      setSelectedId(root.nodeId);
-    } catch (err) {
-      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createCircle);
-    }
   }
 
   // The map's keyboard shortcuts — presentation stepping, line drawing,
