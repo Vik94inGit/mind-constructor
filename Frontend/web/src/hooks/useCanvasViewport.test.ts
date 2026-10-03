@@ -42,17 +42,21 @@ describe("useCanvasViewport dead zone", () => {
     Object.defineProperty(window, "innerWidth", { value: 1024, configurable: true });
   });
 
-  it("is gone: the canvas runs right up to the screen's edge", () => {
+  it("is just wide enough to center a node sitting at the edge", () => {
     const { result } = margins(false);
-    // A 1400x900 view used to get a hatched band (once 700px/450px+) per side.
-    expect(result.current.hScrollMargin).toBe(0);
-    expect(result.current.vScrollMargin).toBe(0);
+    // A node held 60 canvas units in from the edge can reach the middle of a
+    // 1400x900 view at the starting zoom.
+    const zoom = result.current.zoom;
+    expect((result.current.hScrollMargin + 60) * zoom).toBeGreaterThanOrEqual(700 - 1);
+    expect((result.current.vScrollMargin + 60) * zoom).toBeGreaterThanOrEqual(450 - 1);
+    // ...and no wider than that.
+    expect(result.current.hScrollMargin * zoom).toBeLessThanOrEqual(700);
     expect(result.current.vScrollMarginBottom).toBe(result.current.vScrollMargin);
   });
 
   it("grows only the bottom edge while the bottom sheet is open", () => {
     const { result } = margins(true);
     expect(result.current.vScrollMarginBottom).toBeGreaterThan(result.current.vScrollMargin);
-    expect(result.current.vScrollMargin).toBe(0);
+    expect(result.current.vScrollMargin * result.current.zoom).toBeLessThanOrEqual(450);
   });
 });
