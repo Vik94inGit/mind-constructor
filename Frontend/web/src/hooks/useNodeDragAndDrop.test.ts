@@ -257,6 +257,33 @@ describe("useNodeDragAndDrop", () => {
       expect(nodesApi.updateNode).toHaveBeenCalledWith("child", { x: 1000, y: 1000, parentId: null });
     });
 
+    it("keeps a member that already sat past the zone's reach when it's moved without going farther out", async () => {
+      const root = makeNode({ nodeId: "root", x: 0, y: 0, parentId: null });
+      const child = makeNode({ nodeId: "child", parentId: "root", x: 1200, y: 0 });
+      const nodes = [root, child];
+      const positions = new Map<string, Pt>([
+        ["root", { x: 0, y: 0 }],
+        ["child", { x: 1200, y: 0 }],
+      ]);
+      const nodeGroups: NodeGroup[] = [
+        { rootId: "root", members: [root, child], sentiment: "neutral", cx: 0, cy: 0, r: 100, outline: [] },
+      ];
+      const listeners = captureWindowListeners();
+      const { result } = setup({ nodes, positions, nodeGroups, posFor: (n) => positions.get(n.nodeId)! });
+
+      act(() => result.current.onNodePointerDown(child, fakePointerDownEvent({ clientX: 1200, clientY: 0 })));
+      // Pulled in toward the root, but still well past the reach.
+      act(() => listeners.pointermove({ clientX: 900, clientY: 300 }));
+
+      vi.mocked(nodesApi.updateNode).mockResolvedValue({ ...child, x: 900, y: 300 });
+      await act(async () => {
+        listeners.pointerup({ clientX: 900, clientY: 300 });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("child", { x: 900, y: 300 });
+    });
+
     it("never treats a circle's own zone as an obstacle to its own root node", async () => {
       // Regression test: a circle's root has no parentId pointing at its
       // own group (only its *members'* parentId does), so the old

@@ -701,6 +701,13 @@ export function MapPage() {
       .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 20 }));
   }
 
+  // Every zone a new child of `parent` would not belong to — the ones it
+  // roots or sits in are left out, so the child can still land beside it.
+  function otherZoneObstacles(parent: NodeDoc): Obstacle[] {
+    const own = nodeGroups.filter((g) => g.members.some((m) => m.nodeId === parent.nodeId)).map((g) => g.rootId);
+    return bigNodeObstacles(new Set(own));
+  }
+
   // Any closed loop in the Link graph reads as a "figure" and gets colored
   // in — see canvasLayout.ts's own computeLinkCycles doc comment for the
   // full reasoning; the DFS itself lives there now as a pure function of
@@ -1143,9 +1150,11 @@ export function MapPage() {
     // only as far as it takes to stop covering that node (footprint boxes —
     // see footprintObstacles): the new node should appear where the ghost
     // was, not a full node-spacing away from it.
+    // Other circles' zones count too, so the new child doesn't land inside a
+    // zone it isn't part of.
     const placed = avoidOverlap(
       pos,
-      footprintObstacles(obstaclePoints()),
+      [...footprintObstacles(obstaclePoints()), ...otherZoneObstacles(parent)],
       viewportBounds(),
     );
     setInlineEditId(null);
@@ -1981,7 +1990,7 @@ export function MapPage() {
             // child appears right beside its parent.
             const pos = avoidOverlap(
               posFor(anchor),
-              footprintObstacles(obstaclePoints()),
+              [...footprintObstacles(obstaclePoints()), ...otherZoneObstacles(anchor)],
               viewportBounds(),
             );
             setInlineEditId(null);
