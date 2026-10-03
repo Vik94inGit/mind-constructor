@@ -1,6 +1,8 @@
 import type { Language } from "./translations";
 import type { NodeType } from "../types";
 import type { TemplateNodeKey } from "../utils/templates";
+import { THINK_STRINGS } from "./thinkStrings";
+import type { ThinkStrings } from "./thinkStrings";
 
 // The rest of the app's user-facing text — panels, menus, modals, and the
 // messages shown when something goes wrong. translations.ts keeps the core
@@ -278,6 +280,8 @@ export interface UiStrings {
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
   cardMenuLabel: string;
+  /** The "Think it through" flow — see thinkStrings.ts. */
+  think: ThinkStrings;
   admin: {
     title: string;
     subtitle: string;
@@ -649,6 +653,7 @@ const en: UiStrings = {
     nodes: (n) => `${n} node(s)`,
     members: (n) => `${n} member(s)`,
   },
+  think: THINK_STRINGS.en,
   cardMenuLabel: "Map menu",
   admin: {
     title: "Admin",
@@ -1011,6 +1016,7 @@ const cs: UiStrings = {
     nodes: (n) => `${n} uzel(ů)`,
     members: (n) => `${n} člen(ů)`,
   },
+  think: THINK_STRINGS.cs,
   cardMenuLabel: "Nabídka mapy",
   admin: {
     title: "Správa",
@@ -1373,6 +1379,7 @@ const uk: UiStrings = {
     nodes: (n) => `${n} вузол(ів)`,
     members: (n) => `${n} учасник(ів)`,
   },
+  think: THINK_STRINGS.uk,
   cardMenuLabel: "Меню мапи",
   admin: {
     title: "Адміністрування",
@@ -1735,6 +1742,7 @@ const ru: UiStrings = {
     nodes: (n) => `${n} узел(узлов)`,
     members: (n) => `${n} участник(ов)`,
   },
+  think: THINK_STRINGS.ru,
   cardMenuLabel: "Меню карты",
   admin: {
     title: "Администрирование",
