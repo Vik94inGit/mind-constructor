@@ -34,7 +34,7 @@ import { loadBlockLocks, saveBlockLocks } from "../utils/blockLock";
 import type { BlockLocks } from "../utils/blockLock";
 import type { CardFills } from "../utils/cardFill";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
-import { findSnap } from "../utils/puzzleSnap";
+import { connectedPieces, findSnap } from "../utils/puzzleSnap";
 import type { Snap, SnapPiece } from "../utils/puzzleSnap";
 import { pieceEdges } from "../map/PuzzleCard";
 import { focusedZoneIds, sameIds } from "../utils/zoneFocus";
@@ -1183,6 +1183,7 @@ export function MapPage() {
     t,
     snapFor: puzzleSnapFor,
     onSnapped: linkSnappedPieces,
+    clusterFor: puzzleClusterFor,
     isBlockLocked: (id) => !!blockLocks[id],
   });
 
@@ -1272,6 +1273,28 @@ export function MapPage() {
       return piece ? [piece] : [];
     });
     return findSnap(me, others, SNAP_REACH_PX / zoom);
+  }
+  // An assembled puzzle moves as one: every piece clicked together with
+  // `node` (linked to it, as a branch or a link, and sitting flush against it
+  // — see connectedPieces), directly or through others. Pieces held in place
+  // aren't part of it.
+  function puzzleClusterFor(node: NodeDoc): string[] {
+    if (!drawnAsCard(node)) return [node.nodeId];
+    const pieces = visibleNodes.flatMap((n) => {
+      if (!drawnAsCard(n) || n.locked || blockLocks[n.nodeId] || !isOwnNode(n)) return [];
+      const piece = snapPiece(n, posFor(n));
+      return piece ? [piece] : [];
+    });
+    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+    const linked = (a: string, b: string) =>
+      nodeRefId(byId.get(a)?.parentId) === b ||
+      nodeRefId(byId.get(b)?.parentId) === a ||
+      edges.some((e) => {
+        const from = nodeRefId(e.fromNodeId);
+        const to = nodeRefId(e.toNodeId);
+        return (from === a && to === b) || (from === b && to === a);
+      });
+    return connectedPieces(node.nodeId, pieces, linked, 6);
   }
   // Pieces dropped clicked together are linked — from the piece whose tab
   // went in to the one whose blank took it, so the fit stays the way it's

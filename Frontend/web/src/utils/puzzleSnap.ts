@@ -76,3 +76,38 @@ export function findSnap(dragged: SnapPiece, others: SnapPiece[], reach: number)
   }
   return best;
 }
+
+/**
+ * Every piece clicked together with `startId`, directly or through others —
+ * the whole assembled puzzle it's part of, `startId` first. Two pieces count
+ * as clicked together when they're `linked` and sit flush, their boxes
+ * touching (within `tolerance` canvas units) along one side; linked pieces
+ * apart on the canvas, or ones merely lying against each other, don't.
+ */
+export function connectedPieces(
+  startId: string,
+  pieces: SnapPiece[],
+  linked: (a: string, b: string) => boolean,
+  tolerance: number,
+): string[] {
+  const byId = new Map(pieces.map((p) => [p.id, p]));
+  if (!byId.has(startId)) return [startId];
+  const flush = (a: SnapPiece, b: SnapPiece) => {
+    const gapX = Math.abs(a.x - b.x) - (a.w + b.w) / 2;
+    const gapY = Math.abs(a.y - b.y) - (a.h + b.h) / 2;
+    // Touching along a vertical side (side by side, overlapping in y), or a
+    // horizontal one (stacked, overlapping in x).
+    return (Math.abs(gapX) <= tolerance && gapY < 0) || (Math.abs(gapY) <= tolerance && gapX < 0);
+  };
+  const out = [startId];
+  const seen = new Set(out);
+  for (let i = 0; i < out.length; i++) {
+    const a = byId.get(out[i])!;
+    for (const b of pieces) {
+      if (seen.has(b.id) || !flush(a, b) || !linked(a.id, b.id)) continue;
+      seen.add(b.id);
+      out.push(b.id);
+    }
+  }
+  return out;
+}
