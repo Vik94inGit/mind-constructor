@@ -10,6 +10,8 @@ interface Props {
   onCopyMap: () => void;
   onPaste: () => void;
   onExportText: () => void;
+  /** Owner only; absent (no item) for a demo map, which has nowhere to go after. */
+  onDeleteMap?: () => void;
   onClose: () => void;
 }
 
@@ -22,7 +24,17 @@ interface Props {
 // would run the menu off the left edge. Same dismiss-on-outside-click/
 // Escape pattern as NodeContextMenu, just without that one's fixed x/y
 // placement.
-export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onCopyMap, onPaste, onExportText, onClose }: Props) {
+export function AddMenu({
+  isOwner,
+  onInvite,
+  onCreateNode,
+  onCreateCircle,
+  onCopyMap,
+  onPaste,
+  onExportText,
+  onDeleteMap,
+  onClose,
+}: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   // Read once as the menu opens — it mounts fresh each time, so this is what is on the clipboard right now.
@@ -73,6 +85,11 @@ export function AddMenu({ isOwner, onInvite, onCreateNode, onCreateCircle, onCop
       <button className={item} onClick={onExportText}>
         {t.map.addMenu.exportText}
       </button>
+      {isOwner && onDeleteMap && (
+        <button className={`${item} text-danger`} onClick={onDeleteMap}>
+          {t.map.addMenu.deleteMap}
+        </button>
+      )}
     </div>
   );
 }

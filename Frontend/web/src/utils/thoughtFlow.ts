@@ -202,7 +202,16 @@ export function suggestMapName(center: string): string {
  */
 export async function buildMapFromDraft(
   draft: ThoughtDraft,
-  options: { name: string; personal: boolean; ownerColor: string; color: string },
+  options: {
+    name: string;
+    personal: boolean;
+    ownerColor: string;
+    color: string;
+    /** The center node's type; defaults to the one the draft's kind starts from. */
+    rootType?: NodeType;
+    /** false: the map gets no kind (it wasn't made from one of the starting points). */
+    withKind?: boolean;
+  },
   onProgress?: (done: number, total: number) => void,
 ): Promise<MapDoc> {
   const thoughts = draft.thoughts.filter((t) => t.text.trim());
@@ -211,13 +220,13 @@ export async function buildMapFromDraft(
     name: options.name.trim() || suggestMapName(draft.center),
     ownerColor: options.ownerColor,
     color: options.color,
-    kind: draft.kind,
+    kind: options.withKind === false ? undefined : draft.kind,
     discussionMode: !options.personal,
   });
   const { root, positions } = layoutThoughts(thoughts);
   const rootNode = await nodesApi.createNode(map.mapId, {
     text: draft.center.trim(),
-    type: FLOW_ROOT_TYPE[draft.kind],
+    type: options.rootType ?? FLOW_ROOT_TYPE[draft.kind],
     x: root.x,
     y: root.y,
   });

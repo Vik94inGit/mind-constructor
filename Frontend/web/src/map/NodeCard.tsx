@@ -85,6 +85,8 @@ interface Props {
   packedCount?: number;
   /** True for a Problem-type node with no Success/Option/Solution child yet — nothing proposed against it. Pulses a persistent danger-colored ring (see index.css's own unsolved-problem-pulse) until that changes. Ignored for every other type. */
   unsolved?: boolean;
+  /** A Success that solved a Problem or reached a goal (see computeSolved): always wears its wings and halo, even in the simplified view. */
+  triumphant?: boolean;
   /** Someone is currently dragging another node close enough to this one to drop-and-join its circle — "valid" (would succeed) or "invalid" (blocked, e.g. sentiment mismatch). */
   dropHighlight?: "valid" | "invalid";
   /** Swaps the caption for an autofocused text input and makes the icon clickable to cycle type — set by double-click/"Update"/the side panel's Edit button. */
@@ -140,6 +142,7 @@ export const NodeCard = memo(function NodeCard({
   hideCaption,
   packedCount,
   unsolved,
+  triumphant = false,
   dropHighlight,
   inlineEditing,
   flightVector,
@@ -371,6 +374,8 @@ export const NodeCard = memo(function NodeCard({
     opacityClass,
     filterClass,
     chaotic && "animate-node-chaos-drift",
+    // A hovered dot's title (see the dotted branch below) sits above its neighbours.
+    "has-[[data-dot]:hover]:z-[55]",
   ]
     .filter(Boolean)
     .join(" ");
@@ -580,10 +585,20 @@ export const NodeCard = memo(function NodeCard({
         // distance icons, cards and badges are only noise, and the dots
         // still show where everything is and what kind it is.
         // The selected node too, ringed by its selection outline.
-        <div
-          className="pointer-events-auto h-3 w-3 rounded-full border border-surface"
-          style={{ background: circleBorderColor, outline: ringStyle.outline, outlineOffset: 2 }}
-        />
+        // Hovering a dot shows the node's title above it, so a zoomed-out
+        // map can still be read point by point.
+        <div className="group/dot relative flex justify-center">
+          <div
+            data-dot
+            className="pointer-events-auto h-3 w-3 rounded-full border border-surface"
+            style={{ background: circleBorderColor, outline: ringStyle.outline, outlineOffset: 2 }}
+          />
+          {captionLabel && (
+            <div className="pointer-events-none absolute bottom-[calc(100%+6px)] hidden max-w-[220px] truncate rounded-md border border-line bg-surface px-2 py-[0.15rem] text-[0.75rem] font-semibold whitespace-nowrap text-ink shadow-card group-hover/dot:block">
+              {captionLabel}
+            </div>
+          )}
+        </div>
       ) : (
       <>
       {/* pointer-events-auto: the one part of this node that takes the
@@ -665,14 +680,16 @@ export const NodeCard = memo(function NodeCard({
         {/* Halo/horns — see NodeCrown's own doc comment; shared with
             QuickAddGhosts so a ghost previews this too, not just the bare
             symbol. */}
-        {!puzzle && !compact && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
+        {!puzzle && (!compact || triumphant) && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
         {/* Wings — see NodeWings's own doc comment for why this is a
             separate, never-resized overlay rather than living inside
             OutcomeBadge. Placed before the bordered circle below in DOM
             order (both z-index:auto) so the circle paints over the
             wings' own base, same "flanking the head, not stamped on top
             of it" look the wings always had. */}
-        {!puzzle && !compact && <NodeWings type={displayType} show={selected} symbolOverride={node.symbolOverride} />}
+        {!puzzle && (!compact || triumphant) && (
+          <NodeWings type={displayType} show={selected || triumphant} symbolOverride={node.symbolOverride} />
+        )}
         {/* No weapon-type badge here — which weapon landed shows via the
             pointer MapPage draws between this node and its target (see
             the weapon-mark <g> there), not a corner label: an attack node

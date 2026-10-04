@@ -3,13 +3,13 @@ import type { Dispatch, MutableRefObject, PointerEvent as ReactPointerEvent, Set
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { avoidOverlap, footprintObstacles, CANVAS_H, CANVAS_W, CIRCLE_DROP_RADIUS, isDescendant } from "../utils/canvasLayout";
-import type { NodeGroup, Obstacle, ViewportBounds } from "../utils/canvasLayout";
+import type { NodeGroup, ViewportBounds } from "../utils/canvasLayout";
+import type { MovingNode } from "../utils/zoneRules";
 import { nodeRefId } from "../utils/nodeType";
 import { sleep } from "../utils/sleep";
 import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
-import type { Snap } from "../utils/puzzleSnap";
 
 type Pt = { x: number; y: number };
 
@@ -38,7 +38,8 @@ interface Params {
   screenToCanvas: (clientX: number, clientY: number) => Pt;
   viewportBounds: () => ViewportBounds;
   obstaclePoints: (exclude?: Set<string>) => Pt[];
-  bigNodeObstacles: (excludeRootIds?: Set<string>) => Obstacle[];
+  /** Where `moving` lands when dropped at `desired`, under the zone rules (utils/zoneRules.ts). */
+  placeNode: (desired: Pt, moving: MovingNode[]) => Pt;
   zoomToEditAt: (x: number, y: number) => void;
   upsertNode: (node: NodeDoc) => void;
   setActionError: (message: string | null) => void;
@@ -52,12 +53,12 @@ interface Params {
   // which this hook now owns outright (see hooks/dragUIState.ts).
   suppressNextClick: MutableRefObject<boolean>;
   t: Translation;
-  /** Puzzle cards click together (utils/puzzleSnap.ts): where `node` dragged to (x,y) snaps to, if a fitting piece is close. */
-  snapFor?: (node: NodeDoc, x: number, y: number) => Snap | null;
-  /** A piece was dropped clicked into another (`snap.partnerId`). */
-  onSnapped?: (node: NodeDoc, snap: Snap) => void;
-  /** Every node that moves along with `node` as one unit (an assembled puzzle), `node` first. */
-  clusterFor?: (node: NodeDoc) => string[];
+  /**
+   * Touch: holding a node still. Return true when that was handled (a puzzle
+   * card opens its menu, with Lock / Unlock); otherwise the hold toggles the
+   * node in or out of the multi-selection.
+   */
+  onHold?: (node: NodeDoc, clientX: number, clientY: number) => boolean;
   /** Its owner locked this text block (utils/blockLock.ts) — held in place like Node.locked. */
   isBlockLocked?: (nodeId: string) => boolean;
 }
@@ -81,7 +82,7 @@ export function useNodeDragAndDrop({
   screenToCanvas,
   viewportBounds,
   obstaclePoints,
-  bigNodeObstacles,
+  placeNode,
   zoomToEditAt,
   upsertNode,
   setActionError,
@@ -90,9 +91,7 @@ export function useNodeDragAndDrop({
   setMultiSelectIds,
   suppressNextClick,
   t,
-  snapFor,
-  onSnapped,
-  clusterFor,
+  onHold,
   isBlockLocked,
 }: Params) {
   // Held in place: a member of the chosen circle (Node.locked), or a text
@@ -220,17 +219,12 @@ export function useNodeDragAndDrop({
         const dy = p.y - startPt.y;
         setActionError(null);
 
-        // Group drag had zero overlap protection at all before — only the
-        // canvas-bounds clamp. Same nearest-clear-spot settle the single-node
-        // drop now gets: every node NOT in this drag (footprint) and every
-        // zone backdrop the drag isn't itself part of (bigNodeObstacles) is a
-        // real obstacle for where the leader/followers finally land.
+        // The selection lands as one rigid shape, at the nearest spot where
+        // the zone rules hold for every member at once (see placeNode): no
+        // member on another node or in a zone it isn't part of, no zone
+        // crossing another, and nothing left floating far from the rest.
         const memberIdSet = new Set(memberIds);
-        const ownGroupRootIds = new Set(nodeGroups.filter((g) => memberIdSet.has(g.rootId)).map((g) => g.rootId));
-        const externalObstacles = [
-          ...footprintObstacles(obstaclePoints(memberIdSet)),
-          ...bigNodeObstacles(ownGroupRootIds),
-        ];
+        const externalObstacles = footprintObstacles(obstaclePoints(memberIdSet));
 
         // Every member's own final target, worked out up front (leader
         // first, then followers in order) rather than each one independently
@@ -247,18 +241,23 @@ export function useNodeDragAndDrop({
         // follower too, not just of the outside world.
         const memberTargets = new Map<string, Pt>();
         const leaderStart = startPositions.get(node.nodeId)!;
-        const leaderTarget = avoidOverlap(
+        const leaderTarget = placeNode(
           clamp(leaderStart.x + dx, leaderStart.y + dy),
-          externalObstacles,
-          viewportBounds(),
+          memberIds.map((id) => {
+            const start = startPositions.get(id)!;
+            return { nodeId: id, offset: { x: start.x - leaderStart.x, y: start.y - leaderStart.y } };
+          }),
         );
         memberTargets.set(node.nodeId, leaderTarget);
+        // Followers keep their place in the shape. The nudge below only does
+        // anything when no spot satisfied the rules for the whole group.
         for (const id of followerIds) {
           const start = startPositions.get(id)!;
           const placedSoFar = footprintObstacles(Array.from(memberTargets.values()));
+          const keepShape = { x: leaderTarget.x + start.x - leaderStart.x, y: leaderTarget.y + start.y - leaderStart.y };
           memberTargets.set(
             id,
-            avoidOverlap(clamp(start.x + dx, start.y + dy), [...externalObstacles, ...placedSoFar], viewportBounds()),
+            avoidOverlap(clamp(keepShape.x, keepShape.y), [...externalObstacles, ...placedSoFar], viewportBounds()),
           );
         }
 
@@ -320,14 +319,7 @@ export function useNodeDragAndDrop({
     // good (see the group-drag branch's own comment above); touch long-
     // press-to-multiselect still works on one, since picking a locked node
     // into some other selection doesn't move anything.
-    // Puzzle pieces clicked together drag as one (see clusterFor below), so a
-    // puzzle with any piece held in place is held as a whole.
-    const clusterIds = moveMode && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];
-    const clusterHeld = clusterIds.some((id) => {
-      const n = nodes.find((nn) => nn.nodeId === id);
-      return !!n && held(n);
-    });
-    if (!moveMode || held(node) || clusterHeld) {
+    if (!moveMode || held(node)) {
       if (e.pointerType !== "touch") return;
       const touchStartX = e.clientX;
       const touchStartY = e.clientY;
@@ -338,6 +330,7 @@ export function useNodeDragAndDrop({
         window.removeEventListener("pointermove", onIdleMove);
         window.removeEventListener("pointerup", onIdleUp);
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        if (onHold?.(node, touchStartX, touchStartY)) return;
         // Same contract onCanvasPointerDown's marquee onUp already follows —
         // starting a multi-selection always clears any stale single
         // selection, so it can't resurface (a NodePanel popping back open
@@ -387,31 +380,6 @@ export function useNodeDragAndDrop({
     const offsetX = startPt.x - start.x;
     const offsetY = startPt.y - start.y;
 
-    // Puzzle pieces clicked together move as one: dragging any of them
-    // carries the whole assembled puzzle along rigidly, every piece keeping
-    // its place against the others. Such a drag is a plain move of the lot —
-    // no clicking into another piece, joining a circle or leaving one.
-    const clusterStart =
-      clusterIds.length > 1
-        ? new Map(
-            clusterIds.flatMap((id) => {
-              const n = nodes.find((nn) => nn.nodeId === id);
-              return n ? [[id, id === node.nodeId ? start : posFor(n)] as const] : [];
-            }),
-          )
-        : null;
-    // The whole puzzle moved by (dx, dy), held inside the canvas as one —
-    // the shift is cut short rather than any one piece clamped out of place.
-    const movedCluster = (dx: number, dy: number) => {
-      const margin = 60;
-      const pts = Array.from(clusterStart!.values());
-      const lo = (k: "x" | "y") => Math.min(...pts.map((pt) => pt[k]));
-      const hi = (k: "x" | "y") => Math.max(...pts.map((pt) => pt[k]));
-      const cdx = Math.min(CANVAS_W - margin - hi("x"), Math.max(margin - lo("x"), dx));
-      const cdy = Math.min(CANVAS_H - margin - hi("y"), Math.max(margin - lo("y"), dy));
-      return new Map(Array.from(clusterStart!, ([id, pt]) => [id, { x: pt.x + cdx, y: pt.y + cdy }]));
-    };
-
     // Long-press to multi-select, touch only — there's no keyboard on a
     // phone to reach shift+click's own toggle any other way, and
     // marquee-drag is already claimed by native canvas panning on touch
@@ -437,6 +405,7 @@ export function useNodeDragAndDrop({
         window.removeEventListener("pointerup", onUp);
         dispatch({ type: "reset" });
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        if (onHold?.(node, touchStartX, touchStartY)) return;
         // See the other long-press timer's own comment above (the !moveMode
         // branch) — same "starting a multi-selection clears any stale
         // single selection" contract the marquee already follows.
@@ -456,30 +425,12 @@ export function useNodeDragAndDrop({
       };
     }
 
-    // The piece the dragged one is currently clicked into, if any.
-    let snappedTo: string | null = null;
     function onMove(ev: PointerEvent) {
       cancelLongPressIfMoved?.(ev);
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
       dragMoved.current = true;
-      if (clusterStart) {
-        dispatch({ type: "groupStart", positions: movedCluster(x - start.x, y - start.y) });
-        return;
-      }
-      // Close to a fitting puzzle piece: jump flush into it, and light the
-      // partner up. A clicked-in piece isn't joining a circle, so the drop
-      // target search is skipped.
-      const snap = snapFor?.(node, x, y);
-      if (snap) {
-        if (snappedTo !== snap.partnerId) navigator.vibrate?.(10);
-        snappedTo = snap.partnerId;
-        dispatch({ type: "dragSet", nodeId: node.nodeId, x: snap.x, y: snap.y });
-        dispatch({ type: "dropTargetSet", nodeId: snap.partnerId, valid: true });
-        return;
-      }
-      snappedTo = null;
       dispatch({ type: "dragSet", nodeId: node.nodeId, x, y });
       const found = findDropTarget(node, x, y);
       dispatch(
@@ -501,46 +452,6 @@ export function useNodeDragAndDrop({
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
-      if (clusterStart && dragMoved.current) {
-        const moved = movedCluster(x - start.x, y - start.y);
-        const before = new Map(nodes.filter((n) => moved.has(n.nodeId)).map((n) => [n.nodeId, { x: n.x, y: n.y }]));
-        dispatch({ type: "reset" });
-        setNodes((prev) => prev.map((n) => (moved.has(n.nodeId) ? { ...n, ...moved.get(n.nodeId)! } : n)));
-        setActionError(null);
-        const failed: string[] = [];
-        await Promise.all(
-          Array.from(moved, ([id, pt]) =>
-            nodesApi
-              .updateNode(id, pt)
-              .then(upsertNode)
-              .catch(() => failed.push(id)),
-          ),
-        );
-        if (failed.length) {
-          // Put back only what didn't save, so the canvas matches the server.
-          setNodes((prev) => prev.map((n) => (failed.includes(n.nodeId) ? { ...n, ...before.get(n.nodeId)! } : n)));
-          setActionError(t.ui.errors.moveNodes);
-        }
-        return;
-      }
-      const snap = dragMoved.current ? snapFor?.(node, x, y) : null;
-      if (snap) {
-        // Dropped clicked into another piece: it stays exactly there, flush
-        // against its partner (no overlap nudging — sitting right against it
-        // is the point), and the caller links the two.
-        dispatch({ type: "reset" });
-        const before = { x: node.x, y: node.y };
-        setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, x: snap.x, y: snap.y } : n)));
-        navigator.vibrate?.(20);
-        onSnapped?.(node, snap);
-        try {
-          upsertNode(await nodesApi.updateNode(node.nodeId, { x: snap.x, y: snap.y }));
-        } catch (err) {
-          setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
-          setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
-        }
-        return;
-      }
       const found = dragMoved.current ? findDropTarget(node, x, y) : null;
       dispatch({ type: "reset" });
       if (dragMoved.current) {
@@ -557,15 +468,10 @@ export function useNodeDragAndDrop({
         if (found && found.valid) {
           // Dropped onto an eligible node — join its circle instead of a
           // plain reposition. Land just next to the target rather than
-          // exactly on top of it: nudged only as far as it takes to stop
-          // covering it (see footprintObstacles), not a full node-spacing
-          // away from where it was let go.
+          // exactly on top of it: the nearest spot that clears it and keeps
+          // the zone rules as a member of the target's zone (see placeNode).
           const target = found.target;
-          const placed = avoidOverlap(
-            { x, y },
-            footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
-            viewportBounds(),
-          );
+          const placed = placeNode({ x, y }, [{ nodeId: node.nodeId, parentId: target.nodeId }]);
           setActionError(null);
           zoomToEditAt(placed.x, placed.y);
           try {
@@ -580,13 +486,11 @@ export function useNodeDragAndDrop({
           }
           return;
         }
-        // A drop lands where it was let go. The only thing that moves it is a
-        // node it would visibly cover, and then only by the little it takes
-        // to clear that node (footprint boxes — see footprintObstacles), so
-        // where a node ends up is never a surprise. Deliberately no
-        // backdrop obstacles either: pushing a drop out of some other
-        // circle's zone (a big area, once a circle has a few nodes) is what
-        // sent nodes flying well away from the pointer.
+        // A drop lands as close to where it was let go as the zone rules
+        // allow (see placeNode): not on another node, not inside or on the
+        // line of a zone it isn't part of, its own zone not stretched over
+        // anyone else or across another zone, and no further than ~2 cm
+        // from the nearest node or zone line.
         //
         // Dragged clear of its own circle's backdrop (not just repositioned
         // within it) — read as "pull this node out", clearing parentId so it
@@ -599,37 +503,8 @@ export function useNodeDragAndDrop({
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
         // Still a member at the raw drop point?
         const staysMember = !!ownCircle && Math.hypot(x - ownCircle.cx, y - ownCircle.cy) <= ownCircle.r;
-        // A circle's *root* is never excluded by the staysMember check above
-        // (its own parentId points at whatever *it* hangs from, if
-        // anything — never at the circle it's the root of), so without this
-        // its own zone — which its own drag is what's reshaping — counted as
-        // an obstacle to itself. For a large/irregular zone (see the
-        // group-drag branch above, which already excludes every dragged
-        // member's own root the same unconditional way) that could push the
-        // root wherever the nearest clear edge happened to be, nowhere near
-        // where it was actually dropped.
-        const ownRootCircle = nodeGroups.find((g) => g.rootId === node.nodeId);
-        const excludedRootIds = new Set<string>();
-        if (staysMember && ownCircle) excludedRootIds.add(ownCircle.rootId);
-        if (ownRootCircle) excludedRootIds.add(ownRootCircle.rootId);
-        // Every other circle's backdrop is a real obstacle here too (not
-        // just at creation time) — a plain reposition drop used to be able to
-        // land a node's icon right on top of a zone it doesn't belong to.
-        // Its own circle(s) are excluded (see excludedRootIds above) so this
-        // never pushes a node out of a zone it's still part of, whether as a
-        // member or as the root. No corner-angle check any more (see
-        // MIN_ZONE_ANGLE's own removal) — a zone is free to pack as tight as
-        // its own members' footprints allow, as long as it doesn't cross
-        // into a *different* zone's territory.
-        const dropped = avoidOverlap(
-          { x, y },
-          [
-            ...footprintObstacles(obstaclePoints(new Set([node.nodeId]))),
-            ...bigNodeObstacles(excludedRootIds),
-          ],
-          viewportBounds(),
-        );
         const leftCircle = !!ownCircle && !staysMember;
+        const dropped = placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }]);
         zoomToEditAt(dropped.x, dropped.y);
 
         // Remembered so a failed persist below can put the node back exactly

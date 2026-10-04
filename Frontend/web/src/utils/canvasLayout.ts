@@ -256,7 +256,7 @@ export interface Obstacle {
 }
 
 // Icon (48) + gap + a two-row title, roughly — and CAPTION_WIDTH wide.
-const NODE_FOOTPRINT = { w: CAPTION_WIDTH, h: 90 };
+export const NODE_FOOTPRINT = { w: CAPTION_WIDTH, h: 90 };
 
 // Spacing obstacles, one per point — see Obstacle. Deliberately one flat
 // minDist for every point, not per-node-size aware — every call site only
@@ -266,9 +266,11 @@ export function nodeObstacles(points: { x: number; y: number }[], minDist = getN
   return points.map((p) => ({ x: p.x, y: p.y, minDist }));
 }
 
-// Footprint obstacles, one per point — see Obstacle.
-export function footprintObstacles(points: { x: number; y: number }[]): Obstacle[] {
-  return points.map((p) => ({ x: p.x, y: p.y, minDist: 0, footprint: NODE_FOOTPRINT }));
+// Footprint obstacles, one per point — see Obstacle. `pad` keeps that much
+// empty space between two footprints on top of not touching.
+export function footprintObstacles(points: { x: number; y: number }[], pad = 0): Obstacle[] {
+  const footprint = { w: NODE_FOOTPRINT.w + pad, h: NODE_FOOTPRINT.h + pad };
+  return points.map((p) => ({ x: p.x, y: p.y, minDist: 0, footprint }));
 }
 
 // Same min/max-pair clamp pickNonOverlappingPosition uses: a too-small
@@ -371,19 +373,26 @@ function nearestClearSpot(
 //
 // `accept` adds an arbitrary extra condition on the spot itself. It is
 // held to as long as any spot satisfies it; if none does, it's dropped rather
-// than leaving the node with nowhere to go.
+// than leaving the node with nowhere to go. A list is tried strictest first:
+// each one is dropped in turn only when no spot at all satisfies it.
 export function avoidOverlap(
   desired: { x: number; y: number },
   obstacles: Obstacle[],
   bounds: ViewportBounds = FULL_CANVAS_BOUNDS,
-  accept?: (p: Pt) => boolean,
+  accept?: ((p: Pt) => boolean) | ((p: Pt) => boolean)[],
 ): { x: number; y: number } {
   const margin = 40;
-  const inView = nearestClearSpot(desired, obstacles, bounds, margin, accept);
+  const tiers = accept === undefined ? [] : Array.isArray(accept) ? accept : [accept];
+  for (const tier of tiers) {
+    const inView = nearestClearSpot(desired, obstacles, bounds, margin, tier);
+    if (inView.clear) return inView.point;
+    const anywhere = nearestClearSpot(desired, obstacles, FULL_CANVAS_BOUNDS, margin, tier);
+    if (anywhere.clear) return anywhere.point;
+  }
+  const inView = nearestClearSpot(desired, obstacles, bounds, margin);
   if (inView.clear) return inView.point;
-  const anywhere = nearestClearSpot(desired, obstacles, FULL_CANVAS_BOUNDS, margin, accept);
-  if (anywhere.clear) return anywhere.point;
-  return accept ? avoidOverlap(desired, obstacles, bounds) : inView.point;
+  const anywhere = nearestClearSpot(desired, obstacles, FULL_CANVAS_BOUNDS, margin);
+  return anywhere.clear ? anywhere.point : inView.point;
 }
 
 
@@ -488,6 +497,15 @@ export interface NodeGroup {
 // triangle at the 3-member minimum, growing to a quad/pentagon/… as the
 // group grows. Every corner is a member, and nothing is derived or moved:
 // each node is drawn exactly where it is, root included.
+// The order to connect a zone's corners in: by angle around their centroid,
+// which traces a simple (non-self-crossing) outline. Indexes into `pts`.
+export function outlineOrder(pts: Pt[]): number[] {
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  const angle = pts.map((p) => Math.atan2(p.y - cy, p.x - cx));
+  return pts.map((_, i) => i).sort((a, b) => angle[a] - angle[b]);
+}
+
 export function computeNodeGroups(
   visibleNodes: NodeDoc[],
   allNodes: NodeDoc[],
@@ -515,11 +533,9 @@ export function computeNodeGroups(
     // obstacle avoidance, "dragged clear of its circle" — treat as still
     // being part of the zone.
     const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
-    const corners = members
-      .map((m, i) => ({ id: m.nodeId, p: pts[i] }))
-      .sort((a, b) => Math.atan2(a.p.y - cy, a.p.x - cx) - Math.atan2(b.p.y - cy, b.p.x - cx));
-    const outline = corners.map((c) => c.p);
-    const outlineIds = corners.map((c) => c.id);
+    const order = outlineOrder(pts);
+    const outline = order.map((i) => pts[i]);
+    const outlineIds = order.map((i) => members[i].nodeId);
     groups.push({ rootId, members, sentiment, cx, cy, r, outline, outlineIds });
   }
   return groups;

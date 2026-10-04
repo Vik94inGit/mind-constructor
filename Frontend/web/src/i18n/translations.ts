@@ -60,9 +60,34 @@ export interface Translation {
     card: {
       members: (count: number) => string;
       nodes: (count: number) => string;
+      maps: (count: number) => string;
       owner: string;
     };
-    menu: { summary: string; edit: string; invite: string; delete: string };
+    menu: { summary: string; edit: string; invite: string; delete: string; moveToFolder: string };
+    library: {
+      newFolder: string;
+      search: string;
+      noResults: (query: string) => string;
+      allMaps: string;
+      folderEmpty: string;
+      prev: string;
+      next: string;
+      page: (page: number, total: number) => string;
+      foldersError: string;
+      deleteMapError: string;
+      folderMenu: { open: string; rename: string; delete: string };
+      deleteFolderConfirm: (name: string) => string;
+      folderModal: {
+        createTitle: string;
+        renameTitle: string;
+        name: string;
+        cancel: string;
+        create: string;
+        save: string;
+        error: string;
+      };
+      moveModal: { title: (name: string) => string; noFolder: string; error: string };
+    };
     deleteConfirm: (name: string) => string;
     createModal: {
       title: string;
@@ -120,6 +145,7 @@ export interface Translation {
       createNode: string;
       createCircle: string;
       exportText: string;
+      deleteMap: string;
     };
     panelTabs: {
       info: string;
@@ -130,6 +156,33 @@ export interface Translation {
       packed: (count: number) => string;
     };
     legend: { positiveCircle: string; negativeCircle: string };
+  };
+  /** "Text → map" (pages/SplitTextPage.tsx). */
+  split: {
+    entry: string;
+    title: string;
+    hint: string;
+    name: string;
+    namePlaceholder: string;
+    text: string;
+    textPlaceholder: string;
+    rootType: string;
+    next: string;
+    back: string;
+    markTitle: string;
+    markHint: string;
+    mainNode: string;
+    selected: string;
+    clearSelection: string;
+    overlap: string;
+    pieces: (count: number) => string;
+    noPieces: string;
+    remove: string;
+    create: string;
+    creating: (done: number, total: number) => string;
+    error: string;
+    startOver: string;
+    startOverConfirm: string;
   };
   theme: { toggleToLight: string; toggleToDark: string };
   language: { label: string };
@@ -191,9 +244,34 @@ const en: Translation = {
     card: {
       members: (count) => `${count} member(s)`,
       nodes: (count) => `${count} node(s)`,
+      maps: (count) => `${count} map(s)`,
       owner: "Owner",
     },
-    menu: { summary: "Summary", edit: "Edit", invite: "Invite", delete: "Delete" },
+    menu: { summary: "Summary", edit: "Edit", invite: "Invite", delete: "Delete", moveToFolder: "Move to folder…" },
+    library: {
+      newFolder: "+ New folder",
+      search: "Search maps and folders…",
+      noResults: (query) => `Nothing matches "${query}".`,
+      allMaps: "All maps",
+      folderEmpty: "This folder is empty. Move maps here from their ⋯ menu.",
+      prev: "‹ Prev",
+      next: "Next ›",
+      page: (page, total) => `Page ${page} of ${total}`,
+      foldersError: "Failed to load folders",
+      deleteMapError: "Couldn't delete the map",
+      folderMenu: { open: "Open", rename: "Rename", delete: "Delete" },
+      deleteFolderConfirm: (name) => `Delete folder "${name}"? The maps in it stay — they go back to All maps.`,
+      folderModal: {
+        createTitle: "New folder",
+        renameTitle: "Rename folder",
+        name: "Name",
+        cancel: "Cancel",
+        create: "Create",
+        save: "Save",
+        error: "Couldn't save the folder",
+      },
+      moveModal: { title: (name) => `Move "${name}" to…`, noFolder: "No folder (All maps)", error: "Couldn't move the map" },
+    },
     deleteConfirm: (name) => `Delete "${name}"? This removes every node on it too.`,
     createModal: {
       title: "New map",
@@ -253,6 +331,7 @@ const en: Translation = {
       createNode: "Create new node",
       createCircle: "Create circle",
       exportText: "Export text",
+      deleteMap: "Delete map",
     },
     panelTabs: {
       info: "Info",
@@ -263,6 +342,32 @@ const en: Translation = {
       packed: (count) => `Packed (${count})`,
     },
     legend: { positiveCircle: "positive circle", negativeCircle: "negative circle / under fire" },
+  },
+  split: {
+    entry: "✂ Text → map",
+    title: "Turn a text into a map",
+    hint: "Paste or write the whole text. It becomes the main node; then you pick out its pieces and say what each one is.",
+    name: "Map name",
+    namePlaceholder: "Taken from the text if left empty",
+    text: "Text",
+    textPlaceholder: "Paste your text here…",
+    rootType: "Main node type",
+    next: "Next: mark pieces →",
+    back: "← Back",
+    markTitle: "Mark the pieces",
+    markHint: "Select part of the text with the cursor (or hold and drag on a phone), then choose what it is. Each piece becomes a node under the main one.",
+    mainNode: "Main node — the whole text",
+    selected: "Selected",
+    clearSelection: "Clear selection",
+    overlap: "That overlaps a piece you already marked — remove it first or select something else.",
+    pieces: (count) => `Pieces (${count})`,
+    noPieces: "No pieces yet — select some text above.",
+    remove: "Remove",
+    create: "Create map",
+    creating: (done, total) => `Creating… ${done} of ${total}`,
+    error: "Couldn't create the map",
+    startOver: "Start over",
+    startOverConfirm: "Clear this text and all its pieces?",
   },
   theme: { toggleToLight: "Switch to light mode", toggleToDark: "Switch to dark mode" },
   language: { label: "Language" },
@@ -314,9 +419,34 @@ const cs: Translation = {
     card: {
       members: (count) => `${count} člen(ů)`,
       nodes: (count) => `${count} uzel(ů)`,
+      maps: (count) => `Map: ${count}`,
       owner: "Vlastník",
     },
-    menu: { summary: "Přehled", edit: "Upravit", invite: "Pozvat", delete: "Smazat" },
+    menu: { summary: "Přehled", edit: "Upravit", invite: "Pozvat", delete: "Smazat", moveToFolder: "Přesunout do složky…" },
+    library: {
+      newFolder: "+ Nová složka",
+      search: "Hledat mapy a složky…",
+      noResults: (query) => `Nic neodpovídá „${query}“.`,
+      allMaps: "Všechny mapy",
+      folderEmpty: "Složka je prázdná. Mapy sem přesunete z jejich nabídky ⋯.",
+      prev: "‹ Předchozí",
+      next: "Další ›",
+      page: (page, total) => `Strana ${page} z ${total}`,
+      foldersError: "Nepodařilo se načíst složky",
+      deleteMapError: "Mapu se nepodařilo smazat",
+      folderMenu: { open: "Otevřít", rename: "Přejmenovat", delete: "Smazat" },
+      deleteFolderConfirm: (name) => `Smazat složku „${name}“? Mapy v ní zůstanou — vrátí se do Všech map.`,
+      folderModal: {
+        createTitle: "Nová složka",
+        renameTitle: "Přejmenovat složku",
+        name: "Název",
+        cancel: "Zrušit",
+        create: "Vytvořit",
+        save: "Uložit",
+        error: "Složku se nepodařilo uložit",
+      },
+      moveModal: { title: (name) => `Přesunout „${name}“ do…`, noFolder: "Bez složky (Všechny mapy)", error: "Mapu se nepodařilo přesunout" },
+    },
     deleteConfirm: (name) => `Smazat „${name}“? Tím se odstraní i všechny uzly na ní.`,
     createModal: {
       title: "Nová mapa",
@@ -376,6 +506,7 @@ const cs: Translation = {
       createNode: "Vytvořit nový uzel",
       createCircle: "Vytvořit kruh",
       exportText: "Exportovat text",
+      deleteMap: "Smazat mapu",
     },
     panelTabs: {
       info: "Info",
@@ -386,6 +517,32 @@ const cs: Translation = {
       packed: (count) => `Sbaleno (${count})`,
     },
     legend: { positiveCircle: "pozitivní kruh", negativeCircle: "negativní kruh / pod útokem" },
+  },
+  split: {
+    entry: "✂ Text → mapa",
+    title: "Udělejte z textu mapu",
+    hint: "Vložte nebo napište celý text. Stane se hlavním uzlem; potom z něj vyberete části a určíte, co která je.",
+    name: "Název mapy",
+    namePlaceholder: "Když zůstane prázdný, vezme se z textu",
+    text: "Text",
+    textPlaceholder: "Sem vložte text…",
+    rootType: "Typ hlavního uzlu",
+    next: "Dál: označit části →",
+    back: "← Zpět",
+    markTitle: "Označte části",
+    markHint: "Vyberte část textu kurzorem (na telefonu podržte a táhněte) a zvolte, co to je. Každá část bude uzlem pod hlavním.",
+    mainNode: "Hlavní uzel — celý text",
+    selected: "Vybráno",
+    clearSelection: "Zrušit výběr",
+    overlap: "To se překrývá s už označenou částí — nejdřív ji odeberte, nebo vyberte něco jiného.",
+    pieces: (count) => `Části (${count})`,
+    noPieces: "Zatím žádné části — vyberte nahoře kus textu.",
+    remove: "Odebrat",
+    create: "Vytvořit mapu",
+    creating: (done, total) => `Vytvářím… ${done} z ${total}`,
+    error: "Mapu se nepodařilo vytvořit",
+    startOver: "Začít znovu",
+    startOverConfirm: "Smazat tento text i všechny jeho části?",
   },
   theme: { toggleToLight: "Přepnout na světlý režim", toggleToDark: "Přepnout na tmavý režim" },
   language: { label: "Jazyk" },
@@ -437,9 +594,34 @@ const uk: Translation = {
     card: {
       members: (count) => `${count} учасник(ів)`,
       nodes: (count) => `${count} вузол(ів)`,
+      maps: (count) => `Карт: ${count}`,
       owner: "Власник",
     },
-    menu: { summary: "Підсумок", edit: "Редагувати", invite: "Запросити", delete: "Видалити" },
+    menu: { summary: "Підсумок", edit: "Редагувати", invite: "Запросити", delete: "Видалити", moveToFolder: "Перемістити в папку…" },
+    library: {
+      newFolder: "+ Нова папка",
+      search: "Пошук карт і папок…",
+      noResults: (query) => `Нічого не знайдено за «${query}».`,
+      allMaps: "Усі карти",
+      folderEmpty: "Папка порожня. Переміщуйте сюди карти через їхнє меню ⋯.",
+      prev: "‹ Назад",
+      next: "Далі ›",
+      page: (page, total) => `Сторінка ${page} з ${total}`,
+      foldersError: "Не вдалося завантажити папки",
+      deleteMapError: "Не вдалося видалити карту",
+      folderMenu: { open: "Відкрити", rename: "Перейменувати", delete: "Видалити" },
+      deleteFolderConfirm: (name) => `Видалити папку «${name}»? Карти з неї залишаться — повернуться в Усі карти.`,
+      folderModal: {
+        createTitle: "Нова папка",
+        renameTitle: "Перейменувати папку",
+        name: "Назва",
+        cancel: "Скасувати",
+        create: "Створити",
+        save: "Зберегти",
+        error: "Не вдалося зберегти папку",
+      },
+      moveModal: { title: (name) => `Перемістити «${name}» до…`, noFolder: "Без папки (Усі карти)", error: "Не вдалося перемістити карту" },
+    },
     deleteConfirm: (name) => `Видалити «${name}»? Це також видалить усі вузли на ній.`,
     createModal: {
       title: "Нова карта",
@@ -499,6 +681,7 @@ const uk: Translation = {
       createNode: "Створити новий вузол",
       createCircle: "Створити коло",
       exportText: "Експортувати текст",
+      deleteMap: "Видалити карту",
     },
     panelTabs: {
       info: "Інфо",
@@ -509,6 +692,32 @@ const uk: Translation = {
       packed: (count) => `Згорнуто (${count})`,
     },
     legend: { positiveCircle: "позитивне коло", negativeCircle: "негативне коло / під атакою" },
+  },
+  split: {
+    entry: "✂ Текст → карта",
+    title: "Зробіть із тексту карту",
+    hint: "Вставте або напишіть увесь текст. Він стане головним вузлом; потім ви виділите його частини й вкажете, що кожна з них означає.",
+    name: "Назва карти",
+    namePlaceholder: "Якщо порожньо — візьметься з тексту",
+    text: "Текст",
+    textPlaceholder: "Вставте текст сюди…",
+    rootType: "Тип головного вузла",
+    next: "Далі: позначити частини →",
+    back: "← Назад",
+    markTitle: "Позначте частини",
+    markHint: "Виділіть частину тексту курсором (на телефоні — затисніть і потягніть) і виберіть, що це. Кожна частина стане вузлом під головним.",
+    mainNode: "Головний вузол — увесь текст",
+    selected: "Виділено",
+    clearSelection: "Скасувати виділення",
+    overlap: "Це перетинається з уже позначеною частиною — спершу приберіть її або виділіть інше.",
+    pieces: (count) => `Частини (${count})`,
+    noPieces: "Частин поки немає — виділіть текст угорі.",
+    remove: "Прибрати",
+    create: "Створити карту",
+    creating: (done, total) => `Створюю… ${done} з ${total}`,
+    error: "Не вдалося створити карту",
+    startOver: "Почати спочатку",
+    startOverConfirm: "Очистити цей текст і всі його частини?",
   },
   theme: { toggleToLight: "Перемкнути на світлий режим", toggleToDark: "Перемкнути на темний режим" },
   language: { label: "Мова" },
@@ -560,9 +769,34 @@ const ru: Translation = {
     card: {
       members: (count) => `${count} участник(ов)`,
       nodes: (count) => `${count} узел(узлов)`,
+      maps: (count) => `Карт: ${count}`,
       owner: "Владелец",
     },
-    menu: { summary: "Сводка", edit: "Изменить", invite: "Пригласить", delete: "Удалить" },
+    menu: { summary: "Сводка", edit: "Изменить", invite: "Пригласить", delete: "Удалить", moveToFolder: "Переместить в папку…" },
+    library: {
+      newFolder: "+ Новая папка",
+      search: "Поиск карт и папок…",
+      noResults: (query) => `Ничего не найдено по «${query}».`,
+      allMaps: "Все карты",
+      folderEmpty: "Папка пуста. Перемещайте сюда карты через их меню ⋯.",
+      prev: "‹ Назад",
+      next: "Далее ›",
+      page: (page, total) => `Страница ${page} из ${total}`,
+      foldersError: "Не удалось загрузить папки",
+      deleteMapError: "Не удалось удалить карту",
+      folderMenu: { open: "Открыть", rename: "Переименовать", delete: "Удалить" },
+      deleteFolderConfirm: (name) => `Удалить папку «${name}»? Карты из неё останутся — вернутся во Все карты.`,
+      folderModal: {
+        createTitle: "Новая папка",
+        renameTitle: "Переименовать папку",
+        name: "Название",
+        cancel: "Отмена",
+        create: "Создать",
+        save: "Сохранить",
+        error: "Не удалось сохранить папку",
+      },
+      moveModal: { title: (name) => `Переместить «${name}» в…`, noFolder: "Без папки (Все карты)", error: "Не удалось переместить карту" },
+    },
     deleteConfirm: (name) => `Удалить «${name}»? Это также удалит все узлы на ней.`,
     createModal: {
       title: "Новая карта",
@@ -622,6 +856,7 @@ const ru: Translation = {
       createNode: "Создать новый узел",
       createCircle: "Создать круг",
       exportText: "Экспортировать текст",
+      deleteMap: "Удалить карту",
     },
     panelTabs: {
       info: "Инфо",
@@ -632,6 +867,32 @@ const ru: Translation = {
       packed: (count) => `Свёрнуто (${count})`,
     },
     legend: { positiveCircle: "положительный круг", negativeCircle: "отрицательный круг / под атакой" },
+  },
+  split: {
+    entry: "✂ Текст → карта",
+    title: "Превратите текст в карту",
+    hint: "Вставьте или напишите весь текст. Он станет главным узлом; затем вы выделите его части и укажете, что каждая из них значит.",
+    name: "Название карты",
+    namePlaceholder: "Если пусто — возьмётся из текста",
+    text: "Текст",
+    textPlaceholder: "Вставьте текст сюда…",
+    rootType: "Тип главного узла",
+    next: "Далее: отметить части →",
+    back: "← Назад",
+    markTitle: "Отметьте части",
+    markHint: "Выделите часть текста курсором (на телефоне — зажмите и потяните) и выберите, что это. Каждая часть станет узлом под главным.",
+    mainNode: "Главный узел — весь текст",
+    selected: "Выделено",
+    clearSelection: "Снять выделение",
+    overlap: "Это пересекается с уже отмеченной частью — сначала уберите её или выделите другое.",
+    pieces: (count) => `Части (${count})`,
+    noPieces: "Частей пока нет — выделите текст выше.",
+    remove: "Убрать",
+    create: "Создать карту",
+    creating: (done, total) => `Создаю… ${done} из ${total}`,
+    error: "Не удалось создать карту",
+    startOver: "Начать заново",
+    startOverConfirm: "Очистить этот текст и все его части?",
   },
   theme: { toggleToLight: "Переключить на светлую тему", toggleToDark: "Переключить на тёмную тему" },
   language: { label: "Язык" },
