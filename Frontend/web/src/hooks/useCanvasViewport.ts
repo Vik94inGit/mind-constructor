@@ -224,6 +224,14 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     const wrap = wrapRef.current;
     if (!wrap) return;
     function onWheel(e: WheelEvent) {
+      // A trackpad pinch (and Ctrl + scroll wheel) arrives as a wheel event
+      // with ctrlKey set — zoom the map at the cursor instead of the page.
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const step = Math.max(-50, Math.min(50, e.deltaY));
+        zoomNow(zoomRef.current * Math.exp(-step * 0.01), anchorAt(e.clientX, e.clientY));
+        return;
+      }
       if (e.deltaX === 0) return;
       const atLeftEdge = e.deltaX < 0 && wrap!.scrollLeft <= 0;
       const atRightEdge = e.deltaX > 0 && wrap!.scrollLeft >= wrap!.scrollWidth - wrap!.clientWidth;
@@ -306,6 +314,92 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
       setZoom(target);
     }, ZOOM_MS + 150);
   }
+  // Sets the zoom right away, no glide, with the canvas point `anchor` names
+  // held under the screen offset it names — what a pinch or a trackpad pinch
+  // needs, following the fingers frame by frame instead of easing after them.
+  function zoomNow(to: number, anchor: { canvasX: number; canvasY: number; offX: number; offY: number }) {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const target = Math.round(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, to)) * 1000) / 1000;
+    zoomTokenRef.current++;
+    if (zoomFrameRef.current != null) cancelAnimationFrame(zoomFrameRef.current);
+    zoomFrameRef.current = null;
+    zoomTargetRef.current = target;
+    if (target === zoomRef.current) {
+      // Same zoom (at a limit, or two fingers just sliding): only the pan.
+      wrap.scrollLeft = (anchor.canvasX + hMarginRef.current) * target - anchor.offX;
+      wrap.scrollTop = (anchor.canvasY + vMarginRef.current) * target - anchor.offY;
+      return;
+    }
+    zoomAnchorRef.current = anchor;
+    setZoom(target);
+  }
+
+  // The canvas point under a screen point, at the zoom currently drawn.
+  function anchorAt(clientX: number, clientY: number) {
+    const wrap = wrapRef.current!;
+    const rect = wrap.getBoundingClientRect();
+    const offX = clientX - rect.left;
+    const offY = clientY - rect.top;
+    return {
+      canvasX: (wrap.scrollLeft + offX) / zoomRef.current - hMarginRef.current,
+      canvasY: (wrap.scrollTop + offY) / zoomRef.current - vMarginRef.current,
+      offX,
+      offY,
+    };
+  }
+
+  // Two fingers zoom the map, not the page: the spot between the fingers
+  // stays under them while they spread or pinch, and moves with them as they
+  // slide. The browser's own page zoom is kept off the canvas (touch-action
+  // on the wrap, plus Safari's gesture events), so only the map scales — the
+  // toolbar, panels and buttons stay their size.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    let pinch: { spread: number; zoom: number; canvasX: number; canvasY: number } | null = null;
+    const middle = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+    const spreadOf = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length !== 2) return;
+      const m = middle(e.touches);
+      const a = anchorAt(m.x, m.y);
+      pinch = { spread: Math.max(1, spreadOf(e.touches)), zoom: zoomRef.current, canvasX: a.canvasX, canvasY: a.canvasY };
+    }
+    function onTouchMove(e: TouchEvent) {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      const m = middle(e.touches);
+      const rect = wrap!.getBoundingClientRect();
+      zoomNow(pinch.zoom * (spreadOf(e.touches) / pinch.spread), {
+        canvasX: pinch.canvasX,
+        canvasY: pinch.canvasY,
+        offX: m.x - rect.left,
+        offY: m.y - rect.top,
+      });
+    }
+    function onTouchEnd(e: TouchEvent) {
+      if (e.touches.length < 2) pinch = null;
+    }
+    // Safari's own pinch-to-zoom-the-page gesture.
+    const stopGesture = (e: Event) => e.preventDefault();
+    wrap.addEventListener("touchstart", onTouchStart, { passive: true });
+    wrap.addEventListener("touchmove", onTouchMove, { passive: false });
+    wrap.addEventListener("touchend", onTouchEnd, { passive: true });
+    wrap.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    wrap.addEventListener("gesturestart", stopGesture);
+    wrap.addEventListener("gesturechange", stopGesture);
+    return () => {
+      wrap.removeEventListener("touchstart", onTouchStart);
+      wrap.removeEventListener("touchmove", onTouchMove);
+      wrap.removeEventListener("touchend", onTouchEnd);
+      wrap.removeEventListener("touchcancel", onTouchEnd);
+      wrap.removeEventListener("gesturestart", stopGesture);
+      wrap.removeEventListener("gesturechange", stopGesture);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   // Puts the zoom anchor back under the pointer once the canvas has resized
   // for the new zoom (and margin) — before the browser paints, so there is no
   // frame where the content has scaled but not yet re-centered.
@@ -608,11 +702,9 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
       cx = (minX + maxX) / 2;
       cy = (minY + maxY) / 2;
     }
-    wrap.scrollTo({
-      left: (cx + hScrollMargin) * zoom - wrap.clientWidth / 2,
-      top: (cy + vScrollMargin) * zoom - wrap.clientHeight / 2,
-    });
-    // zoom is read once, at fit time — a later zoom must not re-center.
+    // Always opens at 100%, whatever the last map was left at, with the
+    // middle of its nodes in the middle of the screen.
+    zoomNow(1, { canvasX: cx, canvasY: cy, offX: wrap.clientWidth / 2, offY: wrap.clientHeight / 2 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, mapId, hScrollMargin, vScrollMargin, positions]);
 

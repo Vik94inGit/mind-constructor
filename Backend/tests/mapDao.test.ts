@@ -4,6 +4,7 @@ import { Map } from "../src/models/Map.js";
 import { Edge } from "../src/models/Edge.js";
 import { Line } from "../src/models/Line.js";
 import { User } from "../src/models/User.js";
+import { Folder } from "../src/models/Folder.js";
 import {
   findMapByPublicIdDao,
   getMapsDao,
@@ -40,6 +41,11 @@ vi.mock("../src/models/User.js", () => ({
 vi.mock("../src/models/Line.js", () => ({
   Line: {
     deleteMany: vi.fn(),
+  },
+}));
+vi.mock("../src/models/Folder.js", () => ({
+  Folder: {
+    updateMany: vi.fn(),
   },
 }));
 vi.mock("../src/models/Edge.js", () => ({
@@ -294,6 +300,7 @@ describe("mapsDao", () => {
     expect(Edge.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
     expect(Line.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
     expect(Node.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
+    expect(Folder.updateMany).toHaveBeenCalledWith({ mapIds: "pub123" }, { $pull: { mapIds: "pub123" } });
     expect(Map.findByIdAndDelete).toHaveBeenCalledWith("m1");
     expect(result).toEqual(map);
   });

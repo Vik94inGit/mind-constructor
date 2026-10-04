@@ -5,6 +5,8 @@ import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
+import { useBackGuard } from "../hooks/useBackGuard";
+import { useIntroMigration } from "../hooks/useIntroMigration";
 import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
 import { useZoneFocus } from "../hooks/useZoneFocus";
 import { usePresentation } from "../hooks/usePresentation";
@@ -65,6 +67,7 @@ import {
   collectBranchIds,
   computeAttackPairIds,
   computeHiddenBranchIds,
+  computeSolved,
   computeUnsolvedProblemIds,
   countPackedByContainer,
   weaponFlightVector,
@@ -77,13 +80,13 @@ import {
   ZOOM_STEP,
   DOT_ZOOM,
   computeLinkedNeighborIds,
-  pickNonOverlappingPosition,
-  avoidOverlap,
   footprintObstacles,
   computeNodeGroups,
   computeLinkCycles,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
+import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
+import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, NodeDoc, NodeType } from "../types";
 
@@ -98,6 +101,9 @@ const EMPTY_POINTS: { x: number; y: number }[] = [];
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
+  // A back swipe / back button doesn't leave the map — only the toolbar's ←
+  // does (see useBackGuard).
+  useBackGuard();
   const { user, logout } = useAuth();
   const { t } = useI18n();
 
@@ -156,14 +162,13 @@ export function MapPage() {
     storeReadingMode(mode);
     if (mode !== "actual") fitZoomForDisplay(effectiveDisplay(), mode);
   }
-  // An assembled puzzle locks and unlocks as one: every piece clicked
-  // together with this one (puzzleClusterFor) follows its new state.
+  // Locking is per piece and always by hand (right-click, or hold on touch):
+  // a locked piece joins the locked pieces it's linked to (see
+  // puzzleAssembly); unlocking frees just that one.
   function toggleBlockLock(nodeId: string) {
-    const node = nodes.find((n) => n.nodeId === nodeId);
-    const ids = node ? puzzleClusterFor(node) : [nodeId];
-    toggleStoredBlockLock(nodeId, ids);
+    toggleStoredBlockLock(nodeId);
     // Locking a block mid-edit ends the edit.
-    setInlineEditId((cur) => (cur && ids.includes(cur) ? null : cur));
+    setInlineEditId((cur) => (cur === nodeId ? null : cur));
   }
   // Choose mode: a tap on one of your own nodes adds it to / drops it from the
   // group selection (multiSelectIds — the same one shift+click and the marquee
@@ -295,6 +300,8 @@ export function MapPage() {
   // zooming viewport onto the canvas — all derived before anything below
   // reads them.
   const positions = useMemo(() => computeBasePositions(nodes), [nodes]);
+  // Each node's drift during the map's opening animation — see posFor.
+  const introOffset = useIntroMigration(loading ? null : (mapId ?? null), positions);
   // Filters packed-away members out of every canvas rendering loop. Packing
   // (packAbl.ts) still exists as a relationship regardless — a container's
   // own count badge, and its "Packed (N)" unpack list in NodePanel, both
@@ -418,7 +425,10 @@ export function MapPage() {
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
     // Always the real position — the sentiment show's travel is drawn on top
     // of this directly on the canvas DOM (see useSentimentShow), never here.
-    const own = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const stored = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    // The map's opening animation: drifting out and back (useIntroMigration).
+    const drift = introOffset(node.nodeId);
+    const own = drift ? { x: stored.x + drift.x, y: stored.y + drift.y } : stored;
     // Presentation mode's own org-chart blend — checked ahead of the radial
     // selection ring below since the two are mutually exclusive in practice
     // (there's no NodePanel/selection to ring neighbors around while
@@ -448,6 +458,19 @@ export function MapPage() {
     return visibleNodes
       .filter((n) => !exclude?.has(n.nodeId))
       .map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+  }
+
+  // Where `moving` (one node, or a group moved as one) lands when put at
+  // `desired`: the nearest spot that covers no other node and follows the
+  // zone rules — out of zones it isn't in, zones not crossing, and no more
+  // than ~2 cm from the nearest node or zone line. See utils/zoneRules.ts.
+  // Only the moving nodes move; nothing else on the map is pushed around.
+  function placeNode(desired: { x: number; y: number }, moving: MovingNode[], extra: ExtraNode[] = []) {
+    const obstacles = footprintObstacles(
+      [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
+      MIN_NODE_GAP,
+    );
+    return placeByZoneRules(desired, obstacles, viewportBounds(), makeZoneRule(visibleNodes, positions, moving, extra));
   }
 
 
@@ -669,20 +692,8 @@ export function MapPage() {
     zoomedToFitNotice: t.ui.display.zoomedToFit,
   });
 
-  // A map that's already crowded the moment it's opened gets the same
-  // "zoom in to make room" treatment a reading-mode change triggers —
-  // without this, a map that stays in the default icon view the whole time
-  // has no way to ever surface this at all, however crowded loading it left
-  // the canvas (see fitZoomForDisplay's own doc comment: it now checks
-  // icon-mode footprints too, not just text modes). Runs once, right as the
-  // initial load settles — keyed on `loading` alone, not on positions/nodes,
-  // so a node moving near another one mid-drag doesn't zoom the screen in
-  // on its own, fighting the gesture that caused it.
-  useEffect(() => {
-    if (loading) return;
-    fitZoomForDisplay(effectiveDisplay(), readingMode);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  // A map always opens at 100% (see useCanvasViewport's initial fit) — no
+  // zooming in on open, however crowded it is.
 
   // What any node creation/drag has to steer clear of so it never lands
   // inside a big group backdrop — the group's own members are exempt
@@ -724,6 +735,13 @@ export function MapPage() {
   // computeUnsolvedProblemIds. Built from `nodes`, not visibleNodes: a
   // packed-away child still counts as "this got addressed".
   const unsolvedProblemIds = useMemo(() => computeUnsolvedProblemIds(nodes), [nodes]);
+  // A Success that solved a Problem or reached a goal wears wings and a halo,
+  // and every zone it's in gets a gold outline — see computeSolved.
+  const solved = useMemo(() => computeSolved(nodes), [nodes]);
+  const solvedZones = useMemo(
+    () => new Set(nodeGroups.filter((g) => g.members.some((m) => solved.successIds.has(m.nodeId))).map((g) => g.rootId)),
+    [nodeGroups, solved],
+  );
 
   // The sentiment show (see hooks/useSentimentShow.ts): on open, and on every
   // majority swing, the majority type's nodes travel toward the center and
@@ -749,10 +767,11 @@ export function MapPage() {
     const m = modeOf(n.nodeId);
     return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
   }
-  // Linked puzzle cards are drawn assembled, each seated flush against the
-  // piece it's linked to (utils/puzzleAssembly.ts), and interlock along the
-  // map's links (utils/puzzleLinks.ts) — the seated ones claiming their
-  // sides first, so a tab always meets the blank next to it.
+  // Locked puzzle cards are drawn assembled, each seated flush against the
+  // locked piece it's linked to (utils/puzzleAssembly.ts); unlocked ones stay
+  // wherever they were put. All of them interlock along the map's links
+  // (utils/puzzleLinks.ts) — the seated ones claiming their sides first, so a
+  // tab always meets the blank next to it.
   // Changes whenever the assembly's own inputs do, so a layout that can't
   // settle (see usePuzzleCardSizes) is held only until the map changes.
   const puzzleSettleKey = useMemo(
@@ -762,7 +781,8 @@ export function MapPage() {
   );
   const puzzleCardSizes = usePuzzleCardSizes(canvasRef, puzzleSettleKey);
   const puzzleAssembly = useMemo(() => {
-    const ids = visibleNodes.filter((n) => drawnAsCard(n)).map((n) => n.nodeId);
+    // Only pieces you locked join up — nothing clicks together on its own.
+    const ids = visibleNodes.filter((n) => drawnAsCard(n) && blockLocks[n.nodeId]).map((n) => n.nodeId);
     const links = [
       ...visibleNodes.flatMap((n) => {
         const parent = nodeRefId(n.parentId);
@@ -775,38 +795,27 @@ export function MapPage() {
       }),
     ];
     const sizes = new Map(Array.from(puzzleCardSizes, ([id, s]) => [id, { w: s.w / zoom, h: s.h / zoom }]));
-    // A locked block stays assembled: its whole puzzle locks with it, and
-    // nothing in it can be dragged, so only a chosen circle's members are
-    // held where they're stored.
+    // A chosen circle's members are held where they're stored; the rest seat
+    // against them.
     const held = new Set(visibleNodes.filter((n) => n.locked).map((n) => n.nodeId));
     return assemblePuzzles(ids, links, positions, sizes, held);
     // drawnAsCard reads the display state below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode]);
+  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode, blockLocks]);
   const puzzleJoins = useMemo(() => {
     const at = new Map(positions);
     for (const [id, p] of puzzleAssembly.positions) at.set(id, p);
     return computePuzzleJoins(visibleNodes, edges, at, puzzleAssembly.seated);
   }, [visibleNodes, edges, positions, puzzleAssembly]);
-  // Puzzle pieces: dragging a link out of a piece's tab, and clicking pieces
-  // together — see hooks/usePuzzleConnect.ts.
-  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect } = usePuzzleConnect({
-    mapId,
+  // Puzzle pieces: dragging a link out of a piece's tab — see
+  // hooks/usePuzzleConnect.ts.
+  const { puzzleConnect, startPuzzleConnect } = usePuzzleConnect({
     nodes,
     edges,
-    visibleNodes,
-    zoom,
-    puzzleJoins,
     isOwnNode,
-    drawnAsCard,
-    posFor,
     screenToCanvas,
-    upsertEdge,
-    refreshInsights,
-    setActionError,
     setContextMenu,
     setPendingLink,
-    linkFailedMessage: t.ui.link.failed,
   });
 
   // The node drag/drop system: single-node reposition-or-join-a-circle,
@@ -827,7 +836,7 @@ export function MapPage() {
     screenToCanvas,
     viewportBounds,
     obstaclePoints,
-    bigNodeObstacles,
+    placeNode,
     zoomToEditAt,
     upsertNode,
     setActionError,
@@ -836,9 +845,15 @@ export function MapPage() {
     setMultiSelectIds,
     suppressNextClick,
     t,
-    snapFor: puzzleSnapFor,
-    onSnapped: linkSnappedPieces,
-    clusterFor: puzzleClusterFor,
+    // Holding one of your puzzle cards opens its menu, where it's locked or
+    // unlocked — the touch counterpart of right-clicking it.
+    onHold: (node, clientX, clientY) => {
+      if (!isOwnNode(node) || !drawnAsCard(node)) return false;
+      suppressNextClick.current = true;
+      setSelectedId(node.nodeId);
+      setContextMenu({ node, x: clientX, y: clientY });
+      return true;
+    },
     isBlockLocked: (id) => !!blockLocks[id],
   });
 
@@ -1157,6 +1172,10 @@ export function MapPage() {
       [...footprintObstacles(obstaclePoints()), ...otherZoneObstacles(parent)],
       viewportBounds(),
     );
+    // it on top of another node or inside a zone the new node won't be in.
+    // Nudge it to the nearest spot the zone rules allow (see placeNode)
+    // before opening the input.
+    const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
     setInlineEditId(null);
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text });
   }
@@ -1271,6 +1290,7 @@ export function MapPage() {
     setActionError,
     obstaclePoints,
     bigNodeObstacles,
+    placeNode,
     viewportBounds,
     showNodes,
     showNotice,
@@ -1280,6 +1300,19 @@ export function MapPage() {
   // Leaves a demo session for the login page — its account and map are
   // throwaway, so there is no way back to them afterwards. ProtectedRoute
   // sends a logged-out user to /login on its own.
+  // "+" menu > Delete map (owner only): the map and everything on it, then
+  // back to the dashboard.
+  async function deleteThisMap() {
+    if (!map || !confirm(t.dashboard.deleteConfirm(map.name))) return;
+    setActionError(null);
+    try {
+      await mapsApi.deleteMap(map.mapId);
+      navigate("/", { replace: true });
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.dashboard.library.deleteMapError);
+    }
+  }
+
   function exitDemo() {
     if (!confirm(t.ui.demo.exitConfirm)) return;
     void logout();
@@ -1315,7 +1348,11 @@ export function MapPage() {
         {/* A demo session has nowhere else to go — see the toolbar's own
             matching omission below, and ProtectedRoute's own redirect,
             which would just bounce this link straight back here anyway. */}
-        {!user?.isDemo && <Link to="/">&larr; {t.map.toolbar.back}</Link>}
+        {!user?.isDemo && (
+          <Link to="/" replace>
+            &larr; {t.map.toolbar.back}
+          </Link>
+        )}
       </div>
     );
   }
@@ -1324,7 +1361,12 @@ export function MapPage() {
 
   // "+" menu > Create node: a blank node input at a free spot in view.
   function startCreateNodeInView() {
-    const pos = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
+    // As close to the middle of the view as the zone rules allow — next to
+    // what's already there rather than somewhere random in the empty space.
+    const view = viewportBounds();
+    const pos = placeNode({ x: (view.minX + view.maxX) / 2, y: (view.minY + view.maxY) / 2 }, [
+      { nodeId: NEW_NODE_ID, parentId: null },
+    ]);
     setInlineEditId(null);
     setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: null });
   }
@@ -1416,7 +1458,10 @@ export function MapPage() {
               reads as "go back." Setting it here too stops the chain at
               the canvas itself, before it ever reaches the document. */}
           <div
-            className="h-full w-full overflow-auto [overscroll-behavior-x:none]"
+            // pan-x pan-y: one finger still scrolls the canvas natively, but the
+            // browser doesn't pinch-zoom the page here — two fingers zoom the
+            // map instead (see useCanvasViewport).
+            className="h-full w-full touch-pan-x touch-pan-y overflow-auto [overscroll-behavior-x:none]"
             ref={wrapRef}
           >
           {/* Padded outer sizing/transform wrapper — canvasRef (the real
@@ -1549,6 +1594,7 @@ export function MapPage() {
               onLineClick={handleLineClick}
               interactive={!drawMode}
               compact={compactView || dotZoom}
+              solvedZones={solvedZones}
               drawing={
                 drawMode
                   ? {
@@ -1608,6 +1654,7 @@ export function MapPage() {
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
+                  triumphant={solved.successIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
                   readingMode={modeOf(node.nodeId)}
                   compact={compactView}
@@ -1820,6 +1867,7 @@ export function MapPage() {
                 onCopyMap={copyWholeMap}
                 onPaste={() => pasteClipboard()}
                 onExportText={openExportText}
+                onDeleteMap={deleteThisMap}
                 onPresent={enterPresentation}
               />
 
@@ -1993,6 +2041,10 @@ export function MapPage() {
               [...footprintObstacles(obstaclePoints()), ...otherZoneObstacles(anchor)],
               viewportBounds(),
             );
+            // Starts on the anchor itself; placeNode moves it just clear of
+            // it (and of anything else the zone rules keep it from), so the
+            // new child appears right beside its parent.
+            const pos = placeNode(posFor(anchor), [{ nodeId: NEW_NODE_ID, parentId: anchor.nodeId }]);
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: anchor.nodeId });
           }}
@@ -2025,12 +2077,10 @@ export function MapPage() {
           }}
           onPick={(type) => {
             // Where the user right-clicked — nudged only if it would cover
-            // another node (see footprintObstacles), not pushed away from it.
-            const pos = avoidOverlap(
-              { x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY },
-              footprintObstacles(obstaclePoints()),
-              viewportBounds(),
-            );
+            // another node or break a zone rule (see placeNode).
+            const pos = placeNode({ x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY }, [
+              { nodeId: NEW_NODE_ID, parentId: null },
+            ]);
             setCanvasContextMenu(null);
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null });

@@ -28,11 +28,15 @@ interface Props {
   onLineClick: (line: LineDoc) => void;
   /** False while drawing a line: zones and grouped branches stop taking clicks, so a click on one lands on the canvas as a (refused) point instead of choosing a circle. */
   interactive: boolean;
+  /** Zones (by root) holding a Success that solved a Problem or reached a goal — outlined in gold. */
+  solvedZones?: Set<string>;
   /** The simplified view: no ring drawn around a circle's parent. */
   compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
   drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
 }
+
+const SOLVED_GOLD = "#f5b301";
 
 // Everything drawn *behind* the node cards: zone polygons, manual zones and
 // circle-parent rings, link figures, branch arrows, plain edges. One overlay
@@ -56,6 +60,7 @@ export function CanvasBackdrop({
   interactive,
   drawing,
   compact = false,
+  solvedZones,
 }: Props) {
   const { t } = useI18n();
   return (
@@ -119,6 +124,29 @@ export function CanvasBackdrop({
           </polygon>
         );
       })}
+      {/*
+        Solved zones: a zone holding a Success that solved a Problem or reached
+        a goal gets a glowing gold line all the way round, over the zones'
+        own fills, so the area where it worked out stands out at a glance.
+      */}
+      {nodeGroups
+        .filter((g) => solvedZones?.has(g.rootId))
+        .map((g) => {
+          const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+          return (
+            <polygon
+              key={`solved-${g.rootId}`}
+              points={zonePoints}
+              data-reveal-points={g.outlineIds?.join(" ")}
+              data-base={zonePoints}
+              fill="none"
+              stroke={SOLVED_GOLD}
+              strokeWidth={4}
+              strokeLinejoin="round"
+              style={{ filter: `drop-shadow(0 0 6px ${SOLVED_GOLD})` }}
+            />
+          );
+        })}
       {/*
         Manual zones: a single node's own owner-chosen zone ring (node.manualZone —
         see NodePanel's Info tab), independent of the automatic parentId-group zones

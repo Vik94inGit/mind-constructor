@@ -23,6 +23,7 @@ function setup(pendingCreate: PendingCreate | null = null) {
     setActionError: vi.fn(),
     obstaclePoints: () => [],
     bigNodeObstacles: () => [],
+    placeNode: (p: { x: number; y: number }) => p,
     viewportBounds: () => FULL_CANVAS_BOUNDS,
     showNodes: vi.fn(),
     showNotice: vi.fn(),

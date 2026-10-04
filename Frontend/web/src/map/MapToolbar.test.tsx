@@ -27,6 +27,7 @@ function renderToolbar(overrides: Partial<React.ComponentProps<typeof MapToolbar
     onCopyMap: vi.fn(),
     onPaste: vi.fn(),
     onExportText: vi.fn(),
+    onDeleteMap: vi.fn(),
     onPresent: vi.fn(),
   };
   const utils = render(

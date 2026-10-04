@@ -14,6 +14,7 @@ import mapRoute from "./src/routes/mapRoute.js";
 import nodeRoute from "./src/routes/nodeRoute.js";
 import edgeRoute from "./src/routes/edgeRoute.js";
 import lineRoute from "./src/routes/lineRoute.js";
+import folderRoute from "./src/routes/folderRoute.js";
 import { initRealtime } from "./src/realtime/io.js";
 import { createRedisClient } from "./src/config/redis.js";
 
@@ -111,6 +112,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/nodes", nodeRoute);
 app.use("/api/edges", edgeRoute);
 app.use("/api/lines", lineRoute);
+// Before the map routes: those are mounted on /api itself, so /api/folders
+// would otherwise read as GET /api/:mapId with mapId "folders".
+app.use("/api/folders", folderRoute);
 app.use("/api", mapRoute);
 
 // Socket.IO attaches to the same HTTP server Express listens on — one

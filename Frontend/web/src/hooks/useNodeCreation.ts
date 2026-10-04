@@ -1,15 +1,10 @@
 import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
-import {
-  CANVAS_W,
-  CANVAS_H,
-  avoidOverlap,
-  getCirclePackSpacing,
-  nodeObstacles,
-  pickNonOverlappingPosition,
-} from "../utils/canvasLayout";
+import { CANVAS_W, CANVAS_H, getCirclePackSpacing, nodeObstacles } from "../utils/canvasLayout";
 import type { Obstacle, ViewportBounds } from "../utils/canvasLayout";
+import { NEW_NODE_ID } from "../utils/zoneRules";
+import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import { layoutTemplate } from "../utils/templates";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import { sleep } from "../utils/sleep";
@@ -50,6 +45,8 @@ interface Params {
   setActionError: (message: string | null) => void;
   obstaclePoints: (exclude?: Set<string>) => Pt[];
   bigNodeObstacles: (excludeRootIds?: Set<string>) => Obstacle[];
+  /** Where `moving` lands when put at `desired`, under the zone rules (utils/zoneRules.ts). */
+  placeNode: (desired: Pt, moving: MovingNode[], extra?: ExtraNode[]) => Pt;
   viewportBounds: () => ViewportBounds;
   showNodes: (ids: string[]) => void;
   showNotice: (message: string) => void;
@@ -68,6 +65,7 @@ export function useNodeCreation({
   setActionError,
   obstaclePoints,
   bigNodeObstacles,
+  placeNode,
   viewportBounds,
   showNodes,
   showNotice,
@@ -153,7 +151,29 @@ export function useNodeCreation({
     if (!mapId) return;
     setActionError(null);
     try {
-      const rootPos = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
+      // The whole circle's spots are worked out before creating anything, so
+      // each child is placed knowing where the root and its sibling are and
+      // the zone they make follows the zone rules (see placeNode).
+      const view = viewportBounds();
+      const rootPos = placeNode({ x: (view.minX + view.maxX) / 2, y: (view.minY + view.maxY) / 2 }, [
+        { nodeId: NEW_NODE_ID, parentId: null },
+      ]);
+      // Two children fanned either side of straight up from the root —
+      // same angle-from-vertical idea QuickAddGhosts' own ring uses, just
+      // two fixed slots instead of one per node type. getCirclePackSpacing
+      // (not getNodeMinDist), same reasoning as layoutTemplate's own switch
+      // — these two are deliberately fanned around a shared root, not two
+      // unrelated nodes that happened to land near each other.
+      const ROOT_ID = `${NEW_NODE_ID}:root`;
+      const radius = getCirclePackSpacing();
+      const placedSoFar: ExtraNode[] = [{ nodeId: ROOT_ID, parentId: null, pos: rootPos }];
+      const childPositions = [-50, 50].map((deg, i) => {
+        const angle = (-90 + deg) * (Math.PI / 180);
+        const desired = { x: rootPos.x + radius * Math.cos(angle), y: rootPos.y + radius * Math.sin(angle) };
+        const pos = placeNode(desired, [{ nodeId: `${NEW_NODE_ID}:${i}`, parentId: ROOT_ID }], placedSoFar);
+        placedSoFar.push({ nodeId: `${NEW_NODE_ID}:${i}`, parentId: ROOT_ID, pos });
+        return pos;
+      });
       const root = await nodesApi.createNode(mapId, {
         text: t.ui.canvas.newCircleText,
         type: "unknown",
@@ -164,23 +184,9 @@ export function useNodeCreation({
       upsertNode(root);
       setCelebrateIds((prev) => new Set(prev).add(root.nodeId));
 
-      // Two children fanned either side of straight up from the root —
-      // same angle-from-vertical idea QuickAddGhosts' own ring uses, just
-      // two fixed slots instead of one per node type. getCirclePackSpacing
-      // (not getNodeMinDist), same reasoning as layoutTemplate's own switch
-      // — these two are deliberately fanned around a shared root, not two
-      // unrelated nodes that happened to land near each other.
-      const radius = getCirclePackSpacing();
       const children = await Promise.all(
-        [-50, 50].map(async (deg) => {
-          const angle = (-90 + deg) * (Math.PI / 180);
-          const desired = { x: rootPos.x + radius * Math.cos(angle), y: rootPos.y + radius * Math.sin(angle) };
-          const placed = avoidOverlap(
-            desired,
-            [...nodeObstacles([...obstaclePoints(), rootPos]), ...bigNodeObstacles()],
-            viewportBounds(),
-          );
-          return nodesApi.createNode(mapId, {
+        childPositions.map((placed) =>
+          nodesApi.createNode(mapId, {
             // "Option" (not "unknown", like the root) — an all-"unknown"
             // trio would still draw a zone now (circleSentiment returns
             // "neutral" for a tied/no-vote group instead of skipping it —
@@ -193,8 +199,8 @@ export function useNodeCreation({
             x: placed.x,
             y: placed.y,
             parentId: root.nodeId,
-          });
-        }),
+          }),
+        ),
       );
       children.forEach((c) => {
         upsertNode(c);

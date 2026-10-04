@@ -254,3 +254,12 @@ export interface ApiError {
   error: string;
   readyAt?: string;
 }
+
+// A user's own dashboard folder (see the backend's models/Folder.ts). Only
+// its owner ever sees it. mapIds are public mapIds; one may name a map the
+// user can no longer see, which the dashboard simply leaves out.
+export interface FolderDoc {
+  folderId: string;
+  name: string;
+  mapIds: string[];
+}

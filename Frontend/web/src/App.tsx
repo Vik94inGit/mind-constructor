@@ -6,6 +6,7 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { MapPage } from "./pages/MapPage";
 import { ThinkPage } from "./pages/ThinkPage";
+import { SplitTextPage } from "./pages/SplitTextPage";
 import { AdminPage } from "./pages/AdminPage";
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/maps/:mapId" element={<MapPage />} />
             <Route path="/think" element={<ThinkPage />} />
+            <Route path="/split" element={<SplitTextPage />} />
           </Route>
 
           <Route element={<AdminRoute />}>
