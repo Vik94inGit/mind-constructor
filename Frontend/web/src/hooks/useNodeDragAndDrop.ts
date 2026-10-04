@@ -2,7 +2,15 @@ import { useReducer, useRef } from "react";
 import type { Dispatch, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
-import { avoidOverlap, footprintObstacles, CANVAS_H, CANVAS_W, CIRCLE_DROP_RADIUS, isDescendant } from "../utils/canvasLayout";
+import {
+  avoidOverlap,
+  footprintObstacles,
+  CANVAS_H,
+  CANVAS_W,
+  CIRCLE_DROP_RADIUS,
+  getZoneReach,
+  isDescendant,
+} from "../utils/canvasLayout";
 import type { NodeGroup, ViewportBounds } from "../utils/canvasLayout";
 import type { MovingNode } from "../utils/zoneRules";
 import { nodeRefId } from "../utils/nodeType";
@@ -501,8 +509,16 @@ export function useNodeDragAndDrop({
         // backdrop disappears on its own, no separate cleanup needed here.
         const parentId = nodeRefId(node.parentId);
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
-        // Still a member at the raw drop point?
-        const staysMember = !!ownCircle && Math.hypot(x - ownCircle.cx, y - ownCircle.cy) <= ownCircle.r;
+        // Still a member at the raw drop point? Within the zone's reach of
+        // its root (see getZoneReach) it is. Past it, it leaves the circle —
+        // so dragging a member outward can't stretch the zone across the map
+        // — unless it is no farther out than it already was: a member that
+        // already sat out there can be moved around or pulled back in
+        // without being cut loose.
+        const rootPos = ownCircle ? posFor(ownCircle.members[0]) : null;
+        const dropDist = rootPos ? Math.hypot(x - rootPos.x, y - rootPos.y) : 0;
+        const startDist = rootPos ? Math.hypot(start.x - rootPos.x, start.y - rootPos.y) : 0;
+        const staysMember = !!ownCircle && (dropDist <= getZoneReach() || dropDist <= startDist);
         const leftCircle = !!ownCircle && !staysMember;
         const dropped = placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }]);
         zoomToEditAt(dropped.x, dropped.y);
