@@ -77,7 +77,7 @@ function setup(overrides: Partial<Parameters<typeof useNodeDragAndDrop>[0]> = {}
       screenToCanvas: (x: number, y: number) => ({ x, y }),
       viewportBounds: () => ({ minX: 0, minY: 0, maxX: 2400, maxY: 1600 }),
       obstaclePoints: () => [],
-      bigNodeObstacles: () => [],
+      placeNode: (p: Pt) => p,
       zoomToEditAt,
       upsertNode,
       setActionError,
@@ -257,50 +257,25 @@ describe("useNodeDragAndDrop", () => {
       expect(nodesApi.updateNode).toHaveBeenCalledWith("child", { x: 1000, y: 1000, parentId: null });
     });
 
-    it("never treats a circle's own zone as an obstacle to its own root node", async () => {
-      // Regression test: a circle's root has no parentId pointing at its
-      // own group (only its *members'* parentId does), so the old
-      // staysMember-gated exclusion never covered the root-dragging-itself
-      // case at all — its own (often large) zone counted as a real
-      // obstacle to drag around, which could push it well away from
-      // wherever it was actually dropped.
-      const root = makeNode({ nodeId: "root", x: 200, y: 200, parentId: null });
-      const child = makeNode({ nodeId: "child", parentId: "root", x: 900, y: 900 });
-      const nodes = [root, child];
-      const positions = new Map<string, Pt>([
-        ["root", { x: 200, y: 200 }],
-        ["child", { x: 900, y: 900 }],
-      ]);
-      // A large zone (r: 300) — the crude bounding-circle obstacle
-      // bigNodeObstacles derives from a group in production (see MapPage's
-      // own bigNodeObstacles: `{ x: g.cx, y: g.cy, minDist: g.r + 20 }`).
-      const nodeGroups: NodeGroup[] = [
-        { rootId: "root", members: [root, child], sentiment: "neutral", cx: 200, cy: 200, r: 300, outline: [] },
-      ];
-      const bigNodeObstacles = (excludeRootIds: Set<string> = new Set()) =>
-        nodeGroups.filter((g) => !excludeRootIds.has(g.rootId)).map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 20 }));
+    it("lands a drop wherever the zone rules put it", async () => {
+      const node = makeNode({ nodeId: "a", x: 100, y: 100, parentId: null });
+      const nodes = [node];
+      const positions = new Map<string, Pt>([["a", { x: 100, y: 100 }]]);
+      const placeNode = vi.fn(() => ({ x: 333, y: 444 }));
       const listeners = captureWindowListeners();
-      const { result } = setup({
-        nodes,
-        positions,
-        nodeGroups,
-        bigNodeObstacles,
-        posFor: (n) => positions.get(n.nodeId)!,
-      });
+      const { result } = setup({ nodes, positions, placeNode, posFor: (n) => positions.get(n.nodeId)! });
 
-      act(() => result.current.onNodePointerDown(root, fakePointerDownEvent({ clientX: 200, clientY: 200 })));
-      // Still well inside the zone's own 320-unit obstacle radius — before
-      // the fix, avoidOverlap would have pushed this out past that radius
-      // instead of landing right here.
-      act(() => listeners.pointermove({ clientX: 250, clientY: 250 }));
+      act(() => result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 100, clientY: 100 })));
+      act(() => listeners.pointermove({ clientX: 400, clientY: 300 }));
 
-      vi.mocked(nodesApi.updateNode).mockResolvedValue({ ...root, x: 250, y: 250 });
+      vi.mocked(nodesApi.updateNode).mockResolvedValue({ ...node, x: 333, y: 444 });
       await act(async () => {
-        listeners.pointerup({ clientX: 250, clientY: 250 });
+        listeners.pointerup({ clientX: 400, clientY: 300 });
         await vi.runAllTimersAsync();
       });
 
-      expect(nodesApi.updateNode).toHaveBeenCalledWith("root", { x: 250, y: 250 });
+      expect(placeNode).toHaveBeenCalledWith({ x: 400, y: 300 }, [{ nodeId: "a" }]);
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 333, y: 444 });
     });
 
     it("reverts the optimistic move and reports an error when the save fails", async () => {

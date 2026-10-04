@@ -77,13 +77,13 @@ import {
   ZOOM_STEP,
   DOT_ZOOM,
   computeLinkedNeighborIds,
-  pickNonOverlappingPosition,
-  avoidOverlap,
   footprintObstacles,
   computeNodeGroups,
   computeLinkCycles,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
+import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
+import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, NodeDoc, NodeType } from "../types";
 
@@ -448,6 +448,19 @@ export function MapPage() {
     return visibleNodes
       .filter((n) => !exclude?.has(n.nodeId))
       .map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+  }
+
+  // Where `moving` (one node, or a group moved as one) lands when put at
+  // `desired`: the nearest spot that covers no other node and follows the
+  // zone rules — out of zones it isn't in, zones not crossing, and no more
+  // than ~2 cm from the nearest node or zone line. See utils/zoneRules.ts.
+  // Only the moving nodes move; nothing else on the map is pushed around.
+  function placeNode(desired: { x: number; y: number }, moving: MovingNode[], extra: ExtraNode[] = []) {
+    const obstacles = footprintObstacles(
+      [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
+      MIN_NODE_GAP,
+    );
+    return placeByZoneRules(desired, obstacles, viewportBounds(), makeZoneRule(visibleNodes, positions, moving, extra));
   }
 
 
@@ -820,7 +833,7 @@ export function MapPage() {
     screenToCanvas,
     viewportBounds,
     obstaclePoints,
-    bigNodeObstacles,
+    placeNode,
     zoomToEditAt,
     upsertNode,
     setActionError,
@@ -1139,15 +1152,10 @@ export function MapPage() {
     setActionError(null);
     // The ghost's slot is a fixed angle around the anchor — it doesn't know
     // about anything else on the canvas, so a crowded area can still land
-    // it on top of another node. Nudge clear before opening the input, but
-    // only as far as it takes to stop covering that node (footprint boxes —
-    // see footprintObstacles): the new node should appear where the ghost
-    // was, not a full node-spacing away from it.
-    const placed = avoidOverlap(
-      pos,
-      footprintObstacles(obstaclePoints()),
-      viewportBounds(),
-    );
+    // it on top of another node or inside a zone the new node won't be in.
+    // Nudge it to the nearest spot the zone rules allow (see placeNode)
+    // before opening the input.
+    const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
     setInlineEditId(null);
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text });
   }
@@ -1262,6 +1270,7 @@ export function MapPage() {
     setActionError,
     obstaclePoints,
     bigNodeObstacles,
+    placeNode,
     viewportBounds,
     showNodes,
     showNotice,
@@ -1315,7 +1324,12 @@ export function MapPage() {
 
   // "+" menu > Create node: a blank node input at a free spot in view.
   function startCreateNodeInView() {
-    const pos = pickNonOverlappingPosition(obstaclePoints(), bigNodeObstacles(), viewportBounds());
+    // As close to the middle of the view as the zone rules allow — next to
+    // what's already there rather than somewhere random in the empty space.
+    const view = viewportBounds();
+    const pos = placeNode({ x: (view.minX + view.maxX) / 2, y: (view.minY + view.maxY) / 2 }, [
+      { nodeId: NEW_NODE_ID, parentId: null },
+    ]);
     setInlineEditId(null);
     setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: null });
   }
@@ -1976,14 +1990,10 @@ export function MapPage() {
           onCreate={() => {
             const anchor = contextMenu.node;
             setContextMenu(null);
-            // Starts on the anchor itself; the footprint check moves it just
-            // clear of it (and anything else it would cover), so the new
-            // child appears right beside its parent.
-            const pos = avoidOverlap(
-              posFor(anchor),
-              footprintObstacles(obstaclePoints()),
-              viewportBounds(),
-            );
+            // Starts on the anchor itself; placeNode moves it just clear of
+            // it (and of anything else the zone rules keep it from), so the
+            // new child appears right beside its parent.
+            const pos = placeNode(posFor(anchor), [{ nodeId: NEW_NODE_ID, parentId: anchor.nodeId }]);
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: anchor.nodeId });
           }}
@@ -2016,12 +2026,10 @@ export function MapPage() {
           }}
           onPick={(type) => {
             // Where the user right-clicked — nudged only if it would cover
-            // another node (see footprintObstacles), not pushed away from it.
-            const pos = avoidOverlap(
-              { x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY },
-              footprintObstacles(obstaclePoints()),
-              viewportBounds(),
-            );
+            // another node or break a zone rule (see placeNode).
+            const pos = placeNode({ x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY }, [
+              { nodeId: NEW_NODE_ID, parentId: null },
+            ]);
             setCanvasContextMenu(null);
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null });
