@@ -59,7 +59,7 @@ Strict layering, one direction only: **routes → controllers → abl → dao �
 - **`src/routes/*.ts`** (`authRoutes.ts`, `mapRoute.ts`, `nodeRoute.ts`, `edgeRoute.ts`, `lineRoute.ts`) — wires
   URLs to controller functions, applies `protect` (and `requireAdmin` where needed) from
   `src/middleware/auth.ts`. No logic here. Mounted in [server.ts](server.ts) as `/api/auth`,
-  `/api/nodes`, `/api/edges`, `/api/lines`, and `/api` (map routes — note the mount point itself has no `/maps`
+  `/api/nodes`, `/api/edges`, `/api/lines`, `/api/folders` (a user's own dashboard folders — `GET`/`POST /`, `PATCH`/`DELETE /:folderId`, and `PATCH /maps/:mapId` with `{ folderId | null }` to file a map; mounted before the map routes so `folders` isn't read as a mapId), and `/api` (map routes — note the mount point itself has no `/maps`
   segment, so these resolve as `/api/{mapId}/{nodes,edges,lines,circles/select,circles/deselect,
 attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (body: `{ nodeIds }`)
   is the bulk counterpart of `DELETE /api/nodes/:nodeId` — one request for a multi-select delete

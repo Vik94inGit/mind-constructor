@@ -60,9 +60,34 @@ export interface Translation {
     card: {
       members: (count: number) => string;
       nodes: (count: number) => string;
+      maps: (count: number) => string;
       owner: string;
     };
-    menu: { summary: string; edit: string; invite: string; delete: string };
+    menu: { summary: string; edit: string; invite: string; delete: string; moveToFolder: string };
+    library: {
+      newFolder: string;
+      search: string;
+      noResults: (query: string) => string;
+      allMaps: string;
+      folderEmpty: string;
+      prev: string;
+      next: string;
+      page: (page: number, total: number) => string;
+      foldersError: string;
+      deleteMapError: string;
+      folderMenu: { open: string; rename: string; delete: string };
+      deleteFolderConfirm: (name: string) => string;
+      folderModal: {
+        createTitle: string;
+        renameTitle: string;
+        name: string;
+        cancel: string;
+        create: string;
+        save: string;
+        error: string;
+      };
+      moveModal: { title: (name: string) => string; noFolder: string; error: string };
+    };
     deleteConfirm: (name: string) => string;
     createModal: {
       title: string;
@@ -120,6 +145,7 @@ export interface Translation {
       createNode: string;
       createCircle: string;
       exportText: string;
+      deleteMap: string;
     };
     panelTabs: {
       info: string;
@@ -191,9 +217,34 @@ const en: Translation = {
     card: {
       members: (count) => `${count} member(s)`,
       nodes: (count) => `${count} node(s)`,
+      maps: (count) => `${count} map(s)`,
       owner: "Owner",
     },
-    menu: { summary: "Summary", edit: "Edit", invite: "Invite", delete: "Delete" },
+    menu: { summary: "Summary", edit: "Edit", invite: "Invite", delete: "Delete", moveToFolder: "Move to folder…" },
+    library: {
+      newFolder: "+ New folder",
+      search: "Search maps and folders…",
+      noResults: (query) => `Nothing matches "${query}".`,
+      allMaps: "All maps",
+      folderEmpty: "This folder is empty. Move maps here from their ⋯ menu.",
+      prev: "‹ Prev",
+      next: "Next ›",
+      page: (page, total) => `Page ${page} of ${total}`,
+      foldersError: "Failed to load folders",
+      deleteMapError: "Couldn't delete the map",
+      folderMenu: { open: "Open", rename: "Rename", delete: "Delete" },
+      deleteFolderConfirm: (name) => `Delete folder "${name}"? The maps in it stay — they go back to All maps.`,
+      folderModal: {
+        createTitle: "New folder",
+        renameTitle: "Rename folder",
+        name: "Name",
+        cancel: "Cancel",
+        create: "Create",
+        save: "Save",
+        error: "Couldn't save the folder",
+      },
+      moveModal: { title: (name) => `Move "${name}" to…`, noFolder: "No folder (All maps)", error: "Couldn't move the map" },
+    },
     deleteConfirm: (name) => `Delete "${name}"? This removes every node on it too.`,
     createModal: {
       title: "New map",
@@ -253,6 +304,7 @@ const en: Translation = {
       createNode: "Create new node",
       createCircle: "Create circle",
       exportText: "Export text",
+      deleteMap: "Delete map",
     },
     panelTabs: {
       info: "Info",
@@ -314,9 +366,34 @@ const cs: Translation = {
     card: {
       members: (count) => `${count} člen(ů)`,
       nodes: (count) => `${count} uzel(ů)`,
+      maps: (count) => `Map: ${count}`,
       owner: "Vlastník",
     },
-    menu: { summary: "Přehled", edit: "Upravit", invite: "Pozvat", delete: "Smazat" },
+    menu: { summary: "Přehled", edit: "Upravit", invite: "Pozvat", delete: "Smazat", moveToFolder: "Přesunout do složky…" },
+    library: {
+      newFolder: "+ Nová složka",
+      search: "Hledat mapy a složky…",
+      noResults: (query) => `Nic neodpovídá „${query}“.`,
+      allMaps: "Všechny mapy",
+      folderEmpty: "Složka je prázdná. Mapy sem přesunete z jejich nabídky ⋯.",
+      prev: "‹ Předchozí",
+      next: "Další ›",
+      page: (page, total) => `Strana ${page} z ${total}`,
+      foldersError: "Nepodařilo se načíst složky",
+      deleteMapError: "Mapu se nepodařilo smazat",
+      folderMenu: { open: "Otevřít", rename: "Přejmenovat", delete: "Smazat" },
+      deleteFolderConfirm: (name) => `Smazat složku „${name}“? Mapy v ní zůstanou — vrátí se do Všech map.`,
+      folderModal: {
+        createTitle: "Nová složka",
+        renameTitle: "Přejmenovat složku",
+        name: "Název",
+        cancel: "Zrušit",
+        create: "Vytvořit",
+        save: "Uložit",
+        error: "Složku se nepodařilo uložit",
+      },
+      moveModal: { title: (name) => `Přesunout „${name}“ do…`, noFolder: "Bez složky (Všechny mapy)", error: "Mapu se nepodařilo přesunout" },
+    },
     deleteConfirm: (name) => `Smazat „${name}“? Tím se odstraní i všechny uzly na ní.`,
     createModal: {
       title: "Nová mapa",
@@ -376,6 +453,7 @@ const cs: Translation = {
       createNode: "Vytvořit nový uzel",
       createCircle: "Vytvořit kruh",
       exportText: "Exportovat text",
+      deleteMap: "Smazat mapu",
     },
     panelTabs: {
       info: "Info",
@@ -437,9 +515,34 @@ const uk: Translation = {
     card: {
       members: (count) => `${count} учасник(ів)`,
       nodes: (count) => `${count} вузол(ів)`,
+      maps: (count) => `Карт: ${count}`,
       owner: "Власник",
     },
-    menu: { summary: "Підсумок", edit: "Редагувати", invite: "Запросити", delete: "Видалити" },
+    menu: { summary: "Підсумок", edit: "Редагувати", invite: "Запросити", delete: "Видалити", moveToFolder: "Перемістити в папку…" },
+    library: {
+      newFolder: "+ Нова папка",
+      search: "Пошук карт і папок…",
+      noResults: (query) => `Нічого не знайдено за «${query}».`,
+      allMaps: "Усі карти",
+      folderEmpty: "Папка порожня. Переміщуйте сюди карти через їхнє меню ⋯.",
+      prev: "‹ Назад",
+      next: "Далі ›",
+      page: (page, total) => `Сторінка ${page} з ${total}`,
+      foldersError: "Не вдалося завантажити папки",
+      deleteMapError: "Не вдалося видалити карту",
+      folderMenu: { open: "Відкрити", rename: "Перейменувати", delete: "Видалити" },
+      deleteFolderConfirm: (name) => `Видалити папку «${name}»? Карти з неї залишаться — повернуться в Усі карти.`,
+      folderModal: {
+        createTitle: "Нова папка",
+        renameTitle: "Перейменувати папку",
+        name: "Назва",
+        cancel: "Скасувати",
+        create: "Створити",
+        save: "Зберегти",
+        error: "Не вдалося зберегти папку",
+      },
+      moveModal: { title: (name) => `Перемістити «${name}» до…`, noFolder: "Без папки (Усі карти)", error: "Не вдалося перемістити карту" },
+    },
     deleteConfirm: (name) => `Видалити «${name}»? Це також видалить усі вузли на ній.`,
     createModal: {
       title: "Нова карта",
@@ -499,6 +602,7 @@ const uk: Translation = {
       createNode: "Створити новий вузол",
       createCircle: "Створити коло",
       exportText: "Експортувати текст",
+      deleteMap: "Видалити карту",
     },
     panelTabs: {
       info: "Інфо",
@@ -560,9 +664,34 @@ const ru: Translation = {
     card: {
       members: (count) => `${count} участник(ов)`,
       nodes: (count) => `${count} узел(узлов)`,
+      maps: (count) => `Карт: ${count}`,
       owner: "Владелец",
     },
-    menu: { summary: "Сводка", edit: "Изменить", invite: "Пригласить", delete: "Удалить" },
+    menu: { summary: "Сводка", edit: "Изменить", invite: "Пригласить", delete: "Удалить", moveToFolder: "Переместить в папку…" },
+    library: {
+      newFolder: "+ Новая папка",
+      search: "Поиск карт и папок…",
+      noResults: (query) => `Ничего не найдено по «${query}».`,
+      allMaps: "Все карты",
+      folderEmpty: "Папка пуста. Перемещайте сюда карты через их меню ⋯.",
+      prev: "‹ Назад",
+      next: "Далее ›",
+      page: (page, total) => `Страница ${page} из ${total}`,
+      foldersError: "Не удалось загрузить папки",
+      deleteMapError: "Не удалось удалить карту",
+      folderMenu: { open: "Открыть", rename: "Переименовать", delete: "Удалить" },
+      deleteFolderConfirm: (name) => `Удалить папку «${name}»? Карты из неё останутся — вернутся во Все карты.`,
+      folderModal: {
+        createTitle: "Новая папка",
+        renameTitle: "Переименовать папку",
+        name: "Название",
+        cancel: "Отмена",
+        create: "Создать",
+        save: "Сохранить",
+        error: "Не удалось сохранить папку",
+      },
+      moveModal: { title: (name) => `Переместить «${name}» в…`, noFolder: "Без папки (Все карты)", error: "Не удалось переместить карту" },
+    },
     deleteConfirm: (name) => `Удалить «${name}»? Это также удалит все узлы на ней.`,
     createModal: {
       title: "Новая карта",
@@ -622,6 +751,7 @@ const ru: Translation = {
       createNode: "Создать новый узел",
       createCircle: "Создать круг",
       exportText: "Экспортировать текст",
+      deleteMap: "Удалить карту",
     },
     panelTabs: {
       info: "Инфо",

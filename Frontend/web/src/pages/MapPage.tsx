@@ -1280,6 +1280,19 @@ export function MapPage() {
   // Leaves a demo session for the login page — its account and map are
   // throwaway, so there is no way back to them afterwards. ProtectedRoute
   // sends a logged-out user to /login on its own.
+  // "+" menu > Delete map (owner only): the map and everything on it, then
+  // back to the dashboard.
+  async function deleteThisMap() {
+    if (!map || !confirm(t.dashboard.deleteConfirm(map.name))) return;
+    setActionError(null);
+    try {
+      await mapsApi.deleteMap(map.mapId);
+      navigate("/");
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.dashboard.library.deleteMapError);
+    }
+  }
+
   function exitDemo() {
     if (!confirm(t.ui.demo.exitConfirm)) return;
     void logout();
@@ -1825,6 +1838,7 @@ export function MapPage() {
                 onCopyMap={copyWholeMap}
                 onPaste={() => pasteClipboard()}
                 onExportText={openExportText}
+                onDeleteMap={deleteThisMap}
                 onPresent={enterPresentation}
               />
 

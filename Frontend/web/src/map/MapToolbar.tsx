@@ -40,6 +40,8 @@ interface Props {
   onCopyMap: () => void;
   onPaste: () => void;
   onExportText: () => void;
+  /** Deletes the whole map (owner only — see AddMenu). */
+  onDeleteMap: () => void;
   /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay) — offered from the "view" (eye icon) menu below, alongside reading mode. Not owner-gated — anyone viewing a map should be able to self-present it. */
   onPresent: () => void;
 }
@@ -79,6 +81,7 @@ export function MapToolbar({
   onCopyMap,
   onPaste,
   onExportText,
+  onDeleteMap,
   onPresent,
 }: Props) {
   const { t } = useI18n();
@@ -124,6 +127,7 @@ export function MapToolbar({
                 onCopyMap={closeAddThen(onCopyMap)}
                 onPaste={closeAddThen(onPaste)}
                 onExportText={closeAddThen(onExportText)}
+                onDeleteMap={isDemo ? undefined : closeAddThen(onDeleteMap)}
               />
             )}
           </div>
