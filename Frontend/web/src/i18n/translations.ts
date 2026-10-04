@@ -157,6 +157,33 @@ export interface Translation {
     };
     legend: { positiveCircle: string; negativeCircle: string };
   };
+  /** "Text → map" (pages/SplitTextPage.tsx). */
+  split: {
+    entry: string;
+    title: string;
+    hint: string;
+    name: string;
+    namePlaceholder: string;
+    text: string;
+    textPlaceholder: string;
+    rootType: string;
+    next: string;
+    back: string;
+    markTitle: string;
+    markHint: string;
+    mainNode: string;
+    selected: string;
+    clearSelection: string;
+    overlap: string;
+    pieces: (count: number) => string;
+    noPieces: string;
+    remove: string;
+    create: string;
+    creating: (done: number, total: number) => string;
+    error: string;
+    startOver: string;
+    startOverConfirm: string;
+  };
   theme: { toggleToLight: string; toggleToDark: string };
   language: { label: string };
   ui: UiStrings;
@@ -316,6 +343,32 @@ const en: Translation = {
     },
     legend: { positiveCircle: "positive circle", negativeCircle: "negative circle / under fire" },
   },
+  split: {
+    entry: "✂ Text → map",
+    title: "Turn a text into a map",
+    hint: "Paste or write the whole text. It becomes the main node; then you pick out its pieces and say what each one is.",
+    name: "Map name",
+    namePlaceholder: "Taken from the text if left empty",
+    text: "Text",
+    textPlaceholder: "Paste your text here…",
+    rootType: "Main node type",
+    next: "Next: mark pieces →",
+    back: "← Back",
+    markTitle: "Mark the pieces",
+    markHint: "Select part of the text with the cursor (or hold and drag on a phone), then choose what it is. Each piece becomes a node under the main one.",
+    mainNode: "Main node — the whole text",
+    selected: "Selected",
+    clearSelection: "Clear selection",
+    overlap: "That overlaps a piece you already marked — remove it first or select something else.",
+    pieces: (count) => `Pieces (${count})`,
+    noPieces: "No pieces yet — select some text above.",
+    remove: "Remove",
+    create: "Create map",
+    creating: (done, total) => `Creating… ${done} of ${total}`,
+    error: "Couldn't create the map",
+    startOver: "Start over",
+    startOverConfirm: "Clear this text and all its pieces?",
+  },
   theme: { toggleToLight: "Switch to light mode", toggleToDark: "Switch to dark mode" },
   language: { label: "Language" },
   ui: UI_STRINGS.en,
@@ -464,6 +517,32 @@ const cs: Translation = {
       packed: (count) => `Sbaleno (${count})`,
     },
     legend: { positiveCircle: "pozitivní kruh", negativeCircle: "negativní kruh / pod útokem" },
+  },
+  split: {
+    entry: "✂ Text → mapa",
+    title: "Udělejte z textu mapu",
+    hint: "Vložte nebo napište celý text. Stane se hlavním uzlem; potom z něj vyberete části a určíte, co která je.",
+    name: "Název mapy",
+    namePlaceholder: "Když zůstane prázdný, vezme se z textu",
+    text: "Text",
+    textPlaceholder: "Sem vložte text…",
+    rootType: "Typ hlavního uzlu",
+    next: "Dál: označit části →",
+    back: "← Zpět",
+    markTitle: "Označte části",
+    markHint: "Vyberte část textu kurzorem (na telefonu podržte a táhněte) a zvolte, co to je. Každá část bude uzlem pod hlavním.",
+    mainNode: "Hlavní uzel — celý text",
+    selected: "Vybráno",
+    clearSelection: "Zrušit výběr",
+    overlap: "To se překrývá s už označenou částí — nejdřív ji odeberte, nebo vyberte něco jiného.",
+    pieces: (count) => `Části (${count})`,
+    noPieces: "Zatím žádné části — vyberte nahoře kus textu.",
+    remove: "Odebrat",
+    create: "Vytvořit mapu",
+    creating: (done, total) => `Vytvářím… ${done} z ${total}`,
+    error: "Mapu se nepodařilo vytvořit",
+    startOver: "Začít znovu",
+    startOverConfirm: "Smazat tento text i všechny jeho části?",
   },
   theme: { toggleToLight: "Přepnout na světlý režim", toggleToDark: "Přepnout na tmavý režim" },
   language: { label: "Jazyk" },
@@ -614,6 +693,32 @@ const uk: Translation = {
     },
     legend: { positiveCircle: "позитивне коло", negativeCircle: "негативне коло / під атакою" },
   },
+  split: {
+    entry: "✂ Текст → карта",
+    title: "Зробіть із тексту карту",
+    hint: "Вставте або напишіть увесь текст. Він стане головним вузлом; потім ви виділите його частини й вкажете, що кожна з них означає.",
+    name: "Назва карти",
+    namePlaceholder: "Якщо порожньо — візьметься з тексту",
+    text: "Текст",
+    textPlaceholder: "Вставте текст сюди…",
+    rootType: "Тип головного вузла",
+    next: "Далі: позначити частини →",
+    back: "← Назад",
+    markTitle: "Позначте частини",
+    markHint: "Виділіть частину тексту курсором (на телефоні — затисніть і потягніть) і виберіть, що це. Кожна частина стане вузлом під головним.",
+    mainNode: "Головний вузол — увесь текст",
+    selected: "Виділено",
+    clearSelection: "Скасувати виділення",
+    overlap: "Це перетинається з уже позначеною частиною — спершу приберіть її або виділіть інше.",
+    pieces: (count) => `Частини (${count})`,
+    noPieces: "Частин поки немає — виділіть текст угорі.",
+    remove: "Прибрати",
+    create: "Створити карту",
+    creating: (done, total) => `Створюю… ${done} з ${total}`,
+    error: "Не вдалося створити карту",
+    startOver: "Почати спочатку",
+    startOverConfirm: "Очистити цей текст і всі його частини?",
+  },
   theme: { toggleToLight: "Перемкнути на світлий режим", toggleToDark: "Перемкнути на темний режим" },
   language: { label: "Мова" },
   ui: UI_STRINGS.uk,
@@ -762,6 +867,32 @@ const ru: Translation = {
       packed: (count) => `Свёрнуто (${count})`,
     },
     legend: { positiveCircle: "положительный круг", negativeCircle: "отрицательный круг / под атакой" },
+  },
+  split: {
+    entry: "✂ Текст → карта",
+    title: "Превратите текст в карту",
+    hint: "Вставьте или напишите весь текст. Он станет главным узлом; затем вы выделите его части и укажете, что каждая из них значит.",
+    name: "Название карты",
+    namePlaceholder: "Если пусто — возьмётся из текста",
+    text: "Текст",
+    textPlaceholder: "Вставьте текст сюда…",
+    rootType: "Тип главного узла",
+    next: "Далее: отметить части →",
+    back: "← Назад",
+    markTitle: "Отметьте части",
+    markHint: "Выделите часть текста курсором (на телефоне — зажмите и потяните) и выберите, что это. Каждая часть станет узлом под главным.",
+    mainNode: "Главный узел — весь текст",
+    selected: "Выделено",
+    clearSelection: "Снять выделение",
+    overlap: "Это пересекается с уже отмеченной частью — сначала уберите её или выделите другое.",
+    pieces: (count) => `Части (${count})`,
+    noPieces: "Частей пока нет — выделите текст выше.",
+    remove: "Убрать",
+    create: "Создать карту",
+    creating: (done, total) => `Создаю… ${done} из ${total}`,
+    error: "Не удалось создать карту",
+    startOver: "Начать заново",
+    startOverConfirm: "Очистить этот текст и все его части?",
   },
   theme: { toggleToLight: "Переключить на светлую тему", toggleToDark: "Переключить на тёмную тему" },
   language: { label: "Язык" },

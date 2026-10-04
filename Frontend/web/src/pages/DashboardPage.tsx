@@ -183,6 +183,9 @@ export function DashboardPage() {
           <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">{t.dashboard.subtitle}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button className={secondaryBtn} onClick={() => navigate("/split")}>
+            {t.split.entry}
+          </button>
           <button className={secondaryBtn} onClick={() => setFolderModal({})}>
             {t.dashboard.library.newFolder}
           </button>
