@@ -1430,7 +1430,10 @@ export function MapPage() {
               reads as "go back." Setting it here too stops the chain at
               the canvas itself, before it ever reaches the document. */}
           <div
-            className="h-full w-full overflow-auto [overscroll-behavior-x:none]"
+            // pan-x pan-y: one finger still scrolls the canvas natively, but the
+            // browser doesn't pinch-zoom the page here — two fingers zoom the
+            // map instead (see useCanvasViewport).
+            className="h-full w-full touch-pan-x touch-pan-y overflow-auto [overscroll-behavior-x:none]"
             ref={wrapRef}
           >
           {/* Padded outer sizing/transform wrapper — canvasRef (the real
