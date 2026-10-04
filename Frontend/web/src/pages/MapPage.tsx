@@ -5,6 +5,7 @@ import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
+import { useBackGuard } from "../hooks/useBackGuard";
 import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
 import { useZoneFocus } from "../hooks/useZoneFocus";
 import { usePresentation } from "../hooks/usePresentation";
@@ -98,6 +99,9 @@ const EMPTY_POINTS: { x: number; y: number }[] = [];
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
+  // A back swipe / back button doesn't leave the map — only the toolbar's ←
+  // does (see useBackGuard).
+  useBackGuard();
   const { user, logout } = useAuth();
   const { t } = useI18n();
 
@@ -1283,7 +1287,7 @@ export function MapPage() {
     setActionError(null);
     try {
       await mapsApi.deleteMap(map.mapId);
-      navigate("/");
+      navigate("/", { replace: true });
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.dashboard.library.deleteMapError);
     }
@@ -1324,7 +1328,11 @@ export function MapPage() {
         {/* A demo session has nowhere else to go — see the toolbar's own
             matching omission below, and ProtectedRoute's own redirect,
             which would just bounce this link straight back here anyway. */}
-        {!user?.isDemo && <Link to="/">&larr; {t.map.toolbar.back}</Link>}
+        {!user?.isDemo && (
+          <Link to="/" replace>
+            &larr; {t.map.toolbar.back}
+          </Link>
+        )}
       </div>
     );
   }

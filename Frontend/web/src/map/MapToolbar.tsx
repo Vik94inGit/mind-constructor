@@ -102,6 +102,9 @@ export function MapToolbar({
           {!isDemo && (
             <Link
               to="/"
+              // Replaces the map's back guard (see useBackGuard) rather than
+              // stacking the dashboard on top of it.
+              replace
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
               title={t.map.toolbar.back}
             >
