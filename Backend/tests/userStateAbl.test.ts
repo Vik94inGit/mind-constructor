@@ -79,6 +79,7 @@ describe("userStateAbl", () => {
         zoneDisplay: { r: "dots" },
         cardFills: { a: "#fde68a" },
         blockLocks: ["a"],
+        detachedPieces: ["b"],
         center: { x: 10, y: 20 },
         selectedNodeId: null,
       };

@@ -158,6 +158,8 @@ export function MapPage() {
     toggleBlockLock: toggleStoredBlockLock,
     cardFills,
     setCardFill,
+    detachedPieces,
+    setPiecesDetached,
     savedView,
     saveView,
   } = useMapViewerPrefs(mapId, !!user && !user.isDemo);
@@ -165,9 +167,8 @@ export function MapPage() {
     storeReadingMode(mode);
     if (mode !== "actual") fitZoomForDisplay(effectiveDisplay(), mode);
   }
-  // Locking is per piece and always by hand (right-click, or hold on touch):
-  // a locked piece joins the locked pieces it's linked to (see
-  // puzzleAssembly); unlocking frees just that one.
+  // Locking is per piece (right-click, or hold on touch). An assembled puzzle
+  // with any piece locked holds still as a whole (see useNodeDragAndDrop).
   function toggleBlockLock(nodeId: string) {
     toggleStoredBlockLock(nodeId);
     // Locking a block mid-edit ends the edit.
@@ -810,11 +811,11 @@ export function MapPage() {
     const m = modeOf(n.nodeId);
     return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
   }
-  // Locked puzzle cards are drawn assembled, each seated flush against the
-  // locked piece it's linked to (utils/puzzleAssembly.ts); unlocked ones stay
-  // wherever they were put. All of them interlock along the map's links
-  // (utils/puzzleLinks.ts) — the seated ones claiming their sides first, so a
-  // tab always meets the blank next to it.
+  // Linked puzzle cards are drawn assembled, each seated flush against the
+  // piece it's linked to (utils/puzzleAssembly.ts), and interlock along the
+  // map's links (utils/puzzleLinks.ts) — the seated ones claiming their
+  // sides first, so a tab always meets the blank next to it. A piece taken
+  // out of its puzzle on demand (detachedPieces) stays where it was put.
   // Changes whenever the assembly's own inputs do, so a layout that can't
   // settle (see usePuzzleCardSizes) is held only until the map changes.
   const puzzleSettleKey = useMemo(
@@ -824,8 +825,7 @@ export function MapPage() {
   );
   const puzzleCardSizes = usePuzzleCardSizes(canvasRef, puzzleSettleKey);
   const puzzleAssembly = useMemo(() => {
-    // Only pieces you locked join up — nothing clicks together on its own.
-    const ids = visibleNodes.filter((n) => drawnAsCard(n) && blockLocks[n.nodeId]).map((n) => n.nodeId);
+    const ids = visibleNodes.filter((n) => drawnAsCard(n) && !detachedPieces[n.nodeId]).map((n) => n.nodeId);
     const links = [
       ...visibleNodes.flatMap((n) => {
         const parent = nodeRefId(n.parentId);
@@ -838,28 +838,63 @@ export function MapPage() {
       }),
     ];
     const sizes = new Map(Array.from(puzzleCardSizes, ([id, s]) => [id, { w: s.w / zoom, h: s.h / zoom }]));
-    // A chosen circle's members are held where they're stored; the rest seat
-    // against them.
+    // A locked block stays assembled: its whole puzzle locks with it, and
+    // nothing in it can be dragged, so only a chosen circle's members are
+    // held where they're stored.
     const held = new Set(visibleNodes.filter((n) => n.locked).map((n) => n.nodeId));
     return assemblePuzzles(ids, links, positions, sizes, held);
     // drawnAsCard reads the display state below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode, blockLocks]);
+  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode, detachedPieces]);
   const puzzleJoins = useMemo(() => {
     const at = new Map(positions);
     for (const [id, p] of puzzleAssembly.positions) at.set(id, p);
     return computePuzzleJoins(visibleNodes, edges, at, puzzleAssembly.seated);
   }, [visibleNodes, edges, positions, puzzleAssembly]);
-  // Puzzle pieces: dragging a link out of a piece's tab — see
-  // hooks/usePuzzleConnect.ts.
-  const { puzzleConnect, startPuzzleConnect } = usePuzzleConnect({
+  // Puzzle pieces: dragging a link out of a piece's tab, and clicking pieces
+  // together — see hooks/usePuzzleConnect.ts.
+  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect } = usePuzzleConnect({
+    mapId,
     nodes,
     edges,
+    visibleNodes,
+    zoom,
+    puzzleJoins,
     isOwnNode,
+    drawnAsCard,
+    posFor,
     screenToCanvas,
+    upsertEdge,
+    refreshInsights,
+    setActionError,
     setContextMenu,
     setPendingLink,
+    linkFailedMessage: t.ui.link.failed,
+    isDetached: (id) => !!detachedPieces[id],
   });
+  // Taking pieces out of their puzzle, on demand from a piece's menu: just
+  // this one, or the whole puzzle into separate blocks. A detached piece is
+  // drawn where it was put, and dragging it into a fitting piece clicks it
+  // back in.
+  // Every piece of the puzzle keeps the spot it's drawn at — saved as its own
+  // first — so taking one out of the middle doesn't send the rest flying back
+  // to wherever they were stored before they were clicked together.
+  async function detachPieces(ids: string[], puzzleIds: string[] = ids) {
+    const moved = Array.from(new Set([...ids, ...puzzleIds])).flatMap((id) => {
+      const seated = puzzleAssembly.positions.get(id);
+      return seated ? [[id, seated] as const] : [];
+    });
+    setPiecesDetached(ids, true);
+    if (moved.length === 0) return;
+    setNodes((prev) => prev.map((n) => {
+      const at = moved.find(([id]) => id === n.nodeId)?.[1];
+      return at ? { ...n, x: at.x, y: at.y } : n;
+    }));
+    await Promise.all(moved.map(([id, at]) => nodesApi.updateNode(id, at).then(upsertNode).catch(() => {})));
+  }
+  function attachPiece(nodeId: string) {
+    setPiecesDetached([nodeId], false);
+  }
 
   // The node drag/drop system: single-node reposition-or-join-a-circle,
   // group ("follow the leader") drag, and touch's own long-press-to-
@@ -888,8 +923,15 @@ export function MapPage() {
     setMultiSelectIds,
     suppressNextClick,
     t,
-    // Holding one of your puzzle cards opens its menu, where it's locked or
-    // unlocked — the touch counterpart of right-clicking it.
+    snapFor: puzzleSnapFor,
+    // A piece clicked into another is in a puzzle again, detached or not.
+    onSnapped: (node, snap) => {
+      if (detachedPieces[node.nodeId]) attachPiece(node.nodeId);
+      linkSnappedPieces(node, snap);
+    },
+    clusterFor: puzzleClusterFor,
+    // Holding one of your puzzle cards opens its menu (lock, detach…) — the
+    // touch counterpart of right-clicking it.
     onHold: (node, clientX, clientY) => {
       if (!isOwnNode(node) || !drawnAsCard(node)) return false;
       suppressNextClick.current = true;
@@ -2060,6 +2102,17 @@ export function MapPage() {
           canAttack={canAttackNode(contextMenu.node)}
           blockLocked={!!blockLocks[contextMenu.node.nodeId]}
           onToggleBlockLock={isOwnNode(contextMenu.node) ? () => toggleBlockLock(contextMenu.node.nodeId) : undefined}
+          puzzle={
+            isOwnNode(contextMenu.node) && drawnAsCard(contextMenu.node)
+              ? {
+                  detached: !!detachedPieces[contextMenu.node.nodeId],
+                  assembled: puzzleClusterFor(contextMenu.node).length > 1,
+                  onDetach: () => detachPieces([contextMenu.node.nodeId], puzzleClusterFor(contextMenu.node)),
+                  onTakeApart: () => detachPieces(puzzleClusterFor(contextMenu.node)),
+                  onAttach: () => attachPiece(contextMenu.node.nodeId),
+                }
+              : undefined
+          }
           nodeType={contextMenu.node.type}
           onClose={() => setContextMenu(null)}
           onCreate={() => {

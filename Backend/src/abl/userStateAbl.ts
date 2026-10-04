@@ -43,6 +43,7 @@ const mapViewSchema = z
     zoneDisplay: idRecord(z.enum(ZONE_MODES)),
     cardFills: idRecord(z.string().regex(/^#[0-9a-fA-F]{6}$/, "a fill is a #rrggbb color")),
     blockLocks: z.array(z.string().max(64)).max(MAX_ENTRIES),
+    detachedPieces: z.array(z.string().max(64)).max(MAX_ENTRIES),
     center: z.object({ x: z.number().min(-COORD_LIMIT).max(COORD_LIMIT), y: z.number().min(-COORD_LIMIT).max(COORD_LIMIT) }).nullable(),
     selectedNodeId: z.string().max(64).nullable(),
   })

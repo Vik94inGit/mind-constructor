@@ -215,7 +215,7 @@ export interface UiStrings {
   };
   loadingMap: string;
   /** Showing the chosen nodes in their own reading mode, zooming in when their text would overlap. */
-  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; dots: string; zoneView: (zone: string) => string; lockBlock: string; unlockBlock: string; blockLocked: string; zonesInView: string };
+  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; dots: string; zoneView: (zone: string) => string; lockBlock: string; unlockBlock: string; blockLocked: string; detachPiece: string; takePuzzleApart: string; attachPiece: string; zonesInView: string };
   /** Separator lines drawn between groups of nodes. */
   lines: {
     toolbar: string;
@@ -581,6 +581,9 @@ const en: UiStrings = {
     dots: "Dots",
     lockBlock: "Lock this block",
     unlockBlock: "Unlock this block",
+    detachPiece: "Detach from the puzzle",
+    takePuzzleApart: "Take the whole puzzle apart",
+    attachPiece: "Put back into the puzzle",
     blockLocked: "Locked — unlock to move or edit it",
     zonesInView: "Zones in view",
     zoneView: (z) => `View of “${z}”`,
@@ -944,6 +947,9 @@ const cs: UiStrings = {
     dots: "Tečky",
     lockBlock: "Zamknout blok",
     unlockBlock: "Odemknout blok",
+    detachPiece: "Odpojit z puzzle",
+    takePuzzleApart: "Rozložit celé puzzle",
+    attachPiece: "Vrátit do puzzle",
     blockLocked: "Zamčeno — odemkněte pro přesun nebo úpravy",
     zonesInView: "Zóny v zobrazení",
     zoneView: (z) => `Zobrazení „${z}“`,
@@ -1307,6 +1313,9 @@ const uk: UiStrings = {
     dots: "Точки",
     lockBlock: "Заблокувати блок",
     unlockBlock: "Розблокувати блок",
+    detachPiece: "Від'єднати від пазла",
+    takePuzzleApart: "Розібрати весь пазл",
+    attachPiece: "Повернути в пазл",
     blockLocked: "Заблоковано — розблокуйте, щоб рухати чи редагувати",
     zonesInView: "Зони в полі зору",
     zoneView: (z) => `Вигляд «${z}»`,
@@ -1670,6 +1679,9 @@ const ru: UiStrings = {
     dots: "Точки",
     lockBlock: "Заблокировать блок",
     unlockBlock: "Разблокировать блок",
+    detachPiece: "Отсоединить от пазла",
+    takePuzzleApart: "Разобрать весь пазл",
+    attachPiece: "Вернуть в пазл",
     blockLocked: "Заблокировано — разблокируйте, чтобы двигать или править",
     zonesInView: "Зоны в поле зрения",
     zoneView: (z) => `Вид «${z}»`,

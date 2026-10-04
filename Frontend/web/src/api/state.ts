@@ -20,6 +20,8 @@ export interface MapViewState {
   cardFills?: CardFills;
   /** Locked puzzle pieces' nodeIds. */
   blockLocks?: string[];
+  /** Puzzle pieces taken out of their puzzle (see utils/pieceDetach.ts). */
+  detachedPieces?: string[];
   /** The canvas point that was in the middle of the screen. */
   center?: { x: number; y: number } | null;
   selectedNodeId?: string | null;

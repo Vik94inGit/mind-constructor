@@ -38,6 +38,7 @@ const MapViewStateSchema = new mongoose.Schema(
     zoneDisplay: { type: mongoose.Schema.Types.Mixed, default: {} }, // zone root nodeId -> zone mode
     cardFills: { type: mongoose.Schema.Types.Mixed, default: {} }, // nodeId -> #rrggbb
     blockLocks: { type: [String], default: [] }, // locked puzzle pieces' nodeIds
+    detachedPieces: { type: [String], default: [] }, // puzzle pieces taken out of their puzzle
     center: { type: { _id: false, x: Number, y: Number }, default: null }, // canvas point in the middle of the screen
     selectedNodeId: { type: String, default: null },
   },

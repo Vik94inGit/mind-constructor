@@ -340,7 +340,7 @@ describe("useNodeDragAndDrop", () => {
       expect(nodesApi.updateNode).not.toHaveBeenCalled();
     });
 
-    it("hands the hold to onHold instead when it handles it (a puzzle card opening its lock menu)", () => {
+    it("hands the hold to onHold instead when it handles it (a puzzle card opening its menu)", () => {
       const node = makeNode({ nodeId: "a" });
       const onHold = vi.fn(() => true);
       const { result, setMultiSelectIds } = setup({ moveMode: false, onHold });
@@ -353,6 +353,7 @@ describe("useNodeDragAndDrop", () => {
       expect(onHold).toHaveBeenCalledWith(node, 12, 34);
       expect(setMultiSelectIds).not.toHaveBeenCalled();
     });
+
 
     it("does not drag on real movement either — moveMode gates touch the same as mouse now", () => {
       // Regression test: touch used to bypass moveMode entirely, arming a
