@@ -174,7 +174,7 @@ export function getCirclePackSpacing() {
 // How far from its root a circle's child can sit and still be inside the
 // zone — two pack spacings, so a quick-add ring, "Create circle" and a
 // template's spiral all fit, while a child dragged across the map no longer
-// drags the zone with it (see computeNodeGroups and the drop logic in
+// drags the zone with it (see zoneCorners, and the drop logic in
 // useNodeDragAndDrop, which reads a drop past this as leaving the circle).
 export function getZoneReach() {
   return getCirclePackSpacing() * 2;
@@ -509,6 +509,13 @@ export interface NodeGroup {
 // still a member (membership is parentId alone — its branch arrow and color
 // stay), it just doesn't stretch the zone across the map to reach it. With
 // fewer than 3 corners in reach there is no outline at all.
+// The zone is the polygon through the root and each child at
+// its own stored position, sorted by angle around their centroid so
+// connecting them in order traces a simple (non-self-crossing) outline: a
+// triangle at the 3-member minimum, growing to a quad/pentagon/… as the
+// group grows. Only children within reach of the root are corners (see
+// zoneCorners), and nothing is derived or moved: each node is drawn exactly
+// where it is, root included.
 // The order to connect a zone's corners in: by angle around their centroid,
 // which traces a simple (non-self-crossing) outline. Indexes into `pts`.
 export function outlineOrder(pts: Pt[]): number[] {
@@ -516,6 +523,20 @@ export function outlineOrder(pts: Pt[]): number[] {
   const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
   const angle = pts.map((p) => Math.atan2(p.y - cy, p.x - cx));
   return pts.map((_, i) => i).sort((a, b) => angle[a] - angle[b]);
+}
+
+// The corners of a zone, in outline order, given its members' positions with
+// the root first: the root plus every child within `reach` of it. A child
+// farther out is still a member (its branch arrow and color stay), it just
+// doesn't stretch the zone across the map to reach it. Fewer than 3 corners
+// in reach means no outline at all. Indexes into `pts`. Shared by the drawn
+// zone (computeNodeGroups) and the placement rules (zoneRules.ts), so both
+// see the same shape.
+export function zoneCorners(pts: Pt[], reach: number = getZoneReach()): number[] {
+  const root = pts[0];
+  const near = pts.map((_, i) => i).filter((i) => i === 0 || Math.hypot(pts[i].x - root.x, pts[i].y - root.y) <= reach);
+  if (near.length < 3) return [];
+  return outlineOrder(near.map((i) => pts[i])).map((k) => near[k]);
 }
 
 export function computeNodeGroups(
@@ -538,10 +559,10 @@ export function computeNodeGroups(
     if (!root) continue;
     const members = [root, ...children];
     const sentiment = circleSentiment(members);
-    const at = (n: NodeDoc) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const rootPos = at(root);
-    const near = [root, ...children.filter((c) => Math.hypot(at(c).x - rootPos.x, at(c).y - rootPos.y) <= reach)];
-    const pts = near.map(at);
+    const all = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+    const order = zoneCorners(all, reach);
+    // Centre and radius follow the drawn zone; with no outline, just the root.
+    const pts = order.length ? order.map((i) => all[i]) : [all[0]];
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     // +70: the outline runs through the members' own centers, so this is the
@@ -552,6 +573,8 @@ export function computeNodeGroups(
     const order = near.length < 3 ? [] : outlineOrder(pts);
     const outline = order.map((i) => pts[i]);
     const outlineIds = order.map((i) => near[i].nodeId);
+    const outline = order.map((i) => all[i]);
+    const outlineIds = order.map((i) => members[i].nodeId);
     groups.push({ rootId, members, sentiment, cx, cy, r, outline, outlineIds });
   }
   return groups;

@@ -513,8 +513,8 @@ export function useNodeDragAndDrop({
         // its root (see getZoneReach) it is. Past it, it leaves the circle —
         // so dragging a member outward can't stretch the zone across the map
         // — unless it is no farther out than it already was: a member that
-        // already sat out there (from before the reach existed) can be moved
-        // around or pulled back in without being cut loose.
+        // already sat out there can be moved around or pulled back in
+        // without being cut loose.
         const rootPos = ownCircle ? posFor(ownCircle.members[0]) : null;
         const dropDist = rootPos ? Math.hypot(x - rootPos.x, y - rootPos.y) : 0;
         const startDist = rootPos ? Math.hypot(start.x - rootPos.x, start.y - rootPos.y) : 0;
