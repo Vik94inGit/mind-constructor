@@ -20,6 +20,8 @@ function getInitialTheme(): Theme {
 interface ThemeContextValue {
   theme: Theme;
   toggleTheme: () => void;
+  /** Sets it outright — the signed-in user's saved choice (see UserStateContext). */
+  setTheme: (theme: Theme) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -42,7 +44,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setTheme((t) => (t === "dark" ? "light" : "dark"));
   }
 
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme(): ThemeContextValue {

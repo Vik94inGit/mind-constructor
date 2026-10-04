@@ -75,6 +75,7 @@ export interface Translation {
       page: (page: number, total: number) => string;
       foldersError: string;
       deleteMapError: string;
+      resume: { title: string; open: string };
       folderMenu: { open: string; rename: string; delete: string };
       deleteFolderConfirm: (name: string) => string;
       folderModal: {
@@ -259,6 +260,7 @@ const en: Translation = {
       page: (page, total) => `Page ${page} of ${total}`,
       foldersError: "Failed to load folders",
       deleteMapError: "Couldn't delete the map",
+      resume: { title: "Continue where you left off", open: "Open" },
       folderMenu: { open: "Open", rename: "Rename", delete: "Delete" },
       deleteFolderConfirm: (name) => `Delete folder "${name}"? The maps in it stay — they go back to All maps.`,
       folderModal: {
@@ -434,6 +436,7 @@ const cs: Translation = {
       page: (page, total) => `Strana ${page} z ${total}`,
       foldersError: "Nepodařilo se načíst složky",
       deleteMapError: "Mapu se nepodařilo smazat",
+      resume: { title: "Pokračujte, kde jste skončili", open: "Otevřít" },
       folderMenu: { open: "Otevřít", rename: "Přejmenovat", delete: "Smazat" },
       deleteFolderConfirm: (name) => `Smazat složku „${name}“? Mapy v ní zůstanou — vrátí se do Všech map.`,
       folderModal: {
@@ -609,6 +612,7 @@ const uk: Translation = {
       page: (page, total) => `Сторінка ${page} з ${total}`,
       foldersError: "Не вдалося завантажити папки",
       deleteMapError: "Не вдалося видалити карту",
+      resume: { title: "Продовжте з того місця, де зупинилися", open: "Відкрити" },
       folderMenu: { open: "Відкрити", rename: "Перейменувати", delete: "Видалити" },
       deleteFolderConfirm: (name) => `Видалити папку «${name}»? Карти з неї залишаться — повернуться в Усі карти.`,
       folderModal: {
@@ -784,6 +788,7 @@ const ru: Translation = {
       page: (page, total) => `Страница ${page} из ${total}`,
       foldersError: "Не удалось загрузить папки",
       deleteMapError: "Не удалось удалить карту",
+      resume: { title: "Продолжите с того места, где остановились", open: "Открыть" },
       folderMenu: { open: "Открыть", rename: "Переименовать", delete: "Удалить" },
       deleteFolderConfirm: (name) => `Удалить папку «${name}»? Карты из неё останутся — вернутся во Все карты.`,
       folderModal: {

@@ -6,6 +6,7 @@ import { User } from "../models/User.js";
 import { nanoid } from "nanoid";
 import { getHiddenNodesDao } from "./visibilityDao.js";
 import { removeMapFromAllFoldersDao } from "./folderDao.js";
+import { removeMapViewStatesDao } from "./userStateDao.js";
 
 export const findMapByPublicIdDao = async (publicMapId: string) => {
   return await Map.findOne({ mapId: publicMapId });
@@ -292,6 +293,7 @@ export const deleteMapDao = async (publicMapId: string, userId: string) => {
   await Line.deleteMany({ mapId: map._id });
   await Node.deleteMany({ mapId: map._id });
   await removeMapFromAllFoldersDao(publicMapId);
+  await removeMapViewStatesDao(publicMapId);
 
   // 3. Delete the map itself using its internal Mongo _id
   return await Map.findByIdAndDelete(map._id);

@@ -253,13 +253,17 @@ export async function buildMapFromDraft(
 // doesn't hand one person's thoughts to the next.
 const draftKey = (userId: string) => `mc_thought_draft:${userId}`;
 
+/** A draft read back from storage or the server, or null when it isn't one. */
+export function parseThoughtDraft(data: unknown): ThoughtDraft | null {
+  const d = data as ThoughtDraft | null;
+  if (!d || typeof d.center !== "string" || !Array.isArray(d.thoughts) || !FLOW_PROMPTS[d.kind]) return null;
+  return d;
+}
+
 export function loadDraft(userId: string): ThoughtDraft | null {
   try {
     const raw = localStorage.getItem(draftKey(userId));
-    if (!raw) return null;
-    const d = JSON.parse(raw) as ThoughtDraft;
-    if (!d || typeof d.center !== "string" || !Array.isArray(d.thoughts) || !FLOW_PROMPTS[d.kind]) return null;
-    return d;
+    return raw ? parseThoughtDraft(JSON.parse(raw)) : null;
   } catch {
     return null;
   }

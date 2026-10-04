@@ -43,6 +43,9 @@ vi.mock("../src/models/Line.js", () => ({
     deleteMany: vi.fn(),
   },
 }));
+vi.mock("../src/dao/userStateDao.js", () => ({
+  removeMapViewStatesDao: vi.fn(),
+}));
 vi.mock("../src/models/Folder.js", () => ({
   Folder: {
     updateMany: vi.fn(),

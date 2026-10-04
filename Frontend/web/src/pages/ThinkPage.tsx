@@ -4,7 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
 import { ApiRequestError } from "../api/client";
 import { ThoughtPreview } from "../components/ThoughtPreview";
-import { FLOW_ROOT_TYPE, buildMapFromDraft, clearDraft, emptyDraft, loadDraft, saveDraft, suggestMapName } from "../utils/thoughtFlow";
+import { FLOW_ROOT_TYPE, buildMapFromDraft, clearDraft, emptyDraft, loadDraft, parseThoughtDraft, saveDraft, suggestMapName } from "../utils/thoughtFlow";
+import { markDraftChanged, useDraftSync } from "../hooks/useDraftSync";
 import type { Thought, ThoughtDraft } from "../utils/thoughtFlow";
 import { StartStep } from "../think/StartStep";
 import { WriteStep } from "../think/WriteStep";
@@ -35,7 +36,11 @@ export function ThinkPage() {
   const [draft, setDraft] = useState<ThoughtDraft>(() => {
     const seed = (location.state as { seed?: string } | null)?.seed?.trim();
     const saved = loadDraft(userId);
-    if (seed) return { ...(saved && !saved.center.trim() ? saved : emptyDraft(saved?.kind)), center: seed, step: 0 };
+    if (seed) {
+      // A fresh start beats a draft left on another device.
+      markDraftChanged("think", userId);
+      return { ...(saved && !saved.center.trim() ? saved : emptyDraft(saved?.kind)), center: seed, step: 0 };
+    }
     return saved ?? emptyDraft();
   });
   const [name, setName] = useState("");
@@ -46,6 +51,16 @@ export function ThinkPage() {
   useEffect(() => {
     if (!building) saveDraft(userId, draft);
   }, [draft, userId, building]);
+  // The same draft on the server, to finish on another device.
+  const { discard: discardServerDraft } = useDraftSync({
+    kind: "think",
+    userId,
+    enabled: !!user && !user.isDemo,
+    draft,
+    isEmpty: (d) => !d.center.trim() && d.thoughts.length === 0,
+    parse: parseThoughtDraft,
+    apply: setDraft,
+  });
 
   const update = (patch: Partial<ThoughtDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const setThoughts = (fn: (ts: Thought[]) => Thought[]) => setDraft((d) => ({ ...d, thoughts: fn(d.thoughts) }));
@@ -61,6 +76,7 @@ export function ThinkPage() {
   function startOver() {
     if (!confirm(tt.startOverConfirm)) return;
     clearDraft(userId);
+    discardServerDraft();
     setDraft(emptyDraft(draft.kind));
     setName("");
   }
@@ -75,6 +91,7 @@ export function ThinkPage() {
         (done, total) => setBuilding({ done, total }),
       );
       clearDraft(userId);
+      discardServerDraft();
       navigate(`/maps/${map.mapId}`);
     } catch (err) {
       setError(err instanceof ApiRequestError ? `${tt.build.error} (${err.message})` : tt.build.error);

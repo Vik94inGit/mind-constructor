@@ -15,6 +15,7 @@ import nodeRoute from "./src/routes/nodeRoute.js";
 import edgeRoute from "./src/routes/edgeRoute.js";
 import lineRoute from "./src/routes/lineRoute.js";
 import folderRoute from "./src/routes/folderRoute.js";
+import userStateRoute from "./src/routes/userStateRoute.js";
 import { initRealtime } from "./src/realtime/io.js";
 import { createRedisClient } from "./src/config/redis.js";
 
@@ -85,12 +86,14 @@ const sessionMiddleware = session({
   resave: false,
   saveUninitialized: false,
   // Refreshes maxAge on every response, so an actively-used session doesn't
-  // expire mid-use — a sliding window, replacing the old JWT's fixed 7-day
-  // expiresIn with an equivalent "still around a week after your last visit."
+  // expire mid-use — a sliding window: signed in until a month after the
+  // last visit.
   rolling: true,
   cookie: {
     httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    // 30 days: an installed app is opened now and then, not daily, and
+    // should still be signed in when it is.
+    maxAge: 30 * 24 * 60 * 60 * 1000,
     // Secure is mandatory whenever sameSite is "none" (browsers reject the
     // cookie otherwise) and Render always serves over HTTPS, so this only
     // relaxes for local http://localhost dev. sameSite defaults to "none" in
@@ -106,7 +109,8 @@ const sessionMiddleware = session({
 });
 app.use(sessionMiddleware);
 
-app.use(express.json());
+// 300 KB: room for a saved draft (see userStateAbl.ts MAX_DRAFT_BYTES).
+app.use(express.json({ limit: "300kb" }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/nodes", nodeRoute);
@@ -115,6 +119,8 @@ app.use("/api/lines", lineRoute);
 // Before the map routes: those are mounted on /api itself, so /api/folders
 // would otherwise read as GET /api/:mapId with mapId "folders".
 app.use("/api/folders", folderRoute);
+// Also before the map routes, for the same reason.
+app.use("/api/state", userStateRoute);
 app.use("/api", mapRoute);
 
 // Socket.IO attaches to the same HTTP server Express listens on — one

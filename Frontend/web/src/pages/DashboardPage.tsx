@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useUserState } from "../context/UserStateContext";
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
@@ -26,6 +27,8 @@ export function DashboardPage() {
   const { user } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { lastMapId } = useUserState();
+  const [searchParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>("all");
   const [maps, setMaps] = useState<MapDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +82,17 @@ export function DashboardPage() {
 
   // Back to the first page whenever what's listed changes.
   useEffect(() => setPage(1), [filter, openFolderId, query]);
+
+  // The map this user was last on, on any device — if it's still theirs to open.
+  const lastMap = lastMapId ? (maps.find((m) => m.mapId === lastMapId) ?? null) : null;
+  // The installed app starts here with ?resume=1 (see public/manifest.webmanifest):
+  // straight back into that map. Opened from the browser, it's offered instead.
+  const resumeTried = useRef(false);
+  useEffect(() => {
+    if (resumeTried.current || searchParams.get("resume") !== "1" || loading || !lastMapId) return;
+    resumeTried.current = true;
+    if (lastMap) navigate(`/maps/${lastMap.mapId}`, { replace: true });
+  }, [searchParams, loading, lastMapId, lastMap, navigate]);
 
   const openFolder = folders.find((f) => f.folderId === openFolderId) ?? null;
   const items = useMemo(() => libraryItems(maps, folders, openFolderId, query), [maps, folders, openFolderId, query]);
@@ -194,6 +208,25 @@ export function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {lastMap && (
+        <button
+          type="button"
+          className="mb-5 flex w-full cursor-pointer items-center gap-3 rounded-card border border-line bg-surface p-3 text-left shadow-card transition-colors duration-[120ms] hover:border-accent"
+          onClick={() => navigate(`/maps/${lastMap.mapId}`)}
+        >
+          <MapIcon color={lastMap.color} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.75rem] font-semibold tracking-[0.03em] text-ink-soft uppercase">
+              {t.dashboard.library.resume.title}
+            </span>
+            <span className="block truncate text-[1rem] font-bold">{lastMap.name}</span>
+          </span>
+          <span className="shrink-0 rounded-lg bg-accent px-3 py-[0.45rem] text-[0.85rem] font-semibold text-white">
+            {t.dashboard.library.resume.open} →
+          </span>
+        </button>
+      )}
 
       <ThinkEntry />
 
