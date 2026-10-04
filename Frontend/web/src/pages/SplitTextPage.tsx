@@ -13,6 +13,7 @@ import {
   clearSplitDraft,
   emptySplitDraft,
   loadSplitDraft,
+  parseSplitDraft,
   overlapsPiece,
   saveSplitDraft,
   splitToThoughtDraft,
@@ -21,6 +22,7 @@ import {
 } from "../utils/textSplit";
 import type { SplitDraft } from "../utils/textSplit";
 import { btnGhost, btnPrimary, inputCls } from "../think/thinkStyles";
+import { useDraftSync } from "../hooks/useDraftSync";
 import { StepHeader, StepNav } from "../think/StepChrome";
 
 // "Text → map": the whole text becomes the map's main node; pieces of it,
@@ -47,6 +49,16 @@ export function SplitTextPage() {
   useEffect(() => {
     if (!building) saveSplitDraft(userId, draft);
   }, [draft, userId, building]);
+  // The same draft on the server, to finish on another device.
+  const { discard: discardServerDraft } = useDraftSync({
+    kind: "textSplit",
+    userId,
+    enabled: !!user && !user.isDemo,
+    draft,
+    isEmpty: (d) => !d.text.trim() && d.pieces.length === 0,
+    parse: parseSplitDraft,
+    apply: setDraft,
+  });
 
   const update = (patch: Partial<SplitDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -96,6 +108,7 @@ export function SplitTextPage() {
   function startOver() {
     if (!confirm(ts.startOverConfirm)) return;
     clearSplitDraft(userId);
+    discardServerDraft();
     setDraft(emptySplitDraft());
     clearSelection();
   }
@@ -117,6 +130,7 @@ export function SplitTextPage() {
         (done, total) => setBuilding({ done, total }),
       );
       clearSplitDraft(userId);
+      discardServerDraft();
       navigate(`/maps/${map.mapId}`);
     } catch (err) {
       setError(err instanceof ApiRequestError ? `${ts.error} (${err.message})` : ts.error);

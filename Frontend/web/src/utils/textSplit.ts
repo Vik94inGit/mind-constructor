@@ -77,13 +77,17 @@ export function splitToThoughtDraft(draft: SplitDraft): ThoughtDraft {
 // Kept in this browser until the map is made, like the Think flow's draft.
 const storageKey = (userId: string) => `mc_text_split:${userId}`;
 
+/** A draft read back from storage or the server, or null when it isn't one. */
+export function parseSplitDraft(data: unknown): SplitDraft | null {
+  const d = data as SplitDraft | null;
+  if (!d || typeof d.text !== "string" || !Array.isArray(d.pieces)) return null;
+  return { ...emptySplitDraft(), ...d };
+}
+
 export function loadSplitDraft(userId: string): SplitDraft | null {
   try {
     const raw = localStorage.getItem(storageKey(userId));
-    if (!raw) return null;
-    const d = JSON.parse(raw) as SplitDraft;
-    if (typeof d.text !== "string" || !Array.isArray(d.pieces)) return null;
-    return { ...emptySplitDraft(), ...d };
+    return raw ? parseSplitDraft(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
