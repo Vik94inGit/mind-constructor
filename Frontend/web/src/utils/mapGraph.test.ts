@@ -5,6 +5,7 @@ import {
   collectDescendants,
   computeAttackPairIds,
   computeHiddenBranchIds,
+  computeSolved,
   computeUnsolvedProblemIds,
   countPackedByContainer,
   upsertBy,
@@ -144,5 +145,34 @@ describe("zoneLabel", () => {
     expect(zoneLabel(makeNode({ nodeId: "a", title: "T", text: "x" }))).toBe("T");
     expect(zoneLabel(makeNode({ nodeId: "a", text: "a".repeat(30) }))).toBe(`${"a".repeat(22)}…`);
     expect(zoneLabel(undefined)).toBeUndefined();
+  });
+});
+
+describe("computeSolved", () => {
+  it("marks a Success under a Problem or a goal, however deep, and what it solves", () => {
+    const nodes = [
+      makeNode({ nodeId: "p", type: "Problem" }),
+      makeNode({ nodeId: "o", type: "Option", parentId: "p" }),
+      makeNode({ nodeId: "s1", type: "Success", parentId: "o" }),
+      makeNode({ nodeId: "g", type: "Solution" }),
+      makeNode({ nodeId: "s2", type: "Success", parentId: "g" }),
+    ];
+    const { successIds, solvedIds } = computeSolved(nodes);
+    expect(successIds).toEqual(new Set(["s1", "s2"]));
+    expect(solvedIds).toEqual(new Set(["p", "g"]));
+  });
+
+  it("answers the nearest Problem/goal only, and skips a Success with none above it", () => {
+    const nodes = [
+      makeNode({ nodeId: "outer", type: "Problem" }),
+      makeNode({ nodeId: "inner", type: "Problem", parentId: "outer" }),
+      makeNode({ nodeId: "s", type: "Success", parentId: "inner" }),
+      makeNode({ nodeId: "lone", type: "Success" }),
+      makeNode({ nodeId: "under-option", type: "Success", parentId: "opt" }),
+      makeNode({ nodeId: "opt", type: "Option" }),
+    ];
+    const { successIds, solvedIds } = computeSolved(nodes);
+    expect(successIds).toEqual(new Set(["s"]));
+    expect(solvedIds).toEqual(new Set(["inner"]));
   });
 });

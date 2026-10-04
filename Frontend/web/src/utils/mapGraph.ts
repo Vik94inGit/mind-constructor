@@ -146,6 +146,30 @@ export function computeUnsolvedProblemIds(nodes: NodeDoc[]): Set<string> {
   return ids;
 }
 
+// A Problem is solved, or a goal (Solution) reached, once a Success sits
+// somewhere below it — directly or further down the branch. Each such
+// Success is celebrated (wings and halo, see NodeCard's `triumphant`), and
+// so is every zone it's in (a gold outline, see CanvasBackdrop). The walk
+// up stops at the nearest Problem/Solution: that's the one it answers.
+export function computeSolved(nodes: NodeDoc[]): { successIds: Set<string>; solvedIds: Set<string> } {
+  const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+  const successIds = new Set<string>();
+  const solvedIds = new Set<string>();
+  for (const n of nodes) {
+    if (n.type !== "Success" || n.isWeapon) continue;
+    let current = byId.get(nodeRefId(n.parentId) ?? "");
+    for (let hops = 0; current && hops < 50; hops++) {
+      if (current.type === "Problem" || current.type === "Solution") {
+        successIds.add(n.nodeId);
+        solvedIds.add(current.nodeId);
+        break;
+      }
+      current = byId.get(nodeRefId(current.parentId) ?? "");
+    }
+  }
+  return { successIds, solvedIds };
+}
+
 // "Group into circle" picks its root automatically — whichever point sits
 // closest to the group's own centroid. Returns that point's index (0 for an
 // empty or single-point list).

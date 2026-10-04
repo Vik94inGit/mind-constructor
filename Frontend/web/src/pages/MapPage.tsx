@@ -67,6 +67,7 @@ import {
   collectBranchIds,
   computeAttackPairIds,
   computeHiddenBranchIds,
+  computeSolved,
   computeUnsolvedProblemIds,
   countPackedByContainer,
   weaponFlightVector,
@@ -727,6 +728,13 @@ export function MapPage() {
   // computeUnsolvedProblemIds. Built from `nodes`, not visibleNodes: a
   // packed-away child still counts as "this got addressed".
   const unsolvedProblemIds = useMemo(() => computeUnsolvedProblemIds(nodes), [nodes]);
+  // A Success that solved a Problem or reached a goal wears wings and a halo,
+  // and every zone it's in gets a gold outline — see computeSolved.
+  const solved = useMemo(() => computeSolved(nodes), [nodes]);
+  const solvedZones = useMemo(
+    () => new Set(nodeGroups.filter((g) => g.members.some((m) => solved.successIds.has(m.nodeId))).map((g) => g.rootId)),
+    [nodeGroups, solved],
+  );
 
   // The sentiment show (see hooks/useSentimentShow.ts): on open, and on every
   // majority swing, the majority type's nodes travel toward the center and
@@ -1568,6 +1576,7 @@ export function MapPage() {
               onLineClick={handleLineClick}
               interactive={!drawMode}
               compact={compactView || dotZoom}
+              solvedZones={solvedZones}
               drawing={
                 drawMode
                   ? {
@@ -1627,6 +1636,7 @@ export function MapPage() {
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
+                  triumphant={solved.successIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
                   readingMode={modeOf(node.nodeId)}
                   compact={compactView}
