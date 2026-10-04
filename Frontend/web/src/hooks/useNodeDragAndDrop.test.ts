@@ -284,28 +284,6 @@ describe("useNodeDragAndDrop", () => {
       expect(nodesApi.updateNode).toHaveBeenCalledWith("child", { x: 900, y: 300 });
     });
 
-    it("never treats a circle's own zone as an obstacle to its own root node", async () => {
-      // Regression test: a circle's root has no parentId pointing at its
-      // own group (only its *members'* parentId does), so the old
-      // staysMember-gated exclusion never covered the root-dragging-itself
-      // case at all — its own (often large) zone counted as a real
-      // obstacle to drag around, which could push it well away from
-      // wherever it was actually dropped.
-      const root = makeNode({ nodeId: "root", x: 200, y: 200, parentId: null });
-      const child = makeNode({ nodeId: "child", parentId: "root", x: 900, y: 900 });
-      const nodes = [root, child];
-      const positions = new Map<string, Pt>([
-        ["root", { x: 200, y: 200 }],
-        ["child", { x: 900, y: 900 }],
-      ]);
-      // A large zone (r: 300) — the crude bounding-circle obstacle
-      // bigNodeObstacles derives from a group in production (see MapPage's
-      // own bigNodeObstacles: `{ x: g.cx, y: g.cy, minDist: g.r + 20 }`).
-      const nodeGroups: NodeGroup[] = [
-        { rootId: "root", members: [root, child], sentiment: "neutral", cx: 200, cy: 200, r: 300, outline: [] },
-      ];
-      const bigNodeObstacles = (excludeRootIds: Set<string> = new Set()) =>
-        nodeGroups.filter((g) => !excludeRootIds.has(g.rootId)).map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 20 }));
     it("lands a drop wherever the zone rules put it", async () => {
       const node = makeNode({ nodeId: "a", x: 100, y: 100, parentId: null });
       const nodes = [node];

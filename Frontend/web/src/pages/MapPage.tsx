@@ -712,13 +712,6 @@ export function MapPage() {
       .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 20 }));
   }
 
-  // Every zone a new child of `parent` would not belong to — the ones it
-  // roots or sits in are left out, so the child can still land beside it.
-  function otherZoneObstacles(parent: NodeDoc): Obstacle[] {
-    const own = nodeGroups.filter((g) => g.members.some((m) => m.nodeId === parent.nodeId)).map((g) => g.rootId);
-    return bigNodeObstacles(new Set(own));
-  }
-
   // Any closed loop in the Link graph reads as a "figure" and gets colored
   // in — see canvasLayout.ts's own computeLinkCycles doc comment for the
   // full reasoning; the DFS itself lives there now as a pure function of
@@ -1161,17 +1154,6 @@ export function MapPage() {
     setActionError(null);
     // The ghost's slot is a fixed angle around the anchor — it doesn't know
     // about anything else on the canvas, so a crowded area can still land
-    // it on top of another node. Nudge clear before opening the input, but
-    // only as far as it takes to stop covering that node (footprint boxes —
-    // see footprintObstacles): the new node should appear where the ghost
-    // was, not a full node-spacing away from it.
-    // Other circles' zones count too, so the new child doesn't land inside a
-    // zone it isn't part of.
-    const placed = avoidOverlap(
-      pos,
-      [...footprintObstacles(obstaclePoints()), ...otherZoneObstacles(parent)],
-      viewportBounds(),
-    );
     // it on top of another node or inside a zone the new node won't be in.
     // Nudge it to the nearest spot the zone rules allow (see placeNode)
     // before opening the input.
@@ -2033,14 +2015,6 @@ export function MapPage() {
           onCreate={() => {
             const anchor = contextMenu.node;
             setContextMenu(null);
-            // Starts on the anchor itself; the footprint check moves it just
-            // clear of it (and anything else it would cover), so the new
-            // child appears right beside its parent.
-            const pos = avoidOverlap(
-              posFor(anchor),
-              [...footprintObstacles(obstaclePoints()), ...otherZoneObstacles(anchor)],
-              viewportBounds(),
-            );
             // Starts on the anchor itself; placeNode moves it just clear of
             // it (and of anything else the zone rules keep it from), so the
             // new child appears right beside its parent.

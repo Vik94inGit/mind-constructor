@@ -509,12 +509,6 @@ export interface NodeGroup {
 // still a member (membership is parentId alone — its branch arrow and color
 // stay), it just doesn't stretch the zone across the map to reach it. With
 // fewer than 3 corners in reach there is no outline at all.
-// The zone is the polygon through every member — the root and each child at
-// its own stored position, sorted by angle around their centroid so
-// connecting them in order traces a simple (non-self-crossing) outline: a
-// triangle at the 3-member minimum, growing to a quad/pentagon/… as the
-// group grows. Every corner is a member, and nothing is derived or moved:
-// each node is drawn exactly where it is, root included.
 // The order to connect a zone's corners in: by angle around their centroid,
 // which traces a simple (non-self-crossing) outline. Indexes into `pts`.
 export function outlineOrder(pts: Pt[]): number[] {
@@ -555,17 +549,9 @@ export function computeNodeGroups(
     // obstacle avoidance, "dragged clear of its circle" — treat as still
     // being part of the zone.
     const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
-    const corners =
-      near.length < 3
-        ? []
-        : near
-            .map((m, i) => ({ id: m.nodeId, p: pts[i] }))
-            .sort((a, b) => Math.atan2(a.p.y - cy, a.p.x - cx) - Math.atan2(b.p.y - cy, b.p.x - cx));
-    const outline = corners.map((c) => c.p);
-    const outlineIds = corners.map((c) => c.id);
-    const order = outlineOrder(pts);
+    const order = near.length < 3 ? [] : outlineOrder(pts);
     const outline = order.map((i) => pts[i]);
-    const outlineIds = order.map((i) => members[i].nodeId);
+    const outlineIds = order.map((i) => near[i].nodeId);
     groups.push({ rootId, members, sentiment, cx, cy, r, outline, outlineIds });
   }
   return groups;
