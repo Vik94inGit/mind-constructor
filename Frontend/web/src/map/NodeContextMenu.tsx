@@ -28,6 +28,15 @@ interface Props {
   /** Owner only: this node is locked (utils/blockLock.ts) — the menu offers Unlock instead of Lock. */
   blockLocked?: boolean;
   onToggleBlockLock?: () => void;
+  /** Owner only, puzzle cards only: taking it out of its puzzle on demand, or putting it back. */
+  puzzle?: {
+    detached: boolean;
+    /** Part of an assembled puzzle right now (clicked together with another piece). */
+    assembled: boolean;
+    onDetach: () => void;
+    onTakeApart: () => void;
+    onAttach: () => void;
+  };
   onClose: () => void;
 }
 
@@ -49,6 +58,7 @@ export function NodeContextMenu({
   onClose,
   blockLocked = false,
   onToggleBlockLock,
+  puzzle,
 }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -89,7 +99,8 @@ export function NodeContextMenu({
   // "Problematická varianta") wrap inside the root menu's normal 168px.
   const MENU_W = mode === "type" ? 220 : 168;
   const ITEM_H = 34;
-  const rootItemCount = (isOwner ? 5 + (onToggleBlockLock ? 1 : 0) : 0) + (canAttack ? 1 : 0);
+  const puzzleItemCount = !puzzle ? 0 : puzzle.detached ? 1 : puzzle.assembled ? 2 : 0;
+  const rootItemCount = (isOwner ? 5 + (onToggleBlockLock ? 1 : 0) + puzzleItemCount : 0) + (canAttack ? 1 : 0);
   const itemCount = mode === "type" ? NODE_TYPES.length + 1 : rootItemCount;
   const MENU_H = itemCount * ITEM_H + 10;
   const left = Math.min(x, window.innerWidth - MENU_W - 8);
@@ -130,6 +141,39 @@ export function NodeContextMenu({
             >
               {blockLocked ? `🔓 ${t.ui.display.unlockBlock}` : `🔒 ${t.ui.display.lockBlock}`}
             </button>
+          )}
+          {puzzle?.detached && (
+            <button
+              className={item}
+              onClick={() => {
+                puzzle.onAttach();
+                onClose();
+              }}
+            >
+              🧩 {t.ui.display.attachPiece}
+            </button>
+          )}
+          {puzzle && !puzzle.detached && puzzle.assembled && (
+            <>
+              <button
+                className={item}
+                onClick={() => {
+                  puzzle.onDetach();
+                  onClose();
+                }}
+              >
+                ✂️ {t.ui.display.detachPiece}
+              </button>
+              <button
+                className={item}
+                onClick={() => {
+                  puzzle.onTakeApart();
+                  onClose();
+                }}
+              >
+                🧱 {t.ui.display.takePuzzleApart}
+              </button>
+            </>
           )}
           <button className={itemDanger} onClick={onDelete}>
             {t.ui.contextMenu.delete}

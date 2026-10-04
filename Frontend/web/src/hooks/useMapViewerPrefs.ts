@@ -9,6 +9,8 @@ import type { ZoneDisplay } from "../utils/zoneDisplay";
 import { loadBlockLocks, saveBlockLocks } from "../utils/blockLock";
 import type { BlockLocks } from "../utils/blockLock";
 import { loadCardFills, saveCardFills } from "../utils/cardFill";
+import { loadDetachedPieces, saveDetachedPieces } from "../utils/pieceDetach";
+import type { DetachedPieces } from "../utils/pieceDetach";
 import type { CardFills } from "../utils/cardFill";
 import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
 import type { ReadingMode } from "../utils/readingMode";
@@ -67,6 +69,20 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
       return next;
     });
   }
+  // Puzzle pieces taken out of their puzzle — see utils/pieceDetach.ts.
+  const [detachedPieces, setDetachedPiecesState] = useState<DetachedPieces>(() => loadDetachedPieces(mapId));
+  /** Takes these pieces out of their puzzle (detached: true) or lets them back in. */
+  function setPiecesDetached(ids: string[], detached: boolean) {
+    setDetachedPiecesState((prev) => {
+      const next = { ...prev };
+      for (const id of ids) {
+        if (detached) next[id] = true;
+        else delete next[id];
+      }
+      saveDetachedPieces(mapId, next);
+      return next;
+    });
+  }
   // The viewer's own fill per puzzle piece — see utils/cardFill.ts.
   const [cardFills, setCardFills] = useState<CardFills>(() => loadCardFills(mapId));
   function setCardFill(nodeId: string, color: string | null) {
@@ -87,7 +103,13 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   mapIdRef.current = mapId;
   const loadedRef = useRef(false);
   // Exactly what was last taken from the server — not a change to send back.
-  const fromServerRef = useRef<{ nodeDisplay?: unknown; zoneDisplay?: unknown; cardFills?: unknown; blockLocks?: unknown }>({});
+  const fromServerRef = useRef<{
+    nodeDisplay?: unknown;
+    zoneDisplay?: unknown;
+    cardFills?: unknown;
+    blockLocks?: unknown;
+    detachedPieces?: unknown;
+  }>({});
   // Where the viewer was on this map last time (any device), for MapPage to go back to.
   const [savedView, setSavedView] = useState<{ center: { x: number; y: number } | null; selectedNodeId: string | null } | null>(null);
 
@@ -122,7 +144,8 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
           const zd = view.zoneDisplay ?? {};
           const cf = view.cardFills ?? {};
           const bl: BlockLocks = Object.fromEntries((view.blockLocks ?? []).map((id) => [id, true as const]));
-          fromServerRef.current = { nodeDisplay: nd, zoneDisplay: zd, cardFills: cf, blockLocks: bl };
+          const dp: DetachedPieces = Object.fromEntries((view.detachedPieces ?? []).map((id) => [id, true as const]));
+          fromServerRef.current = { nodeDisplay: nd, zoneDisplay: zd, cardFills: cf, blockLocks: bl, detachedPieces: dp };
           setNodeDisplay(nd);
           saveNodeDisplay(mapId, nd);
           setZoneDisplay(zd);
@@ -131,6 +154,8 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
           saveCardFills(mapId, cf);
           setBlockLocks(bl);
           saveBlockLocks(mapId, bl);
+          setDetachedPiecesState(dp);
+          saveDetachedPieces(mapId, dp);
           setSavedView({ center: view.center ?? null, selectedNodeId: view.selectedNodeId ?? null });
           // Opening it makes it the map they were last on.
           stateApi.saveMapViewState(mapId, {}).catch(() => {});
@@ -142,6 +167,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
               zoneDisplay: loadZoneDisplay(mapId),
               cardFills: loadCardFills(mapId),
               blockLocks: Object.keys(loadBlockLocks(mapId)),
+              detachedPieces: Object.keys(loadDetachedPieces(mapId)),
             })
             .catch(() => {});
           setSavedView({ center: null, selectedNodeId: null });
@@ -169,6 +195,10 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   useEffect(() => sendIfChanged("zoneDisplay", zoneDisplay, { zoneDisplay }), [zoneDisplay]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("cardFills", cardFills, { cardFills }), [cardFills]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("blockLocks", blockLocks, { blockLocks: Object.keys(blockLocks) }), [blockLocks]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(
+    () => sendIfChanged("detachedPieces", detachedPieces, { detachedPieces: Object.keys(detachedPieces) }),
+    [detachedPieces], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   // The app going to the background (or closing) sends what's waiting.
   useEffect(() => {
@@ -193,6 +223,8 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     toggleBlockLock,
     cardFills,
     setCardFill,
+    detachedPieces,
+    setPiecesDetached,
     savedView,
     saveView,
   };
