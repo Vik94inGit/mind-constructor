@@ -190,7 +190,7 @@ export function PuzzleCard({
   return (
     <div
       ref={ref}
-      // Found by MapPage's snapping (utils/puzzleSnap.ts) to measure the piece.
+      // Measured by usePuzzleCardSizes, which the puzzle assembly is laid out from.
       data-puzzle-card
       className="relative box-border text-left"
       style={{

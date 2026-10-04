@@ -10,7 +10,6 @@ import { sleep } from "../utils/sleep";
 import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
-import type { Snap } from "../utils/puzzleSnap";
 
 type Pt = { x: number; y: number };
 
@@ -54,12 +53,12 @@ interface Params {
   // which this hook now owns outright (see hooks/dragUIState.ts).
   suppressNextClick: MutableRefObject<boolean>;
   t: Translation;
-  /** Puzzle cards click together (utils/puzzleSnap.ts): where `node` dragged to (x,y) snaps to, if a fitting piece is close. */
-  snapFor?: (node: NodeDoc, x: number, y: number) => Snap | null;
-  /** A piece was dropped clicked into another (`snap.partnerId`). */
-  onSnapped?: (node: NodeDoc, snap: Snap) => void;
-  /** Every node that moves along with `node` as one unit (an assembled puzzle), `node` first. */
-  clusterFor?: (node: NodeDoc) => string[];
+  /**
+   * Touch: holding a node still. Return true when that was handled (a puzzle
+   * card opens its menu, with Lock / Unlock); otherwise the hold toggles the
+   * node in or out of the multi-selection.
+   */
+  onHold?: (node: NodeDoc, clientX: number, clientY: number) => boolean;
   /** Its owner locked this text block (utils/blockLock.ts) — held in place like Node.locked. */
   isBlockLocked?: (nodeId: string) => boolean;
 }
@@ -92,9 +91,7 @@ export function useNodeDragAndDrop({
   setMultiSelectIds,
   suppressNextClick,
   t,
-  snapFor,
-  onSnapped,
-  clusterFor,
+  onHold,
   isBlockLocked,
 }: Params) {
   // Held in place: a member of the chosen circle (Node.locked), or a text
@@ -322,14 +319,7 @@ export function useNodeDragAndDrop({
     // good (see the group-drag branch's own comment above); touch long-
     // press-to-multiselect still works on one, since picking a locked node
     // into some other selection doesn't move anything.
-    // Puzzle pieces clicked together drag as one (see clusterFor below), so a
-    // puzzle with any piece held in place is held as a whole.
-    const clusterIds = moveMode && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];
-    const clusterHeld = clusterIds.some((id) => {
-      const n = nodes.find((nn) => nn.nodeId === id);
-      return !!n && held(n);
-    });
-    if (!moveMode || held(node) || clusterHeld) {
+    if (!moveMode || held(node)) {
       if (e.pointerType !== "touch") return;
       const touchStartX = e.clientX;
       const touchStartY = e.clientY;
@@ -340,6 +330,7 @@ export function useNodeDragAndDrop({
         window.removeEventListener("pointermove", onIdleMove);
         window.removeEventListener("pointerup", onIdleUp);
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        if (onHold?.(node, touchStartX, touchStartY)) return;
         // Same contract onCanvasPointerDown's marquee onUp already follows —
         // starting a multi-selection always clears any stale single
         // selection, so it can't resurface (a NodePanel popping back open
@@ -389,31 +380,6 @@ export function useNodeDragAndDrop({
     const offsetX = startPt.x - start.x;
     const offsetY = startPt.y - start.y;
 
-    // Puzzle pieces clicked together move as one: dragging any of them
-    // carries the whole assembled puzzle along rigidly, every piece keeping
-    // its place against the others. Such a drag is a plain move of the lot —
-    // no clicking into another piece, joining a circle or leaving one.
-    const clusterStart =
-      clusterIds.length > 1
-        ? new Map(
-            clusterIds.flatMap((id) => {
-              const n = nodes.find((nn) => nn.nodeId === id);
-              return n ? [[id, id === node.nodeId ? start : posFor(n)] as const] : [];
-            }),
-          )
-        : null;
-    // The whole puzzle moved by (dx, dy), held inside the canvas as one —
-    // the shift is cut short rather than any one piece clamped out of place.
-    const movedCluster = (dx: number, dy: number) => {
-      const margin = 60;
-      const pts = Array.from(clusterStart!.values());
-      const lo = (k: "x" | "y") => Math.min(...pts.map((pt) => pt[k]));
-      const hi = (k: "x" | "y") => Math.max(...pts.map((pt) => pt[k]));
-      const cdx = Math.min(CANVAS_W - margin - hi("x"), Math.max(margin - lo("x"), dx));
-      const cdy = Math.min(CANVAS_H - margin - hi("y"), Math.max(margin - lo("y"), dy));
-      return new Map(Array.from(clusterStart!, ([id, pt]) => [id, { x: pt.x + cdx, y: pt.y + cdy }]));
-    };
-
     // Long-press to multi-select, touch only — there's no keyboard on a
     // phone to reach shift+click's own toggle any other way, and
     // marquee-drag is already claimed by native canvas panning on touch
@@ -439,6 +405,7 @@ export function useNodeDragAndDrop({
         window.removeEventListener("pointerup", onUp);
         dispatch({ type: "reset" });
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        if (onHold?.(node, touchStartX, touchStartY)) return;
         // See the other long-press timer's own comment above (the !moveMode
         // branch) — same "starting a multi-selection clears any stale
         // single selection" contract the marquee already follows.
@@ -458,30 +425,12 @@ export function useNodeDragAndDrop({
       };
     }
 
-    // The piece the dragged one is currently clicked into, if any.
-    let snappedTo: string | null = null;
     function onMove(ev: PointerEvent) {
       cancelLongPressIfMoved?.(ev);
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
       dragMoved.current = true;
-      if (clusterStart) {
-        dispatch({ type: "groupStart", positions: movedCluster(x - start.x, y - start.y) });
-        return;
-      }
-      // Close to a fitting puzzle piece: jump flush into it, and light the
-      // partner up. A clicked-in piece isn't joining a circle, so the drop
-      // target search is skipped.
-      const snap = snapFor?.(node, x, y);
-      if (snap) {
-        if (snappedTo !== snap.partnerId) navigator.vibrate?.(10);
-        snappedTo = snap.partnerId;
-        dispatch({ type: "dragSet", nodeId: node.nodeId, x: snap.x, y: snap.y });
-        dispatch({ type: "dropTargetSet", nodeId: snap.partnerId, valid: true });
-        return;
-      }
-      snappedTo = null;
       dispatch({ type: "dragSet", nodeId: node.nodeId, x, y });
       const found = findDropTarget(node, x, y);
       dispatch(
@@ -503,46 +452,6 @@ export function useNodeDragAndDrop({
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
-      if (clusterStart && dragMoved.current) {
-        const moved = movedCluster(x - start.x, y - start.y);
-        const before = new Map(nodes.filter((n) => moved.has(n.nodeId)).map((n) => [n.nodeId, { x: n.x, y: n.y }]));
-        dispatch({ type: "reset" });
-        setNodes((prev) => prev.map((n) => (moved.has(n.nodeId) ? { ...n, ...moved.get(n.nodeId)! } : n)));
-        setActionError(null);
-        const failed: string[] = [];
-        await Promise.all(
-          Array.from(moved, ([id, pt]) =>
-            nodesApi
-              .updateNode(id, pt)
-              .then(upsertNode)
-              .catch(() => failed.push(id)),
-          ),
-        );
-        if (failed.length) {
-          // Put back only what didn't save, so the canvas matches the server.
-          setNodes((prev) => prev.map((n) => (failed.includes(n.nodeId) ? { ...n, ...before.get(n.nodeId)! } : n)));
-          setActionError(t.ui.errors.moveNodes);
-        }
-        return;
-      }
-      const snap = dragMoved.current ? snapFor?.(node, x, y) : null;
-      if (snap) {
-        // Dropped clicked into another piece: it stays exactly there, flush
-        // against its partner (no overlap nudging — sitting right against it
-        // is the point), and the caller links the two.
-        dispatch({ type: "reset" });
-        const before = { x: node.x, y: node.y };
-        setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, x: snap.x, y: snap.y } : n)));
-        navigator.vibrate?.(20);
-        onSnapped?.(node, snap);
-        try {
-          upsertNode(await nodesApi.updateNode(node.nodeId, { x: snap.x, y: snap.y }));
-        } catch (err) {
-          setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
-          setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
-        }
-        return;
-      }
       const found = dragMoved.current ? findDropTarget(node, x, y) : null;
       dispatch({ type: "reset" });
       if (dragMoved.current) {
