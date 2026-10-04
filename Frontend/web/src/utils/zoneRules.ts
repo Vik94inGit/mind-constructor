@@ -1,4 +1,4 @@
-import { NODE_FOOTPRINT, avoidOverlap, outlineOrder } from "./canvasLayout";
+import { NODE_FOOTPRINT, avoidOverlap, getZoneReach, zoneCorners } from "./canvasLayout";
 import type { Obstacle, ViewportBounds } from "./canvasLayout";
 import { nodeRefId } from "./nodeType";
 import type { NodeDoc } from "../types";
@@ -139,6 +139,7 @@ export function makeZoneRule(
   positions: Map<string, Pt>,
   moving: MovingNode[],
   extra: ExtraNode[] = [],
+  reach: number = getZoneReach(),
 ): ZoneRule {
   const offsetOf = new Map(moving.map((m) => [m.nodeId, m.offset ?? { x: 0, y: 0 }]));
   const parentOf = new Map<string, string | null>();
@@ -180,7 +181,9 @@ export function makeZoneRule(
       if (!p) return null;
       pts.push(p);
     }
-    return outlineOrder(pts).map((i) => pts[i]);
+    // ids[0] is the root. Same compact shape the map draws (see zoneCorners).
+    const order = zoneCorners(pts, reach);
+    return order.length ? order.map((i) => pts[i]) : null;
   };
 
   // Zones none of the moving nodes are in keep their shape wherever they go.

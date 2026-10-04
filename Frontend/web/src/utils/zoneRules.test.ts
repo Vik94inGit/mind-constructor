@@ -6,6 +6,10 @@ import type { NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
 
+// These cases are about the rules themselves, on zones drawn wider than the
+// default reach (see getZoneReach); the reach gets its own test below.
+const WIDE = Infinity;
+
 // A triangle zone: root "r" at the top, children "a" and "b" below it.
 function triangleMap(extra: { node: NodeDoc; pos: Pt }[] = []) {
   const nodes = [
@@ -25,28 +29,28 @@ function triangleMap(extra: { node: NodeDoc; pos: Pt }[] = []) {
 
 function place(nodes: NodeDoc[], positions: Map<string, Pt>, desired: Pt, nodeId: string, parentId?: string | null) {
   const others = Array.from(positions).filter(([id]) => id !== nodeId).map(([, p]) => p);
-  const rule = makeZoneRule(nodes, positions, [{ nodeId, ...(parentId !== undefined ? { parentId } : {}) }]);
+  const rule = makeZoneRule(nodes, positions, [{ nodeId, ...(parentId !== undefined ? { parentId } : {}) }], [], WIDE);
   return { at: placeByZoneRules(desired, footprintObstacles(others, MIN_NODE_GAP), FULL_CANVAS_BOUNDS, rule), rule };
 }
 
 describe("makeZoneRule", () => {
   it("keeps a node with no zone out of a zone", () => {
     const { nodes, positions } = triangleMap();
-    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], WIDE);
     expect(rule.fits({ x: 1000, y: 750 })).toBe(false);
     expect(rule.fits({ x: 1000, y: 1100 })).toBe(true);
   });
 
   it("keeps a node off a zone's line, not just out of its inside", () => {
     const { nodes, positions } = triangleMap();
-    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], WIDE);
     // Just below the a–b edge.
     expect(rule.fits({ x: 1000, y: 920 })).toBe(false);
   });
 
   it("lets a member move around inside its own zone", () => {
     const { nodes, positions } = triangleMap();
-    const rule = makeZoneRule(nodes, positions, [{ nodeId: "a" }]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: "a" }], [], WIDE);
     expect(rule.fits({ x: 800, y: 850 })).toBe(true);
   });
 
@@ -54,7 +58,7 @@ describe("makeZoneRule", () => {
     const { nodes, positions } = triangleMap([
       { node: makeNode({ nodeId: "loner", parentId: null }), pos: { x: 700, y: 1300 } },
     ]);
-    const rule = makeZoneRule(nodes, positions, [{ nodeId: "a" }]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: "a" }], [], WIDE);
     // a dragged down past the loner: the triangle would now cover it.
     expect(rule.fits({ x: 600, y: 1500 })).toBe(false);
   });
@@ -65,7 +69,7 @@ describe("makeZoneRule", () => {
       { node: makeNode({ nodeId: "c", parentId: "r2" }), pos: { x: 1600, y: 900 } },
       { node: makeNode({ nodeId: "d", parentId: "r2" }), pos: { x: 2000, y: 900 } },
     ]);
-    const rule = makeZoneRule(nodes, positions, [{ nodeId: "c" }]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: "c" }], [], WIDE);
     // c pulled left under the first triangle: its zone's edge r2–c would cut
     // through the a–b edge without any corner landing inside.
     expect(rule.fits({ x: 900, y: 1150 })).toBe(false);
@@ -77,7 +81,7 @@ describe("makeZoneRule", () => {
       { node: makeNode({ nodeId: "a1", parentId: "a" }), pos: { x: 500, y: 1250 } },
       { node: makeNode({ nodeId: "a2", parentId: "a" }), pos: { x: 800, y: 1250 } },
     ]);
-    const rule = makeZoneRule(nodes, positions, [{ nodeId: "a2" }]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: "a2" }], [], WIDE);
     expect(rule.fits({ x: 820, y: 1250 })).toBe(true);
     // ...but its children still stay out of the parent zone.
     expect(rule.fits({ x: 1000, y: 800 })).toBe(false);
@@ -85,7 +89,7 @@ describe("makeZoneRule", () => {
 
   it("calls a spot compact only within ~2 cm of a node or zone line", () => {
     const { nodes, positions } = triangleMap();
-    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], WIDE);
     const nearB = { x: 1300, y: 900 + NODE_FOOTPRINT.h + MAX_ZONE_GAP - 5 };
     const farFromAll = { x: 2200, y: 1500 };
     expect(rule.compact(nearB)).toBe(true);
@@ -107,9 +111,19 @@ describe("makeZoneRule", () => {
     const rule = makeZoneRule(nodes, positions, [
       { nodeId: "x", offset: { x: 0, y: 0 } },
       { nodeId: "y", offset: { x: 300, y: 0 } },
-    ]);
+    ], [], WIDE);
     expect(rule.fits({ x: 700, y: 750 })).toBe(false);
     expect(rule.fits({ x: 200, y: 600 })).toBe(true);
+  });
+});
+
+describe("zone reach", () => {
+  it("doesn't treat a zone as one when its children sit past the reach", () => {
+    const { nodes, positions } = triangleMap();
+    // Both children are ~580 from the root, past the default reach: no zone
+    // shape for a stranger to stay out of.
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }]);
+    expect(rule.fits({ x: 1000, y: 750 })).toBe(true);
   });
 });
 
