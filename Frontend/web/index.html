@@ -2,8 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Installable app (see public/manifest.webmanifest and public/sw.js). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#f1e1cc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#12141b" media="(prefers-color-scheme: dark)" />
+    <!-- iPhone / iPad: "Add to Home Screen" opens it full screen, with this icon and name. -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Mind Constructor" />
     <title>Mind Constructor</title>
     <!-- Sets the light/dark data-theme attribute before the first paint —
          ThemeProvider (src/theme/ThemeContext.tsx) keeps it in sync after
