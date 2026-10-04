@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import * as offline from "../offline/sync";
 import type { ReadingMode } from "../utils/readingMode";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import type { ZoneDisplay } from "../utils/zoneDisplay";
@@ -36,6 +37,18 @@ export async function savePreferences(preferences: Preferences): Promise<Prefere
   const res = await apiRequest<{ success: boolean; preferences: Preferences }>("/api/state/preferences", {
     method: "PATCH",
     body: preferences,
+    offline: {
+      merge: true,
+      quiet: true,
+      optimistic: async () => {
+        let merged = preferences;
+        await offline.patchCached<{ preferences?: Preferences }>("/api/state", (prev) => {
+          merged = { ...prev.preferences, ...preferences };
+          return { ...prev, preferences: merged };
+        });
+        return { success: true, preferences: merged };
+      },
+    },
   });
   return res.preferences;
 }
@@ -47,7 +60,23 @@ export async function getMapViewState(mapId: string): Promise<MapViewState | nul
 
 /** Saves the given fields (an empty object just marks the map as the last one opened). */
 export async function saveMapViewState(mapId: string, fields: MapViewState): Promise<void> {
-  await apiRequest(`/api/state/maps/${mapId}`, { method: "PATCH", body: fields });
+  await apiRequest(`/api/state/maps/${mapId}`, {
+    method: "PATCH",
+    body: fields,
+    offline: {
+      merge: true,
+      quiet: true,
+      optimistic: async () => {
+        await offline.upsertCached<{ success: boolean; view: MapViewState | null }>(
+          `/api/state/maps/${mapId}`,
+          { success: true, view: null },
+          (prev) => ({ ...prev, view: { ...prev.view, ...fields } }),
+        );
+        await offline.patchCached<{ lastMapId?: string | null }>("/api/state", (prev) => ({ ...prev, lastMapId: mapId }));
+        return undefined;
+      },
+    },
+  });
 }
 
 export async function getDraft(kind: DraftKind): Promise<{ data: unknown; clientUpdatedAt: number } | null> {
@@ -58,9 +87,29 @@ export async function getDraft(kind: DraftKind): Promise<{ data: unknown; client
 }
 
 export async function saveDraft(kind: DraftKind, data: unknown, clientUpdatedAt: number): Promise<void> {
-  await apiRequest(`/api/state/drafts/${kind}`, { method: "PATCH", body: { data, clientUpdatedAt } });
+  await apiRequest(`/api/state/drafts/${kind}`, {
+    method: "PATCH",
+    body: { data, clientUpdatedAt },
+    offline: {
+      merge: true,
+      quiet: true,
+      optimistic: async () => {
+        await offline.setCached(`/api/state/drafts/${kind}`, { success: true, draft: { data, clientUpdatedAt } });
+        return undefined;
+      },
+    },
+  });
 }
 
 export async function deleteDraft(kind: DraftKind): Promise<void> {
-  await apiRequest(`/api/state/drafts/${kind}`, { method: "DELETE" });
+  await apiRequest(`/api/state/drafts/${kind}`, {
+    method: "DELETE",
+    offline: {
+      quiet: true,
+      optimistic: async () => {
+        await offline.setCached(`/api/state/drafts/${kind}`, { success: true, draft: null });
+        return undefined;
+      },
+    },
+  });
 }

@@ -1,15 +1,36 @@
 // Mind Constructor's service worker: what makes the app installable, and what
-// lets it open instantly (even on a poor connection) from its own copy of the
-// app's files. Map data is never cached here — /api always goes to the
-// server, so what's on screen is what's saved.
+// lets it open instantly — or with no connection at all — from its own copy
+// of the app's files. Map data is never cached here: /api always goes to the
+// network, and the app itself keeps its own offline copy of maps and the
+// changes waiting to be sent (src/offline/sync.ts).
 //
 // Bump VERSION to drop every old cached file on the next visit.
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = `mc-${VERSION}`;
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 
+// The built JS/CSS the current page links to. The very first visit loads
+// them before this worker is running, so without fetching them here too the
+// app's page would be cached but its code wouldn't, and it couldn't start offline.
+async function builtAssets() {
+  try {
+    const html = await (await fetch("/", { cache: "no-cache" })).text();
+    return [...new Set(html.match(/\/assets\/[^"'\s)]+/g) ?? [])];
+  } catch {
+    return [];
+  }
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then(async (cache) => {
+        await cache.addAll(SHELL);
+        await Promise.all((await builtAssets()).map((url) => cache.add(url).catch(() => {})));
+      })
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {

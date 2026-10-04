@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import * as authApi from "../api/auth";
+import { clearReadCache, setOfflineUser } from "../offline/sync";
 import type { User } from "../types";
 
 interface AuthContextValue {
@@ -22,8 +23,16 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUserState] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  // Told right away, not in an effect: pages below may already be saving
+  // something offline in their own first effects, which run before this
+  // provider's. Only this user's own offline changes are ever sent (see
+  // offline/sync.ts).
+  const setUser = useCallback((next: User | null) => {
+    setOfflineUser(next?._id ?? null);
+    setUserState(next);
+  }, []);
 
   useEffect(() => {
     // Relies purely on the mc_sid cookie (sent automatically, see
@@ -33,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .me()
       .then(setUser)
       .finally(() => setLoading(false));
-  }, []);
+  }, [setUser]);
 
   const login = useCallback(async (email: string, password: string) => {
     setUser(await authApi.login(email, password));
@@ -58,6 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await authApi.logout();
+    // What this browser kept of their maps isn't for whoever signs in next.
+    await clearReadCache();
     setUser(null);
   }, []);
 

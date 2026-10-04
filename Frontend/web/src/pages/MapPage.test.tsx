@@ -17,7 +17,7 @@ vi.mock("../context/AuthContext", () => ({
   useAuth: () => ({ user: { _id: "u1", username: "me", email: "me@x" }, logout: vi.fn() }),
 }));
 vi.mock("../api/socket", () => {
-  const socket = { on: vi.fn(), off: vi.fn(), connected: false };
+  const socket = { on: vi.fn(), off: vi.fn(), connected: false, io: { on: vi.fn(), off: vi.fn() } };
   return { getSocket: () => socket, joinMap: vi.fn(), leaveMap: vi.fn() };
 });
 vi.mock("../api/maps", () => ({

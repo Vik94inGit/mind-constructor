@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Navbar } from "./components/Navbar";
+import { OfflineBanner } from "./components/OfflineBanner";
 import { ProtectedRoute, AdminRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <OfflineBanner />
     </div>
   );
 }

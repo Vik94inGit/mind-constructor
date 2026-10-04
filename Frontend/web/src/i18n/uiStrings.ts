@@ -282,6 +282,18 @@ export interface UiStrings {
   cardMenuLabel: string;
   /** The "Think it through" flow — see thinkStrings.ts. */
   think: ThinkStrings;
+  /** The offline / syncing indicator — see components/OfflineBanner.tsx. */
+  offline: {
+    offline: string;
+    offlinePending: (count: number) => string;
+    pending: (count: number) => string;
+    syncing: (count: number) => string;
+    synced: string;
+    syncNow: string;
+    signIn: (count: number) => string;
+    failed: (count: number, error: string) => string;
+    dismiss: string;
+  };
   admin: {
     title: string;
     subtitle: string;
@@ -655,6 +667,17 @@ const en: UiStrings = {
   },
   think: THINK_STRINGS.en,
   cardMenuLabel: "Map menu",
+  offline: {
+    offline: "Offline — keep working, changes are saved on this device.",
+    offlinePending: (n) => `Offline — ${n} ${n === 1 ? "change" : "changes"} saved on this device, will sync when you're back online.`,
+    pending: (n) => `${n} ${n === 1 ? "change" : "changes"} waiting to sync.`,
+    syncing: (n) => `Syncing ${n} ${n === 1 ? "change" : "changes"}…`,
+    synced: "All changes synced.",
+    syncNow: "Sync now",
+    signIn: (n) => `Sign in again to sync ${n} ${n === 1 ? "change" : "changes"} made offline.`,
+    failed: (n, e) => `${n} offline ${n === 1 ? "change" : "changes"} couldn't be saved: ${e}`,
+    dismiss: "Dismiss",
+  },
   admin: {
     title: "Admin",
     subtitle: "Manage every registered user.",
@@ -1018,6 +1041,17 @@ const cs: UiStrings = {
   },
   think: THINK_STRINGS.cs,
   cardMenuLabel: "Nabídka mapy",
+  offline: {
+    offline: "Offline — pracujte dál, změny se ukládají v tomto zařízení.",
+    offlinePending: (n) => `Offline — ${n} ${csPlural(n, "změna uložena", "změny uloženy", "změn uloženo")} v tomto zařízení, synchronizují se po připojení.`,
+    pending: (n) => `${n} ${csPlural(n, "změna čeká", "změny čekají", "změn čeká")} na synchronizaci.`,
+    syncing: (n) => `Synchronizace: ${n} ${csPlural(n, "změna", "změny", "změn")}…`,
+    synced: "Všechny změny jsou synchronizovány.",
+    syncNow: "Synchronizovat",
+    signIn: (n) => `Přihlaste se znovu a synchronizujte ${n} ${csPlural(n, "změnu", "změny", "změn")} provedených offline.`,
+    failed: (n, e) => `${n} ${csPlural(n, "změnu", "změny", "změn")} z offline režimu nešlo uložit: ${e}`,
+    dismiss: "Zavřít",
+  },
   admin: {
     title: "Správa",
     subtitle: "Správa všech registrovaných uživatelů.",
@@ -1381,6 +1415,17 @@ const uk: UiStrings = {
   },
   think: THINK_STRINGS.uk,
   cardMenuLabel: "Меню мапи",
+  offline: {
+    offline: "Офлайн — працюйте далі, зміни зберігаються на цьому пристрої.",
+    offlinePending: (n) => `Офлайн — ${n} ${slavicPlural(n, "зміну", "зміни", "змін")} збережено на цьому пристрої, їх буде синхронізовано після підключення.`,
+    pending: (n) => `${n} ${slavicPlural(n, "зміна чекає", "зміни чекають", "змін чекають")} на синхронізацію.`,
+    syncing: (n) => `Синхронізація: ${n} ${slavicPlural(n, "зміна", "зміни", "змін")}…`,
+    synced: "Усі зміни синхронізовано.",
+    syncNow: "Синхронізувати",
+    signIn: (n) => `Увійдіть знову, щоб синхронізувати ${n} ${slavicPlural(n, "зміну", "зміни", "змін")}, зроблених офлайн.`,
+    failed: (n, e) => `Не вдалося зберегти ${n} ${slavicPlural(n, "офлайн-зміну", "офлайн-зміни", "офлайн-змін")}: ${e}`,
+    dismiss: "Закрити",
+  },
   admin: {
     title: "Адміністрування",
     subtitle: "Керування всіма зареєстрованими користувачами.",
@@ -1744,6 +1789,17 @@ const ru: UiStrings = {
   },
   think: THINK_STRINGS.ru,
   cardMenuLabel: "Меню карты",
+  offline: {
+    offline: "Офлайн — продолжайте работать, изменения сохраняются на этом устройстве.",
+    offlinePending: (n) => `Офлайн — ${n} ${slavicPlural(n, "изменение сохранено", "изменения сохранены", "изменений сохранено")} на этом устройстве, они синхронизируются после подключения.`,
+    pending: (n) => `${n} ${slavicPlural(n, "изменение ждёт", "изменения ждут", "изменений ждут")} синхронизации.`,
+    syncing: (n) => `Синхронизация: ${n} ${slavicPlural(n, "изменение", "изменения", "изменений")}…`,
+    synced: "Все изменения синхронизированы.",
+    syncNow: "Синхронизировать",
+    signIn: (n) => `Войдите снова, чтобы синхронизировать ${n} ${slavicPlural(n, "изменение", "изменения", "изменений")}, сделанных офлайн.`,
+    failed: (n, e) => `Не удалось сохранить ${n} ${slavicPlural(n, "офлайн-изменение", "офлайн-изменения", "офлайн-изменений")}: ${e}`,
+    dismiss: "Закрыть",
+  },
   admin: {
     title: "Администрирование",
     subtitle: "Управление всеми зарегистрированными пользователями.",

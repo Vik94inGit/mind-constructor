@@ -25,7 +25,7 @@ function getSocket(): Socket {
       // Called on every connect and reconnect, so it's always fresh. A
       // failed fetch just connects without one — the cookie may still do.
       auth: (cb) => {
-        apiRequest<{ token: string }>("/api/auth/socket-token")
+        apiRequest<{ token: string }>("/api/auth/socket-token", { cache: false })
           .then(({ token }) => cb({ token }))
           .catch(() => cb({}));
       },
