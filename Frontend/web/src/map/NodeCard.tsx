@@ -371,6 +371,8 @@ export const NodeCard = memo(function NodeCard({
     opacityClass,
     filterClass,
     chaotic && "animate-node-chaos-drift",
+    // A hovered dot's title (see the dotted branch below) sits above its neighbours.
+    "has-[[data-dot]:hover]:z-[55]",
   ]
     .filter(Boolean)
     .join(" ");
@@ -580,10 +582,20 @@ export const NodeCard = memo(function NodeCard({
         // distance icons, cards and badges are only noise, and the dots
         // still show where everything is and what kind it is.
         // The selected node too, ringed by its selection outline.
-        <div
-          className="pointer-events-auto h-3 w-3 rounded-full border border-surface"
-          style={{ background: circleBorderColor, outline: ringStyle.outline, outlineOffset: 2 }}
-        />
+        // Hovering a dot shows the node's title above it, so a zoomed-out
+        // map can still be read point by point.
+        <div className="group/dot relative flex justify-center">
+          <div
+            data-dot
+            className="pointer-events-auto h-3 w-3 rounded-full border border-surface"
+            style={{ background: circleBorderColor, outline: ringStyle.outline, outlineOffset: 2 }}
+          />
+          {captionLabel && (
+            <div className="pointer-events-none absolute bottom-[calc(100%+6px)] hidden max-w-[220px] truncate rounded-md border border-line bg-surface px-2 py-[0.15rem] text-[0.75rem] font-semibold whitespace-nowrap text-ink shadow-card group-hover/dot:block">
+              {captionLabel}
+            </div>
+          )}
+        </div>
       ) : (
       <>
       {/* pointer-events-auto: the one part of this node that takes the

@@ -6,6 +6,7 @@ import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
 import { useBackGuard } from "../hooks/useBackGuard";
+import { useIntroMigration } from "../hooks/useIntroMigration";
 import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
 import { useZoneFocus } from "../hooks/useZoneFocus";
 import { usePresentation } from "../hooks/usePresentation";
@@ -298,6 +299,8 @@ export function MapPage() {
   // zooming viewport onto the canvas — all derived before anything below
   // reads them.
   const positions = useMemo(() => computeBasePositions(nodes), [nodes]);
+  // Each node's drift during the map's opening animation — see posFor.
+  const introOffset = useIntroMigration(loading ? null : (mapId ?? null), positions);
   // Filters packed-away members out of every canvas rendering loop. Packing
   // (packAbl.ts) still exists as a relationship regardless — a container's
   // own count badge, and its "Packed (N)" unpack list in NodePanel, both
@@ -421,7 +424,10 @@ export function MapPage() {
     if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
     // Always the real position — the sentiment show's travel is drawn on top
     // of this directly on the canvas DOM (see useSentimentShow), never here.
-    const own = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const stored = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    // The map's opening animation: drifting out and back (useIntroMigration).
+    const drift = introOffset(node.nodeId);
+    const own = drift ? { x: stored.x + drift.x, y: stored.y + drift.y } : stored;
     // Presentation mode's own org-chart blend — checked ahead of the radial
     // selection ring below since the two are mutually exclusive in practice
     // (there's no NodePanel/selection to ring neighbors around while
@@ -685,20 +691,8 @@ export function MapPage() {
     zoomedToFitNotice: t.ui.display.zoomedToFit,
   });
 
-  // A map that's already crowded the moment it's opened gets the same
-  // "zoom in to make room" treatment a reading-mode change triggers —
-  // without this, a map that stays in the default icon view the whole time
-  // has no way to ever surface this at all, however crowded loading it left
-  // the canvas (see fitZoomForDisplay's own doc comment: it now checks
-  // icon-mode footprints too, not just text modes). Runs once, right as the
-  // initial load settles — keyed on `loading` alone, not on positions/nodes,
-  // so a node moving near another one mid-drag doesn't zoom the screen in
-  // on its own, fighting the gesture that caused it.
-  useEffect(() => {
-    if (loading) return;
-    fitZoomForDisplay(effectiveDisplay(), readingMode);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  // A map always opens at 100% (see useCanvasViewport's initial fit) — no
+  // zooming in on open, however crowded it is.
 
   // What any node creation/drag has to steer clear of so it never lands
   // inside a big group backdrop — the group's own members are exempt

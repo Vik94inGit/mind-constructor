@@ -702,11 +702,9 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
       cx = (minX + maxX) / 2;
       cy = (minY + maxY) / 2;
     }
-    wrap.scrollTo({
-      left: (cx + hScrollMargin) * zoom - wrap.clientWidth / 2,
-      top: (cy + vScrollMargin) * zoom - wrap.clientHeight / 2,
-    });
-    // zoom is read once, at fit time — a later zoom must not re-center.
+    // Always opens at 100%, whatever the last map was left at, with the
+    // middle of its nodes in the middle of the screen.
+    zoomNow(1, { canvasX: cx, canvasY: cy, offX: wrap.clientWidth / 2, offY: wrap.clientHeight / 2 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, mapId, hScrollMargin, vScrollMargin, positions]);
 
