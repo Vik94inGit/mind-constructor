@@ -500,15 +500,6 @@ export interface NodeGroup {
 // list — a root can be visible via its children even if something unusual
 // hid the root node itself.
 //
-// The zone is the polygon through the root and every child within
-// getZoneReach() of it — each at its own stored position, sorted by angle
-// around their centroid so connecting them in order traces a simple
-// (non-self-crossing) outline: a triangle at the 3-member minimum, growing to
-// a quad/pentagon/… as the group grows. Nothing is derived or moved: each
-// node is drawn exactly where it is, root included. A child farther out is
-// still a member (membership is parentId alone — its branch arrow and color
-// stay), it just doesn't stretch the zone across the map to reach it. With
-// fewer than 3 corners in reach there is no outline at all.
 // The zone is the polygon through the root and each child at
 // its own stored position, sorted by angle around their centroid so
 // connecting them in order traces a simple (non-self-crossing) outline: a
@@ -570,9 +561,6 @@ export function computeNodeGroups(
     // obstacle avoidance, "dragged clear of its circle" — treat as still
     // being part of the zone.
     const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
-    const order = near.length < 3 ? [] : outlineOrder(pts);
-    const outline = order.map((i) => pts[i]);
-    const outlineIds = order.map((i) => near[i].nodeId);
     const outline = order.map((i) => all[i]);
     const outlineIds = order.map((i) => members[i].nodeId);
     groups.push({ rootId, members, sentiment, cx, cy, r, outline, outlineIds });
