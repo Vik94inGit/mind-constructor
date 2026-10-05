@@ -13,6 +13,8 @@ interface Props {
   /** Owner only; absent (no item) for a demo map, which has nowhere to go after. */
   onDeleteMap?: () => void;
   onClose: () => void;
+  /** Where it opens from its button: below (top toolbar) or to the right (desktop side panel). */
+  side?: "below" | "right";
 }
 
 // The top toolbar's whole surface area: a single "+" trigger (see MapPage's
@@ -34,6 +36,7 @@ export function AddMenu({
   onExportText,
   onDeleteMap,
   onClose,
+  side = "below",
 }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -61,7 +64,7 @@ export function AddMenu({
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-[calc(100%+0.4rem)] z-[60] flex min-w-[170px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
+      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex min-w-[170px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
     >
       {isOwner && (
         <button className={item} onClick={onInvite}>

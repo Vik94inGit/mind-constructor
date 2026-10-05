@@ -1,5 +1,5 @@
 import type { Language } from "./translations";
-import type { NodeType } from "../types";
+import type { MapKind, NodeType } from "../types";
 import type { TemplateNodeKey } from "../utils/templates";
 import { THINK_STRINGS } from "./thinkStrings";
 import type { ThinkStrings } from "./thinkStrings";
@@ -38,6 +38,8 @@ export interface UiStrings {
     failed: string;
     nodes: Record<TemplateNodeKey, { title: string; text: string }>;
   };
+  /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
+  canvasMenu: { newNode: string; structures: Record<MapKind, string> };
   contextMenu: {
     createBranch: string;
     edit: string;
@@ -398,6 +400,10 @@ const en: UiStrings = {
       tryNext1: { title: "Change 1", text: "One thing we will do differently" },
       tryNext2: { title: "Change 2", text: "Another change to try" },
     },
+  },
+  canvasMenu: {
+    newNode: "New node",
+    structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)" },
   },
   contextMenu: {
     createBranch: "Create branch",
@@ -773,6 +779,10 @@ const cs: UiStrings = {
       tryNext2: { title: "Změna 2", text: "Další změna k vyzkoušení" },
     },
   },
+  canvasMenu: {
+    newNode: "Nový uzel",
+    structures: { problem: "Analyzovat problém", goal: "Naplánovat cíl", decision: "Rozhodnout se", retro: "Ohlédnutí (retrospektiva)" },
+  },
   contextMenu: {
     createBranch: "Vytvořit větev",
     edit: "Upravit",
@@ -1147,6 +1157,10 @@ const uk: UiStrings = {
       tryNext2: { title: "Зміна 2", text: "Ще одна зміна для спроби" },
     },
   },
+  canvasMenu: {
+    newNode: "Новий вузол",
+    structures: { problem: "Проаналізувати проблему", goal: "Спланувати ціль", decision: "Ухвалити рішення", retro: "Озирнутися назад (ретроспектива)" },
+  },
   contextMenu: {
     createBranch: "Створити гілку",
     edit: "Редагувати",
@@ -1520,6 +1534,10 @@ const ru: UiStrings = {
       tryNext1: { title: "Изменение 1", text: "Одна вещь, которую мы сделаем иначе" },
       tryNext2: { title: "Изменение 2", text: "Ещё одно изменение для проверки" },
     },
+  },
+  canvasMenu: {
+    newNode: "Новый узел",
+    structures: { problem: "Проанализировать проблему", goal: "Спланировать цель", decision: "Принять решение", retro: "Оглянуться назад (ретроспектива)" },
   },
   contextMenu: {
     createBranch: "Создать ветку",

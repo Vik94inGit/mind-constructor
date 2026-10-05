@@ -5,11 +5,11 @@ import { CANVAS_W, CANVAS_H, getCirclePackSpacing, nodeObstacles } from "../util
 import type { Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import { NEW_NODE_ID } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
-import { layoutTemplate } from "../utils/templates";
+import { layoutTemplate, MAP_KIND_ROOTS } from "../utils/templates";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import { sleep } from "../utils/sleep";
 import type { Translation } from "../i18n/translations";
-import type { NodeDoc, NodeType } from "../types";
+import type { MapKind, NodeDoc, NodeType } from "../types";
 
 type Pt = { x: number; y: number };
 
@@ -79,9 +79,10 @@ export function useNodeCreation({
   // effect confirmPendingCreate uses) and a deliberate pause before the
   // next, so growing a whole template branch reads as it building itself
   // step by step instead of popping in as a single flash.
-  async function applyTemplate(kind: TemplateKind, root: NodeDoc) {
+  async function applyTemplate(kind: TemplateKind, root: NodeDoc, at?: Pt) {
     if (!mapId) return;
-    const rootPos = positions.get(root.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    // `at`: a root created a moment ago isn't in `positions` yet.
+    const rootPos = at ?? positions.get(root.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
     // Same obstacle set createCircle's own children-fanning uses (plain
     // nodes, root included explicitly, plus every existing zone backdrop) —
     // without it, layoutTemplate had no idea what else was already on the
@@ -214,5 +215,34 @@ export function useNodeCreation({
     }
   }
 
-  return { confirmPendingCreate, applyTemplate, createCircle };
+  // The empty canvas's right-click menu ("Analyze a problem", "Plan a goal"…):
+  // the same starter structure a new map of that kind is seeded with (see
+  // utils/seedMap.ts), grown right where the user clicked — its root node
+  // first, then the rest of the template around it.
+  async function growStructure(kind: MapKind, desired: Pt) {
+    if (!mapId) return;
+    setActionError(null);
+    const root = MAP_KIND_ROOTS[kind];
+    const pos = placeNode(desired, [{ nodeId: NEW_NODE_ID, parentId: null }]);
+    try {
+      const copy = t.ui.templates.nodes[root.key];
+      const rootNode = await nodesApi.createNode(mapId, {
+        text: copy.text,
+        title: copy.title,
+        type: root.type,
+        x: pos.x,
+        y: pos.y,
+        parentId: null,
+      });
+      upsertNode(rootNode);
+      setCelebrateIds((prev) => new Set(prev).add(rootNode.nodeId));
+      setSelectedId(null);
+      await sleep(TEMPLATE_NODE_STAGGER_MS);
+      await applyTemplate(root.template, rootNode, pos);
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
+    }
+  }
+
+  return { confirmPendingCreate, applyTemplate, createCircle, growStructure };
 }
