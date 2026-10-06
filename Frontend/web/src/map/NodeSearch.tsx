@@ -11,6 +11,8 @@ interface Props {
   onMatches: (ids: Set<string> | null) => void;
   onPick: (nodeId: string) => void;
   onClose: () => void;
+  /** Where it opens from its button: below (top toolbar) or to the right (desktop side panel). */
+  side?: "below" | "right";
 }
 
 const MAX_RESULTS = 8;
@@ -21,7 +23,7 @@ const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 // The toolbar's node search: type to find nodes by their title, text or zone
 // name. Matching nodes stay lit on the canvas while the rest dim; clicking a
 // result selects that node and brings it to the middle of the screen.
-export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, onClose }: Props) {
+export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, onClose, side = "below" }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState("");
@@ -67,7 +69,7 @@ export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, onClose }: P
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-[calc(100%+0.4rem)] z-[60] flex w-[min(300px,calc(100vw-1.5rem))] flex-col gap-[0.35rem] rounded-card border border-line bg-surface p-[0.5rem] shadow-card"
+      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex w-[min(300px,calc(100vw-1.5rem))] flex-col gap-[0.35rem] rounded-card border border-line bg-surface p-[0.5rem] shadow-card`}
     >
       <input
         autoFocus

@@ -44,6 +44,8 @@ interface Props {
   onDeleteMap: () => void;
   /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay) — offered from the "view" (eye icon) menu below, alongside reading mode. Not owner-gated — anyone viewing a map should be able to self-present it. */
   onPresent: () => void;
+  /** Computer mode (see hooks/useDesktopLayout): a panel docked down the left edge instead of a floating top-left cluster. */
+  vertical?: boolean;
 }
 
 const iconBtn =
@@ -83,6 +85,7 @@ export function MapToolbar({
   onExportText,
   onDeleteMap,
   onPresent,
+  vertical = false,
 }: Props) {
   const { t } = useI18n();
   // Each dropdown's own open/closed state.
@@ -95,9 +98,21 @@ export function MapToolbar({
     action();
   };
 
+  // Menus open beside a docked panel's button rather than below it.
+  const side = vertical ? "right" : "below";
+  // The docked panel never covers the canvas, so it has no reason to collapse.
+  const showAll = expanded || vertical;
+
   return (
-    <div className="absolute top-3 left-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
-      {expanded ? (
+    <div
+      className={
+        vertical
+          ? "z-[45] flex h-full w-[4.75rem] shrink-0 flex-col items-center gap-1 border-r border-line bg-surface px-1 py-2 shadow-card"
+          : "absolute top-3 left-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
+      }
+      role={vertical ? "navigation" : undefined}
+    >
+      {showAll ? (
         <>
           {!isDemo && (
             <Link
@@ -122,6 +137,7 @@ export function MapToolbar({
             </button>
             {showAddMenu && (
               <AddMenu
+                side={side}
                 isOwner={isOwner}
                 onClose={() => setShowAddMenu(false)}
                 onInvite={closeAddThen(onInvite)}
@@ -180,6 +196,7 @@ export function MapToolbar({
             </button>
             {showReadingMenu && (
               <ReadingModeMenu
+                side={side}
                 mode={readingMode}
                 compact={compact}
                 onToggleCompact={onToggleCompact}
@@ -210,6 +227,7 @@ export function MapToolbar({
             </button>
             {showSearch && (
               <NodeSearch
+                side={side}
                 nodes={nodes}
                 onLoadTexts={onLoadTexts}
                 onMatches={onSearchMatches}
@@ -221,7 +239,14 @@ export function MapToolbar({
           {/* The global Navbar (which normally hosts these) is hidden on the
               map route — see App.tsx's onMapPage check — so this is the only
               place a map-page user can reach them. */}
-          <div className="ml-1 flex items-center gap-1 border-l border-line pl-1">
+          {/* Docked: pinned to the bottom of the panel, like a taskbar's tray. */}
+          <div
+            className={
+              vertical
+                ? "order-last mt-auto flex flex-col items-center gap-1 border-t border-line pt-2"
+                : "ml-1 flex items-center gap-1 border-l border-line pl-1"
+            }
+          >
             <LanguageSwitcher />
             <ThemeToggle />
           </div>
@@ -264,7 +289,7 @@ export function MapToolbar({
       {isDemo && (
         <button
           type="button"
-          className="ml-1 inline-flex h-7 cursor-pointer items-center justify-center rounded-md border border-line bg-transparent px-2 text-[0.72rem] font-semibold whitespace-nowrap text-ink hover:bg-surface-2"
+          className={`${vertical ? "mt-1 w-full whitespace-normal" : "ml-1 whitespace-nowrap"} inline-flex min-h-7 cursor-pointer items-center justify-center rounded-md border border-line bg-transparent px-2 text-[0.72rem] font-semibold text-ink hover:bg-surface-2`}
           title={t.ui.demo.exitTitle}
           onClick={onExitDemo}
         >

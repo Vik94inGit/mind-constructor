@@ -49,6 +49,25 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   weapon marks, quick-add ghosts) and the view glides to the middle of the map; zones near the
   middle of the view stay at full strength while the rest are muted; selecting a node centers it on
   screen.
+- **Right-click on empty canvas** — a desktop-style menu at the click point: *Paste here*, *New node ▸*
+  (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
+  (retrospective)* (grows that map kind's starter structure right there, see `utils/templates.ts`),
+  and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+- **Computer mode** — on a wide screen with a mouse/trackpad (`hooks/useDesktopLayout.ts`), the map's
+  toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
+  opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
+  floating top-left cluster.
+- **Offline** — the dashboard and every map you've opened before still open with no connection
+  (the service worker keeps the app's files, `src/offline/` keeps the last copy of your data in
+  IndexedDB). You can keep working: creating, editing, moving and deleting nodes, links and lines,
+  creating/renaming/deleting maps and folders. Each change answers right away and waits in an
+  outbox; when the server is reachable again they're sent in order, and anything made offline gets
+  its real id swapped in for the temporary `local_…` one in every later request. A pill at the
+  bottom shows offline / waiting / syncing, and which changes the server refused (e.g. a node
+  someone else deleted meanwhile — the server's state wins). Attacks, shields, packing, hiding a
+  branch, choosing a circle and inviting need a connection, since only the server can decide them.
+  Changes are tagged with the account that made them and only ever sent for that account; signing
+  out clears the kept copy of the data but not unsent changes. See `src/offline/sync.ts`.
 - **Admin** (`/admin`) — visible only if your account's `role` is `admin` (granted with
   `npm run admin:promote` in `Backend/`, never through the app itself). Block/unblock/delete
   users, wipe the database.

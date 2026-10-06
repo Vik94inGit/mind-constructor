@@ -14,6 +14,7 @@ import { usePuzzleConnect } from "../hooks/usePuzzleConnect";
 import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
+import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
 import { useChosenCircle } from "../hooks/useChosenCircle";
 import { usePackMode } from "../hooks/usePackMode";
@@ -101,6 +102,7 @@ const EMPTY_POINTS: { x: number; y: number }[] = [];
 export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
+  const desktopLayout = useDesktopLayout();
   // A back swipe / back button doesn't leave the map — only the toolbar's ←
   // does (see useBackGuard).
   useBackGuard();
@@ -1310,7 +1312,7 @@ export function MapPage() {
 
   // Every way a new node gets made — the pending-node input's confirm, a
   // template branch, "Create circle". See hooks/useNodeCreation.ts.
-  const { confirmPendingCreate, applyTemplate, createCircle } = useNodeCreation({
+  const { confirmPendingCreate, applyTemplate, createCircle, growStructure } = useNodeCreation({
     mapId,
     positions,
     pendingCreate,
@@ -1468,12 +1470,54 @@ export function MapPage() {
     return childCaptionsCoveringParents(children, shownParents.map(captionSpec), zoom);
   })();
 
+  // The map's toolbar: a floating top-left cluster, or in computer mode a
+  // panel docked down the left edge, like a desktop's taskbar / main menu
+  // (see hooks/useDesktopLayout.ts).
+  const renderToolbar = (vertical: boolean) => (
+    <MapToolbar
+      vertical={vertical}
+      isDemo={!!user?.isDemo}
+      isOwner={isOwner}
+      isDiscussionMode={isDiscussionMode}
+      expanded={!quickAddActive || forceShowToolbar}
+      onExpand={() => setForceShowToolbar(true)}
+      moveMode={moveMode}
+      onToggleMove={() => setMoveMode((v) => !v)}
+      drawMode={drawMode}
+      onToggleDraw={toggleDrawMode}
+      readingMode={readingMode}
+      onPickReadingMode={setReadingMode}
+      compact={compactView}
+      onToggleCompact={toggleCompactView}
+      nodes={visibleNodes}
+      onLoadTexts={async () => {
+        await ensureNodeText(visibleNodes.map((n) => n.nodeId));
+      }}
+      onSearchMatches={setSearchMatches}
+      onPickSearchResult={(id) => {
+        setSelectedId(id);
+        centerOnNode(id);
+      }}
+      onToggleMapMode={toggleMapMode}
+      onExitDemo={exitDemo}
+      onInvite={() => setShowInvite(true)}
+      onCreateNode={startCreateNodeInView}
+      onCreateCircle={createCircle}
+      onCopyMap={copyWholeMap}
+      onPaste={() => pasteClipboard()}
+      onExportText={openExportText}
+      onDeleteMap={deleteThisMap}
+      onPresent={enterPresentation}
+    />
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {notice && <MapBanner tone="success" message={notice} onDismiss={dismissNotice} />}
       {actionError && <MapBanner tone="danger" message={actionError} onDismiss={() => setActionError(null)} />}
 
       <div className="flex min-h-0 flex-1">
+        {desktopLayout && !presenting && renderToolbar(true)}
         {/* This extra wrapper exists purely so MiniMap has somewhere to sit
             that's positioned relative to the *viewport* (this flex cell)
             rather than the scrolling canvas itself — an absolutely
@@ -1868,40 +1912,7 @@ export function MapPage() {
                 }}
               />
 
-              <MapToolbar
-                isDemo={!!user?.isDemo}
-                isOwner={isOwner}
-                isDiscussionMode={isDiscussionMode}
-                expanded={!quickAddActive || forceShowToolbar}
-                onExpand={() => setForceShowToolbar(true)}
-                moveMode={moveMode}
-                onToggleMove={() => setMoveMode((v) => !v)}
-                drawMode={drawMode}
-                onToggleDraw={toggleDrawMode}
-                readingMode={readingMode}
-                onPickReadingMode={setReadingMode}
-                compact={compactView}
-                onToggleCompact={toggleCompactView}
-                nodes={visibleNodes}
-                onLoadTexts={async () => {
-                  await ensureNodeText(visibleNodes.map((n) => n.nodeId));
-                }}
-                onSearchMatches={setSearchMatches}
-                onPickSearchResult={(id) => {
-                  setSelectedId(id);
-                  centerOnNode(id);
-                }}
-                onToggleMapMode={toggleMapMode}
-                onExitDemo={exitDemo}
-                onInvite={() => setShowInvite(true)}
-                onCreateNode={startCreateNodeInView}
-                onCreateCircle={createCircle}
-                onCopyMap={copyWholeMap}
-                onPaste={() => pasteClipboard()}
-                onExportText={openExportText}
-                onDeleteMap={deleteThisMap}
-                onPresent={enterPresentation}
-              />
+              {!desktopLayout && renderToolbar(false)}
 
               <ZoomControls
                 zoom={zoom}
@@ -2108,6 +2119,16 @@ export function MapPage() {
             setCanvasContextMenu(null);
             setInlineEditId(null);
             setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null });
+          }}
+          onGrow={(kind) => {
+            const at = { x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY };
+            setCanvasContextMenu(null);
+            setInlineEditId(null);
+            void growStructure(kind, at);
+          }}
+          onTextToMap={() => {
+            setCanvasContextMenu(null);
+            navigate("/split");
           }}
         />
       )}

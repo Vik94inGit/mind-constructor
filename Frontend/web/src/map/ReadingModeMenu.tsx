@@ -12,13 +12,15 @@ interface Props {
    *  rather than its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
   onClose: () => void;
+  /** Where it opens from its button: below (top toolbar) or to the right (desktop side panel). */
+  side?: "below" | "right";
 }
 
 // The toolbar's "view" (eye icon) dropdown — which way the map reads (see
 // utils/readingMode.ts), plus the entry point into presentation mode. Same
 // open-downward, dismiss-on-outside-click/Escape pattern as AddMenu,
 // positioned by a `relative` wrapper around its trigger.
-export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, onPresent, onClose }: Props) {
+export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, onPresent, onClose, side = "below" }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -47,7 +49,7 @@ export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, onPres
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-[calc(100%+0.4rem)] z-[60] flex min-w-[210px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
+      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex min-w-[210px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
     >
       {READING_MODES.map((m, i) => (
         <button

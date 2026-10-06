@@ -1,8 +1,12 @@
 import { apiRequest } from "./client";
+import * as offline from "../offline/sync";
+import { upsertBy } from "../utils/mapGraph";
 import type { Attack, AttackNodeType, NodeDoc, NodeType, Weapon } from "../types";
 
 export async function listNodes(mapId: string): Promise<NodeDoc[]> {
-  return apiRequest<NodeDoc[]>(`/api/${mapId}/nodes`);
+  const nodes = await apiRequest<NodeDoc[]>(`/api/${mapId}/nodes`);
+  offline.rememberNodes(nodes);
+  return nodes;
 }
 
 export async function getNode(nodeId: string): Promise<NodeDoc> {
@@ -26,11 +30,66 @@ export async function createNode(
     manualZone?: NodeDoc["manualZone"];
   },
 ): Promise<NodeDoc> {
-  return apiRequest<NodeDoc>(`/api/nodes/${mapId}`, { method: "POST", body: input });
+  const localId = offline.newLocalId();
+  const node = await apiRequest<NodeDoc>(`/api/nodes/${mapId}`, {
+    method: "POST",
+    body: input,
+    offline: {
+      localId,
+      idKey: "nodeId",
+      // Same defaults the backend's Node model fills in.
+      optimistic: async () => {
+        const now = new Date().toISOString();
+        const draft: NodeDoc = {
+          title: "",
+          order: null,
+          zoneName: "",
+          sizeTier: null,
+          symbolOverride: null,
+          manualZone: null,
+          ...input,
+          parentId: input.parentId ?? null,
+          nodeId: localId,
+          mapId,
+          userId: offline.getOfflineUserId() ?? "",
+          health: 100,
+          defeated: false,
+          blockedDamage: 0,
+          packedIntoNodeId: null,
+          locked: false,
+          hiddenFromMembers: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        // So the map opens with it even if the canvas isn't up yet (a map made and seeded offline).
+        await offline.upsertCached<NodeDoc[]>(`/api/${mapId}/nodes`, [], (list) =>
+          upsertBy(list, draft, (n) => n.nodeId),
+        );
+        await offline.rememberTexts(mapId, { [localId]: input.text });
+        return draft;
+      },
+    },
+  });
+  offline.rememberNodes([node]);
+  return node;
 }
 
 export async function updateNode(nodeId: string, updates: Partial<NodeDoc>): Promise<NodeDoc> {
-  return apiRequest<NodeDoc>(`/api/nodes/${nodeId}`, { method: "PATCH", body: updates });
+  const node = await apiRequest<NodeDoc>(`/api/nodes/${nodeId}`, {
+    method: "PATCH",
+    body: updates,
+    offline: {
+      // A drag sends a move per drop; offline, one request with the last position is enough.
+      merge: true,
+      optimistic: () => ({
+        ...(offline.knownNode<NodeDoc>(nodeId) ?? ({ nodeId } as NodeDoc)),
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      }),
+    },
+  });
+  offline.rememberNodes([node]);
+  return node;
 }
 
 // damagedProtectedNode: set only when the deleted node was a protection
@@ -40,7 +99,11 @@ export async function updateNode(nodeId: string, updates: Partial<NodeDoc>): Pro
 export async function deleteNode(nodeId: string) {
   return apiRequest<{ success: boolean; deletedId: string; damagedProtectedNode: NodeDoc | null }>(
     `/api/nodes/${nodeId}`,
-    { method: "DELETE" },
+    {
+      method: "DELETE",
+      // Offline, a shield's banked damage lands on its target only once the server deletes it.
+      offline: { optimistic: () => ({ success: true, deletedId: nodeId, damagedProtectedNode: null }) },
+    },
   );
 }
 
@@ -53,7 +116,16 @@ export async function deleteManyNodes(nodeIds: string[]) {
   return apiRequest<{
     success: boolean;
     deleted: { deletedId: string; damagedProtectedNode: NodeDoc | null }[];
-  }>(`/api/nodes`, { method: "DELETE", body: { nodeIds } });
+  }>(`/api/nodes`, {
+    method: "DELETE",
+    body: { nodeIds },
+    offline: {
+      optimistic: () => ({
+        success: true,
+        deleted: nodeIds.map((deletedId) => ({ deletedId, damagedProtectedNode: null })),
+      }),
+    },
+  });
 }
 
 // Attacking always creates a real content node alongside the damage — type

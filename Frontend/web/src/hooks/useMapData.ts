@@ -5,6 +5,8 @@ import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import * as linesApi from "../api/lines";
 import { ApiRequestError } from "../api/client";
+import { getSocket } from "../api/socket";
+import * as offline from "../offline/sync";
 import { useMapSocket } from "./useMapSocket";
 import { upsertBy } from "../utils/mapGraph";
 import type { AttackIndicator, EdgeDoc, LineDoc, MapDoc, NodeDoc, SelectedCircle } from "../types";
@@ -177,6 +179,67 @@ export function useMapData({ mapId, setSelectedId, setCelebrateIds, loadErrorMes
       // best-effort: the next full load picks it up
     }
   }, [mapId]);
+
+  // What's on screen is also kept in this browser, under the same keys the
+  // GETs above are cached by (see offline/sync.ts) — so this map opens
+  // offline exactly as it was left, changes from others and offline edits
+  // included. Debounced: a drag changes `nodes` on every frame.
+  useEffect(() => {
+    offline.rememberNodes(nodes);
+  }, [nodes]);
+  useEffect(() => {
+    if (!mapId || loading || error || !map) return;
+    const save = () => {
+      void offline.setCached(`/api/${mapId}`, { success: true, map });
+      void offline.setCached(`/api/${mapId}/nodes`, nodes);
+      void offline.setCached(`/api/${mapId}/edges`, edges);
+      void offline.setCached(`/api/${mapId}/lines`, lines);
+      void offline.rememberTexts(mapId, Object.fromEntries(nodes.map((n) => [n.nodeId, n.text])));
+    };
+    const timer = setTimeout(save, 400);
+    return () => clearTimeout(timer);
+  }, [mapId, loading, error, map, nodes, edges, lines]);
+
+  // Catching up: once the changes made offline are all on the server (or the
+  // live connection comes back after missing whatever others did meanwhile),
+  // swap in the server's own copy — real ids for temporary ones included.
+  const refreshAll = useCallback(async () => {
+    if (!mapId) return;
+    try {
+      const [mapDoc, nodeList, edgeList, lineList] = await Promise.all([
+        mapsApi.getMap(mapId),
+        nodesApi.listNodes(mapId),
+        edgesApi.listEdges(mapId),
+        linesApi.listLines(mapId).catch(() => [] as LineDoc[]),
+      ]);
+      setMap(mapDoc);
+      setNodes((prev) => {
+        const known = new Map(prev.map((n) => [offline.resolveId(n.nodeId), n.text]));
+        return nodeList.map((n) => ({ ...n, text: n.text ?? known.get(n.nodeId) ?? "" }));
+      });
+      setEdges(edgeList);
+      setLines(lineList);
+      refreshInsights(mapId);
+    } catch {
+      // Still offline after all — what's on screen stays.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapId]);
+
+  useEffect(() => {
+    if (!mapId || loading) return;
+    const offSynced = offline.onSynced((ids) => {
+      setSelectedId((prev) => (prev && ids[prev] ? ids[prev] : prev));
+      void refreshAll();
+    });
+    const manager = getSocket().io;
+    const onReconnect = () => void refreshAll();
+    manager.on("reconnect", onReconnect);
+    return () => {
+      offSynced();
+      manager.off("reconnect", onReconnect);
+    };
+  }, [mapId, loading, refreshAll, setSelectedId]);
 
   useMapSocket({
     mapId,
