@@ -296,6 +296,44 @@ export interface UiStrings {
     failed: (count: number, error: string) => string;
     dismiss: string;
   };
+  /** Pictures on a node — see map/nodePanel/ImagesSection.tsx. */
+  images: {
+    title: string;
+    add: string;
+    hint: string;
+    remove: string;
+    open: string;
+    close: string;
+    loading: string;
+    limit: (max: number) => string;
+    tooLarge: string;
+    failed: string;
+  };
+  /** "Text → nodes" right on the map — see map/TextToNodesModal.tsx. */
+  textNodes: {
+    entry: string;
+    title: string;
+    hint: string;
+    withRoot: string;
+    next: string;
+    back: string;
+    markHint: string;
+    splitLines: string;
+    splitSentences: string;
+    add: (count: number) => string;
+    adding: (done: number, total: number) => string;
+    nothing: string;
+    noRoom: string;
+    overflowTitle: string;
+    overflow: (fit: number, total: number) => string;
+    packHint: (need: number) => string;
+    packNeedsRoot: string;
+    useRoot: string;
+    picked: (picked: number, need: number) => string;
+    addAndPack: (shown: number, packed: number) => string;
+    created: (count: number, packed: number) => string;
+    failed: string;
+  };
   admin: {
     title: string;
     subtitle: string;
@@ -674,15 +712,53 @@ const en: UiStrings = {
   think: THINK_STRINGS.en,
   cardMenuLabel: "Map menu",
   offline: {
-    offline: "Offline — keep working, changes are saved on this device.",
-    offlinePending: (n) => `Offline — ${n} ${n === 1 ? "change" : "changes"} saved on this device, will sync when you're back online.`,
-    pending: (n) => `${n} ${n === 1 ? "change" : "changes"} waiting to sync.`,
+    offline: "Offline · saved on this device",
+    offlinePending: (n) => `Offline · ${n} to sync later`,
+    pending: (n) => `${n} to sync`,
     syncing: (n) => `Syncing ${n} ${n === 1 ? "change" : "changes"}…`,
     synced: "All changes synced.",
     syncNow: "Sync now",
     signIn: (n) => `Sign in again to sync ${n} ${n === 1 ? "change" : "changes"} made offline.`,
     failed: (n, e) => `${n} offline ${n === 1 ? "change" : "changes"} couldn't be saved: ${e}`,
     dismiss: "Dismiss",
+  },
+  images: {
+    title: "Pictures",
+    add: "+ Add picture",
+    hint: "or paste a screenshot (Ctrl+V), or drop an image here",
+    remove: "Remove picture",
+    open: "Open full size",
+    close: "Close",
+    loading: "Loading pictures…",
+    limit: (max) => `Up to ${max} pictures per node`,
+    tooLarge: "That picture couldn't be used — try a smaller one.",
+    failed: "Couldn't save the pictures",
+  },
+  textNodes: {
+    entry: "✂ Text → nodes here",
+    title: "Text → nodes",
+    hint: "Paste or write a text. Pick out its pieces — each one becomes a node right where you clicked.",
+    withRoot: "Keep the whole text as a main node (the pieces hang from it)",
+    next: "Next: mark pieces →",
+    back: "← Back",
+    markHint: "Select part of the text and choose what it is — or cut it up automatically.",
+    splitLines: "Each line → node",
+    splitSentences: "Each sentence → node",
+    add: (n) => `Add ${n} ${n === 1 ? "node" : "nodes"}`,
+    adding: (done, total) => `Adding… ${done} of ${total}`,
+    nothing: "Mark at least one piece, or keep the main node.",
+    noRoom: "There's no free room left on this map — move, delete or pack some nodes first.",
+    overflowTitle: "Not everything fits",
+    overflow: (fit, total) => `There's room on the map for ${fit} of the ${total} new nodes.`,
+    packHint: (need) =>
+      `Choose at least ${need} ${need === 1 ? "piece" : "pieces"} to pack into the main node — they're folded inside it, and you can unpack them later from its “Packed” tab.`,
+    packNeedsRoot: "Packing folds pieces into the main node — turn it on to pack.",
+    useRoot: "Use a main node",
+    picked: (picked, need) => `${picked} chosen · at least ${need}`,
+    addAndPack: (shown, packed) => `Add ${shown}, pack ${packed}`,
+    created: (n, packed) =>
+      packed > 0 ? `${n} ${n === 1 ? "node" : "nodes"} added, ${packed} packed into the main node` : `${n} ${n === 1 ? "node" : "nodes"} added`,
+    failed: "Couldn't add the nodes",
   },
   admin: {
     title: "Admin",
@@ -1052,15 +1128,52 @@ const cs: UiStrings = {
   think: THINK_STRINGS.cs,
   cardMenuLabel: "Nabídka mapy",
   offline: {
-    offline: "Offline — pracujte dál, změny se ukládají v tomto zařízení.",
-    offlinePending: (n) => `Offline — ${n} ${csPlural(n, "změna uložena", "změny uloženy", "změn uloženo")} v tomto zařízení, synchronizují se po připojení.`,
-    pending: (n) => `${n} ${csPlural(n, "změna čeká", "změny čekají", "změn čeká")} na synchronizaci.`,
+    offline: "Offline · ukládá se v zařízení",
+    offlinePending: (n) => `Offline · ${n} k pozdější synchronizaci`,
+    pending: (n) => `${n} k synchronizaci`,
     syncing: (n) => `Synchronizace: ${n} ${csPlural(n, "změna", "změny", "změn")}…`,
     synced: "Všechny změny jsou synchronizovány.",
     syncNow: "Synchronizovat",
     signIn: (n) => `Přihlaste se znovu a synchronizujte ${n} ${csPlural(n, "změnu", "změny", "změn")} provedených offline.`,
     failed: (n, e) => `${n} ${csPlural(n, "změnu", "změny", "změn")} z offline režimu nešlo uložit: ${e}`,
     dismiss: "Zavřít",
+  },
+  images: {
+    title: "Obrázky",
+    add: "+ Přidat obrázek",
+    hint: "nebo vložte snímek obrazovky (Ctrl+V), či sem přetáhněte obrázek",
+    remove: "Odebrat obrázek",
+    open: "Otevřít v plné velikosti",
+    close: "Zavřít",
+    loading: "Načítání obrázků…",
+    limit: (max) => `Nejvýše ${max} obrázků na uzel`,
+    tooLarge: "Tento obrázek nešel použít — zkuste menší.",
+    failed: "Obrázky se nepodařilo uložit",
+  },
+  textNodes: {
+    entry: "✂ Text → uzly sem",
+    title: "Text → uzly",
+    hint: "Vložte nebo napište text. Vyberte z něj části — každá se stane uzlem přímo tam, kam jste klikli.",
+    withRoot: "Ponechat celý text jako hlavní uzel (části z něj vycházejí)",
+    next: "Dál: označit části →",
+    back: "← Zpět",
+    markHint: "Vyberte část textu a zvolte, co to je — nebo ho rozdělte automaticky.",
+    splitLines: "Každý řádek → uzel",
+    splitSentences: "Každá věta → uzel",
+    add: (n) => `Přidat ${csNodes(n)}`,
+    adding: (done, total) => `Přidávám… ${done} z ${total}`,
+    nothing: "Označte aspoň jednu část, nebo ponechte hlavní uzel.",
+    noRoom: "Na mapě už není volné místo — nejdřív některé uzly přesuňte, smažte nebo zabalte.",
+    overflowTitle: "Všechno se nevejde",
+    overflow: (fit, total) => `Na mapě je místo pro ${fit} z ${total} nových uzlů.`,
+    packHint: (need) =>
+      `Vyberte aspoň ${need} ${csPlural(need, "část", "části", "částí")} k zabalení do hlavního uzlu — složí se do něj a později je můžete rozbalit na jeho kartě „Sbaleno“.`,
+    packNeedsRoot: "Balení skládá části do hlavního uzlu — zapněte ho, abyste mohli balit.",
+    useRoot: "Použít hlavní uzel",
+    picked: (picked, need) => `vybráno ${picked} · aspoň ${need}`,
+    addAndPack: (shown, packed) => `Přidat ${shown}, zabalit ${packed}`,
+    created: (n, packed) => (packed > 0 ? `Přidáno: ${csNodes(n)}, ${packed} zabaleno do hlavního uzlu` : `Přidáno: ${csNodes(n)}`),
+    failed: "Uzly se nepodařilo přidat",
   },
   admin: {
     title: "Správa",
@@ -1430,15 +1543,55 @@ const uk: UiStrings = {
   think: THINK_STRINGS.uk,
   cardMenuLabel: "Меню мапи",
   offline: {
-    offline: "Офлайн — працюйте далі, зміни зберігаються на цьому пристрої.",
-    offlinePending: (n) => `Офлайн — ${n} ${slavicPlural(n, "зміну", "зміни", "змін")} збережено на цьому пристрої, їх буде синхронізовано після підключення.`,
-    pending: (n) => `${n} ${slavicPlural(n, "зміна чекає", "зміни чекають", "змін чекають")} на синхронізацію.`,
+    offline: "Офлайн · зберігається на пристрої",
+    offlinePending: (n) => `Офлайн · ${n} для синхронізації згодом`,
+    pending: (n) => `${n} до синхронізації`,
     syncing: (n) => `Синхронізація: ${n} ${slavicPlural(n, "зміна", "зміни", "змін")}…`,
     synced: "Усі зміни синхронізовано.",
     syncNow: "Синхронізувати",
     signIn: (n) => `Увійдіть знову, щоб синхронізувати ${n} ${slavicPlural(n, "зміну", "зміни", "змін")}, зроблених офлайн.`,
     failed: (n, e) => `Не вдалося зберегти ${n} ${slavicPlural(n, "офлайн-зміну", "офлайн-зміни", "офлайн-змін")}: ${e}`,
     dismiss: "Закрити",
+  },
+  images: {
+    title: "Зображення",
+    add: "+ Додати зображення",
+    hint: "або вставте знімок екрана (Ctrl+V) чи перетягніть зображення сюди",
+    remove: "Видалити зображення",
+    open: "Відкрити в повному розмірі",
+    close: "Закрити",
+    loading: "Завантаження зображень…",
+    limit: (max) => `Не більше ${max} зображень на вузол`,
+    tooLarge: "Це зображення не вдалося використати — спробуйте менше.",
+    failed: "Не вдалося зберегти зображення",
+  },
+  textNodes: {
+    entry: "✂ Текст → вузли тут",
+    title: "Текст → вузли",
+    hint: "Вставте або напишіть текст. Виберіть його частини — кожна стане вузлом саме там, де ви клацнули.",
+    withRoot: "Залишити весь текст головним вузлом (частини відходять від нього)",
+    next: "Далі: позначити частини →",
+    back: "← Назад",
+    markHint: "Виділіть частину тексту й оберіть, що це — або розріжте його автоматично.",
+    splitLines: "Кожен рядок → вузол",
+    splitSentences: "Кожне речення → вузол",
+    add: (n) => `Додати ${n} ${slavicPlural(n, "вузол", "вузли", "вузлів")}`,
+    adding: (done, total) => `Додаю… ${done} з ${total}`,
+    nothing: "Позначте хоча б одну частину або залиште головний вузол.",
+    noRoom: "На карті не лишилося вільного місця — спершу перемістіть, видаліть або спакуйте якісь вузли.",
+    overflowTitle: "Не все вміщується",
+    overflow: (fit, total) => `На карті є місце для ${fit} з ${total} нових вузлів.`,
+    packHint: (need) =>
+      `Виберіть щонайменше ${need} ${slavicPlural(need, "частину", "частини", "частин")}, щоб спакувати в головний вузол — вони згорнуться в нього, а розпакувати їх можна пізніше на його вкладці «Згорнуто».`,
+    packNeedsRoot: "Пакування згортає частини в головний вузол — увімкніть його, щоб пакувати.",
+    useRoot: "Використати головний вузол",
+    picked: (picked, need) => `вибрано ${picked} · щонайменше ${need}`,
+    addAndPack: (shown, packed) => `Додати ${shown}, спакувати ${packed}`,
+    created: (n, packed) =>
+      packed > 0
+        ? `Додано ${n} ${slavicPlural(n, "вузол", "вузли", "вузлів")}, ${packed} спаковано в головний вузол`
+        : `Додано ${n} ${slavicPlural(n, "вузол", "вузли", "вузлів")}`,
+    failed: "Не вдалося додати вузли",
   },
   admin: {
     title: "Адміністрування",
@@ -1808,15 +1961,55 @@ const ru: UiStrings = {
   think: THINK_STRINGS.ru,
   cardMenuLabel: "Меню карты",
   offline: {
-    offline: "Офлайн — продолжайте работать, изменения сохраняются на этом устройстве.",
-    offlinePending: (n) => `Офлайн — ${n} ${slavicPlural(n, "изменение сохранено", "изменения сохранены", "изменений сохранено")} на этом устройстве, они синхронизируются после подключения.`,
-    pending: (n) => `${n} ${slavicPlural(n, "изменение ждёт", "изменения ждут", "изменений ждут")} синхронизации.`,
+    offline: "Офлайн · сохраняется на устройстве",
+    offlinePending: (n) => `Офлайн · ${n} к синхронизации позже`,
+    pending: (n) => `${n} к синхронизации`,
     syncing: (n) => `Синхронизация: ${n} ${slavicPlural(n, "изменение", "изменения", "изменений")}…`,
     synced: "Все изменения синхронизированы.",
     syncNow: "Синхронизировать",
     signIn: (n) => `Войдите снова, чтобы синхронизировать ${n} ${slavicPlural(n, "изменение", "изменения", "изменений")}, сделанных офлайн.`,
     failed: (n, e) => `Не удалось сохранить ${n} ${slavicPlural(n, "офлайн-изменение", "офлайн-изменения", "офлайн-изменений")}: ${e}`,
     dismiss: "Закрыть",
+  },
+  images: {
+    title: "Изображения",
+    add: "+ Добавить изображение",
+    hint: "или вставьте снимок экрана (Ctrl+V), или перетащите изображение сюда",
+    remove: "Удалить изображение",
+    open: "Открыть в полном размере",
+    close: "Закрыть",
+    loading: "Загрузка изображений…",
+    limit: (max) => `Не больше ${max} изображений на узел`,
+    tooLarge: "Это изображение не удалось использовать — попробуйте поменьше.",
+    failed: "Не удалось сохранить изображения",
+  },
+  textNodes: {
+    entry: "✂ Текст → узлы здесь",
+    title: "Текст → узлы",
+    hint: "Вставьте или напишите текст. Выберите его части — каждая станет узлом прямо там, где вы щёлкнули.",
+    withRoot: "Оставить весь текст главным узлом (части отходят от него)",
+    next: "Далее: отметить части →",
+    back: "← Назад",
+    markHint: "Выделите часть текста и выберите, что это — или разрежьте его автоматически.",
+    splitLines: "Каждая строка → узел",
+    splitSentences: "Каждое предложение → узел",
+    add: (n) => `Добавить ${n} ${slavicPlural(n, "узел", "узла", "узлов")}`,
+    adding: (done, total) => `Добавляю… ${done} из ${total}`,
+    nothing: "Отметьте хотя бы одну часть или оставьте главный узел.",
+    noRoom: "На карте не осталось свободного места — сначала переместите, удалите или упакуйте какие-то узлы.",
+    overflowTitle: "Не всё помещается",
+    overflow: (fit, total) => `На карте есть место для ${fit} из ${total} новых узлов.`,
+    packHint: (need) =>
+      `Выберите хотя бы ${need} ${slavicPlural(need, "часть", "части", "частей")}, чтобы упаковать в главный узел — они свернутся в него, а распаковать их можно позже на его вкладке «Свёрнуто».`,
+    packNeedsRoot: "Упаковка сворачивает части в главный узел — включите его, чтобы упаковывать.",
+    useRoot: "Использовать главный узел",
+    picked: (picked, need) => `выбрано ${picked} · хотя бы ${need}`,
+    addAndPack: (shown, packed) => `Добавить ${shown}, упаковать ${packed}`,
+    created: (n, packed) =>
+      packed > 0
+        ? `Добавлено ${n} ${slavicPlural(n, "узел", "узла", "узлов")}, ${packed} упаковано в главный узел`
+        : `Добавлено ${n} ${slavicPlural(n, "узел", "узла", "узлов")}`,
+    failed: "Не удалось добавить узлы",
   },
   admin: {
     title: "Администрирование",

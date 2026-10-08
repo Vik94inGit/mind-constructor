@@ -198,6 +198,22 @@ describe("nodeAbl", () => {
       ).rejects.toThrow(ValidationError);
     });
 
+    it("passes a list of image data URLs through, and rejects anything that isn't one", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+      const png = "data:image/png;base64,iVBORw0KGgo=";
+
+      await updateNodeAbl("node1", "user1", { images: [png] });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { images: [png] });
+
+      await expect(updateNodeAbl("node1", "user1", { images: ["https://example.com/a.png"] })).rejects.toThrow(
+        ValidationError,
+      );
+      await expect(updateNodeAbl("node1", "user1", { images: ["data:image/svg+xml;base64,PHN2Zz4="] })).rejects.toThrow(
+        ValidationError,
+      );
+      await expect(updateNodeAbl("node1", "user1", { images: Array(7).fill(png) })).rejects.toThrow(ValidationError);
+    });
+
     it("passes a valid symbolOverride through to the DAO", async () => {
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
 

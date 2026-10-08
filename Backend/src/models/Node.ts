@@ -78,6 +78,12 @@ export const NodeSchema = new mongoose.Schema(
       max: 9999,
       validate: { validator: (v: number | null) => v === null || Number.isInteger(v), message: "order must be a whole number" },
     },
+    // Pictures attached to the node — screenshots, photos, sketches — as
+    // image data URLs (a frontend shrinks and re-encodes each one before
+    // sending it, see nodeAbl.ts's imageSchema for the caps). Stripped from
+    // the map's node list like `text` (see getNodesByMapDao): a frontend
+    // fetches them with the single node when its panel opens.
+    images: { type: [String], default: [] },
     type: { type: String, enum: NODE_TYPES, required: true }, // mandatory: forces the author to categorize every node
     x: Number, // Coordinates for the UI
     y: Number,

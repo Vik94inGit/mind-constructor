@@ -33,6 +33,7 @@ vi.mock("../api/nodes", () => ({
   updateNode: vi.fn(),
   createNode: vi.fn(),
   getAttackHistory: vi.fn(async () => []),
+  getNode: vi.fn(async () => ({ images: [] })),
 }));
 vi.mock("../api/edges", () => ({ listEdges: vi.fn(async () => []), createEdge: vi.fn() }));
 vi.mock("../api/lines", () => ({ listLines: vi.fn(async () => []) }));

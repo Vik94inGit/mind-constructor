@@ -16,6 +16,8 @@ import { AttackTab } from "./nodePanel/AttackTab";
 import { ProtectTab } from "./nodePanel/ProtectTab";
 import { PackedTab } from "./nodePanel/PackedTab";
 import { HistoryTab } from "./nodePanel/HistoryTab";
+import { ImagesSection } from "./nodePanel/ImagesSection";
+import { MAX_NODE_IMAGES, imageFilesFrom, shrinkImage } from "../utils/images";
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own
@@ -130,6 +132,9 @@ interface Props {
   textLocked?: boolean;
   /** Locks/unlocks this node — owner only. */
   onToggleLock?: () => void;
+  /** Set right after this node was created: open on its text, focused, ready to write more. Fired back through onAutoFocused once done. */
+  autoFocusText?: boolean;
+  onAutoFocused?: () => void;
 }
 
 export function NodePanel({
@@ -156,6 +161,8 @@ export function NodePanel({
   cardFill,
   textLocked = false,
   onToggleLock,
+  autoFocusText = false,
+  onAutoFocused,
 }: Props) {
   const { t } = useI18n();
   const isCreator = idOf(node.userId) === currentUserId;
@@ -208,6 +215,31 @@ export function NodePanel({
   // the sheet itself taller/scrollable rather than needing its own nested
   // scrollbar.
   const [expanded, setExpanded] = useState(false);
+
+  // The node's pictures. The map's node list leaves them out (like text), so
+  // unless this node already carries them (it was just edited here, or came
+  // in over the socket) they're fetched with the single node on open. null
+  // while that fetch is in flight.
+  const [images, setImages] = useState<string[] | null>(node.images ?? null);
+  useEffect(() => {
+    if (node.images) {
+      setImages(node.images);
+      return;
+    }
+    let cancelled = false;
+    setImages(null);
+    nodesApi
+      .getNode(node.nodeId)
+      .then((full) => !cancelled && setImages(full.images ?? []))
+      .catch(() => !cancelled && setImages([]));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.nodeId]);
+  useEffect(() => {
+    if (node.images) setImages(node.images);
+  }, [node.images]);
 
   // Dragging the sheet off its bottom dock and resizing it — see
   // usePanelSheet.
@@ -355,6 +387,73 @@ export function NodePanel({
     if (node.text !== "" && textDraft === "") setTextDraft(node.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.text]);
+
+  // Right after this node was created (MapPage's confirmPendingCreate): the
+  // Info tab, its text field focused with the caret at the end, so writing
+  // more about the new node can start straight away.
+  useEffect(() => {
+    if (!autoFocusText) return;
+    setTab("info");
+    const timer = window.setTimeout(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        ta.focus();
+        const end = ta.value.length;
+        ta.setSelectionRange(end, end);
+      }
+      onAutoFocused?.();
+    }, 60);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFocusText, node.nodeId]);
+
+  // Owner-only, like every node edit. Each picture is shrunk first (see
+  // utils/images.ts); the whole list is then saved in one PATCH.
+  async function saveImages(next: string[]) {
+    const updated = await nodesApi.updateNode(node.nodeId, { images: next });
+    setImages(updated.images ?? next);
+    onUpdated(updated);
+  }
+
+  async function handleAddImages(files: File[]) {
+    if (!isCreator || images === null) return;
+    const room = MAX_NODE_IMAGES - images.length;
+    if (room <= 0) {
+      setError(t.ui.images.limit(MAX_NODE_IMAGES));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const added: string[] = [];
+      for (const file of files.slice(0, room)) {
+        try {
+          added.push(await shrinkImage(file));
+        } catch {
+          setError(t.ui.images.tooLarge);
+        }
+      }
+      if (files.length > room) setError(t.ui.images.limit(MAX_NODE_IMAGES));
+      if (added.length) await saveImages([...images, ...added]);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.images.failed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemoveImage(index: number) {
+    if (!isCreator || images === null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await saveImages(images.filter((_, i) => i !== index));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.images.failed);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // Owner-only (same as text/type edits) — a manual annotation over the
   // badge's symbol, not a rewrite of the node's own claim.
@@ -643,6 +742,16 @@ export function NodePanel({
     <div
       ref={panelRef}
       className={PANEL_CLASS}
+      // A screenshot pasted anywhere in the panel (the text field included)
+      // lands on the node as a picture; pasting plain text is left alone.
+      onPaste={(e) => {
+        if (!isCreator) return;
+        const files = imageFilesFrom(e.clipboardData);
+        if (files.length === 0) return;
+        e.preventDefault();
+        setTab("info");
+        void handleAddImages(files);
+      }}
       style={{
         ...(dragOffset.x || dragOffset.y ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined),
         // Overrides PANEL_CLASS's own responsive max-height cap the moment
@@ -749,6 +858,15 @@ export function NodePanel({
           onDelete={handleDelete}
           onTemplate={handleTemplate}
           onClose={onClose}
+          imagesSection={
+            <ImagesSection
+              images={images}
+              canEdit={isCreator}
+              busy={busy}
+              onAdd={(files) => void handleAddImages(files)}
+              onRemove={(i) => void handleRemoveImage(i)}
+            />
+          }
         />
       )}
 

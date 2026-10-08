@@ -1,4 +1,4 @@
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import { isMobileViewport } from "../../utils/canvasLayout";
 import type { TemplateKind } from "../../utils/templates";
 import { CARD_FILL_COLORS } from "../../utils/cardFill";
@@ -28,12 +28,14 @@ interface Props {
   onDelete: () => void;
   onTemplate: (kind: TemplateKind) => void;
   onClose: () => void;
+  /** The node's pictures (ImagesSection), shown under the text. */
+  imagesSection?: ReactNode;
 }
 
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection }: Props) {
   const { t } = useI18n();
   return (
     <div className="mt-4">
@@ -167,6 +169,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleL
           </button>
         )}
       </div>
+    {imagesSection}
     {templateKind && (
       <div className="mt-4 rounded-lg border border-line bg-surface-2 p-3">
         <div className="text-[0.78rem] font-semibold text-ink-soft">

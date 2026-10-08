@@ -38,6 +38,18 @@ const orderSchema = z
   .min(1, "order must be at least 1")
   .max(9999, "order must be at most 9999");
 
+// Node.images — each one an image data URL. The frontend shrinks a picture
+// to fit well under this before sending it; the cap keeps a single node from
+// growing without bound. MAX_NODE_IMAGES × MAX_IMAGE_CHARS stays under the
+// JSON body limit in server.ts.
+export const MAX_NODE_IMAGES = 6;
+export const MAX_IMAGE_CHARS = 400_000;
+const imageSchema = z
+  .string()
+  .max(MAX_IMAGE_CHARS, "image is too large")
+  .regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/, "image must be a PNG, JPEG, WebP or GIF data URL");
+const imagesSchema = z.array(imageSchema).max(MAX_NODE_IMAGES, `at most ${MAX_NODE_IMAGES} images per node`);
+
 const createNodeSchema = z.object({
   text: z.string().min(1, "text is required"),
   title: titleSchema.optional(),
@@ -103,6 +115,8 @@ const updateNodeSchema = z
     // "" clears the title (back to the text's own first words).
     title: titleSchema.optional(),
     zoneName: zoneNameSchema.optional(),
+    // The node's whole picture list — [] removes them all.
+    images: imagesSchema.optional(),
     // null clears the step number — same nullish-vs-absent convention as
     // symbolOverride/manualZone below.
     order: orderSchema.nullish(),

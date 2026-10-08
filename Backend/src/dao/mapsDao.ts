@@ -146,8 +146,8 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   // filter for anyone who wasn't looking at a still-live tab. Keep this in
   // sync with NODE_POPULATE by hand; the two aren't shared code since this
   // one is scoped to a whole map's nodes rather than one at a time.
-  // .select("-text"): a node's own `text` is the one field this list
-  // deliberately leaves out — the frontend shows almost none of it up front
+  // .select("-text -images"): a node's own `text` (and its pictures, which
+  // are far bigger still) are the fields this list deliberately leaves out — the frontend shows almost none of it up front
   // (captions are hidden by default, see NodeCard's showCaption), so sending
   // a whole map's worth of full node text on every initial load would mostly
   // go to waste. The client fetches the real text lazily, in
@@ -168,7 +168,7 @@ export const getNodesByMapDao = async (publicMapId: string, userId: string) => {
   // not _id, so its populated shape here already matches that (select
   // "username" alone still includes _id by default, same as before).
   return await Node.find({ mapId: map._id, _id: { $nin: hiddenIds } })
-    .select("-text -_id -__v")
+    .select("-text -images -_id -__v")
     .populate("userId", "username")
     .populate("parentId", "-_id nodeId text type")
     .populate("targetNodeId", "-_id nodeId text type")
