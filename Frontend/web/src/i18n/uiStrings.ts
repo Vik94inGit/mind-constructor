@@ -308,6 +308,7 @@ export interface UiStrings {
     limit: (max: number) => string;
     tooLarge: string;
     failed: string;
+    selectNode: string;
   };
   /** "Text → nodes" right on the map — see map/TextToNodesModal.tsx. */
   textNodes: {
@@ -733,6 +734,7 @@ const en: UiStrings = {
     limit: (max) => `Up to ${max} pictures per node`,
     tooLarge: "That picture couldn't be used — try a smaller one.",
     failed: "Couldn't save the pictures",
+    selectNode: "Open one of your nodes first, then paste the picture into it",
   },
   textNodes: {
     entry: "✂ Text → nodes here",
@@ -1149,6 +1151,7 @@ const cs: UiStrings = {
     limit: (max) => `Nejvýše ${max} obrázků na uzel`,
     tooLarge: "Tento obrázek nešel použít — zkuste menší.",
     failed: "Obrázky se nepodařilo uložit",
+    selectNode: "Nejdřív otevřete jeden ze svých uzlů, pak do něj obrázek vložte",
   },
   textNodes: {
     entry: "✂ Text → uzly sem",
@@ -1564,6 +1567,7 @@ const uk: UiStrings = {
     limit: (max) => `Не більше ${max} зображень на вузол`,
     tooLarge: "Це зображення не вдалося використати — спробуйте менше.",
     failed: "Не вдалося зберегти зображення",
+    selectNode: "Спершу відкрийте один зі своїх вузлів, потім вставте в нього зображення",
   },
   textNodes: {
     entry: "✂ Текст → вузли тут",
@@ -1982,6 +1986,7 @@ const ru: UiStrings = {
     limit: (max) => `Не больше ${max} изображений на узел`,
     tooLarge: "Это изображение не удалось использовать — попробуйте поменьше.",
     failed: "Не удалось сохранить изображения",
+    selectNode: "Сначала откройте один из своих узлов, затем вставьте в него изображение",
   },
   textNodes: {
     entry: "✂ Текст → узлы здесь",

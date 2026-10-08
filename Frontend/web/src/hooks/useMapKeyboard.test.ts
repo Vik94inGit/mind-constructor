@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useMapKeyboard } from "./useMapKeyboard";
 
@@ -19,6 +19,7 @@ function setup(overrides: Partial<Parameters<typeof useMapKeyboard>[0]> = {}) {
     exitChooseMode: vi.fn(),
     copySelection: vi.fn(),
     pasteClipboard: vi.fn(),
+    onImagePasteWithoutNode: vi.fn(),
     ...overrides,
   };
   renderHook(() => useMapKeyboard(params));
@@ -29,13 +30,44 @@ function press(key: string, init: KeyboardEventInit = {}, target: EventTarget = 
   target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }));
 }
 
+// jsdom has no ClipboardEvent/DataTransfer — a plain event carrying a stub is enough.
+function pasteEvent(files: { type: string }[] = []) {
+  const e = new Event("paste", { bubbles: true, cancelable: true }) as Event & { clipboardData: unknown };
+  e.clipboardData = {
+    items: files.map((f) => ({ kind: "file", type: f.type, getAsFile: () => f })),
+    files: [],
+  };
+  return e;
+}
+
 describe("useMapKeyboard", () => {
-  it("copies and pastes with Ctrl+C / Ctrl+V", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("copies with Ctrl+C, and pastes copied nodes from the paste event Ctrl+V lets through", () => {
     const p = setup();
     press("c", { ctrlKey: true });
-    press("V", { metaKey: true });
     expect(p.copySelection).toHaveBeenCalledTimes(1);
+    const key = new KeyboardEvent("keydown", { key: "V", metaKey: true, bubbles: true, cancelable: true });
+    window.dispatchEvent(key);
+    // The key press isn't cancelled — otherwise the browser never fires paste.
+    expect(key.defaultPrevented).toBe(false);
+    window.dispatchEvent(pasteEvent());
     expect(p.pasteClipboard).toHaveBeenCalledTimes(1);
+  });
+
+  it("still pastes nodes when a browser fires no paste event", () => {
+    vi.useFakeTimers();
+    const p = setup();
+    press("v", { ctrlKey: true });
+    vi.advanceTimersByTime(200);
+    expect(p.pasteClipboard).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't paste nodes for a pasted picture — it belongs to an open node", () => {
+    const p = setup();
+    window.dispatchEvent(pasteEvent([{ type: "image/png" }]));
+    expect(p.pasteClipboard).not.toHaveBeenCalled();
+    expect(p.onImagePasteWithoutNode).toHaveBeenCalledTimes(1);
   });
 
   it("leaves keys typed into a text field alone", () => {

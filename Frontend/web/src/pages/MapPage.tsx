@@ -1385,6 +1385,7 @@ export function MapPage() {
     exitChooseMode,
     copySelection,
     pasteClipboard,
+    onImagePasteWithoutNode: () => showNotice(t.ui.images.selectNode),
   });
 
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
