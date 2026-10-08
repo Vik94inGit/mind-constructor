@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import { imageFilesFrom } from "../utils/images";
 
 interface Params {
   presenting: boolean;
@@ -17,6 +18,8 @@ interface Params {
   exitChooseMode: () => void;
   copySelection: () => void;
   pasteClipboard: () => void;
+  /** A picture was pasted with no node of your own open to take it (an open node's panel takes it itself — see NodePanel). */
+  onImagePasteWithoutNode?: () => void;
 }
 
 export function useMapKeyboard({
@@ -35,6 +38,7 @@ export function useMapKeyboard({
   exitChooseMode,
   copySelection,
   pasteClipboard,
+  onImagePasteWithoutNode,
 }: Params) {
   // Global Ctrl/Cmd+C / Ctrl/Cmd+V for the current node selection — ignored
   // whenever focus is inside a real text field (NodePanel's textarea, the
@@ -120,12 +124,37 @@ export function useMapKeyboard({
       if (e.key === "c" || e.key === "C") {
         copySelection();
       } else if (e.key === "v" || e.key === "V") {
-        e.preventDefault();
-        pasteClipboard();
+        // Not prevented: that would stop the browser's own paste event, the
+        // only way a screenshot on the system clipboard ever reaches the page
+        // (see onPaste below, and NodePanel's own paste handling). The node
+        // paste runs from that event instead — or, should a browser fire no
+        // paste event with nothing editable focused, from this fallback.
+        window.clearTimeout(pasteFallback);
+        pasteFallback = window.setTimeout(pasteClipboard, 150);
       }
     }
+    // Ctrl/Cmd+V's real paste. A picture on the clipboard belongs to the open
+    // node — NodePanel handles it first and marks the event handled; with no
+    // such node there's nowhere to put it, so say so. Anything else pastes
+    // the app's own copied nodes.
+    function onPaste(e: ClipboardEvent) {
+      window.clearTimeout(pasteFallback);
+      if (e.defaultPrevented || isEditableTarget(e.target) || presenting || drawMode) return;
+      if (imageFilesFrom(e.clipboardData).length > 0) {
+        onImagePasteWithoutNode?.();
+        return;
+      }
+      e.preventDefault();
+      pasteClipboard();
+    }
+    let pasteFallback = 0;
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.clearTimeout(pasteFallback);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("paste", onPaste);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   });
 }

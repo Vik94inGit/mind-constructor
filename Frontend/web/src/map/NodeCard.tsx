@@ -8,6 +8,7 @@ import { NodeCrown } from "./NodeCrown";
 import { NodeWings } from "./NodeWings";
 import { KnightHelmet } from "./KnightHelmet";
 import { NodeTypeIcon } from "./NodeTypeIcon";
+import { NodeFlipIcon } from "./NodeFlipIcon";
 import { PuzzleCard } from "./PuzzleCard";
 import type { PuzzleJoins } from "../utils/puzzleLinks";
 import { CAPTION_WIDTH } from "../utils/canvasLayout";
@@ -46,6 +47,8 @@ const ICON_TEXT_CAPTION_WIDTH = 176;
 
 interface Props {
   node: NodeDoc;
+  /** The viewer's "emoji first" mode: a node with an emoji shows it face up, its type on the back (see NodeFlipIcon). */
+  emojiFirst?: boolean;
   x: number;
   y: number;
   /** MapPage's own canvas zoom (see its zoom state) — this node's own visual content (icon, health ring, caption) counter-scales by 1/zoom so it renders at a constant on-screen size regardless of zoom level; only its *position* moves with the rest of the canvas. See the inverseScaleStyle wrapper below for why that's a separate inner element rather than folded into this node's own transform. */
@@ -119,6 +122,7 @@ interface Props {
 
 export const NodeCard = memo(function NodeCard({
   node,
+  emojiFirst = false,
   x,
   y,
   zoom,
@@ -796,15 +800,23 @@ export const NodeCard = memo(function NodeCard({
               className={`flex h-full w-full items-center justify-center rounded-full bg-[var(--node-fill)] ${circleBorderClass}`}
               style={{ borderColor: circleBorderColor }}
             >
-              {isOutcome ? (
-                <OutcomeBadge
-                  type={displayType as OutcomeType}
-                  size={OUTCOME_BADGE_SIZE}
-                  symbolOverride={node.symbolOverride}
-                />
-              ) : (
-                <NodeTypeIcon type={displayType} size={21} />
-              )}
+              {(() => {
+                const typeFace = isOutcome ? (
+                  <OutcomeBadge
+                    type={displayType as OutcomeType}
+                    size={OUTCOME_BADGE_SIZE}
+                    symbolOverride={node.symbolOverride}
+                  />
+                ) : (
+                  <NodeTypeIcon type={displayType} size={21} />
+                );
+                // With an emoji the icon is a two-sided card (see NodeFlipIcon).
+                return node.emoji ? (
+                  <NodeFlipIcon typeFace={typeFace} emoji={node.emoji} emojiFirst={emojiFirst} flipped={selected} />
+                ) : (
+                  typeFace
+                );
+              })()}
             </div>
           )}
         </div>

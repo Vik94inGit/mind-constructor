@@ -210,6 +210,8 @@ export interface NodeDoc {
   manualZone?: ManualZoneColor | null;
   /** Set by the map owner on the root of a branch hidden from invited members — see Node.hiddenFromMembers on the backend. */
   hiddenFromMembers?: boolean;
+  /** Optional emoji — the node's icon flips between it and the type's symbol. See Backend's Node.emoji. "" / absent = none. */
+  emoji?: string;
   /** Pictures attached to the node (image data URLs) — see Node.images on the backend. Absent on the map's node list, which leaves them out like `text`; fetched with the single node when its panel opens. */
   images?: string[];
   /** Name of the zone this node is the parent of — see Node.zoneName on the backend. */

@@ -442,6 +442,28 @@ export function NodePanel({
     }
   }
 
+  // A screenshot pasted while this panel is open lands on the node even when
+  // nothing in the panel has focus (the usual case: a node was just clicked
+  // on the canvas). A paste inside the panel is already handled by its own
+  // onPaste below, and one into some other text field is left to it.
+  const addImagesRef = useRef(handleAddImages);
+  addImagesRef.current = handleAddImages;
+  useEffect(() => {
+    if (!isCreator) return;
+    function onDocumentPaste(e: ClipboardEvent) {
+      if (e.defaultPrevented) return;
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      const files = imageFilesFrom(e.clipboardData);
+      if (files.length === 0) return;
+      e.preventDefault();
+      setTab("info");
+      void addImagesRef.current(files);
+    }
+    document.addEventListener("paste", onDocumentPaste);
+    return () => document.removeEventListener("paste", onDocumentPaste);
+  }, [isCreator]);
+
   async function handleRemoveImage(index: number) {
     if (!isCreator || images === null) return;
     setBusy(true);
@@ -545,6 +567,19 @@ export function NodePanel({
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.errors.title);
       return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Owner-only, like every node edit — "" removes the emoji.
+  async function handleSetEmoji(emoji: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      onUpdated(await nodesApi.updateNode(node.nodeId, { emoji }));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.emoji.failed);
     } finally {
       setBusy(false);
     }
@@ -890,6 +925,7 @@ export function NodePanel({
           orderDraft={orderDraft}
           setOrderDraft={setOrderDraft}
           onTitleSave={handleTitleSave}
+          onSetEmoji={(emoji) => void handleSetEmoji(emoji)}
           onZoneNameSave={handleZoneNameSave}
           onOrderSave={handleOrderSave}
           onToggleHidden={handleToggleHidden}

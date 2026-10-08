@@ -31,6 +31,15 @@ const titleSchema = z.string().trim().max(80, "title must be at most 80 characte
 // Node.zoneName — same shape as the title: "" clears it.
 const zoneNameSchema = z.string().trim().max(40, "zone name must be at most 40 characters");
 
+// Node.emoji — a single emoji (several code points once skin tones, flags or
+// joined sequences come in, hence 32). "" clears it. Plain letters and digits
+// are refused, so the field can't turn into a second title.
+const emojiSchema = z
+  .string()
+  .trim()
+  .max(32, "emoji must be at most 32 characters")
+  .refine((v) => v === "" || !/[\p{L}\p{N}]/u.test(v), "emoji must be an emoji, not text");
+
 // Node.order — a whole step number, 1..9999. null clears it (update only).
 const orderSchema = z
   .number()
@@ -53,6 +62,7 @@ const imagesSchema = z.array(imageSchema).max(MAX_NODE_IMAGES, `at most ${MAX_NO
 const createNodeSchema = z.object({
   text: z.string().min(1, "text is required"),
   title: titleSchema.optional(),
+  emoji: emojiSchema.optional(),
   order: orderSchema.nullish(),
   type: z.enum(NODE_TYPES, {
     error: () => `type is required and must be one of: ${NODE_TYPES.join(", ")}`,
@@ -115,6 +125,8 @@ const updateNodeSchema = z
     // "" clears the title (back to the text's own first words).
     title: titleSchema.optional(),
     zoneName: zoneNameSchema.optional(),
+    // "" removes the emoji.
+    emoji: emojiSchema.optional(),
     // The node's whole picture list — [] removes them all.
     images: imagesSchema.optional(),
     // null clears the step number — same nullish-vs-absent convention as

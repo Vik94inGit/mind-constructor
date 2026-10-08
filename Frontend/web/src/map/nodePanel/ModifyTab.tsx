@@ -1,4 +1,5 @@
 import { nodeRefId, ZONE_COLORS } from "../../utils/nodeType";
+import { EmojiPicker } from "./EmojiPicker";
 import { MANUAL_ZONE_COLORS, SIZE_TIERS } from "../../types";
 import type { EdgeDoc, ManualZoneColor, NodeDoc, SizeTier, SymbolOverride } from "../../types";
 import { useI18n } from "../../i18n/I18nContext";
@@ -32,6 +33,8 @@ interface Props {
   setOrderDraft: (value: string) => void;
   /** Each resolves true unless the save failed. */
   onTitleSave: () => Promise<boolean>;
+  /** Sets the node's emoji ("" removes it). */
+  onSetEmoji: (emoji: string) => void;
   onZoneNameSave: () => Promise<boolean>;
   onOrderSave: () => Promise<boolean>;
   onToggleHidden: () => Promise<void>;
@@ -50,7 +53,7 @@ interface Props {
 // NodePanel's "Modify" tab: health, what a weapon/shield points at, the
 // owner's title/zone name/step number/size/zone/symbol controls, branch
 // visibility, choosing and packing, and this node's links.
-export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutcome, busy, target, protectedTarget, protectors, connectedEdges, nodeById, titleDraft, setTitleDraft, zoneNameDraft, setZoneNameDraft, orderDraft, setOrderDraft, onTitleSave, onZoneNameSave, onOrderSave, onToggleHidden, onSetSize, onSetZone, onSetSymbol, onDeleteEdge, onSelectNode, onEdit, onStartPack, onStartChoose, onExtractText, onClose }: Props) {
+export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutcome, busy, target, protectedTarget, protectors, connectedEdges, nodeById, titleDraft, setTitleDraft, zoneNameDraft, setZoneNameDraft, orderDraft, setOrderDraft, onTitleSave, onSetEmoji, onZoneNameSave, onOrderSave, onToggleHidden, onSetSize, onSetZone, onSetSymbol, onDeleteEdge, onSelectNode, onEdit, onStartPack, onStartChoose, onExtractText, onClose }: Props) {
   const { t } = useI18n();
   return (
     <div className="mt-4">
@@ -132,6 +135,9 @@ export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutc
           />
         </div>
       )}
+
+      {/* Emoji — the node's icon flips between it and the type's symbol. */}
+      {isCreator && <EmojiPicker value={node.emoji ?? ""} busy={busy} onPick={onSetEmoji} />}
 
       {/* Name of the zone this node is the parent of — shown under it on
           the canvas and on the minimap. Saves on blur/Enter. */}

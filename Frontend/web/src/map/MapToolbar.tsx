@@ -26,6 +26,8 @@ interface Props {
   onPickReadingMode: (mode: ReadingMode) => void;
   compact: boolean;
   onToggleCompact: () => void;
+  emojiFirst: boolean;
+  onToggleEmojiFirst: () => void;
   /** Node search (see NodeSearch). */
   nodes: NodeDoc[];
   onLoadTexts: () => Promise<void>;
@@ -71,6 +73,8 @@ export function MapToolbar({
   onPickReadingMode,
   compact,
   onToggleCompact,
+  emojiFirst,
+  onToggleEmojiFirst,
   nodes,
   onLoadTexts,
   onSearchMatches,
@@ -200,6 +204,8 @@ export function MapToolbar({
                 mode={readingMode}
                 compact={compact}
                 onToggleCompact={onToggleCompact}
+                emojiFirst={emojiFirst}
+                onToggleEmojiFirst={onToggleEmojiFirst}
                 onPick={(mode) => {
                   onPickReadingMode(mode);
                   setShowReadingMenu(false);

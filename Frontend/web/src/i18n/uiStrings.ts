@@ -308,6 +308,19 @@ export interface UiStrings {
     limit: (max: number) => string;
     tooLarge: string;
     failed: string;
+    selectNode: string;
+  };
+  /** A node's emoji, and the "emoji first" view — see map/NodeFlipIcon.tsx. */
+  emoji: {
+    label: string;
+    current: string;
+    remove: string;
+    customPlaceholder: string;
+    use: string;
+    invalid: string;
+    failed: string;
+    first: string;
+    firstHint: string;
   };
   /** "Text → nodes" right on the map — see map/TextToNodesModal.tsx. */
   textNodes: {
@@ -733,6 +746,18 @@ const en: UiStrings = {
     limit: (max) => `Up to ${max} pictures per node`,
     tooLarge: "That picture couldn't be used — try a smaller one.",
     failed: "Couldn't save the pictures",
+    selectNode: "Open one of your nodes first, then paste the picture into it",
+  },
+  emoji: {
+    label: "Emoji",
+    current: "Current emoji",
+    remove: "Remove",
+    customPlaceholder: "Any other emoji…",
+    use: "Use",
+    invalid: "That isn't an emoji",
+    failed: "Couldn't change the emoji",
+    first: "Emoji first",
+    firstHint: "Nodes with an emoji show it face up; hover or select one to flip it to its type (Problem, Solution…)",
   },
   textNodes: {
     entry: "✂ Text → nodes here",
@@ -1149,6 +1174,18 @@ const cs: UiStrings = {
     limit: (max) => `Nejvýše ${max} obrázků na uzel`,
     tooLarge: "Tento obrázek nešel použít — zkuste menší.",
     failed: "Obrázky se nepodařilo uložit",
+    selectNode: "Nejdřív otevřete jeden ze svých uzlů, pak do něj obrázek vložte",
+  },
+  emoji: {
+    label: "Emoji",
+    current: "Současné emoji",
+    remove: "Odebrat",
+    customPlaceholder: "Jiné emoji…",
+    use: "Použít",
+    invalid: "To není emoji",
+    failed: "Emoji se nepodařilo změnit",
+    first: "Nejdřív emoji",
+    firstHint: "Uzly s emoji ukazují emoji navrch; najetím nebo výběrem se otočí na svůj typ (Problém, Řešení…)",
   },
   textNodes: {
     entry: "✂ Text → uzly sem",
@@ -1564,6 +1601,18 @@ const uk: UiStrings = {
     limit: (max) => `Не більше ${max} зображень на вузол`,
     tooLarge: "Це зображення не вдалося використати — спробуйте менше.",
     failed: "Не вдалося зберегти зображення",
+    selectNode: "Спершу відкрийте один зі своїх вузлів, потім вставте в нього зображення",
+  },
+  emoji: {
+    label: "Емодзі",
+    current: "Поточне емодзі",
+    remove: "Прибрати",
+    customPlaceholder: "Інше емодзі…",
+    use: "Використати",
+    invalid: "Це не емодзі",
+    failed: "Не вдалося змінити емодзі",
+    first: "Спершу емодзі",
+    firstHint: "Вузли з емодзі показують його зверху; наведіть або виберіть вузол, щоб перевернути на його тип (Проблема, Рішення…)",
   },
   textNodes: {
     entry: "✂ Текст → вузли тут",
@@ -1982,6 +2031,18 @@ const ru: UiStrings = {
     limit: (max) => `Не больше ${max} изображений на узел`,
     tooLarge: "Это изображение не удалось использовать — попробуйте поменьше.",
     failed: "Не удалось сохранить изображения",
+    selectNode: "Сначала откройте один из своих узлов, затем вставьте в него изображение",
+  },
+  emoji: {
+    label: "Эмодзи",
+    current: "Текущее эмодзи",
+    remove: "Убрать",
+    customPlaceholder: "Другое эмодзи…",
+    use: "Использовать",
+    invalid: "Это не эмодзи",
+    failed: "Не удалось изменить эмодзи",
+    first: "Сначала эмодзи",
+    firstHint: "Узлы с эмодзи показывают его сверху; наведите или выберите узел, чтобы перевернуть на его тип (Проблема, Решение…)",
   },
   textNodes: {
     entry: "✂ Текст → узлы здесь",

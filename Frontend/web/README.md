@@ -60,6 +60,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Pictures on nodes** — the node panel's Info tab takes screenshots pasted with Ctrl+V, dropped
   images or picked files; each is shrunk before upload (`utils/images.ts`). See
   `src/map/nodePanel/ImagesSection.tsx`.
+- **Emoji cards** — a node can carry an emoji (Modify tab, `map/nodePanel/EmojiPicker.tsx`); its icon
+  is then a two-sided card that flips between the emoji and the type's symbol on hover or selection
+  (`map/NodeFlipIcon.tsx`). *Emoji first* in the eye menu turns the emoji face up instead
+  (`utils/emojiFace.ts`, kept in this browser).
 - **New node → panel** — confirming a new node's inline name opens its panel with the text field
   focused, ready for the full text.
 - **Computer mode** — on a wide screen with a mouse/trackpad (`hooks/useDesktopLayout.ts`), the map's

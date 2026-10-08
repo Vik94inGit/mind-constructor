@@ -34,6 +34,7 @@ import { NodePanel } from "../map/NodePanel";
 import { PackPickerPanel } from "../map/PackPickerPanel";
 import { TextToNodesModal } from "../map/TextToNodesModal";
 import { findFreeSpots } from "../utils/freeSpots";
+import { loadEmojiFirst, saveEmojiFirst } from "../utils/emojiFace";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
@@ -145,6 +146,15 @@ export function MapPage() {
   // already-multi-selected group's own drag — both stay available
   // regardless, since neither one is the "accidental" case this addresses.
   const [moveMode, setMoveMode] = useState(false);
+  // "Emoji first" (eye menu): which face of a node's emoji/type card is up —
+  // a per-viewer choice kept in this browser (utils/emojiFace.ts).
+  const [emojiFirst, setEmojiFirst] = useState<boolean>(loadEmojiFirst);
+  function toggleEmojiFirst() {
+    setEmojiFirst((v) => {
+      saveEmojiFirst(!v);
+      return !v;
+    });
+  }
   // The ids the node search currently matches (null = no search): everything else dims.
   const [searchMatches, setSearchMatches] = useState<Set<string> | null>(null);
   // This viewer's own view of the map — reading mode, compact view,
@@ -1385,6 +1395,7 @@ export function MapPage() {
     exitChooseMode,
     copySelection,
     pasteClipboard,
+    onImagePasteWithoutNode: () => showNotice(t.ui.images.selectNode),
   });
 
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
@@ -1504,6 +1515,8 @@ export function MapPage() {
       onPickReadingMode={setReadingMode}
       compact={compactView}
       onToggleCompact={toggleCompactView}
+      emojiFirst={emojiFirst}
+      onToggleEmojiFirst={toggleEmojiFirst}
       nodes={visibleNodes}
       onLoadTexts={async () => {
         await ensureNodeText(visibleNodes.map((n) => n.nodeId));
@@ -1721,6 +1734,7 @@ export function MapPage() {
                 <NodeCard
                   key={node.nodeId}
                   node={node}
+                  emojiFirst={emojiFirst}
                   x={pos.x}
                   y={pos.y}
                   zoom={zoom}
