@@ -321,6 +321,12 @@ export interface UiStrings {
     failed: string;
     first: string;
     firstHint: string;
+    /** Above the emoji ghost ring (map/QuickAddGhosts.tsx). */
+    ringPrompt: string;
+    /** The ring's "no emoji" ghost. */
+    skip: string;
+    /** Names of QuickAddGhosts' FEELING_EMOJIS, same order. */
+    feelings: string[];
   };
   /** "Text → nodes" right on the map — see map/TextToNodesModal.tsx. */
   textNodes: {
@@ -737,8 +743,8 @@ const en: UiStrings = {
   },
   images: {
     title: "Pictures",
-    add: "+ Add picture",
-    hint: "or paste a screenshot (Ctrl+V), or drop an image here",
+    add: "🖼️ Picture",
+    hint: "or paste (Ctrl+V) / drop one into the text",
     remove: "Remove picture",
     open: "Open full size",
     close: "Close",
@@ -757,7 +763,10 @@ const en: UiStrings = {
     invalid: "That isn't an emoji",
     failed: "Couldn't change the emoji",
     first: "Emoji first",
-    firstHint: "Nodes with an emoji show it face up; hover or select one to flip it to its type (Problem, Solution…)",
+    firstHint: "Nodes with an emoji show it face up, and new nodes offer the emoji before the type; choosing a node flips it to its type for a moment",
+    ringPrompt: "How does it feel?",
+    skip: "No emoji",
+    feelings: ["Happy", "Excited", "Calm", "Thoughtful", "Confused", "Worried", "Sad", "Angry"],
   },
   textNodes: {
     entry: "✂ Text → nodes here",
@@ -1165,8 +1174,8 @@ const cs: UiStrings = {
   },
   images: {
     title: "Obrázky",
-    add: "+ Přidat obrázek",
-    hint: "nebo vložte snímek obrazovky (Ctrl+V), či sem přetáhněte obrázek",
+    add: "🖼️ Obrázek",
+    hint: "nebo ho vložte (Ctrl+V) / přetáhněte do textu",
     remove: "Odebrat obrázek",
     open: "Otevřít v plné velikosti",
     close: "Zavřít",
@@ -1185,7 +1194,10 @@ const cs: UiStrings = {
     invalid: "To není emoji",
     failed: "Emoji se nepodařilo změnit",
     first: "Nejdřív emoji",
-    firstHint: "Uzly s emoji ukazují emoji navrch; najetím nebo výběrem se otočí na svůj typ (Problém, Řešení…)",
+    firstHint: "Uzly s emoji ukazují emoji navrch a nové uzly nabízejí emoji před typem; výběr uzlu ho na chvíli otočí na jeho typ",
+    ringPrompt: "Jak se u toho cítíte?",
+    skip: "Bez emoji",
+    feelings: ["Radost", "Nadšení", "Klid", "Zamyšlení", "Zmatek", "Obava", "Smutek", "Vztek"],
   },
   textNodes: {
     entry: "✂ Text → uzly sem",
@@ -1592,8 +1604,8 @@ const uk: UiStrings = {
   },
   images: {
     title: "Зображення",
-    add: "+ Додати зображення",
-    hint: "або вставте знімок екрана (Ctrl+V) чи перетягніть зображення сюди",
+    add: "🖼️ Зображення",
+    hint: "або вставте (Ctrl+V) / перетягніть його в текст",
     remove: "Видалити зображення",
     open: "Відкрити в повному розмірі",
     close: "Закрити",
@@ -1612,7 +1624,10 @@ const uk: UiStrings = {
     invalid: "Це не емодзі",
     failed: "Не вдалося змінити емодзі",
     first: "Спершу емодзі",
-    firstHint: "Вузли з емодзі показують його зверху; наведіть або виберіть вузол, щоб перевернути на його тип (Проблема, Рішення…)",
+    firstHint: "Вузли з емодзі показують його зверху, а нові вузли пропонують емодзі перед типом; вибір вузла на мить перевертає його на тип",
+    ringPrompt: "Як ви це відчуваєте?",
+    skip: "Без емодзі",
+    feelings: ["Радість", "Захват", "Спокій", "Роздуми", "Розгубленість", "Тривога", "Сум", "Злість"],
   },
   textNodes: {
     entry: "✂ Текст → вузли тут",
@@ -2022,8 +2037,8 @@ const ru: UiStrings = {
   },
   images: {
     title: "Изображения",
-    add: "+ Добавить изображение",
-    hint: "или вставьте снимок экрана (Ctrl+V), или перетащите изображение сюда",
+    add: "🖼️ Изображение",
+    hint: "или вставьте (Ctrl+V) / перетащите его в текст",
     remove: "Удалить изображение",
     open: "Открыть в полном размере",
     close: "Закрыть",
@@ -2042,7 +2057,10 @@ const ru: UiStrings = {
     invalid: "Это не эмодзи",
     failed: "Не удалось изменить эмодзи",
     first: "Сначала эмодзи",
-    firstHint: "Узлы с эмодзи показывают его сверху; наведите или выберите узел, чтобы перевернуть на его тип (Проблема, Решение…)",
+    firstHint: "Узлы с эмодзи показывают его сверху, а новые узлы предлагают эмодзи перед типом; выбор узла на миг переворачивает его на тип",
+    ringPrompt: "Как вы это чувствуете?",
+    skip: "Без эмодзи",
+    feelings: ["Радость", "Восторг", "Спокойствие", "Раздумье", "Растерянность", "Тревога", "Грусть", "Злость"],
   },
   textNodes: {
     entry: "✂ Текст → узлы здесь",
