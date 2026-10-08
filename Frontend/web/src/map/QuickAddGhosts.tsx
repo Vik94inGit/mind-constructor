@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
@@ -64,8 +64,12 @@ interface Props {
   anchorPos: { x: number; y: number };
   /** The currently-visible rectangle of the canvas, in canvas coordinates — keeps ghosts from fanning out past the edge of the screen. */
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
-  /** `text` is set when a ghost template (a starter phrase) was clicked rather than the ghost itself. */
-  onPick: (type: NodeType, pos: { x: number; y: number }, text?: string) => void;
+  /** `text` is set when a ghost template (a starter phrase) was clicked rather than the ghost itself; `emoji` when one was picked from the emoji ring (see offerEmoji). */
+  onPick: (type: NodeType, pos: { x: number; y: number }, text?: string, emoji?: string) => void;
+  /** Also offers a ring of emoji ghosts: after the type, or before it in emoji-first mode. */
+  offerEmoji?: boolean;
+  /** The viewer's "emoji first" mode (utils/emojiFace.ts): the emoji ring comes first, the types after. */
+  emojiFirst?: boolean;
   /** An empty map's hint: the ghosts draw in one at a time — icon, then its name — instead of all being there at once. */
   intro?: boolean;
   /** The simplified view: no halo/horns on the ghosts. */
@@ -78,6 +82,12 @@ interface Props {
 // (icon, then its name); afterwards, and whenever a node is chosen, every
 // icon is up and the name moves from one ghost to the next, one per step.
 const STEP_MS = 1000;
+// See stageAt below.
+const STAGE_GUARD_MS = 350;
+// The emoji ghosts' circle, on screen — a little smaller than a type ghost (48 × 0.85).
+const EMOJI_GHOST_SIZE = 38;
+/** The feelings the emoji ring offers, in ring order — names in t.ui.emoji.feelings, same order. */
+export const FEELING_EMOJIS = ["😊", "🤩", "😌", "🤔", "😕", "😟", "😢", "😡"];
 
 // Half-visible "ghost" previews fanned out around the selected node, one per
 // node type. Clicking a ghost names its type and fans out a few ghost
@@ -86,7 +96,16 @@ const STEP_MS = 1000;
 // opens it blank. Either way it lands at the ghost's spot, linked to the
 // anchor — branching an argument tree becomes two clicks instead of toolbar
 // button -> modal -> manual placement.
-export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, onPick, intro = false, compact = false, zoom = 1 }: Props) {
+export const QuickAddGhosts = memo(function QuickAddGhosts({
+  anchorPos,
+  bounds,
+  onPick,
+  intro = false,
+  compact = false,
+  zoom = 1,
+  offerEmoji = false,
+  emojiFirst = false,
+}: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
   useEffect(() => {
@@ -105,6 +124,35 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   // preview); a second click on that same ghost creates it.
   const [armed, setArmed] = useState<{ type: NodeType; x: number; y: number; angle: number } | null>(null);
   const armedType = armed?.type ?? null;
+  // With offerEmoji the ghosts come in two rounds — the types, then a ring of
+  // feeling emoji (or the other way round in emoji-first mode) — and the node
+  // opens once both are picked. The skip ghost picks "no emoji".
+  const [stage, setStage] = useState<"type" | "emoji">(offerEmoji && emojiFirst ? "emoji" : "type");
+  const [picked, setPicked] = useState<{ type: NodeType; x: number; y: number; text?: string } | { emoji: string } | null>(
+    null,
+  );
+  // A quick double tap on the last ghost of one round mustn't land on the
+  // ghost that has just appeared in the same spot in the next.
+  const stageAt = useRef(0);
+  function pickType(type: NodeType, pos: { x: number; y: number }, text?: string) {
+    if (!offerEmoji) return onPick(type, pos, text);
+    if (emojiFirst) return onPick(type, pos, text, picked && "emoji" in picked ? picked.emoji || undefined : undefined);
+    setPicked({ type, x: pos.x, y: pos.y, text });
+    setArmed(null);
+    setStage("emoji");
+    stageAt.current = Date.now();
+  }
+  function pickEmoji(emoji: string) {
+    if (Date.now() - stageAt.current < STAGE_GUARD_MS) return;
+    if (emojiFirst) {
+      setPicked({ emoji });
+      setStage("type");
+      stageAt.current = Date.now();
+      return;
+    }
+    if (picked && "type" in picked) onPick(picked.type, { x: picked.x, y: picked.y }, picked.text, emoji || undefined);
+  }
+  const pickedEmoji = picked && "emoji" in picked ? picked.emoji : "";
   // Read live, every render — see the doc comment above RADIUS/EDGE_MARGIN's
   // old module-level home for why this can't be hoisted back out to module
   // scope.
@@ -206,6 +254,63 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
   // outside the nominal safe zone, which reads far better than several of
   // them landing exactly on top of each other.
   const fitsBounds = R <= tightest;
+  if (stage === "emoji") {
+    const n = FEELING_EMOJIS.length + 1;
+    const borderColor = picked && "type" in picked ? NODE_TYPE_COLORS[picked.type] : "var(--line)";
+    return (
+      <>
+        <div
+          className="pointer-events-none absolute z-[33] -translate-x-1/2 -translate-y-full rounded-[3px] bg-surface px-[0.4rem] py-[0.1rem] text-[0.68rem] font-semibold whitespace-nowrap text-ink shadow-card"
+          style={{ left: ringCenter.x, top: ringCenter.y - R - 34 * k, transform: `scale(${k})`, transformOrigin: "50% 100%" }}
+        >
+          {t.ui.emoji.ringPrompt}
+        </div>
+        {[...FEELING_EMOJIS, ""].map((emoji, i) => {
+          const angle = (-i / n) * Math.PI * 2 - Math.PI / 2;
+          const sinA = Math.sin(angle);
+          const rawX = ringCenter.x + R * Math.cos(angle);
+          const rawY = ringCenter.y + R * sinA;
+          const x = fitsBounds ? Math.min(bounds.maxX, Math.max(bounds.minX, rawX)) : rawX;
+          const y = fitsBounds
+            ? Math.min(bounds.maxY, Math.max(bounds.minY - (sinA < 0 ? UP_SLACK : 0), rawY))
+            : rawY;
+          const name = emoji ? t.ui.emoji.feelings[i] : t.ui.emoji.skip;
+          return (
+            <button
+              key={emoji || "skip"}
+              type="button"
+              className="absolute z-[33] flex -translate-x-1/2 -translate-y-1/2 cursor-pointer animate-ghost-in flex-col items-center border-0 bg-transparent p-0 opacity-85 transition-[opacity,transform] duration-[150ms] ease-[ease] hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.12] hover:opacity-100 focus-visible:scale-[1.12] focus-visible:opacity-100"
+              style={{ left: x, top: y, touchAction: "manipulation", animationDelay: `${i * 40}ms` }}
+              title={name}
+              aria-label={name}
+              data-testid="emoji-ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                pickEmoji(emoji);
+              }}
+            >
+              <div
+                className={`flex items-center justify-center rounded-full border-2 bg-[var(--node-fill)] shadow-card ${emoji ? "animate-quick-add-pulse" : "border-dashed"}`}
+                style={{ height: EMOJI_GHOST_SIZE * k, width: EMOJI_GHOST_SIZE * k, borderColor }}
+              >
+                <span aria-hidden className="leading-none" style={{ fontSize: (emoji ? 22 : 14) * k }}>
+                  {emoji || "✕"}
+                </span>
+              </div>
+              <div
+                className={`pointer-events-none absolute left-1/2 top-full -translate-x-1/2 rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] text-[0.62rem] leading-[1.2] font-semibold whitespace-nowrap text-ink shadow-card transition-opacity duration-500 ${
+                  step % n === i ? "opacity-100" : "opacity-0"
+                }`}
+                style={{ marginTop: 4 * k, transform: `scale(${k})`, transformOrigin: "50% 0" }}
+              >
+                {name}
+              </div>
+            </button>
+          );
+        })}
+      </>
+    );
+  }
   return (
     <>
       {NODE_TYPES.map((type, i) => {
@@ -261,7 +366,8 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
             title={armedType === type ? `${t.ui.types[type]} — ${t.ui.node.ghostAgain}` : t.ui.types[type]}
             onClick={(e) => {
               e.stopPropagation();
-              if (armedType === type) onPick(type, { x, y });
+              if (Date.now() - stageAt.current < STAGE_GUARD_MS) return;
+              if (armedType === type) pickType(type, { x, y });
               else setArmed({ type, x, y, angle });
             }}
           >
@@ -292,6 +398,12 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
                   <NodeTypeIcon type={type} size={21} />
                 )}
               </div>
+              {pickedEmoji && (
+                // Emoji first: the feeling already picked rides along on every type.
+                <span aria-hidden className="absolute -top-1 -right-2 text-[18px] leading-none">
+                  {pickedEmoji}
+                </span>
+              )}
               </div>
             </div>
             {/* Always mounted and faded (not added/removed) so the names
@@ -327,7 +439,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({ anchorPos, bounds, 
           zoom={zoom}
           phrases={t.ui.node.ghostTemplates[armed.type]}
           title={t.ui.node.ghostTemplatesTitle}
-          onPick={(text) => onPick(armed.type, { x: armed.x, y: armed.y }, text)}
+          onPick={(text) => pickType(armed.type, { x: armed.x, y: armed.y }, text)}
         />
       )}
     </>

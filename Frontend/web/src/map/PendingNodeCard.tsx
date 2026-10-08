@@ -1,3 +1,4 @@
+import { MAX_NODE_TEXT } from "../utils/nodeText";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { NODE_TYPE_COLORS, cycleNodeType } from "../utils/nodeType";
@@ -14,6 +15,8 @@ interface Props {
   type: NodeType;
   /** A ghost template's starter phrase to open with — selected, so typing replaces it and Enter keeps it. */
   initialText?: string;
+  /** Picked from the emoji ghost ring — shown on the icon's corner until the node is made. */
+  emoji?: string;
   onConfirm: (text: string, type: NodeType) => void;
   onCancel: () => void;
   /** MapPage's own canvas zoom — see QuickAddGhosts' identical prop. This card is drawn inside the zoomed canvas the same as everything else, so it has to counter-scale by 1/zoom or it visibly balloons/shrinks along with whatever zoom level the map happens to be at instead of staying the same size on screen as a real node's own icon. */
@@ -27,7 +30,7 @@ interface Props {
 // sent to the backend until there's actual text — clicking a quick-add
 // ghost (or the toolbar/double-click/"Create branch" paths) opens one of
 // these instead of a modal, autofocused so typing can start immediately.
-export function PendingNodeCard({ x, y, type, initialText = "", onConfirm, onCancel, zoom = 1, onTypeChange }: Props) {
+export function PendingNodeCard({ x, y, type, initialText = "", emoji, onConfirm, onCancel, zoom = 1, onTypeChange }: Props) {
   const { t } = useI18n();
   const [text, setText] = useState(initialText);
   const [draftType, setDraftType] = useState<NodeType>(type);
@@ -128,11 +131,18 @@ export function PendingNodeCard({ x, y, type, initialText = "", onConfirm, onCan
             {isOutcome ? <OutcomeBadge type={draftType as OutcomeType} size={26} /> : <NodeTypeIcon type={draftType} size={21} />}
           </button>
         </div>
+        {emoji && (
+          <span aria-hidden className="pointer-events-none absolute -top-1 -right-2 text-[18px] leading-none">
+            {emoji}
+          </span>
+        )}
       </div>
       <textarea
         ref={fieldRef}
         rows={1}
-        className="mt-[0.35rem] block w-full resize-none overflow-hidden rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+        maxLength={MAX_NODE_TEXT}
+        // Grows taller, never wider — past max-h it scrolls in place.
+        className="mt-[0.35rem] block max-h-[200px] w-full resize-none overflow-y-auto rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
         autoFocus
         onFocus={(e) => e.currentTarget.select()}
         value={text}

@@ -38,6 +38,7 @@ import { loadEmojiFirst, saveEmojiFirst } from "../utils/emojiFace";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
+import { useFlipSequence } from "../hooks/useFlipSequence";
 import { NodeContextMenu } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
@@ -737,6 +738,13 @@ export function MapPage() {
     return map;
   }, [nodeGroups]);
 
+  // Choosing a zone — clicking its parent node, or holding the zone still —
+  // turns its emoji cards over one by one, parent first (see useFlipSequence).
+  const flipTokens = useFlipSequence(
+    selectedId && circleRootSentimentByNode.has(selectedId) ? selectedId : (map?.selectedCircle?.rootId ?? null),
+    nodeGroups,
+  );
+
   // Every camera-framing cue (fit-to-zoom for a text reading mode, the
   // floor-at-100%-for-editing after a drag, bringing a set of nodes into
   // view) — see hooks/useCanvasFraming.ts.
@@ -1216,7 +1224,7 @@ export function MapPage() {
   // parentId (a tree-lineage arrow, not a sentiment Edge/"link" — those
   // stay reserved for the explicit "Link nodes" flow). Nothing is created
   // until confirmPendingCreate actually fires.
-  function startQuickAdd(type: NodeType, pos: { x: number; y: number }, parent: NodeDoc, text?: string) {
+  function startQuickAdd(type: NodeType, pos: { x: number; y: number }, parent: NodeDoc, text?: string, emoji?: string) {
     setActionError(null);
     // The ghost's slot is a fixed angle around the anchor — it doesn't know
     // about anything else on the canvas, so a crowded area can still land
@@ -1225,7 +1233,7 @@ export function MapPage() {
     // before opening the input.
     const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
     setInlineEditId(null);
-    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text });
+    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text, emoji });
   }
 
   // ---- Separator lines ----
@@ -1735,6 +1743,7 @@ export function MapPage() {
                   key={node.nodeId}
                   node={node}
                   emojiFirst={emojiFirst}
+                  flipToken={flipTokens.get(node.nodeId)}
                   x={pos.x}
                   y={pos.y}
                   zoom={zoom}
@@ -1843,16 +1852,21 @@ export function MapPage() {
 
             {quickAddActive && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
+                // A fresh round of ghosts for each node, and when the emoji-first order changes.
+                key={`${selectedNode.nodeId}:${emojiFirst}`}
                 anchorPos={posFor(selectedNode)}
                 bounds={settledViewportBounds()}
                 compact={compactView}
                 zoom={zoom}
-                onPick={(type, pos, text) => startQuickAdd(type, pos, selectedNode, text)}
+                offerEmoji
+                emojiFirst={emojiFirst}
+                onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
               />
             )}
 
             {!loading && nodes.length === 0 && !pendingCreate && !drawMode && (
               <QuickAddGhosts
+                key={`intro:${emojiFirst}`}
                 intro
                 compact={compactView}
                 zoom={zoom}
@@ -1860,9 +1874,11 @@ export function MapPage() {
                 // No bounds to squeeze the ring into: the view opens centered
                 // on this point, so a full round ring fits.
                 bounds={{ minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity }}
-                onPick={(type, pos, text) => {
+                offerEmoji
+                emojiFirst={emojiFirst}
+                onPick={(type, pos, text, emoji) => {
                   setActionError(null);
-                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, text });
+                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, text, emoji });
                 }}
               />
             )}
@@ -1873,6 +1889,7 @@ export function MapPage() {
                 y={pendingCreate.y}
                 type={pendingCreate.type}
                 initialText={pendingCreate.text}
+                emoji={pendingCreate.emoji}
                 zoom={zoom}
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}

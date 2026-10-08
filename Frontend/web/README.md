@@ -57,13 +57,21 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   at once) and they become nodes around the click point, hanging from the whole text as a main node.
   The map's free room is counted first (`utils/freeSpots.ts`); when not every new node fits, the user
   sees how many do and chooses which pieces to pack into the main node. See `src/map/TextToNodesModal.tsx`.
-- **Pictures on nodes** — the node panel's Info tab takes screenshots pasted with Ctrl+V, dropped
-  images or picked files; each is shrunk before upload (`utils/images.ts`). See
-  `src/map/nodePanel/ImagesSection.tsx`.
-- **Emoji cards** — a node can carry an emoji (Modify tab, `map/nodePanel/EmojiPicker.tsx`); its icon
-  is then a two-sided card that flips between the emoji and the type's symbol on hover or selection
-  (`map/NodeFlipIcon.tsx`). *Emoji first* in the eye menu turns the emoji face up instead
+- **Pictures on nodes** — the node panel's Info tab shows the text and its pictures in one box, like
+  a post: screenshots pasted with Ctrl+V, images dropped on the box or picked with its 🖼️ button land
+  under the text; each is shrunk before upload (`utils/images.ts`). See
+  `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
+- **Emoji cards** — a node can carry an emoji (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the
+  emoji ghost ring below); its icon is then a two-sided card that turns over once, to the emoji and
+  back, when the node is chosen (`map/NodeFlipIcon.tsx`). Choosing a zone (its parent, or holding it
+  still) turns its cards over one after another, parent first, then the children by their order
+  (`hooks/useFlipSequence.ts`). *Emoji first* in the eye menu turns the emoji face up instead
   (`utils/emojiFace.ts`, kept in this browser).
+- **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
+  offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
+  types (`map/QuickAddGhosts.tsx`).
+- **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
+  in the panel; the inline inputs grow taller with the text, never wider.
 - **New node → panel** — confirming a new node's inline name opens its panel with the text field
   focused, ready for the full text.
 - **Computer mode** — on a wide screen with a mouse/trackpad (`hooks/useDesktopLayout.ts`), the map's

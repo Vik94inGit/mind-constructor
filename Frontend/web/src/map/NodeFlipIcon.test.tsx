@@ -1,30 +1,53 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { NodeFlipIcon } from "./NodeFlipIcon";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { FLIP_HOLD_MS, NodeFlipIcon } from "./NodeFlipIcon";
 import { isValidEmoji } from "../utils/emojiFace";
 
 function faces() {
-  const card = screen.getByTestId("node-flip-icon").firstElementChild as HTMLElement;
+  const root = screen.getByTestId("node-flip-icon");
+  const card = root.firstElementChild as HTMLElement;
   const [front, back] = Array.from(card.children) as HTMLElement[];
-  return { card, front, back };
+  return { root, card, front, back };
 }
 
 describe("NodeFlipIcon", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
   it("puts the type face up by default, the emoji on the back", () => {
-    render(<NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} flipped={false} />);
-    const { front, back, card } = faces();
+    render(<NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} selected={false} />);
+    const { front, back, root } = faces();
     expect(front.textContent).toBe("TYPE");
     expect(back.textContent).toBe("🔥");
-    expect(card.className).toContain("group-hover:[transform:rotateY(180deg)]");
+    expect(root.dataset.flipped).toBe("false");
   });
 
-  it("puts the emoji face up in emoji-first mode, and turns over while selected", () => {
-    render(<NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst flipped />);
-    const { front, back, card } = faces();
+  it("puts the emoji face up in emoji-first mode", () => {
+    render(<NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst selected={false} />);
+    const { front, back } = faces();
     expect(front.textContent).toBe("🔥");
     expect(back.textContent).toBe("TYPE");
-    expect(card.className).toContain("[transform:rotateY(180deg)]");
-    expect(card.className).not.toContain("group-hover:");
+  });
+
+  it("turns over once when chosen, then settles home on its own", () => {
+    const { rerender } = render(
+      <NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} selected={false} />,
+    );
+    rerender(<NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} selected />);
+    expect(faces().root.dataset.flipped).toBe("true");
+    act(() => vi.advanceTimersByTime(FLIP_HOLD_MS));
+    expect(faces().root.dataset.flipped).toBe("false");
+  });
+
+  it("turns over again for each new flip token", () => {
+    const { rerender } = render(
+      <NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} selected={false} flipToken={0} />,
+    );
+    expect(faces().root.dataset.flipped).toBe("false");
+    rerender(<NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} selected={false} flipToken={7} />);
+    expect(faces().root.dataset.flipped).toBe("true");
+    act(() => vi.advanceTimersByTime(FLIP_HOLD_MS));
+    expect(faces().root.dataset.flipped).toBe("false");
   });
 });
 

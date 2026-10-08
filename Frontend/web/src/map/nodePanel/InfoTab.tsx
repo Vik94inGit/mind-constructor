@@ -1,4 +1,7 @@
+import { useState } from "react";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
+import { imageFilesFrom } from "../../utils/images";
+import { MAX_NODE_TEXT } from "../../utils/nodeText";
 import { isMobileViewport } from "../../utils/canvasLayout";
 import type { TemplateKind } from "../../utils/templates";
 import { CARD_FILL_COLORS } from "../../utils/cardFill";
@@ -28,15 +31,18 @@ interface Props {
   onDelete: () => void;
   onTemplate: (kind: TemplateKind) => void;
   onClose: () => void;
-  /** The node's pictures (ImagesSection), shown under the text. */
+  /** The node's pictures (ImagesSection), shown under the text inside the same box, like a post. */
   imagesSection?: ReactNode;
+  /** Pictures dropped anywhere on the post box. Unset when this viewer can't add any. */
+  onDropImages?: (files: File[]) => void;
 }
 
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages }: Props) {
   const { t } = useI18n();
+  const [dragOver, setDragOver] = useState(false);
   return (
     <div className="mt-4">
       {cardFill && (
@@ -99,44 +105,68 @@ export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleL
           {textLocked && <span className="text-[0.75rem] text-ink-soft">{t.ui.display.blockLocked}</span>}
         </div>
       )}
-      {isCreator && !textLocked ? (
-        <textarea
-          id="node-text"
-          ref={textareaRef}
-          rows={6}
-          value={textDraft}
-          onChange={(e) => setTextDraft(e.target.value)}
-          disabled={busy}
-          onKeyDown={(e) => {
-            // Mobile has no Shift key to reach alongside a virtual
-            // keyboard's Enter/return, so plain Enter has to behave
-            // like a normal textarea there too (insert a newline,
-            // "another row," same as Shift+Enter below) — saving is
-            // onBlur's job only (tapping the visible strip of canvas
-            // outside the panel already does this). Desktop keeps its
-            // existing plain-Enter-saves shortcut, Shift+Enter still
-            // its own newline escape hatch.
-            if (e.key === "Enter" && !e.shiftKey && !isMobileViewport()) {
-              e.preventDefault();
-              // Saves, then closes the panel — editing is done.
-              void onTextSave().then((ok) => ok && onClose());
-            }
-            // Shift+Enter (desktop), or plain Enter on mobile: no
-            // preventDefault — the textarea's own default behavior
-            // (insert a newline) is exactly what's wanted here.
-          }}
-          onBlur={() => void onTextSave()}
-          className={`min-h-[8rem] w-full resize-y rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
-        />
-      ) : (
-        <div
-          ref={readonlyTextRef}
-          className={`min-h-[8rem] w-full overflow-y-auto rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
-          style={!expanded && textHeight != null ? { height: textHeight } : undefined}
-        >
-          {node.text}
-        </div>
-      )}
+      {/* The text and its pictures share one box, like a post: write, then
+          paste, drop or pick a picture right under the words. */}
+      <div
+        className={`overflow-hidden rounded-lg border focus-within:outline focus-within:-outline-offset-1 focus-within:outline-2 focus-within:outline-accent ${
+          dragOver ? "border-accent bg-accent-soft" : `border-line ${isCreator && !textLocked ? "bg-surface" : "bg-surface-2"}`
+        }`}
+        onDragOver={(e) => {
+          if (!onDropImages || !Array.from(e.dataTransfer.types).includes("Files")) return;
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          setDragOver(false);
+          if (!onDropImages) return;
+          const files = imageFilesFrom(e.dataTransfer);
+          if (files.length === 0) return;
+          e.preventDefault();
+          onDropImages(files);
+        }}
+      >
+        {isCreator && !textLocked ? (
+          <textarea
+            id="node-text"
+            ref={textareaRef}
+            rows={6}
+            maxLength={MAX_NODE_TEXT}
+            value={textDraft}
+            onChange={(e) => setTextDraft(e.target.value)}
+            disabled={busy}
+            onKeyDown={(e) => {
+              // Mobile has no Shift key to reach alongside a virtual
+              // keyboard's Enter/return, so plain Enter has to behave
+              // like a normal textarea there too (insert a newline,
+              // "another row," same as Shift+Enter below) — saving is
+              // onBlur's job only (tapping the visible strip of canvas
+              // outside the panel already does this). Desktop keeps its
+              // existing plain-Enter-saves shortcut, Shift+Enter still
+              // its own newline escape hatch.
+              if (e.key === "Enter" && !e.shiftKey && !isMobileViewport()) {
+                e.preventDefault();
+                // Saves, then closes the panel — editing is done.
+                void onTextSave().then((ok) => ok && onClose());
+              }
+              // Shift+Enter (desktop), or plain Enter on mobile: no
+              // preventDefault — the textarea's own default behavior
+              // (insert a newline) is exactly what's wanted here.
+            }}
+            onBlur={() => void onTextSave()}
+            className={`block min-h-[8rem] w-full resize-y border-0 bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline-none ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
+          />
+        ) : (
+          <div
+            ref={readonlyTextRef}
+            className={`min-h-[8rem] w-full overflow-y-auto bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
+            style={!expanded && textHeight != null ? { height: textHeight } : undefined}
+          >
+            {node.text}
+          </div>
+        )}
+        {imagesSection}
+      </div>
       <div className="mt-2 flex items-center gap-[0.5rem]">
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -169,7 +199,6 @@ export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleL
           </button>
         )}
       </div>
-    {imagesSection}
     {templateKind && (
       <div className="mt-4 rounded-lg border border-line bg-surface-2 p-3">
         <div className="text-[0.78rem] font-semibold text-ink-soft">

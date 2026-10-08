@@ -17,6 +17,7 @@ import { ProtectTab } from "./nodePanel/ProtectTab";
 import { PackedTab } from "./nodePanel/PackedTab";
 import { HistoryTab } from "./nodePanel/HistoryTab";
 import { ImagesSection } from "./nodePanel/ImagesSection";
+import { MAX_NODE_TEXT } from "../utils/nodeText";
 import { MAX_NODE_IMAGES, imageFilesFrom, shrinkImage } from "../utils/images";
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
@@ -900,8 +901,18 @@ export function NodePanel({
               busy={busy}
               onAdd={(files) => void handleAddImages(files)}
               onRemove={(i) => void handleRemoveImage(i)}
+              extra={
+                isCreator && !textLocked ? (
+                  <span
+                    className={`text-[0.7rem] tabular-nums ${textDraft.length >= MAX_NODE_TEXT ? "font-semibold text-danger" : "text-ink-soft"}`}
+                  >
+                    {textDraft.length}/{MAX_NODE_TEXT}
+                  </span>
+                ) : undefined
+              }
             />
           }
+          onDropImages={isCreator ? (files) => void handleAddImages(files) : undefined}
         />
       )}
 

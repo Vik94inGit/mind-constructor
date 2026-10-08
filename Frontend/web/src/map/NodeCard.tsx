@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useRef } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { NODE_TYPE_COLORS, ZONE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
@@ -10,6 +10,7 @@ import { KnightHelmet } from "./KnightHelmet";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { NodeFlipIcon } from "./NodeFlipIcon";
 import { PuzzleCard } from "./PuzzleCard";
+import { MAX_NODE_TEXT } from "../utils/nodeText";
 import type { PuzzleJoins } from "../utils/puzzleLinks";
 import { CAPTION_WIDTH } from "../utils/canvasLayout";
 import { useI18n } from "../i18n/I18nContext";
@@ -49,6 +50,8 @@ interface Props {
   node: NodeDoc;
   /** The viewer's "emoji first" mode: a node with an emoji shows it face up, its type on the back (see NodeFlipIcon). */
   emojiFirst?: boolean;
+  /** Each new non-zero value turns the emoji card over once and back — MapPage's chosen-zone sequence (see useFlipSequence). */
+  flipToken?: number;
   x: number;
   y: number;
   /** MapPage's own canvas zoom (see its zoom state) — this node's own visual content (icon, health ring, caption) counter-scales by 1/zoom so it renders at a constant on-screen size regardless of zoom level; only its *position* moves with the rest of the canvas. See the inverseScaleStyle wrapper below for why that's a separate inner element rather than folded into this node's own transform. */
@@ -123,6 +126,7 @@ interface Props {
 export const NodeCard = memo(function NodeCard({
   node,
   emojiFirst = false,
+  flipToken,
   x,
   y,
   zoom,
@@ -191,6 +195,14 @@ export const NodeCard = memo(function NodeCard({
     onInlineConfirm,
     onInlineCancel,
   });
+  // The inline text field grows with the text, a row per line or wrap.
+  const inlineFieldRef = useRef<HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    const el = inlineFieldRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draftText, inlineEditing]);
 
   // A circle's own root/parent (parentCrownSentiment set) always renders at
   // the biggest size tier, overriding whatever node.sizeTier actually is —
@@ -810,9 +822,16 @@ export const NodeCard = memo(function NodeCard({
                 ) : (
                   <NodeTypeIcon type={displayType} size={21} />
                 );
-                // With an emoji the icon is a two-sided card (see NodeFlipIcon).
+                // With an emoji the icon is a two-sided card that turns over
+                // once when the node is chosen (see NodeFlipIcon).
                 return node.emoji ? (
-                  <NodeFlipIcon typeFace={typeFace} emoji={node.emoji} emojiFirst={emojiFirst} flipped={selected} />
+                  <NodeFlipIcon
+                    typeFace={typeFace}
+                    emoji={node.emoji}
+                    emojiFirst={emojiFirst}
+                    selected={selected}
+                    flipToken={flipToken}
+                  />
                 ) : (
                   typeFace
                 );
@@ -823,8 +842,13 @@ export const NodeCard = memo(function NodeCard({
         )}
       </div>
       {inlineEditing ? (
-        <input
-          className="pointer-events-auto absolute top-full left-0 mt-[0.6rem] w-full rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+        <textarea
+          ref={inlineFieldRef}
+          rows={1}
+          maxLength={MAX_NODE_TEXT}
+          // Same width as the node; a long text makes it taller (up to
+          // max-h, then it scrolls), never wider.
+          className="pointer-events-auto absolute top-full left-0 mt-[0.6rem] block max-h-[200px] w-full resize-none overflow-y-auto rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
           autoFocus
           value={draftText}
           onChange={(e) => setDraftText(e.target.value)}
@@ -832,7 +856,8 @@ export const NodeCard = memo(function NodeCard({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            // Enter confirms; Shift+Enter adds a row.
+            if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               e.currentTarget.blur();
             } else if (e.key === "Escape") {
