@@ -19,6 +19,7 @@ export async function createNode(
   input: {
     text: string;
     title?: string;
+    emoji?: string;
     order?: number | null;
     type: NodeType;
     x?: number;
@@ -42,6 +43,7 @@ export async function createNode(
         const now = new Date().toISOString();
         const draft: NodeDoc = {
           title: "",
+          emoji: "",
           order: null,
           zoneName: "",
           sizeTier: null,

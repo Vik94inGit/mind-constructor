@@ -143,6 +143,10 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   lines (members only); `DELETE /api/lines/:lineId` is allowed for whoever drew it or the map's owner
   (`NotLineDeleterError` otherwise). Broadcast to the map's room as `line:created` / `line:deleted`, and
   removed with the map (`deleteMapDao`'s cascade).
+- **`Node.emoji`** — an optional emoji (max 32 chars, `""` = none; letters/digits refused by
+  `emojiSchema` in `nodeAbl.ts`) set via `POST`/`PATCH /api/nodes`, owner-only. A frontend draws the
+  node's icon as a two-sided card: the emoji on one face, the type's symbol on the other. Like `title`,
+  it is *not* stripped from `GET /:mapId/nodes`.
 - **`Node.images`** — pictures attached to a node (screenshots, photos): an array of image data URLs
   (`data:image/png|jpeg|webp|gif;base64,…`), at most `MAX_NODE_IMAGES` (6), each at most
   `MAX_IMAGE_CHARS` characters (`imagesSchema` in `nodeAbl.ts`). Set via `PATCH /api/nodes/:nodeId`

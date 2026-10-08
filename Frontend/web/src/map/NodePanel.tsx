@@ -572,6 +572,19 @@ export function NodePanel({
     }
   }
 
+  // Owner-only, like every node edit — "" removes the emoji.
+  async function handleSetEmoji(emoji: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      onUpdated(await nodesApi.updateNode(node.nodeId, { emoji }));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.emoji.failed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // A blank field clears the step number; anything else has to be a whole
   // number from 1 to 9999 (the backend's own bounds). No-op if unchanged.
   async function handleOrderSave(): Promise<boolean> {
@@ -912,6 +925,7 @@ export function NodePanel({
           orderDraft={orderDraft}
           setOrderDraft={setOrderDraft}
           onTitleSave={handleTitleSave}
+          onSetEmoji={(emoji) => void handleSetEmoji(emoji)}
           onZoneNameSave={handleZoneNameSave}
           onOrderSave={handleOrderSave}
           onToggleHidden={handleToggleHidden}

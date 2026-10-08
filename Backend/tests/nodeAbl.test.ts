@@ -214,6 +214,19 @@ describe("nodeAbl", () => {
       await expect(updateNodeAbl("node1", "user1", { images: Array(7).fill(png) })).rejects.toThrow(ValidationError);
     });
 
+    it("passes an emoji through, \"\" to clear it, and refuses plain text", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      await updateNodeAbl("node1", "user1", { emoji: " 🔥 " });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { emoji: "🔥" });
+      await updateNodeAbl("node1", "user1", { emoji: "👩‍💻" });
+      await updateNodeAbl("node1", "user1", { emoji: "" });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { emoji: "" });
+
+      await expect(updateNodeAbl("node1", "user1", { emoji: "ok" })).rejects.toThrow(ValidationError);
+      await expect(updateNodeAbl("node1", "user1", { emoji: "🔥".repeat(20) })).rejects.toThrow(ValidationError);
+    });
+
     it("passes a valid symbolOverride through to the DAO", async () => {
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
 

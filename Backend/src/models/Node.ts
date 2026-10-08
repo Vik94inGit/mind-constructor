@@ -78,6 +78,11 @@ export const NodeSchema = new mongoose.Schema(
       max: 9999,
       validate: { validator: (v: number | null) => v === null || Number.isInteger(v), message: "order must be a whole number" },
     },
+    // An optional emoji for the node — a frontend draws the node's icon as a
+    // two-sided card, this emoji on one face and the type's own symbol on the
+    // other. Empty (the default) means none. Small, so it rides along on the
+    // map's node list like `title`.
+    emoji: { type: String, default: "", trim: true, maxlength: 32 },
     // Pictures attached to the node — screenshots, photos, sketches — as
     // image data URLs (a frontend shrinks and re-encodes each one before
     // sending it, see nodeAbl.ts's imageSchema for the caps). Stripped from

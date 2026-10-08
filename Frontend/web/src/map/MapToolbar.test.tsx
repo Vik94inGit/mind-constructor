@@ -16,6 +16,8 @@ function renderToolbar(overrides: Partial<React.ComponentProps<typeof MapToolbar
     onToggleDraw: vi.fn(),
     onPickReadingMode: vi.fn(),
     onToggleCompact: vi.fn(),
+    emojiFirst: false,
+    onToggleEmojiFirst: vi.fn(),
     onLoadTexts: vi.fn().mockResolvedValue(undefined),
     onSearchMatches: vi.fn(),
     onPickSearchResult: vi.fn(),
