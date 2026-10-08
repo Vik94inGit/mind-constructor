@@ -52,7 +52,16 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Right-click on empty canvas** — a desktop-style menu at the click point: *Paste here*, *New node ▸*
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* (grows that map kind's starter structure right there, see `utils/templates.ts`),
-  and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+  *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+- **Text → nodes** — paste a text on the map itself, mark its pieces (by hand, or every line/sentence
+  at once) and they become nodes around the click point, hanging from the whole text as a main node.
+  The map's free room is counted first (`utils/freeSpots.ts`); when not every new node fits, the user
+  sees how many do and chooses which pieces to pack into the main node. See `src/map/TextToNodesModal.tsx`.
+- **Pictures on nodes** — the node panel's Info tab takes screenshots pasted with Ctrl+V, dropped
+  images or picked files; each is shrunk before upload (`utils/images.ts`). See
+  `src/map/nodePanel/ImagesSection.tsx`.
+- **New node → panel** — confirming a new node's inline name opens its panel with the text field
+  focused, ready for the full text.
 - **Computer mode** — on a wide screen with a mouse/trackpad (`hooks/useDesktopLayout.ts`), the map's
   toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the

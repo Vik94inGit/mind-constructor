@@ -14,6 +14,8 @@ interface Props {
   onPick: (type: NodeType) => void;
   /** Grows a ready-made structure ("Analyze a problem", "Plan a goal"…) at the click point. */
   onGrow: (kind: MapKind) => void;
+  /** Opens "Text → nodes": a text cut into nodes right at the click point. */
+  onTextToNodes: () => void;
   /** Opens "Text → map". */
   onTextToMap: () => void;
   /** How many nodes are on the clipboard right now — 0 hides "Paste here". */
@@ -42,13 +44,13 @@ function TypeSymbol({ type }: { type: NodeType }) {
 //     PendingNodeCard at the click point (see MapPage's onPick wiring)
 //   - Analyze a problem / Plan a goal / Make a decision / Look back — the
 //     starter structure of that map kind, grown right at the click point
-//   - Text → map
+//   - Text → nodes here (a text cut into nodes at the click point) / Text → map
 // Fixed to the viewport at the click point, same reasoning as
 // NodeContextMenu's own doc comment (the canvas scrolls independently of
 // viewport coordinates). The submenu flies out to the side on a wide screen
 // (on hover or click) and opens in place on a phone, where there's no room
 // beside the menu.
-export function CanvasContextMenu({ x, y, onPick, onGrow, onTextToMap, pasteCount, onPasteHere, onClose }: Props) {
+export function CanvasContextMenu({ x, y, onPick, onGrow, onTextToNodes, onTextToMap, pasteCount, onPasteHere, onClose }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   const [typesOpen, setTypesOpen] = useState(false);
@@ -71,7 +73,7 @@ export function CanvasContextMenu({ x, y, onPick, onGrow, onTextToMap, pasteCoun
 
   // Same on-screen clamping as NodeContextMenu — keeps the menu (and its
   // submenu) fully visible even when the click landed near a screen edge.
-  const rows = (pasteCount > 0 ? 1 : 0) + 1 + MAP_KINDS.length + 1 + (inline && typesOpen ? NODE_TYPES.length : 0);
+  const rows = (pasteCount > 0 ? 1 : 0) + 1 + MAP_KINDS.length + 2 + (inline && typesOpen ? NODE_TYPES.length : 0);
   const MENU_H = rows * ITEM_H + 24;
   const left = Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8));
   const top = Math.max(8, Math.min(y, window.innerHeight - MENU_H - 8));
@@ -151,6 +153,9 @@ export function CanvasContextMenu({ x, y, onPick, onGrow, onTextToMap, pasteCoun
       ))}
 
       {divider}
+      <button role="menuitem" className={`${item} font-semibold`} onClick={onTextToNodes}>
+        {t.ui.textNodes.entry}
+      </button>
       <button role="menuitem" className={item} onClick={onTextToMap}>
         {t.split.entry}
       </button>

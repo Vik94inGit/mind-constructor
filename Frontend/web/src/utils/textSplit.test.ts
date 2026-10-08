@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addPiece, splitToThoughtDraft, textSegments, trimRange } from "./textSplit";
+import { addPiece, autoPieces, splitToThoughtDraft, textSegments, trimRange } from "./textSplit";
 import type { TextPiece } from "./textSplit";
 
 const piece = (id: string, start: number, end: number): TextPiece => ({ id, start, end, type: "Option" });
@@ -51,5 +51,32 @@ describe("splitToThoughtDraft", () => {
     expect(draft.thoughts).toEqual([
       { id: "p1", text: "Buy a faster laptop.", type: "Option", parentId: "root", prompt: "anythingElse" },
     ]);
+  });
+});
+
+describe("autoPieces", () => {
+  let n = 0;
+  const id = () => `a${++n}`;
+  const text = "First line.\n\n  Second one!  \nThird? And more.";
+  const slices = (pieces: TextPiece[]) => pieces.map((p) => text.slice(p.start, p.end));
+
+  it("makes one piece per non-empty line, trimmed", () => {
+    expect(slices(autoPieces(text, [], "lines", "unknown", id))).toEqual(["First line.", "Second one!", "Third? And more."]);
+  });
+
+  it("makes one piece per sentence", () => {
+    expect(slices(autoPieces(text, [], "sentences", "Option", id))).toEqual([
+      "First line.",
+      "Second one!",
+      "Third?",
+      "And more.",
+    ]);
+  });
+
+  it("keeps pieces already marked and skips what would overlap them", () => {
+    const existing = [piece("x", 0, 5)];
+    const out = autoPieces(text, existing, "lines", "unknown", id);
+    expect(out[0]).toBe(existing[0]);
+    expect(slices(out)).toEqual(["First", "Second one!", "Third? And more."]);
   });
 });

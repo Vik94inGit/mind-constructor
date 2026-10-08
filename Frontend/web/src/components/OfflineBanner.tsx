@@ -11,7 +11,9 @@ import {
 
 // A small pill along the bottom of every page saying whether the app is
 // working offline and how many changes are still waiting to reach the server
-// (see offline/sync.ts). Hidden while everything is online and saved.
+// (see offline/sync.ts). Hidden while everything is online and saved. Kept
+// deliberately tiny — one short line, small type, tucked in the bottom-left
+// corner — so it reads as a status note rather than covering the canvas.
 export function OfflineBanner() {
   const { t } = useI18n();
   const status = useSyncExternalStore(subscribeSyncStatus, getSyncStatus);
@@ -72,17 +74,18 @@ export function OfflineBanner() {
     <div
       role="status"
       aria-live="polite"
-      className={`pointer-events-auto fixed bottom-3 left-1/2 z-[60] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-line px-4 py-2 text-[0.8rem] shadow-md ${toneClass}`}
+      title={message}
+      className={`pointer-events-auto fixed bottom-2 left-2 z-[60] flex max-w-[min(20rem,calc(100vw-1rem))] items-center gap-[0.4rem] rounded-full border border-line px-[0.55rem] py-[0.15rem] text-[0.68rem] leading-tight opacity-90 shadow-sm ${toneClass}`}
     >
       {!status.online && (
-        <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full bg-ink-soft" />
+        <span aria-hidden="true" className="inline-block h-[0.4rem] w-[0.4rem] shrink-0 rounded-full bg-ink-soft" />
       )}
-      <span>{message}</span>
+      <span className="min-w-0 truncate">{message}</span>
       {action && (
         <button
           type="button"
           onClick={action.run}
-          className="shrink-0 rounded-full border border-line px-2 py-[0.15rem] font-semibold hover:bg-paper"
+          className="shrink-0 cursor-pointer rounded-full border border-line px-[0.4rem] py-0 font-semibold hover:bg-paper"
         >
           {action.label}
         </button>

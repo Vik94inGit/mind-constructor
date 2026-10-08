@@ -143,6 +143,13 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   lines (members only); `DELETE /api/lines/:lineId` is allowed for whoever drew it or the map's owner
   (`NotLineDeleterError` otherwise). Broadcast to the map's room as `line:created` / `line:deleted`, and
   removed with the map (`deleteMapDao`'s cascade).
+- **`Node.images`** — pictures attached to a node (screenshots, photos): an array of image data URLs
+  (`data:image/png|jpeg|webp|gif;base64,…`), at most `MAX_NODE_IMAGES` (6), each at most
+  `MAX_IMAGE_CHARS` characters (`imagesSchema` in `nodeAbl.ts`). Set via `PATCH /api/nodes/:nodeId`
+  with the whole list (`[]` removes them all), owner-only like every node edit; the frontend shrinks
+  and re-encodes each picture before sending it. Like `text`, stripped from `GET /:mapId/nodes`
+  (`.select("-text -images")`) — a frontend fetches them with the single node (`GET /api/nodes/:nodeId`)
+  when its panel opens. The JSON body limit in `server.ts` (3 MB) is sized to fit a full list.
 - **`Node.title`** — an optional short label (max 80 chars, `""` = none) a frontend shows under a node
   in place of the start of its `text`. Set via `POST`/`PATCH /api/nodes` (`titleSchema` in
   `nodeAbl.ts`; an empty string on PATCH clears it). Unlike `text`, it is *not* stripped from

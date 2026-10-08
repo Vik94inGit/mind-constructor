@@ -203,7 +203,7 @@ describe("mapsDao", () => {
     const result = await getNodesByMapDao("pub123", "user1");
 
     expect(Node.find).toHaveBeenCalledWith({ mapId: "m1", _id: { $nin: [] } });
-    expect(chain.select).toHaveBeenCalledWith("-text -_id -__v");
+    expect(chain.select).toHaveBeenCalledWith("-text -images -_id -__v");
     expect(chain.populate).toHaveBeenNthCalledWith(1, "userId", "username");
     expect(chain.populate).toHaveBeenNthCalledWith(2, "parentId", "-_id nodeId text type");
     expect(chain.populate).toHaveBeenNthCalledWith(3, "targetNodeId", "-_id nodeId text type");

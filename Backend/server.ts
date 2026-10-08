@@ -109,8 +109,10 @@ const sessionMiddleware = session({
 });
 app.use(sessionMiddleware);
 
-// 300 KB: room for a saved draft (see userStateAbl.ts MAX_DRAFT_BYTES).
-app.use(express.json({ limit: "300kb" }));
+// 3 MB: room for a node's whole picture list in one PATCH (see nodeAbl.ts
+// MAX_NODE_IMAGES × MAX_IMAGE_CHARS), and for a saved draft (userStateAbl.ts
+// MAX_DRAFT_BYTES).
+app.use(express.json({ limit: "3mb" }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/nodes", nodeRoute);

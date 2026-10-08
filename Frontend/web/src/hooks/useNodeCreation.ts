@@ -28,6 +28,20 @@ export interface PendingCreate {
   text?: string;
 }
 
+// What "Text → nodes" (map/TextToNodesModal.tsx) asks to have made: the
+// whole text as an optional main node, each marked piece as a node (hanging
+// from the main node when there is one), placed on the free spots it already
+// found — the main node on the first. Pieces listed in `packed` didn't get a
+// spot of their own: they're folded into the main node right away.
+export interface TextNodesPlan {
+  text: string;
+  rootType: NodeType;
+  withRoot: boolean;
+  pieces: { id: string; text: string; type: NodeType }[];
+  packed: Set<string>;
+  spots: Pt[];
+}
+
 // applyTemplate's own reveal pace — long enough that each node in a growing
 // template branch reads as its own discrete step (plus its celebrate burst),
 // not a flash of everything at once.
@@ -50,6 +64,8 @@ interface Params {
   viewportBounds: () => ViewportBounds;
   showNodes: (ids: string[]) => void;
   showNotice: (message: string) => void;
+  /** Opens a just-created node's panel on its text field, ready to write more (see confirmPendingCreate). */
+  openNewNode: (node: NodeDoc, at: Pt) => void;
   t: Translation;
 }
 
@@ -69,6 +85,7 @@ export function useNodeCreation({
   viewportBounds,
   showNodes,
   showNotice,
+  openNewNode,
   t,
 }: Params) {
   // Grows a template branch (see utils/templates.ts) from `root`: every node
@@ -127,14 +144,10 @@ export function useNodeCreation({
       const node = await nodesApi.createNode(mapId, { text, type, x, y, parentId });
       upsertNode(node);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-      // Deselect rather than select the freshly-created node — same "close
-      // the panel after creating a node" behavior NodePanel's own
-      // handleAttack/handleProtect follow, applied to every other
-      // node-creation path (toolbar, double-click, quick-add) that ends up
-      // here too. Used to select it instead, opening its panel right away;
-      // this leaves the canvas clear so the create-flow itself reads as
-      // finished rather than immediately handing you another panel.
-      setSelectedId(null);
+      // The new node's panel opens straight away on its text field, so the
+      // short line typed into the inline input can grow into the full text
+      // (and pictures) without a second click.
+      openNewNode(node, { x, y });
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
     } finally {
@@ -244,5 +257,55 @@ export function useNodeCreation({
     }
   }
 
-  return { confirmPendingCreate, applyTemplate, createCircle, growStructure };
+  // "Text → nodes": makes everything a TextNodesPlan asks for, in order — the
+  // main node first (the pieces need its real id as their parent), then each
+  // piece on its spot, then packs the pieces that didn't fit into the main
+  // node in one request. Throws on failure; the modal shows the error.
+  async function createFromText(plan: TextNodesPlan, onProgress?: (done: number, total: number) => void) {
+    if (!mapId) return;
+    setActionError(null);
+    const total = (plan.withRoot ? 1 : 0) + plan.pieces.length;
+    let done = 0;
+    const shownIds: string[] = [];
+    let rootId: string | null = null;
+    let spot = 0;
+    if (plan.withRoot) {
+      const at = plan.spots[spot++];
+      const root = await nodesApi.createNode(mapId, { text: plan.text, type: plan.rootType, x: at.x, y: at.y, parentId: null });
+      rootId = root.nodeId;
+      upsertNode(root);
+      setCelebrateIds((prev) => new Set(prev).add(root.nodeId));
+      shownIds.push(root.nodeId);
+      onProgress?.(++done, total);
+    }
+    // Pieces that get a spot first, so the ones about to be packed (created
+    // on the main node's own spot) are on the canvas for as short a moment
+    // as possible before they fold away.
+    const ordered = [...plan.pieces.filter((p) => !plan.packed.has(p.id)), ...plan.pieces.filter((p) => plan.packed.has(p.id))];
+    const packedIds: string[] = [];
+    for (const piece of ordered) {
+      const isPacked = plan.packed.has(piece.id) && rootId !== null;
+      const at = isPacked ? plan.spots[0] : plan.spots[spot++];
+      const node = await nodesApi.createNode(mapId, { text: piece.text, type: piece.type, x: at.x, y: at.y, parentId: rootId });
+      upsertNode(node);
+      if (isPacked) {
+        packedIds.push(node.nodeId);
+      } else {
+        setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
+        shownIds.push(node.nodeId);
+      }
+      onProgress?.(++done, total);
+    }
+    if (rootId && packedIds.length > 0) {
+      const res = await nodesApi.packNodes(rootId, packedIds);
+      upsertNode(res.container);
+      res.members.forEach(upsertNode);
+    }
+    setMultiSelectIds(new Set());
+    setSelectedId(null);
+    showNodes(shownIds);
+    showNotice(t.ui.textNodes.created(total, packedIds.length));
+  }
+
+  return { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText };
 }

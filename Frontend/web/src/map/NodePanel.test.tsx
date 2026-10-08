@@ -8,6 +8,7 @@ import { makeEdge, makeNode } from "../test/fixtures";
 import type { NodeDoc } from "../types";
 
 vi.mock("../api/nodes", () => ({
+  getNode: vi.fn(async () => ({ images: [] })),
   getAttackHistory: vi.fn(async () => [{ attackerId: { _id: "u2", username: "rival" }, weapon: "sword", damage: 7 }]),
   updateNode: vi.fn(),
   attackNode: vi.fn(),

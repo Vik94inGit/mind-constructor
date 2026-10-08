@@ -32,6 +32,8 @@ import { useI18n } from "../i18n/I18nContext";
 import { NodeCard } from "../map/NodeCard";
 import { NodePanel } from "../map/NodePanel";
 import { PackPickerPanel } from "../map/PackPickerPanel";
+import { TextToNodesModal } from "../map/TextToNodesModal";
+import { findFreeSpots } from "../utils/freeSpots";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
@@ -84,6 +86,8 @@ import {
   footprintObstacles,
   computeNodeGroups,
   computeLinkCycles,
+  getCirclePackSpacing,
+  nodeObstacles,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
@@ -1312,7 +1316,12 @@ export function MapPage() {
 
   // Every way a new node gets made — the pending-node input's confirm, a
   // template branch, "Create circle". See hooks/useNodeCreation.ts.
-  const { confirmPendingCreate, applyTemplate, createCircle, growStructure } = useNodeCreation({
+  // A node just made through the inline input: its panel opens focused on
+  // the text (see NodePanel's autoFocusText) — cleared once that's done.
+  const [focusTextNodeId, setFocusTextNodeId] = useState<string | null>(null);
+  // "Text → nodes" (canvas right-click menu): where on the canvas it was asked for.
+  const [textNodesAt, setTextNodesAt] = useState<{ x: number; y: number } | null>(null);
+  const { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText } = useNodeCreation({
     mapId,
     positions,
     pendingCreate,
@@ -1328,6 +1337,12 @@ export function MapPage() {
     viewportBounds,
     showNodes,
     showNotice,
+    openNewNode: (node, at) => {
+      setMultiSelectIds(new Set());
+      setSelectedId(node.nodeId);
+      setFocusTextNodeId(node.nodeId);
+      centerOnPoint(at.x, at.y);
+    },
     t,
   });
 
@@ -1992,6 +2007,8 @@ export function MapPage() {
               <NodePanel
                 node={selectedNode}
                 textLocked={!!blockLocks[selectedNode.nodeId]}
+                autoFocusText={focusTextNodeId === selectedNode.nodeId}
+                onAutoFocused={() => setFocusTextNodeId(null)}
                 onToggleLock={isOwnNode(selectedNode) ? () => toggleBlockLock(selectedNode.nodeId) : undefined}
                 cardFill={(() => {
                   const mode = modeOf(selectedNode.nodeId);
@@ -2126,10 +2143,34 @@ export function MapPage() {
             setInlineEditId(null);
             void growStructure(kind, at);
           }}
+          onTextToNodes={() => {
+            setCanvasContextMenu(null);
+            setInlineEditId(null);
+            setTextNodesAt({ x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY });
+          }}
           onTextToMap={() => {
             setCanvasContextMenu(null);
             navigate("/split");
           }}
+        />
+      )}
+
+      {textNodesAt && (
+        <TextToNodesModal
+          // The whole canvas counts, not just what's on screen — the question
+          // is whether the map itself has room. New nodes keep the usual
+          // spacing from everything already there (zones included) and the
+          // tighter family spacing among themselves.
+          findSpots={(count) =>
+            findFreeSpots(
+              textNodesAt,
+              count,
+              [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()],
+              getCirclePackSpacing(),
+            )
+          }
+          onCreate={createFromText}
+          onClose={() => setTextNodesAt(null)}
         />
       )}
 

@@ -108,3 +108,25 @@ export function clearSplitDraft(userId: string) {
     // best-effort
   }
 }
+
+/**
+ * Pieces cut out of `text` automatically — one per non-empty line, or one per
+ * sentence — skipping any that would overlap a piece already there. Ranges
+ * leave out surrounding whitespace, same as a hand-made selection.
+ */
+export function autoPieces(
+  text: string,
+  existing: TextPiece[],
+  by: "lines" | "sentences",
+  type: NodeType,
+  newId: () => string,
+): TextPiece[] {
+  const pattern = by === "lines" ? /[^\n]+/g : /[^.!?…\n]+(?:[.!?…]+|$)/gm;
+  let pieces = existing;
+  for (const m of text.matchAll(pattern)) {
+    const range = trimRange(text, m.index ?? 0, (m.index ?? 0) + m[0].length);
+    if (!range) continue;
+    pieces = addPiece(pieces, { id: newId(), ...range, type }) ?? pieces;
+  }
+  return pieces;
+}
