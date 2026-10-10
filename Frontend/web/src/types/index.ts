@@ -214,6 +214,8 @@ export interface NodeDoc {
   emoji?: string;
   /** A small square thumbnail drawn as the node's icon (Node.iconImage); "" or absent means none. */
   iconImage?: string;
+  /** A small copy of one of the pictures shown as a picture card on the map (Node.cardImage); "" or absent means none. Independent of iconImage. */
+  cardImage?: string;
   /** Pictures attached to the node (image data URLs) — see Node.images on the backend. Absent on the map's node list, which leaves them out like `text`; fetched with the single node when its panel opens. */
   images?: string[];
   /** Name of the zone this node is the parent of — see Node.zoneName on the backend. */

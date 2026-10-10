@@ -44,6 +44,8 @@ const PUZZLE_MAX_WIDTH = 240;
 const PUZZLE_SELECTED_MAX_WIDTH = 180;
 // iconText captions: a little wider and taller than the default chip.
 const ICON_TEXT_CAPTION_WIDTH = 176;
+// A picture card (NodeDoc.cardImage) above the icon, on screen.
+const CARD_IMAGE_WIDTH = 120;
 
 
 interface Props {
@@ -751,6 +753,10 @@ export const NodeCard = memo(function NodeCard({
                         : null
             }
           >
+            {node.cardImage && (
+              // The picture card, at the top of the puzzle piece.
+              <img src={node.cardImage} alt="" className="mb-[0.3rem] block max-h-[110px] w-full rounded-[4px] object-cover" draggable={false} />
+            )}
             {trimmedTitle && (
               <div className={`text-[0.78rem] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}>{trimmedTitle}</div>
             )}
@@ -916,6 +922,24 @@ export const NodeCard = memo(function NodeCard({
           ) : (
             captionLabel
           )}
+        </div>
+      )}
+      {node.cardImage && !puzzle && !selected && !inlineEditing && (
+        // A picture card (NodeDoc.cardImage) stands above the icon, clear of
+        // its crown — hidden while selected, when the ghosts ring the node.
+        // Undoes the size tier like the caption, so it's one size on screen.
+        <div
+          className="pointer-events-none absolute bottom-full left-1/2 overflow-hidden rounded-md border-2 bg-surface shadow-card"
+          style={{
+            width: CARD_IMAGE_WIDTH,
+            marginBottom: compact ? 8 : 22,
+            borderColor: circleBorderColor,
+            transform: `translateX(-50%) scale(${1 / sizeMultiplier})`,
+            transformOrigin: "50% 100%",
+          }}
+          data-testid="node-picture-card"
+        >
+          <img src={node.cardImage} alt="" className="block max-h-[120px] w-full object-cover" draggable={false} />
         </div>
       )}
       {isNamedZone && !puzzle && !compact && !selected && !inlineEditing && (

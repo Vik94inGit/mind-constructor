@@ -19,7 +19,7 @@ import { PackedTab } from "./nodePanel/PackedTab";
 import { HistoryTab } from "./nodePanel/HistoryTab";
 import { ImagesSection } from "./nodePanel/ImagesSection";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
-import { MAX_NODE_IMAGES, imageFilesFrom, makeIconImage, shrinkImage } from "../utils/images";
+import { MAX_NODE_IMAGES, imageFilesFrom, makeCardImage, makeIconImage, shrinkImage } from "../utils/images";
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own
@@ -610,6 +610,22 @@ export function NodePanel({
     }
   }
 
+  // A picture as a card on the map (makeCardImage), or null to take it off.
+  async function handleSetCard(index: number | null) {
+    const src = index == null ? "" : images?.[index];
+    if (src == null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const cardImage = src ? await makeCardImage(src) : "";
+      onUpdated(await nodesApi.updateNode(node.nodeId, { cardImage }));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.images.iconFailed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleSetEmoji(emoji: string) {
     setBusy(true);
     setError(null);
@@ -939,6 +955,8 @@ export function NodePanel({
               onRemove={(i) => void handleRemoveImage(i)}
               iconImage={node.iconImage}
               onSetIcon={isCreator ? (i) => void handleSetIcon(i) : undefined}
+              cardImage={node.cardImage}
+              onSetCard={isCreator ? (i) => void handleSetCard(i) : undefined}
               extra={
                 isCreator && !textLocked ? (
                   <span
