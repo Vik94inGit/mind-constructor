@@ -77,3 +77,36 @@ export async function shrinkImage(file: Blob): Promise<string> {
   }
   throw new Error("image too large");
 }
+
+/** Mirrors the backend's MAX_ICON_IMAGE_CHARS. */
+export const MAX_ICON_IMAGE_CHARS = 40_000;
+const ICON_SIDE = 112;
+
+/**
+ * A node's picture icon (NodeDoc.iconImage): the middle square of `src` (one
+ * of the node's pictures, a data URL), scaled down to ICON_SIDE and encoded
+ * small enough for the map's node list.
+ */
+export async function makeIconImage(src: string): Promise<string> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("not an image"));
+    el.src = src;
+  });
+  const side = Math.min(img.naturalWidth, img.naturalHeight);
+  if (!side) throw new Error("not an image");
+  const canvas = document.createElement("canvas");
+  canvas.width = ICON_SIDE;
+  canvas.height = ICON_SIDE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no canvas");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, ICON_SIDE, ICON_SIDE);
+  ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, ICON_SIDE, ICON_SIDE);
+  for (const quality of [0.8, 0.6, 0.4]) {
+    const url = canvas.toDataURL("image/jpeg", quality);
+    if (url.length <= MAX_ICON_IMAGE_CHARS) return url;
+  }
+  throw new Error("image too large");
+}

@@ -26,7 +26,7 @@ export interface PendingCreate {
   parentId: string | null;
   /** A ghost template's starter phrase the input opens with. */
   text?: string;
-  /** Picked from the emoji ghost ring (see QuickAddGhosts' offerEmoji). */
+  /** Picked from the emoji ghost ring (QuickAddGhosts) — optional: writing the text straight away makes the node without one. */
   emoji?: string;
 }
 
@@ -138,12 +138,14 @@ export function useNodeCreation({
   // Fires once the inline pending-node input (see PendingNodeCard) actually
   // confirms with non-empty text — the one place any node-creation path
   // (toolbar, double-click, "Create branch", quick-add) ends up.
-  async function confirmPendingCreate(text: string, type: NodeType) {
+  async function confirmPendingCreate(text: string, type: NodeType, images: string[] = []) {
     if (!pendingCreate || !mapId) return;
     const { x, y, parentId, emoji } = pendingCreate;
     setActionError(null);
     try {
-      const node = await nodesApi.createNode(mapId, { text, type, x, y, parentId, ...(emoji ? { emoji } : {}) });
+      let node = await nodesApi.createNode(mapId, { text, type, x, y, parentId, ...(emoji ? { emoji } : {}) });
+      // Pictures added while writing it (NewNodePanel) go on once it exists.
+      if (images.length) node = await nodesApi.updateNode(node.nodeId, { images });
       upsertNode(node);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
       // The new node's panel opens straight away on its text field, so the

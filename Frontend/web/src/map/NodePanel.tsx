@@ -6,7 +6,8 @@ import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf } from "..
 import type { TemplateKind } from "../utils/templates";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
-import { NODE_TYPES } from "../types";
+import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
+import { TypePicker } from "./TypePicker";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { usePanelSheet } from "./nodePanel/usePanelSheet";
@@ -18,7 +19,7 @@ import { PackedTab } from "./nodePanel/PackedTab";
 import { HistoryTab } from "./nodePanel/HistoryTab";
 import { ImagesSection } from "./nodePanel/ImagesSection";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
-import { MAX_NODE_IMAGES, imageFilesFrom, shrinkImage } from "../utils/images";
+import { MAX_NODE_IMAGES, imageFilesFrom, makeIconImage, shrinkImage } from "../utils/images";
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own
@@ -66,8 +67,12 @@ import { MAX_NODE_IMAGES, imageFilesFrom, shrinkImage } from "../utils/images";
 // instead of the panel's content actually covering it. Still below a real
 // modal (Modal.tsx, z-50), which should stay on top of everything,
 // this panel included.
+// Docked to the top now, at half the screen (panelReserveFrac), with the
+// node's text first — the chosen node is centered in the half left below it
+// (centerOnNode). The content scrolls inside; the resize handle stays pinned
+// to the sheet's bottom edge.
 const PANEL_CLASS =
-  "fixed inset-x-0 bottom-0 z-[46] max-h-[50dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+  "fixed inset-x-0 top-0 z-[46] flex h-[50dvh] w-full flex-col rounded-b-2xl border-b border-line bg-surface shadow-[var(--shadow-card)]";
 
 
 // The header only ever shows the type icon and a two-line clamp of the
@@ -244,7 +249,7 @@ export function NodePanel({
 
   // Dragging the sheet off its bottom dock and resizing it — see
   // usePanelSheet.
-  const { panelRef, dragOffset, setDragOffset, panelHeight, textHeight, onResizeHandlePointerDown, onGripPointerDown } =
+  const { panelRef, dragOffset, setDragOffset, panelHeight, setPanelHeight, textHeight, onResizeHandlePointerDown, onGripPointerDown } =
     usePanelSheet({ textareaRef, readonlyTextRef });
 
   // A weapon node's own targetNodeId — only ever meaningful when isWeapon,
@@ -364,6 +369,7 @@ export function NodePanel({
     setOrderDraft(node.order != null ? String(node.order) : "");
     setExpanded(false);
     setDragOffset({ x: 0, y: 0 });
+    setPanelHeight(null);
     setTab("info");
     nodesApi
       .getAttackHistory(node.nodeId)
@@ -574,6 +580,36 @@ export function NodePanel({
   }
 
   // Owner-only, like every node edit — "" removes the emoji.
+  // The header's type picker (TypePicker).
+  async function handleSetType(type: NodeType) {
+    setBusy(true);
+    setError(null);
+    try {
+      onUpdated(await nodesApi.updateNode(node.nodeId, { type }));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.type);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // A picture as the node's icon: a small square cut from it (makeIconImage),
+  // or null to go back to the type's symbol.
+  async function handleSetIcon(index: number | null) {
+    const src = index == null ? "" : images?.[index];
+    if (src == null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const iconImage = src ? await makeIconImage(src) : "";
+      onUpdated(await nodesApi.updateNode(node.nodeId, { iconImage }));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.images.iconFailed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleSetEmoji(emoji: string) {
     setBusy(true);
     setError(null);
@@ -799,17 +835,7 @@ export function NodePanel({
         ...(panelHeight != null ? { height: panelHeight, maxHeight: panelHeight } : undefined),
       }}
     >
-      {/* Resize handle — drags the sheet's top edge to grow/shrink it (see
-          panelHeight/onResizeHandlePointerDown above). Separate from the
-          grip below (which repositions the whole sheet instead) so the two
-          gestures never fight over the same strip. Same bleed-to-the-edge
-          technique the grip already uses, just for height instead of
-          reach. */}
-      <div
-        className="-mx-5 -mt-5 mb-[0.15rem] h-[0.6rem] touch-none cursor-ns-resize select-none"
-        onPointerDown={onResizeHandlePointerDown}
-        title={t.ui.panelResizeHandle}
-      />
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-3">
       {/* Grip handle — the only way to drag this sheet off its default
           bottom dock (see dragOffset/onGripPointerDown above). A dedicated
           strip rather than making the whole header draggable, so the tab
@@ -818,7 +844,7 @@ export function NodePanel({
           attempt. touch-none: without it a touch-drag here scrolls/bounces
           the page underneath instead of moving the sheet. */}
       <div
-        className="-mx-5 mb-3 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
+        className="-mx-5 mb-2 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
         onPointerDown={onGripPointerDown}
         title={t.ui.panelDragHandle}
       >
@@ -838,12 +864,22 @@ export function NodePanel({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line pb-[0.7rem]">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex flex-shrink-0 items-center gap-[0.4rem]">
-            <div
-              className="flex items-center text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase"
-              title={t.ui.types[node.type]}
-            >
-              <NodeTypeIcon type={node.type} />
-            </div>
+            {isCreator ? (
+              // The node's own type, changeable right here.
+              <TypePicker
+                value={node.type}
+                types={node.isWeapon || node.isProtection ? ATTACK_NODE_TYPES : NODE_TYPES}
+                disabled={busy}
+                onChange={(type) => void handleSetType(type)}
+              />
+            ) : (
+              <div
+                className="flex items-center text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase"
+                title={t.ui.types[node.type]}
+              >
+                <NodeTypeIcon type={node.type} />
+              </div>
+            )}
             {/* No title/caption here any more — the node's own text is
                 still readable in the Info tab below (scrollable, full
                 text), just not repeated as a header up here. */}
@@ -901,6 +937,8 @@ export function NodePanel({
               busy={busy}
               onAdd={(files) => void handleAddImages(files)}
               onRemove={(i) => void handleRemoveImage(i)}
+              iconImage={node.iconImage}
+              onSetIcon={isCreator ? (i) => void handleSetIcon(i) : undefined}
               extra={
                 isCreator && !textLocked ? (
                   <span
@@ -984,6 +1022,17 @@ export function NodePanel({
       {tab === "pack" && <PackedTab packedMembers={packedMembers} busy={busy} onUnpack={handleUnpack} />}
 
       {tab === "history" && <HistoryTab history={history} />}
+      </div>
+      {/* Resize handle, pinned to the sheet's bottom edge: drag it down to
+          give the panel (and the text box in it) more room, up for less (see
+          panelHeight/onResizeHandlePointerDown). */}
+      <div
+        className="flex h-[1.1rem] flex-shrink-0 touch-none cursor-ns-resize items-center justify-center select-none"
+        onPointerDown={onResizeHandlePointerDown}
+        title={t.ui.panelResizeHandle}
+      >
+        <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
+      </div>
     </div>
   );
 }

@@ -17,6 +17,8 @@ interface Props {
   initialText?: string;
   /** Picked from the emoji ghost ring — shown on the icon's corner until the node is made. */
   emoji?: string;
+  /** Just the marker on the map: the text is written in MapPage's NewNodePanel instead, and `type` follows that panel. */
+  iconOnly?: boolean;
   onConfirm: (text: string, type: NodeType) => void;
   onCancel: () => void;
   /** MapPage's own canvas zoom — see QuickAddGhosts' identical prop. This card is drawn inside the zoomed canvas the same as everything else, so it has to counter-scale by 1/zoom or it visibly balloons/shrinks along with whatever zoom level the map happens to be at instead of staying the same size on screen as a real node's own icon. */
@@ -30,7 +32,7 @@ interface Props {
 // sent to the backend until there's actual text — clicking a quick-add
 // ghost (or the toolbar/double-click/"Create branch" paths) opens one of
 // these instead of a modal, autofocused so typing can start immediately.
-export function PendingNodeCard({ x, y, type, initialText = "", emoji, onConfirm, onCancel, zoom = 1, onTypeChange }: Props) {
+export function PendingNodeCard({ x, y, type, initialText = "", emoji, iconOnly = false, onConfirm, onCancel, zoom = 1, onTypeChange }: Props) {
   const { t } = useI18n();
   const [text, setText] = useState(initialText);
   const [draftType, setDraftType] = useState<NodeType>(type);
@@ -41,6 +43,8 @@ export function PendingNodeCard({ x, y, type, initialText = "", emoji, onConfirm
     onTypeChange?.(draftType);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftType]);
+  // A type picked in the panel (iconOnly) comes back down as `type`.
+  useEffect(() => setDraftType(type), [type]);
   // Same single-resolution-point pattern as NodeCard's inline editor —
   // Escape blurs and defers to this flag instead of racing a separate path.
   const cancelingRef = useRef(false);
@@ -137,6 +141,7 @@ export function PendingNodeCard({ x, y, type, initialText = "", emoji, onConfirm
           </span>
         )}
       </div>
+      {!iconOnly && (
       <textarea
         ref={fieldRef}
         rows={1}
@@ -163,6 +168,7 @@ export function PendingNodeCard({ x, y, type, initialText = "", emoji, onConfirm
         }}
         onBlur={resolve}
       />
+      )}
     </div>
   );
 }

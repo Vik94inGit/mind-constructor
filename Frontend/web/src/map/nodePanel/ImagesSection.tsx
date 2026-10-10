@@ -12,6 +12,10 @@ interface Props {
   onRemove: (index: number) => void;
   /** Shown at the right end of the toolbar — the text's character count. */
   extra?: ReactNode;
+  /** The node's current picture icon (NodeDoc.iconImage), if it has one. */
+  iconImage?: string;
+  /** Makes picture `index` the node's icon, or (null) goes back to the type's symbol. Unset when this viewer can't. */
+  onSetIcon?: (index: number | null) => void;
 }
 
 // The lower half of the Info tab's "post" box (see InfoTab): the node's
@@ -19,7 +23,7 @@ interface Props {
 // it full size) and, for the node's owner, a small toolbar to add more. A
 // picture can also be pasted anywhere in the panel (NodePanel's own onPaste)
 // or dropped anywhere on the post box (InfoTab).
-export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra }: Props) {
+export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, iconImage = "", onSetIcon }: Props) {
   const { t } = useI18n();
   const s = t.ui.images;
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -51,6 +55,18 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra }:
                     className={`block w-full object-cover ${list.length === 1 ? "max-h-[220px]" : "h-[110px]"}`}
                   />
                 </button>
+                {onSetIcon && (
+                  // Shows this picture as the node's icon on the map, instead
+                  // of its type's symbol; tapping it again goes back.
+                  <button
+                    type="button"
+                    className="absolute bottom-[0.3rem] left-[0.3rem] cursor-pointer rounded-full border border-line bg-surface px-[0.45rem] py-[0.1rem] text-[0.68rem] font-semibold text-ink shadow-card hover:bg-surface-2 disabled:opacity-50"
+                    disabled={busy}
+                    onClick={() => onSetIcon(i)}
+                  >
+                    {s.useAsIcon}
+                  </button>
+                )}
                 {canEdit && (
                   <button
                     type="button"
@@ -80,6 +96,22 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra }:
             {s.add}
           </button>
           <span className="text-[0.7rem] text-ink-soft">{full ? s.limit(MAX_NODE_IMAGES) : s.hint}</span>
+          {iconImage && onSetIcon && (
+            // The picture icon in use, and a way back to the type's symbol.
+            <span className="inline-flex items-center gap-[0.3rem] rounded-full border border-line bg-surface-2 py-[0.1rem] pr-[0.2rem] pl-[0.1rem] text-[0.68rem] font-semibold text-ink">
+              <img src={iconImage} alt="" className="h-[1.3rem] w-[1.3rem] rounded-full object-cover" />
+              {s.isIcon}
+              <button
+                type="button"
+                className="cursor-pointer rounded-full border-0 bg-transparent px-[0.25rem] text-[0.8rem] leading-none text-ink-soft hover:text-danger disabled:opacity-50"
+                aria-label={s.remove}
+                disabled={busy}
+                onClick={() => onSetIcon(null)}
+              >
+                ×
+              </button>
+            </span>
+          )}
           {extra && <span className="ml-auto">{extra}</span>}
           <input
             ref={fileRef}

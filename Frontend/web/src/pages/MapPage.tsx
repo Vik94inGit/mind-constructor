@@ -38,6 +38,7 @@ import { loadEmojiFirst, saveEmojiFirst } from "../utils/emojiFace";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
+import { NewNodePanel } from "../map/NewNodePanel";
 import { useFlipSequence } from "../hooks/useFlipSequence";
 import { NodeContextMenu } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
@@ -336,7 +337,7 @@ export function MapPage() {
   // third (half on mobile) of the screen while it's open. Skipped for the
   // group-selection footer (multiSelectIds), which is a slim bar, not a tall
   // sheet.
-  const sheetOpen = chooseMode || packMode || (!!selectedNode && multiSelectIds.size === 0);
+  const sheetOpen = chooseMode || packMode || !!pendingCreate || (!!selectedNode && multiSelectIds.size === 0);
   const {
     canvasRef,
     wrapRef,
@@ -972,19 +973,18 @@ export function MapPage() {
   // a node double-click and the side panel's own Edit button. The context
   // menu's own "Edit" item is a different, separate action now — it just
   // opens the panel (see handleNodeClick below), not this inline editor.
+  // Editing opens the node's panel on its text field (NodePanel's
+  // autoFocusText), the same place a new node is written — not an inline
+  // input under the icon any more.
   async function startInlineEdit(node: NodeDoc) {
     setContextMenu(null);
     setPendingCreate(null);
+    if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
     setSelectedId(node.nodeId);
+    centerOnNode(node.nodeId);
     if (!canEditNode(node)) return;
-    // Awaited, not fire-and-forget: NodeCard seeds its draft from node.text
-    // the instant inlineEditing flips true, and again on every later change
-    // to node.text while still editing (so a slower typist can still get
-    // clobbered if this landed *during* editing instead of before it) — so
-    // the real text has to be in `nodes` before setInlineEditId turns
-    // editing on, not just requested around the same time as it.
     await ensureNodeText([node.nodeId]);
-    setInlineEditId(node.nodeId);
+    setFocusTextNodeId(node.nodeId);
   }
 
   function handleNodeClick(node: NodeDoc, shiftKey = false) {
@@ -1233,7 +1233,9 @@ export function MapPage() {
     // before opening the input.
     const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
     setInlineEditId(null);
-    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text, emoji });
+    // Emoji first: the feeling was already picked (or skipped, "") on the
+    // ring before the types. Otherwise it's offered around the new node.
+    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text, emoji: emojiFirst ? (emoji ?? "") : undefined });
   }
 
   // ---- Separator lines ----
@@ -1337,6 +1339,12 @@ export function MapPage() {
   // A node just made through the inline input: its panel opens focused on
   // the text (see NodePanel's autoFocusText) — cleared once that's done.
   const [focusTextNodeId, setFocusTextNodeId] = useState<string | null>(null);
+  // A node being made is brought to the middle of the screen below its panel,
+  // with the emoji ring around it.
+  useEffect(() => {
+    if (pendingCreate) centerOnPoint(pendingCreate.x, pendingCreate.y);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCreate?.x, pendingCreate?.y]);
   // "Text → nodes" (canvas right-click menu): where on the canvas it was asked for.
   const [textNodesAt, setTextNodesAt] = useState<{ x: number; y: number } | null>(null);
   const { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText } = useNodeCreation({
@@ -1858,7 +1866,6 @@ export function MapPage() {
                 bounds={settledViewportBounds()}
                 compact={compactView}
                 zoom={zoom}
-                offerEmoji
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
               />
@@ -1874,22 +1881,37 @@ export function MapPage() {
                 // No bounds to squeeze the ring into: the view opens centered
                 // on this point, so a full round ring fits.
                 bounds={{ minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity }}
-                offerEmoji
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => {
                   setActionError(null);
-                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, text, emoji });
+                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, text, emoji: emojiFirst ? (emoji ?? "") : undefined });
                 }}
+              />
+            )}
+
+            {pendingCreate && pendingCreate.emoji === undefined && !dotZoom && (
+              // The feelings, offered around the node being made — optional:
+              // writing the text straight away makes it without one.
+              <QuickAddGhosts
+                key={`emoji:${pendingCreate.x}:${pendingCreate.y}`}
+                anchorPos={{ x: pendingCreate.x, y: pendingCreate.y }}
+                bounds={settledViewportBounds()}
+                compact={compactView}
+                zoom={zoom}
+                onPick={() => {}}
+                onPickEmoji={(emoji) => setPendingCreate((prev) => (prev ? { ...prev, emoji } : prev))}
               />
             )}
 
             {pendingCreate && (
               <PendingNodeCard
+                // The text is written in NewNodePanel; this is its marker.
+                iconOnly
                 x={pendingCreate.x}
                 y={pendingCreate.y}
                 type={pendingCreate.type}
                 initialText={pendingCreate.text}
-                emoji={pendingCreate.emoji}
+                emoji={pendingCreate.emoji || undefined}
                 zoom={zoom}
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}
@@ -2014,6 +2036,18 @@ export function MapPage() {
             onGroupCircle={groupSelectionIntoCircle}
             onDelete={deleteSelection}
             onDone={exitChooseMode}
+          />
+        ) : pendingCreate && !presenting ? (
+          // A node being made is written in its own top sheet, text field first.
+          <NewNodePanel
+            key={`${pendingCreate.x}:${pendingCreate.y}`}
+            type={pendingCreate.type}
+            emoji={pendingCreate.emoji || undefined}
+            initialText={pendingCreate.text}
+            onTypeChange={(type) => setPendingCreate((prev) => (prev ? { ...prev, type } : prev))}
+            onClearEmoji={() => setPendingCreate((prev) => (prev ? { ...prev, emoji: "" } : prev))}
+            onCreate={(text, type, images) => confirmPendingCreate(text, type, images)}
+            onCancel={() => setPendingCreate(null)}
           />
         ) : (
           // !presenting: NodePanel already only renders when a node is

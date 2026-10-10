@@ -813,7 +813,11 @@ export const NodeCard = memo(function NodeCard({
               style={{ borderColor: circleBorderColor }}
             >
               {(() => {
-                const typeFace = isOutcome ? (
+                // A picture icon (NodeDoc.iconImage) stands in for the type's
+                // symbol; the ring's color still says the type.
+                const typeFace = node.iconImage ? (
+                  <img src={node.iconImage} alt="" className="h-full w-full rounded-full object-cover" draggable={false} />
+                ) : isOutcome ? (
                   <OutcomeBadge
                     type={displayType as OutcomeType}
                     size={OUTCOME_BADGE_SIZE}

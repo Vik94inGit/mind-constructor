@@ -59,6 +59,18 @@ const imageSchema = z
   .regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/, "image must be a PNG, JPEG, WebP or GIF data URL");
 const imagesSchema = z.array(imageSchema).max(MAX_NODE_IMAGES, `at most ${MAX_NODE_IMAGES} images per node`);
 
+// Node.iconImage — a small square thumbnail (a frontend cuts it from one of
+// the node's pictures) drawn as the node's icon. Small enough to ride along
+// on the map's node list. "" removes it.
+export const MAX_ICON_IMAGE_CHARS = 40_000;
+const iconImageSchema = z.union([
+  z.literal(""),
+  z
+    .string()
+    .max(MAX_ICON_IMAGE_CHARS, "icon image is too large")
+    .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, "icon image must be a PNG, JPEG or WebP data URL"),
+]);
+
 const createNodeSchema = z.object({
   text: z.string().min(1, "text is required"),
   title: titleSchema.optional(),
@@ -129,6 +141,8 @@ const updateNodeSchema = z
     emoji: emojiSchema.optional(),
     // The node's whole picture list — [] removes them all.
     images: imagesSchema.optional(),
+    // "" removes the picture icon.
+    iconImage: iconImageSchema.optional(),
     // null clears the step number — same nullish-vs-absent convention as
     // symbolOverride/manualZone below.
     order: orderSchema.nullish(),

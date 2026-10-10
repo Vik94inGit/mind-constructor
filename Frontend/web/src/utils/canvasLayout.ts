@@ -52,8 +52,9 @@ export const DOT_ZOOM = 0.5;
 // visible top arc" — a row, not a ring. 1/2 doesn't eliminate the
 // clamp in every case, but it gives the ring meaningfully more room to
 // actually close underneath the node before hitting that edge.
-export function panelReserveFrac(isMobile: boolean) {
-  return isMobile ? 1 / 2 : 1 / 3;
+// The node panel is a top sheet now, half the screen on every size.
+export function panelReserveFrac(_isMobile: boolean) {
+  return 1 / 2;
 }
 
 // Low-level seeded-hash primitive shared by this file's own hashOffset,

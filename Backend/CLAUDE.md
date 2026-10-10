@@ -147,6 +147,10 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `emojiSchema` in `nodeAbl.ts`) set via `POST`/`PATCH /api/nodes`, owner-only. A frontend draws the
   node's icon as a two-sided card: the emoji on one face, the type's symbol on the other. Like `title`,
   it is *not* stripped from `GET /:mapId/nodes`.
+- **`Node.iconImage`** — an optional small square thumbnail (a JPEG/PNG/WebP data URL, at most
+  `MAX_ICON_IMAGE_CHARS` = 40 000 chars, `""` = none; `iconImageSchema` in `nodeAbl.ts`) set via
+  `PATCH /api/nodes/:nodeId`. A frontend cuts it from one of the node's pictures and draws it as the
+  node's icon in place of the type's symbol. Unlike `images`, it is kept on `GET /:mapId/nodes`.
 - **`Node.images`** — pictures attached to a node (screenshots, photos): an array of image data URLs
   (`data:image/png|jpeg|webp|gif;base64,…`), at most `MAX_NODE_IMAGES` (6), each at most
   `MAX_IMAGE_CHARS` characters (`imagesSchema` in `nodeAbl.ts`). Set via `PATCH /api/nodes/:nodeId`

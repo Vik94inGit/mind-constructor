@@ -25,15 +25,12 @@ const NODE_EDGE_INSET = 60;
 // and no wider. (It was briefly cut to nothing, which pinned edge nodes to
 // the screen's edge with half their ghosts clamped or off screen.) When the
 // whole canvas fits across the screen at this zoom, it's whatever centers
-// the canvas instead, if that's more. The bottom edge also grows for the
-// bottom sheet (vScrollMarginBottom below).
+// the canvas instead, if that's more. The top edge also has room for the
+// node panel's top sheet (vScrollMargin below).
 export function axisMarginPx(viewPx: number, canvasUnits: number, zoom: number): number {
   return Math.max(0, viewPx / 2 - NODE_EDGE_INSET * zoom, (viewPx - canvasUnits * zoom) / 2);
 }
 
-// How far above the bottom sheet's top edge a centered node stays, at least,
-// in screen pixels — room for its card or icon and caption.
-const NODE_CLEAR_OF_SHEET = 150;
 
 interface Params {
   mapId: string | undefined;
@@ -188,13 +185,13 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   const hMarginPx = axisMarginPx(viewSize.w, CANVAS_W, zoom);
   const vMarginPx = axisMarginPx(viewSize.h, CANVAS_H, zoom);
   const hScrollMargin = viewSize.w ? Math.ceil(hMarginPx / zoom) : 0;
-  const vScrollMargin = viewSize.h ? Math.ceil(vMarginPx / zoom) : 0;
-  // Only the bottom edge grows for the sheet. Every scroll<->canvas
-  // conversion measures from the top-left, so this changes nothing but how
-  // far down the view can go.
-  const vScrollMarginBottom = viewSize.h
-    ? Math.ceil((vMarginPx + (sheetOpen ? viewSize.h * panelReserveFrac(isMobileViewport()) : 0)) / zoom)
-    : 0;
+  // The top edge always keeps room for the node panel's top sheet, open or
+  // not, so a node at the canvas's top edge can still be centered in the half
+  // of the screen below the sheet. Always, not only while the sheet is open:
+  // every scroll<->canvas conversion measures from this top margin, so it
+  // growing and shrinking with the sheet would make the whole map jump.
+  const vScrollMargin = viewSize.h ? Math.ceil((vMarginPx + viewSize.h * panelReserveFrac(isMobileViewport())) / zoom) : 0;
+  const vScrollMarginBottom = viewSize.h ? Math.ceil(vMarginPx / zoom) : 0;
   // Latest values for the camera functions below, which can run from a timer
   // or an animation frame after the render that created them.
   const zoomRef = useRef(zoom);
@@ -511,9 +508,9 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // conversion screenToCanvas uses.
     return {
       minX: wrap.scrollLeft / zoom + pad - hScrollMargin,
-      minY: wrap.scrollTop / zoom + pad - vScrollMargin,
+      minY: (wrap.scrollTop + reserve) / zoom + pad - vScrollMargin,
       maxX: (wrap.scrollLeft + wrap.clientWidth) / zoom - pad - hScrollMargin,
-      maxY: (wrap.scrollTop + wrap.clientHeight - reserve) / zoom - pad - vScrollMargin,
+      maxY: (wrap.scrollTop + wrap.clientHeight) / zoom - pad - vScrollMargin,
     };
   }
 
@@ -542,9 +539,9 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // conversion screenToCanvas uses.
     return {
       minX: target.left / zoom + pad - hScrollMargin,
-      minY: target.top / zoom + pad - vScrollMargin,
+      minY: (target.top + reserve) / zoom + pad - vScrollMargin,
       maxX: (target.left + wrap.clientWidth) / zoom - pad - hScrollMargin,
-      maxY: (target.top + wrap.clientHeight - reserve) / zoom - pad - vScrollMargin,
+      maxY: (target.top + wrap.clientHeight) / zoom - pad - vScrollMargin,
     };
   }
 
@@ -591,7 +588,7 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // positions (unlike posFor) never carries a radial override at all,
     // so it's always that node's own real, settled spot regardless of
     // what was selected a moment ago.
-    const visibleH = Math.max(150, wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport())));
+    const reserve = wrap.clientHeight * panelReserveFrac(isMobileViewport());
     // *zoom throughout: pos.x/y are canvas-space, but scrollTo/scrollWidth
     // deal in screen pixels of the rendered (scaled) canvas — same
     // conversion as screenToCanvas/zoomAt above, just the other direction.
@@ -601,22 +598,17 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // maxTop for a node sitting right at the real 0/CANVAS_W/CANVAS_H edge
     // instead of leaving it pinned there with nowhere left to scroll to.
     const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
-    // Sized for the sheet being open, as it will be by the time the glide
-    // runs: this is called in the same click that opens it, before the
-    // bottom margin has grown for it.
-    const bottomMargin =
-      (axisMarginPx(wrap.clientHeight, CANVAS_H, zoom) + wrap.clientHeight * panelReserveFrac(isMobileViewport())) / zoom;
+    const bottomMargin = axisMarginPx(wrap.clientHeight, CANVAS_H, zoom) / zoom;
     const maxTop = Math.max(0, (CANVAS_H + vScrollMargin + bottomMargin) * zoom - wrap.clientHeight);
     // + hScrollMargin/+ vScrollMargin: pos.x/y are real canvas coordinates;
     // scrollTo deals in screen pixels within the *padded* canvasRef (see
     // screenToCanvas's own doc comment) — same conversion, just the other
     // direction.
     const targetLeft = Math.min(maxLeft, Math.max(0, (pos.x + hScrollMargin) * zoom - wrap.clientWidth / 2));
-    // Dead center of the screen — unless the bottom sheet would then cover
-    // it (a phone's sheet takes half the screen), in which case it sits just
-    // clear above the sheet instead.
-    const screenY = Math.min(wrap.clientHeight / 2, visibleH - NODE_CLEAR_OF_SHEET);
-    const targetTop = Math.min(maxTop, Math.max(0, (pos.y + vScrollMargin) * zoom - Math.max(screenY, visibleH / 2)));
+    // Dead center of the part of the screen the top sheet leaves clear, which
+    // it is about to cover (this runs in the same click that opens it).
+    const screenY = reserve + (wrap.clientHeight - reserve) / 2;
+    const targetTop = Math.min(maxTop, Math.max(0, (pos.y + vScrollMargin) * zoom - screenY));
     // See its own doc comment — recorded regardless of which branch below
     // actually runs, since settledViewportBounds() should always reflect
     // the most recent centerOnNode call, not just the ones that had to
@@ -656,20 +648,12 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     const wrap = wrapRef.current;
     if (!wrap) return;
     const reserveSheet = aboveSheet || sheetOpen;
-    const visibleH = reserveSheet
-      ? Math.max(150, wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport())))
-      : wrap.clientHeight;
+    const reserve = reserveSheet ? wrap.clientHeight * panelReserveFrac(isMobileViewport()) : 0;
     const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
-    // Sized for the sheet being open, as it will be by the time the glide
-    // runs: this is called in the same click that opens it, before the
-    // bottom margin has grown for it.
-    const bottomMargin =
-      (axisMarginPx(wrap.clientHeight, CANVAS_H, zoom) +
-        (reserveSheet ? wrap.clientHeight * panelReserveFrac(isMobileViewport()) : 0)) /
-      zoom;
+    const bottomMargin = axisMarginPx(wrap.clientHeight, CANVAS_H, zoom) / zoom;
     const maxTop = Math.max(0, (CANVAS_H + vScrollMargin + bottomMargin) * zoom - wrap.clientHeight);
     const targetLeft = Math.min(maxLeft, Math.max(0, (x + hScrollMargin) * zoom - wrap.clientWidth / 2));
-    const targetTop = Math.min(maxTop, Math.max(0, (y + vScrollMargin) * zoom - visibleH / 2));
+    const targetTop = Math.min(maxTop, Math.max(0, (y + vScrollMargin) * zoom - (reserve + (wrap.clientHeight - reserve) / 2)));
     animateScrollTo(targetLeft, targetTop);
   }
 
