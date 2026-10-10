@@ -27,6 +27,8 @@ interface Params {
   showNotice: (message: string) => void;
   positiveMajorityNotice: string;
   negativeMajorityNotice: string;
+  /** Off on a Personal map: no majority notice and no show, the map just sits still. Defaults to on. */
+  enabled?: boolean;
 }
 
 interface Running {
@@ -58,6 +60,7 @@ export function useSentimentShow({
   showNotice,
   positiveMajorityNotice,
   negativeMajorityNotice,
+  enabled = true,
 }: Params) {
   const [active, setActive] = useState(false);
   const running = useRef<Running | null>(null);
@@ -127,6 +130,7 @@ export function useSentimentShow({
     prevSentimentRef.current = dominantSentiment;
     const opening = !openedRef.current;
     openedRef.current = true;
+    if (!enabled) return;
     if (dominantSentiment === "tie") return; // no majority, nothing to show
     if (!opening && dominantSentiment === prev) return;
     showNotice(dominantSentiment === "negative" ? negativeMajorityNotice : positiveMajorityNotice);

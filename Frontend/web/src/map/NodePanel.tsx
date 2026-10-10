@@ -315,8 +315,8 @@ export function NodePanel({
   const tabs: Tab[] = [
     "info",
     "links",
-    "attack",
-    ...(discussionMode ? (["protect"] as const) : []),
+    // Personal maps have no attacks to make: Attack and Protect only in Discussion.
+    ...(discussionMode ? (["attack", "protect"] as const) : []),
     ...(packedMembers.length > 0 ? (["pack"] as const) : []),
     "history",
   ];
@@ -353,7 +353,7 @@ export function NodePanel({
   // content (both content blocks below are gated by the same discussionMode
   // check, so it would otherwise render as a silently blank sheet).
   useEffect(() => {
-    if (!discussionMode && tab === "protect") setTab("info");
+    if (!discussionMode && (tab === "attack" || tab === "protect")) setTab("info");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [discussionMode]);
 

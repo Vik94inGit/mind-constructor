@@ -150,6 +150,19 @@ describe("NodeCard", () => {
       expect(screen.getByText("root text")).toBeInTheDocument();
     });
 
+    it("drops the crown badge on a Personal map but keeps the parent's caption", () => {
+      const node = makeNode({ nodeId: "a", text: "root text" });
+      renderNode({ node, groupSentiment: "positive", parentCrownSentiment: "positive", discussionMode: false });
+      expect(screen.getByText("root text")).toBeInTheDocument();
+      expect(screen.queryByText("👑")).toBeNull();
+    });
+
+    it("keeps the crown badge in Discussion mode", () => {
+      const node = makeNode({ nodeId: "a", text: "root text" });
+      renderNode({ node, groupSentiment: "positive", parentCrownSentiment: "positive" });
+      expect(screen.getByText("👑")).toBeInTheDocument();
+    });
+
     it("shows every member's caption once its circle is the chosen one", () => {
       const node = makeNode({ nodeId: "a", text: "chosen member" });
       renderNode({ node, groupSentiment: "positive", inChosenCircle: true });
