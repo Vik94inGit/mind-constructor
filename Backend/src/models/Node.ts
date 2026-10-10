@@ -94,6 +94,10 @@ export const NodeSchema = new mongoose.Schema(
     // Kept on the map's node list (unlike `images`) — it's capped small
     // (MAX_ICON_IMAGE_CHARS in nodeAbl.ts).
     iconImage: { type: String, default: "" },
+    // A small copy of one of the pictures shown on the map as a picture card
+    // under the node (MAX_CARD_IMAGE_CHARS in nodeAbl.ts). "" means none;
+    // independent of iconImage, so a node can show either or both.
+    cardImage: { type: String, default: "" },
     type: { type: String, enum: NODE_TYPES, required: true }, // mandatory: forces the author to categorize every node
     x: Number, // Coordinates for the UI
     y: Number,

@@ -71,6 +71,18 @@ const iconImageSchema = z.union([
     .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, "icon image must be a PNG, JPEG or WebP data URL"),
 ]);
 
+// Node.cardImage — a small copy of one of the pictures (its own shape, not
+// cut square) drawn on the map as a picture card under the node, with or
+// without a picture icon. Also kept on the map's node list. "" removes it.
+export const MAX_CARD_IMAGE_CHARS = 80_000;
+const cardImageSchema = z.union([
+  z.literal(""),
+  z
+    .string()
+    .max(MAX_CARD_IMAGE_CHARS, "card image is too large")
+    .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, "card image must be a PNG, JPEG or WebP data URL"),
+]);
+
 const createNodeSchema = z.object({
   text: z.string().min(1, "text is required"),
   title: titleSchema.optional(),
@@ -143,6 +155,8 @@ const updateNodeSchema = z
     images: imagesSchema.optional(),
     // "" removes the picture icon.
     iconImage: iconImageSchema.optional(),
+    // "" removes the picture card.
+    cardImage: cardImageSchema.optional(),
     // null clears the step number — same nullish-vs-absent convention as
     // symbolOverride/manualZone below.
     order: orderSchema.nullish(),

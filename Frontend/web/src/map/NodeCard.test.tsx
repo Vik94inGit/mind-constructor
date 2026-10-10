@@ -57,6 +57,24 @@ describe("NodeCard", () => {
     });
   });
 
+  describe("pictures", () => {
+    const jpeg = "data:image/jpeg;base64,/9j/4AAQ";
+
+    it("shows a picture card above the icon, and hides it while selected", () => {
+      const node = makeNode({ nodeId: "a", text: "hello", cardImage: jpeg });
+      const shown = renderNode({ node });
+      expect(shown.getByTestId("node-picture-card").querySelector("img")!.getAttribute("src")).toBe(jpeg);
+      shown.unmount();
+      expect(renderNode({ node, selected: true }).queryByTestId("node-picture-card")).toBeNull();
+    });
+
+    it("can show the same picture as the icon and as a card at once", () => {
+      const node = makeNode({ nodeId: "a", text: "hello", iconImage: jpeg, cardImage: jpeg });
+      const { container } = renderNode({ node });
+      expect(container.querySelectorAll(`img[src="${jpeg}"]`)).toHaveLength(2);
+    });
+  });
+
   it("renders with the node's text as its title attribute", () => {
     const node = makeNode({ nodeId: "a", text: "hello world" });
     const { container } = renderNode({ node });

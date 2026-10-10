@@ -75,8 +75,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   below it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
   node (any way) opens `map/NewNodePanel.tsx` with its text field focused — with the feelings offered
   as a ring around the new node, optional — and editing opens the node's panel on its text.
-- **Picture icons** — any picture on a node can be its icon on the map ("Use as icon" in the Info tab,
-  a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`).
+- **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
+  icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
+  picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the piece in
+  the puzzle view).
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
   in the panel; the inline inputs grow taller with the text, never wider.
 - **New node → panel** — confirming a new node's inline name opens its panel with the text field

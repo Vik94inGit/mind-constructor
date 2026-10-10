@@ -314,6 +314,11 @@ export interface UiStrings {
     /** On a picture: show it as the node's icon (NodeDoc.iconImage). */
     useAsIcon: string;
     isIcon: string;
+    removeIcon: string;
+    /** On a picture: show it as a card on the map (NodeDoc.cardImage). */
+    useAsCard: string;
+    isCard: string;
+    removeCard: string;
     iconFailed: string;
   };
   /** A node's emoji, and the "emoji first" view — see map/NodeFlipIcon.tsx. */
@@ -762,7 +767,11 @@ const en: UiStrings = {
     selectNode: "Open one of your nodes first, then paste the picture into it",
     useAsIcon: "Use as icon",
     isIcon: "Icon",
-    iconFailed: "Couldn't change the icon",
+    removeIcon: "Back to the type's symbol",
+    useAsCard: "Show as card",
+    isCard: "Card",
+    removeCard: "Take the card off the map",
+    iconFailed: "Couldn't change how the picture shows",
   },
   emoji: {
     label: "Emoji",
@@ -1197,7 +1206,11 @@ const cs: UiStrings = {
     selectNode: "Nejdřív otevřete jeden ze svých uzlů, pak do něj obrázek vložte",
     useAsIcon: "Jako ikona",
     isIcon: "Ikona",
-    iconFailed: "Ikonu se nepodařilo změnit",
+    removeIcon: "Zpět na symbol typu",
+    useAsCard: "Jako karta",
+    isCard: "Karta",
+    removeCard: "Odebrat kartu z mapy",
+    iconFailed: "Zobrazení obrázku se nepodařilo změnit",
   },
   emoji: {
     label: "Emoji",
@@ -1631,7 +1644,11 @@ const uk: UiStrings = {
     selectNode: "Спершу відкрийте один зі своїх вузлів, потім вставте в нього зображення",
     useAsIcon: "Як іконка",
     isIcon: "Іконка",
-    iconFailed: "Не вдалося змінити іконку",
+    removeIcon: "Повернути символ типу",
+    useAsCard: "Як картка",
+    isCard: "Картка",
+    removeCard: "Прибрати картку з мапи",
+    iconFailed: "Не вдалося змінити показ зображення",
   },
   emoji: {
     label: "Емодзі",
@@ -2068,7 +2085,11 @@ const ru: UiStrings = {
     selectNode: "Сначала откройте один из своих узлов, затем вставьте в него изображение",
     useAsIcon: "Как иконка",
     isIcon: "Иконка",
-    iconFailed: "Не удалось изменить иконку",
+    removeIcon: "Вернуть символ типа",
+    useAsCard: "Как карточка",
+    isCard: "Карточка",
+    removeCard: "Убрать карточку с карты",
+    iconFailed: "Не удалось изменить показ изображения",
   },
   emoji: {
     label: "Эмодзи",

@@ -110,3 +110,40 @@ export async function makeIconImage(src: string): Promise<string> {
   }
   throw new Error("image too large");
 }
+
+/** Mirrors the backend's MAX_CARD_IMAGE_CHARS. */
+export const MAX_CARD_IMAGE_CHARS = 80_000;
+const CARD_SIDE = 320;
+
+/**
+ * A node's picture card (NodeDoc.cardImage): `src` (one of the node's
+ * pictures, a data URL) in its own shape, scaled to fit CARD_SIDE and encoded
+ * small enough for the map's node list.
+ */
+export async function makeCardImage(src: string): Promise<string> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("not an image"));
+    el.src = src;
+  });
+  if (!img.naturalWidth || !img.naturalHeight) throw new Error("not an image");
+  let side = CARD_SIDE;
+  for (let round = 0; round < 3; round++) {
+    const k = fitScale(img.naturalWidth, img.naturalHeight, side);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * k));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * k));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no canvas");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.75, 0.55]) {
+      const url = canvas.toDataURL("image/jpeg", quality);
+      if (url.length <= MAX_CARD_IMAGE_CHARS) return url;
+    }
+    side = Math.round(side * 0.7);
+  }
+  throw new Error("image too large");
+}
