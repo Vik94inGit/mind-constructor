@@ -1,14 +1,14 @@
 import { useI18n } from "../i18n/I18nContext";
 import type { NodeDoc } from "../types";
 
-// Same bottom-sheet look/slot NodePanel uses (the 1/3-desktop/1/2-mobile
-// viewport cap is kept in sync with MapPage's panelReserveFrac()) — this takes
+// Same top-sheet slot NodePanel uses (the half-screen cap is kept in sync
+// with panelReserveFrac()) — this takes
 // over that exact slot while pack mode is active. Tap eligible nodes on the
 // canvas to toggle them in or out of packSelection (see MapPage's own
 // startPackFrom/eligiblePackIds gating); this panel just lists the current
 // picks and confirms/cancels.
 const PANEL_CLASS =
-  "fixed inset-x-0 bottom-0 z-[46] max-h-[50dvh] sm:max-h-[34dvh] w-full overflow-y-auto rounded-t-2xl border-t border-line bg-surface p-5 shadow-[var(--shadow-card)]";
+  "fixed inset-x-0 top-0 z-[46] max-h-[50dvh] w-full overflow-y-auto rounded-b-2xl border-b border-line bg-surface p-5 shadow-[var(--shadow-card)]";
 
 interface Props {
   containerText: string;

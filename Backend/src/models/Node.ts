@@ -89,6 +89,11 @@ export const NodeSchema = new mongoose.Schema(
     // the map's node list like `text` (see getNodesByMapDao): a frontend
     // fetches them with the single node when its panel opens.
     images: { type: [String], default: [] },
+    // A small square thumbnail cut from one of the pictures, drawn as the
+    // node's icon instead of its type symbol. "" (the default) means none.
+    // Kept on the map's node list (unlike `images`) — it's capped small
+    // (MAX_ICON_IMAGE_CHARS in nodeAbl.ts).
+    iconImage: { type: String, default: "" },
     type: { type: String, enum: NODE_TYPES, required: true }, // mandatory: forces the author to categorize every node
     x: Number, // Coordinates for the UI
     y: Number,

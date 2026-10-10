@@ -270,6 +270,8 @@ export interface UiStrings {
   minimapTitle: string;
   panelDragHandle: string;
   panelResizeHandle: string;
+  /** The panel a new node is written in before it exists — map/NewNodePanel.tsx. */
+  newNode: { title: string; placeholder: string; create: string; hint: string };
   negativeMajorityNotice: string;
   positiveMajorityNotice: string;
   presentation: {
@@ -309,6 +311,10 @@ export interface UiStrings {
     tooLarge: string;
     failed: string;
     selectNode: string;
+    /** On a picture: show it as the node's icon (NodeDoc.iconImage). */
+    useAsIcon: string;
+    isIcon: string;
+    iconFailed: string;
   };
   /** A node's emoji, and the "emoji first" view — see map/NodeFlipIcon.tsx. */
   emoji: {
@@ -713,6 +719,7 @@ const en: UiStrings = {
   minimapTitle: "Minimap — click or drag to jump around the map",
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
+  newNode: { title: "New node", placeholder: "Write your thought…", create: "Create", hint: "Enter creates it, Shift+Enter adds a line" },
   negativeMajorityNotice: "Negative arguments are now the majority — the map has shifted",
   positiveMajorityNotice: "Positive arguments are now the majority — the map has shifted",
   presentation: {
@@ -753,6 +760,9 @@ const en: UiStrings = {
     tooLarge: "That picture couldn't be used — try a smaller one.",
     failed: "Couldn't save the pictures",
     selectNode: "Open one of your nodes first, then paste the picture into it",
+    useAsIcon: "Use as icon",
+    isIcon: "Icon",
+    iconFailed: "Couldn't change the icon",
   },
   emoji: {
     label: "Emoji",
@@ -1144,6 +1154,7 @@ const cs: UiStrings = {
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
+  newNode: { title: "Nový uzel", placeholder: "Napište svou myšlenku…", create: "Vytvořit", hint: "Enter vytvoří, Shift+Enter přidá řádek" },
   negativeMajorityNotice: "Negativní argumenty jsou nyní většinou — mapa se přeuspořádala",
   positiveMajorityNotice: "Pozitivní argumenty jsou nyní většinou — mapa se přeuspořádala",
   presentation: {
@@ -1184,6 +1195,9 @@ const cs: UiStrings = {
     tooLarge: "Tento obrázek nešel použít — zkuste menší.",
     failed: "Obrázky se nepodařilo uložit",
     selectNode: "Nejdřív otevřete jeden ze svých uzlů, pak do něj obrázek vložte",
+    useAsIcon: "Jako ikona",
+    isIcon: "Ikona",
+    iconFailed: "Ikonu se nepodařilo změnit",
   },
   emoji: {
     label: "Emoji",
@@ -1574,6 +1588,7 @@ const uk: UiStrings = {
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
+  newNode: { title: "Новий вузол", placeholder: "Напишіть свою думку…", create: "Створити", hint: "Enter створює, Shift+Enter додає рядок" },
   negativeMajorityNotice: "Негативні аргументи тепер у більшості — мапа перебудувалася",
   positiveMajorityNotice: "Позитивні аргументи тепер у більшості — мапа перебудувалася",
   presentation: {
@@ -1614,6 +1629,9 @@ const uk: UiStrings = {
     tooLarge: "Це зображення не вдалося використати — спробуйте менше.",
     failed: "Не вдалося зберегти зображення",
     selectNode: "Спершу відкрийте один зі своїх вузлів, потім вставте в нього зображення",
+    useAsIcon: "Як іконка",
+    isIcon: "Іконка",
+    iconFailed: "Не вдалося змінити іконку",
   },
   emoji: {
     label: "Емодзі",
@@ -2007,6 +2025,7 @@ const ru: UiStrings = {
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",
+  newNode: { title: "Новый узел", placeholder: "Напишите свою мысль…", create: "Создать", hint: "Enter создаёт, Shift+Enter добавляет строку" },
   negativeMajorityNotice: "Негативные аргументы теперь в большинстве — карта перестроилась",
   positiveMajorityNotice: "Позитивные аргументы теперь в большинстве — карта перестроилась",
   presentation: {
@@ -2047,6 +2066,9 @@ const ru: UiStrings = {
     tooLarge: "Это изображение не удалось использовать — попробуйте поменьше.",
     failed: "Не удалось сохранить изображения",
     selectNode: "Сначала откройте один из своих узлов, затем вставьте в него изображение",
+    useAsIcon: "Как иконка",
+    isIcon: "Иконка",
+    iconFailed: "Не удалось изменить иконку",
   },
   emoji: {
     label: "Эмодзи",

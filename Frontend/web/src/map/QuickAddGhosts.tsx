@@ -64,12 +64,12 @@ interface Props {
   anchorPos: { x: number; y: number };
   /** The currently-visible rectangle of the canvas, in canvas coordinates — keeps ghosts from fanning out past the edge of the screen. */
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
-  /** `text` is set when a ghost template (a starter phrase) was clicked rather than the ghost itself; `emoji` when one was picked from the emoji ring (see offerEmoji). */
+  /** `text` is set when a ghost template (a starter phrase) was clicked rather than the ghost itself; `emoji` when one was picked from the emoji ring first (see emojiFirst). */
   onPick: (type: NodeType, pos: { x: number; y: number }, text?: string, emoji?: string) => void;
-  /** Also offers a ring of emoji ghosts: after the type, or before it in emoji-first mode. */
-  offerEmoji?: boolean;
-  /** The viewer's "emoji first" mode (utils/emojiFace.ts): the emoji ring comes first, the types after. */
+  /** The viewer's "emoji first" mode (utils/emojiFace.ts): a ring of feeling emoji comes first, the types after. */
   emojiFirst?: boolean;
+  /** Only the emoji ring, for a node already being made (MapPage's pending node): a pick goes here, and onPick is never called. */
+  onPickEmoji?: (emoji: string) => void;
   /** An empty map's hint: the ghosts draw in one at a time — icon, then its name — instead of all being there at once. */
   intro?: boolean;
   /** The simplified view: no halo/horns on the ghosts. */
@@ -103,8 +103,8 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   intro = false,
   compact = false,
   zoom = 1,
-  offerEmoji = false,
   emojiFirst = false,
+  onPickEmoji,
 }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
@@ -124,35 +124,25 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   // preview); a second click on that same ghost creates it.
   const [armed, setArmed] = useState<{ type: NodeType; x: number; y: number; angle: number } | null>(null);
   const armedType = armed?.type ?? null;
-  // With offerEmoji the ghosts come in two rounds — the types, then a ring of
-  // feeling emoji (or the other way round in emoji-first mode) — and the node
-  // opens once both are picked. The skip ghost picks "no emoji".
-  const [stage, setStage] = useState<"type" | "emoji">(offerEmoji && emojiFirst ? "emoji" : "type");
-  const [picked, setPicked] = useState<{ type: NodeType; x: number; y: number; text?: string } | { emoji: string } | null>(
-    null,
-  );
+  // The emoji ring: before the types in emoji-first mode, or on its own
+  // around a node already being made (onPickEmoji). The skip ghost picks "no
+  // emoji".
+  const [stage, setStage] = useState<"type" | "emoji">(onPickEmoji || emojiFirst ? "emoji" : "type");
+  const [picked, setPicked] = useState<{ emoji: string } | null>(null);
   // A quick double tap on the last ghost of one round mustn't land on the
   // ghost that has just appeared in the same spot in the next.
   const stageAt = useRef(0);
   function pickType(type: NodeType, pos: { x: number; y: number }, text?: string) {
-    if (!offerEmoji) return onPick(type, pos, text);
-    if (emojiFirst) return onPick(type, pos, text, picked && "emoji" in picked ? picked.emoji || undefined : undefined);
-    setPicked({ type, x: pos.x, y: pos.y, text });
-    setArmed(null);
-    setStage("emoji");
-    stageAt.current = Date.now();
+    onPick(type, pos, text, picked?.emoji || undefined);
   }
   function pickEmoji(emoji: string) {
     if (Date.now() - stageAt.current < STAGE_GUARD_MS) return;
-    if (emojiFirst) {
-      setPicked({ emoji });
-      setStage("type");
-      stageAt.current = Date.now();
-      return;
-    }
-    if (picked && "type" in picked) onPick(picked.type, { x: picked.x, y: picked.y }, picked.text, emoji || undefined);
+    if (onPickEmoji) return onPickEmoji(emoji);
+    setPicked({ emoji });
+    setStage("type");
+    stageAt.current = Date.now();
   }
-  const pickedEmoji = picked && "emoji" in picked ? picked.emoji : "";
+  const pickedEmoji = picked?.emoji ?? "";
   // Read live, every render — see the doc comment above RADIUS/EDGE_MARGIN's
   // old module-level home for why this can't be hoisted back out to module
   // scope.
@@ -161,33 +151,12 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   const k = 1 / zoom;
   const RADIUS = (mobile ? 104 : 126) * k;
   const EDGE_MARGIN = (mobile ? 38 : 58) * k;
-  // If the anchor were simply the ring's center, with each of the 7 points
-  // *independently* clamped into bounds afterward, that would be fine when
-  // the anchor sits well clear of every edge — but a node close enough to
-  // one (a phone's own narrow/short visible strip makes "close enough" the
-  // common case, not a rare one, and centerOnNode can only scroll a node
-  // so close to the actual edge of the whole 2400x1600 canvas to begin
-  // with — there's nothing further to scroll into) would have every point
-  // that lands past that edge clamped to the *same* boundary value,
-  // collapsing several ghosts on top of each other into a squashed line
-  // instead of a ring.
-  //
-  // ringCenter itself stays dead simple — just the anchor, clamped into
-  // bounds — because the actual "does it fit" question is answered below by
-  // R instead. A fixed halfSpan inset that pushes the whole ring away from
-  // the node whenever it doesn't fully fit doesn't solve this either: a
-  // *naive* plain circular radius with only a final per-point clamp still
-  // flattens the cramped axis into a near-straight line, several ghosts
-  // landing at the exact same clamped coordinate instead of a curve. R
-  // below avoids that: it's pre-shrunk to whatever
-  // `bounds` actually has (down to a real floor — see MIN_RADIUS's own
-  // comment — rather than shrinking all the way to zero) *before* any
-  // point is placed, so the final per-point clamp only ever has to nudge
-  // the handful of points nearest a tight edge, not rescue the whole ring.
-  const ringCenter = {
-    x: Math.min(bounds.maxX, Math.max(bounds.minX, anchorPos.x)),
-    y: Math.min(bounds.maxY, Math.max(bounds.minY, anchorPos.y)),
-  };
+  // The ring is always centered on the chosen node itself — it's tied to
+  // that node, never slid away from it to fit the screen. centerOnNode parks
+  // the node in the middle of the part of the screen the panel leaves clear,
+  // so a full ring fits around it; on a cramped screen the radius shrinks
+  // (down to MIN_RADIUS) rather than the ring moving or flattening.
+  const ringCenter = anchorPos;
   // One shared radius — a genuine circle, not an ellipse. A previous
   // version here let rx/ry shrink independently on their own axis (use
   // whatever room each direction actually has), reasoning that a shorter,
@@ -240,23 +209,9 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   const availDown = bounds.maxY - ringCenter.y;
   const tightest = Math.min(availLeft, availRight, availUp, availDown);
   const R = Math.min(RADIUS, Math.max(MIN_RADIUS, tightest - EDGE_MARGIN));
-  // Whether the MIN_RADIUS floor above actually won (R had to be sized past
-  // what `bounds` has room for) — a real case at strong zoom-in, where
-  // `bounds` shrinks (it's the visible viewport in *canvas* units, and a
-  // canvas unit covers less screen the more you're zoomed into it) faster
-  // than MIN_RADIUS's own on-screen size does. When it did, every point's
-  // per-axis clamp below would fire, not just the "handful nearest a tight
-  // edge" the clamp was designed for — every point on the near side of a too-
-  // narrow `bounds` clamps to the exact same edge value as every other one on
-  // that side, collapsing the whole ring into two overlapping vertical (or
-  // horizontal) stacks instead of a circle. Skipping the clamp in that case
-  // keeps it a real, non-overlapping circle — some ghosts legitimately sit
-  // outside the nominal safe zone, which reads far better than several of
-  // them landing exactly on top of each other.
-  const fitsBounds = R <= tightest;
   if (stage === "emoji") {
     const n = FEELING_EMOJIS.length + 1;
-    const borderColor = picked && "type" in picked ? NODE_TYPE_COLORS[picked.type] : "var(--line)";
+    const borderColor = "var(--line)";
     return (
       <>
         <div
@@ -267,13 +222,8 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
         </div>
         {[...FEELING_EMOJIS, ""].map((emoji, i) => {
           const angle = (-i / n) * Math.PI * 2 - Math.PI / 2;
-          const sinA = Math.sin(angle);
-          const rawX = ringCenter.x + R * Math.cos(angle);
-          const rawY = ringCenter.y + R * sinA;
-          const x = fitsBounds ? Math.min(bounds.maxX, Math.max(bounds.minX, rawX)) : rawX;
-          const y = fitsBounds
-            ? Math.min(bounds.maxY, Math.max(bounds.minY - (sinA < 0 ? UP_SLACK : 0), rawY))
-            : rawY;
+          const x = ringCenter.x + R * Math.cos(angle);
+          const y = ringCenter.y + R * Math.sin(angle);
           const name = emoji ? t.ui.emoji.feelings[i] : t.ui.emoji.skip;
           return (
             <button
@@ -326,26 +276,8 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
         // (i=0 keeps angle at -90°), only the direction the rest of the
         // list sweeps around the circle flips.
         const angle = (-i / NODE_TYPES.length) * Math.PI * 2 - Math.PI / 2;
-        // R (not RADIUS) — sized to fit `bounds` whenever there's room for
-        // that, but R's own MIN_RADIUS floor wins even when there isn't
-        // (see its own comment) — so this clamp does real work on a tight
-        // screen, not just a theoretical no-op: it's what keeps the
-        // handful of points nearest the tight axis right at the edge of
-        // `bounds` instead of past it, while the rest of the ring still
-        // gets its full, undistorted radius.
-        const sinA = Math.sin(angle);
-        // bounds.minY - UP_SLACK, not bare bounds.minY: has to match
-        // availUp's own +UP_SLACK above, or this would just clamp the
-        // topmost points straight back down to bare bounds.minY and undo
-        // that slack for exactly the points it was meant to help. Only
-        // applied above center (sinA < 0) — the bottom half never reads
-        // UP_SLACK at all.
-        const rawX = ringCenter.x + R * Math.cos(angle);
-        const rawY = ringCenter.y + R * sinA;
-        const x = fitsBounds ? Math.min(bounds.maxX, Math.max(bounds.minX, rawX)) : rawX;
-        const y = fitsBounds
-          ? Math.min(bounds.maxY, Math.max(bounds.minY - (sinA < 0 ? UP_SLACK : 0), rawY))
-          : rawY;
+        const x = ringCenter.x + R * Math.cos(angle);
+        const y = ringCenter.y + R * Math.sin(angle);
         return (
           <button
             key={type}
