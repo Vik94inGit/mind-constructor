@@ -7,7 +7,7 @@ import type { NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
 
-function setup(nodes: NodeDoc[]) {
+function setup(nodes: NodeDoc[], enabled?: boolean) {
   const root = document.createElement("div");
   root.innerHTML =
     nodes.map((n) => `<div data-reveal-node="${n.nodeId}"></div>`).join("") +
@@ -29,6 +29,7 @@ function setup(nodes: NodeDoc[]) {
       showNotice,
       positiveMajorityNotice: "POS",
       negativeMajorityNotice: "NEG",
+      enabled,
     }),
   );
   const translate = (id: string) => (root.querySelector(`[data-reveal-node="${id}"]`) as HTMLElement).style.translate;
@@ -50,6 +51,16 @@ describe("useSentimentShow", () => {
   afterEach(() => {
     vi.useRealTimers();
     document.body.innerHTML = "";
+  });
+
+  it("stays still on a Personal map: no show and no notice", () => {
+    const { result, translate, showNotice } = setup(mapNodes(), false);
+    act(() => {
+      vi.advanceTimersByTime(OUT_MS);
+    });
+    expect(result.current.active).toBe(false);
+    expect(showNotice).not.toHaveBeenCalled();
+    expect(translate("a")).toBe("");
   });
 
   it("plays on open: nodes leave one after another, the zone stretches, and everything ends exactly home", () => {

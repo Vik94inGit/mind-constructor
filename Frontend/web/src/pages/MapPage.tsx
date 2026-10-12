@@ -816,7 +816,9 @@ export function MapPage() {
   // the minority's toward the edge, one after another, hold, and come back.
   // Drawn straight onto the canvas DOM on top of the real positions (posFor
   // never sees it); skip is wired to any pointer-down on the canvas.
+  // A Personal map stays calm: no majority notice, nothing travels on open.
   const sentimentShow = useSentimentShow({
+    enabled: map?.discussionMode !== false,
     nodes,
     visibleNodes,
     positions,
@@ -961,9 +963,10 @@ export function MapPage() {
   // Any node (yours, someone else's, a weapon node, already at 0 health) is a
   // valid attack target for any map member. What varies is which node types
   // the attack may carry (NodePanel's allowedAttackTypes, enforced by
-  // attackAbl.ts), not which nodes may be attacked.
+  // attackAbl.ts), not which nodes may be attacked. A Personal map has no
+  // attacks at all (the owner can switch it back to Discussion for that).
   function canAttackNode(_node: NodeDoc) {
-    return true;
+    return map?.discussionMode !== false;
   }
 
   // Single entry point for "start editing this node's text/type inline, on
@@ -1864,7 +1867,7 @@ export function MapPage() {
                 key={`${selectedNode.nodeId}:${emojiFirst}`}
                 anchorPos={posFor(selectedNode)}
                 bounds={settledViewportBounds()}
-                compact={compactView}
+                compact={compactView || !isDiscussionMode}
                 zoom={zoom}
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
@@ -1875,7 +1878,7 @@ export function MapPage() {
               <QuickAddGhosts
                 key={`intro:${emojiFirst}`}
                 intro
-                compact={compactView}
+                compact={compactView || !isDiscussionMode}
                 zoom={zoom}
                 anchorPos={{ x: CANVAS_W / 2, y: CANVAS_H / 2 }}
                 // No bounds to squeeze the ring into: the view opens centered
@@ -1896,7 +1899,7 @@ export function MapPage() {
                 key={`emoji:${pendingCreate.x}:${pendingCreate.y}`}
                 anchorPos={{ x: pendingCreate.x, y: pendingCreate.y }}
                 bounds={settledViewportBounds()}
-                compact={compactView}
+                compact={compactView || !isDiscussionMode}
                 zoom={zoom}
                 onPick={() => {}}
                 onPickEmoji={(emoji) => setPendingCreate((prev) => (prev ? { ...prev, emoji } : prev))}

@@ -108,7 +108,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   breakdown, and a failed (Fail) node gets "Analyze and try again". See `src/utils/templates.ts`.
 - **Map types** — creating a map asks for one of four kinds (Problem analysis, Decision, Goal planning,
   Retrospective), each seeded with a starter structure in your language, and for a mode (Discussion or
-  Personal). The owner can switch the mode later from the map's toolbar.
+  Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
+  calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, no "majority" notice
+  or sentiment show when it opens, and no Attack tab or menu item (switch to Discussion for those).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
   matches stay lit while everything else dims, and a result takes you to that node.
 - **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden

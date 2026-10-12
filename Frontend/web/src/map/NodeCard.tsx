@@ -454,6 +454,9 @@ export const NodeCard = memo(function NodeCard({
   // true (not false) when omitted, matching MapPage's own "undefined means
   // Discussion" contract.
   const showHealth = discussionMode !== false && selected;
+  // A Personal map is a calm place to think: no halo/horns, wings or crown
+  // badge — just the node's own icon and text.
+  const calm = discussionMode === false;
 
   // Ring is a conic-gradient read off CSS custom properties, so the health
   // sweep and its color are just two variables — no per-type CSS needed.
@@ -660,7 +663,7 @@ export const NodeCard = memo(function NodeCard({
             small surface-colored chip ringed in the circle's color, so it
             stands out against whatever the canvas has behind it. Top-left
             corner. */}
-        {parentCrownSentiment && (
+        {parentCrownSentiment && !calm && (
           <div
             className="absolute -top-2.5 -left-2.5 flex h-[1.45rem] w-[1.45rem] items-center justify-center rounded-full border-[1.5px] bg-surface text-[0.8rem] leading-none"
             style={{ color: ZONE_COLORS[parentCrownSentiment], borderColor: ZONE_COLORS[parentCrownSentiment] }}
@@ -698,14 +701,14 @@ export const NodeCard = memo(function NodeCard({
         {/* Halo/horns — see NodeCrown's own doc comment; shared with
             QuickAddGhosts so a ghost previews this too, not just the bare
             symbol. */}
-        {!puzzle && (!compact || triumphant) && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
+        {!puzzle && !calm && (!compact || triumphant) && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
         {/* Wings — see NodeWings's own doc comment for why this is a
             separate, never-resized overlay rather than living inside
             OutcomeBadge. Placed before the bordered circle below in DOM
             order (both z-index:auto) so the circle paints over the
             wings' own base, same "flanking the head, not stamped on top
             of it" look the wings always had. */}
-        {!puzzle && (!compact || triumphant) && (
+        {!puzzle && !calm && (!compact || triumphant) && (
           <NodeWings type={displayType} show={selected || triumphant} symbolOverride={node.symbolOverride} />
         )}
         {/* No weapon-type badge here — which weapon landed shows via the

@@ -102,4 +102,10 @@ describe("NodePanel", () => {
     renderPanel({ discussionMode: false });
     expect(screen.queryByRole("button", { name: en.map.panelTabs.protect })).toBeNull();
   });
+
+  it("hides Attack in Personal mode", () => {
+    renderPanel({ discussionMode: false });
+    expect(screen.queryByRole("button", { name: en.map.panelTabs.attack })).toBeNull();
+    expect(screen.getByRole("button", { name: en.map.panelTabs.info })).toBeInTheDocument();
+  });
 });
