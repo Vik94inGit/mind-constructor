@@ -268,6 +268,15 @@ export interface UiStrings {
     newNodeText: string;
   };
   minimapTitle: string;
+  abstraction: {
+    title: string;
+    label: string;
+    all: string;
+    level: (n: number, total: number) => string;
+    hidden: (n: number) => string;
+    lessDetail: string;
+    moreDetail: string;
+  };
   panelDragHandle: string;
   panelResizeHandle: string;
   /** The panel a new node is written in before it exists — map/NewNodePanel.tsx. */
@@ -722,6 +731,15 @@ const en: UiStrings = {
     newNodeText: "New node",
   },
   minimapTitle: "Minimap — click or drag to jump around the map",
+  abstraction: {
+    title: "Level of abstraction — fewer levels show only the bigger ideas",
+    label: "Detail",
+    all: "All",
+    level: (n, total) => `Level ${n} of ${total}`,
+    hidden: (n) => `${n} hidden`,
+    lessDetail: "Fewer levels",
+    moreDetail: "More levels",
+  },
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
   newNode: { title: "New node", placeholder: "Write your thought…", create: "Create", hint: "Enter creates it, Shift+Enter adds a line" },
@@ -1161,6 +1179,15 @@ const cs: UiStrings = {
     newNodeText: "Nový uzel",
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
+  abstraction: {
+    title: "Úroveň abstrakce — méně úrovní ukáže jen hlavní myšlenky",
+    label: "Detail",
+    all: "Vše",
+    level: (n, total) => `Úroveň ${n} z ${total}`,
+    hidden: (n) => `skryto: ${n}`,
+    lessDetail: "Méně úrovní",
+    moreDetail: "Více úrovní",
+  },
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
   newNode: { title: "Nový uzel", placeholder: "Napište svou myšlenku…", create: "Vytvořit", hint: "Enter vytvoří, Shift+Enter přidá řádek" },
@@ -1599,6 +1626,15 @@ const uk: UiStrings = {
     newNodeText: "Новий вузол",
   },
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
+  abstraction: {
+    title: "Рівень абстракції — менше рівнів показує лише головні ідеї",
+    label: "Деталі",
+    all: "Усе",
+    level: (n, total) => `Рівень ${n} з ${total}`,
+    hidden: (n) => `приховано: ${n}`,
+    lessDetail: "Менше рівнів",
+    moreDetail: "Більше рівнів",
+  },
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
   newNode: { title: "Новий вузол", placeholder: "Напишіть свою думку…", create: "Створити", hint: "Enter створює, Shift+Enter додає рядок" },
@@ -2040,6 +2076,15 @@ const ru: UiStrings = {
     newNodeText: "Новый узел",
   },
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
+  abstraction: {
+    title: "Уровень абстракции — меньше уровней показывает только главные идеи",
+    label: "Детали",
+    all: "Все",
+    level: (n, total) => `Уровень ${n} из ${total}`,
+    hidden: (n) => `скрыто: ${n}`,
+    lessDetail: "Меньше уровней",
+    moreDetail: "Больше уровней",
+  },
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",
   newNode: { title: "Новый узел", placeholder: "Напишите свою мысль…", create: "Создать", hint: "Enter создаёт, Shift+Enter добавляет строку" },
