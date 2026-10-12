@@ -59,4 +59,12 @@ describe("ViewCorner", () => {
     await userEvent.click(screen.getByRole("switch"));
     expect(props.onToggleMinimap).toHaveBeenCalled();
   });
+
+  it("lifts the corner above the minimap while the menu is open", async () => {
+    renderCorner();
+    const button = screen.getByRole("button", { name: s.menu });
+    expect(button.parentElement!.className).toContain("z-[45]");
+    await userEvent.click(button);
+    expect(button.parentElement!.className).toContain("z-[49]");
+  });
 });

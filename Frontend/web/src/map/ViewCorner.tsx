@@ -70,8 +70,10 @@ function Stepper({ label, valueText, value, steps, lessTitle, moreTitle, onStep 
 
 // The map's bottom-right corner: an eye button that opens the view controls —
 // the level of abstraction, the reading mode on a scale from most text to most
-// minimal, and whether the minimap shows. Same z-[45] as the zoom controls;
-// the open menu sits above everything but a real modal.
+// minimal, and whether the minimap shows. Same z-[45] as the zoom controls
+// while closed; open, the whole corner lifts to z-[49] — the menu's own
+// z-index only counts inside this wrapper, so without the lift the minimap
+// (a later z-45 sibling) painted over it. Still below a real modal (z-50).
 export function ViewCorner({
   level,
   levels,
@@ -117,7 +119,7 @@ export function ViewCorner({
   const modeValue = Math.max(0, VIEW_SCALE.indexOf(readingMode)) + 1;
 
   return (
-    <div ref={ref} className="absolute bottom-3 right-3 z-[45]">
+    <div ref={ref} className={`absolute bottom-3 right-3 ${open ? "z-[49]" : "z-[45]"}`}>
       {open && (
         <div className="absolute right-0 bottom-[calc(100%+0.4rem)] z-[60] flex w-[230px] flex-col gap-3 rounded-card border border-line bg-surface p-2 shadow-card">
           <Stepper
