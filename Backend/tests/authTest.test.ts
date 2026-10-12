@@ -1,17 +1,66 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import request from "supertest";
-import { app } from "../server.js"; // export your express app
-import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+
+// Runs against the real app and its real session cookie, with an in-memory
+// stand-in for the user DAO instead of MongoDB (like every other test here),
+// so it needs no database. The session itself uses express-session's
+// in-memory store, since REDIS_URL isn't set under test.
+vi.hoisted(() => {
+  process.env.SESSION_SECRET ??= "test-session-secret";
+});
+
+type FakeUser = {
+  _id: string;
+  username: string;
+  email: string;
+  passwordHash?: string;
+  role: "user" | "admin";
+  isBlocked: boolean;
+  isDemo: boolean;
+};
+
+const users = vi.hoisted(() => [] as FakeUser[]);
+
+vi.mock("../src/dao/userDao.js", () => ({
+  createUserDao: vi.fn(async (data: { username: string; email: string; password: string }) => {
+    const user: FakeUser = {
+      _id: `user${users.length + 1}`,
+      username: data.username,
+      email: data.email,
+      passwordHash: await bcrypt.hash(data.password, 4),
+      role: "user",
+      isBlocked: false,
+      isDemo: false,
+    };
+    users.push(user);
+    return user;
+  }),
+  findUserByEmailDao: vi.fn(async (email: string) => users.find((u) => u.email === email) ?? null),
+  findUserByIdDao: vi.fn(async (id: string) => {
+    const user = users.find((u) => u._id === id);
+    if (!user) return null;
+    const { passwordHash: _omit, ...rest } = user;
+    return rest;
+  }),
+  findUserByUsernameDao: vi.fn(async (username: string) => users.find((u) => u.username === username) ?? null),
+  findUserByGoogleIdDao: vi.fn(),
+  createGoogleUserDao: vi.fn(),
+  createDemoUserDao: vi.fn(),
+  linkGoogleIdDao: vi.fn(),
+  updateUserDao: vi.fn(),
+  getAllUsersDao: vi.fn(),
+  deleteUserDao: vi.fn(),
+  setUserBlockedDao: vi.fn(),
+  deleteAllDao: vi.fn(),
+}));
+
+let app: typeof import("../server.js").app;
 
 describe("Auth", () => {
   beforeAll(async () => {
-    // connect to test database
-    await mongoose.connect(process.env.MONGO_URI_TEST!);
-  });
-
-  afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    ({ app } = await import("../server.js"));
   });
 
   it("registers a new user and the session cookie authenticates a follow-up request", async () => {
