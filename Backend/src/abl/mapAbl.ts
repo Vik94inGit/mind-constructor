@@ -7,6 +7,7 @@ import {
   updateMapDao,
   inviteUserToMapDao,
 } from "../dao/mapsDao.js";
+import { findUserByIdDao } from "../dao/userDao.js";
 import { parseOrThrow } from "./errors.js";
 import { createNodeAbl } from "./nodeAbl.js";
 import type { NodeType } from "../models/Node.js";
@@ -18,6 +19,9 @@ import { MAP_KINDS } from "../models/Map.js";
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
 export class ColorTakenError extends Error {}
+export class NotInviterError extends Error {}
+export class InviteeNotFoundError extends Error {}
+export class AlreadyMemberError extends Error {}
 
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const hexColor = (fieldName: string) =>
@@ -190,7 +194,22 @@ export const inviteUserToMapAbl = async (
   currentUserId: string,
 ) => {
   const { userIdToInvite } = parseOrThrow(inviteUserSchema, input);
-  return await inviteUserToMapDao(publicMapId, userIdToInvite, currentUserId);
+
+  // null (→ 404) when the map doesn't exist or you're not on it at all;
+  // a member who isn't the owner gets told why instead of the same 404.
+  const map = await getMapByIdDao(publicMapId, currentUserId);
+  if (!map) return null;
+  if (map.ownerId.toString() !== currentUserId.toString()) throw new NotInviterError();
+  if (map.members.some((m: unknown) => String(m) === userIdToInvite)) throw new AlreadyMemberError();
+
+  // Blocked accounts can't sign in, so inviting one would only ever look
+  // like it worked.
+  const invitee = await findUserByIdDao(userIdToInvite);
+  if (!invitee || invitee.isBlocked) throw new InviteeNotFoundError();
+
+  const updated = await inviteUserToMapDao(publicMapId, userIdToInvite, currentUserId);
+  if (!updated) return null;
+  return { map: updated, invitee: { _id: userIdToInvite, username: invitee.username } };
 };
 
 const setColorSchema = z.object({ color: hexColor("color") });

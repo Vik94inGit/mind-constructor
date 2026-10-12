@@ -37,6 +37,7 @@ export interface Translation {
       title: string;
       subtitle: string;
       username: string;
+      usernameHint: string;
       email: string;
       password: string;
       passwordHint: string;
@@ -223,6 +224,7 @@ const en: Translation = {
       title: "Create your account",
       subtitle: "Start mapping out your next decision.",
       username: "Username",
+      usernameHint: "Optional — leave empty to use your email up to the @",
       email: "Email",
       password: "Password",
       passwordHint: "At least 6 characters",
@@ -399,6 +401,7 @@ const cs: Translation = {
       title: "Vytvořte si účet",
       subtitle: "Začněte mapovat své další rozhodnutí.",
       username: "Uživatelské jméno",
+      usernameHint: "Nepovinné — prázdné pole použije část e-mailu před @",
       email: "E-mail",
       password: "Heslo",
       passwordHint: "Alespoň 6 znaků",
@@ -575,6 +578,7 @@ const uk: Translation = {
       title: "Створіть обліковий запис",
       subtitle: "Почніть картувати своє наступне рішення.",
       username: "Ім'я користувача",
+      usernameHint: "Необов'язково — якщо порожньо, візьмемо частину email до @",
       email: "Електронна пошта",
       password: "Пароль",
       passwordHint: "Щонайменше 6 символів",
@@ -751,6 +755,7 @@ const ru: Translation = {
       title: "Создайте аккаунт",
       subtitle: "Начните картировать своё следующее решение.",
       username: "Имя пользователя",
+      usernameHint: "Необязательно — если пусто, возьмём часть email до @",
       email: "Электронная почта",
       password: "Пароль",
       passwordHint: "Не менее 6 символов",

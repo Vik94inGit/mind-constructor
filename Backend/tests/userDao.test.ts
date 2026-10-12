@@ -62,7 +62,12 @@ describe("userDao", () => {
   it("createGoogleUserDao stores the googleId and no password", async () => {
     await createGoogleUserDao({ username: "bob", email: "b@test.com", googleId: "g1" });
 
-    expect(User.create).toHaveBeenCalledWith({ username: "bob", email: "b@test.com", googleId: "g1" });
+    expect(User.create).toHaveBeenCalledWith({
+      username: "bob",
+      email: "b@test.com",
+      googleId: "g1",
+      usernameConfirmed: true,
+    });
     expect(bcrypt.hash).not.toHaveBeenCalled();
   });
 

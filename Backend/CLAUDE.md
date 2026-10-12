@@ -103,7 +103,8 @@ Cross-cutting pieces:
 - **`src/realtime/io.ts`** — Socket.IO server sharing the same HTTP server *and the same
   express-session middleware instance* as the REST API (`io.engine.use(sessionMiddleware)`), so a
   browser's `mc_sid` cookie authenticates the socket handshake against the same session store. One
-  room per map, keyed by the map's public id. `broadcastToMap(publicMapId, event,
+  room per map, keyed by the map's public id, plus one `user:{id}` room per signed-in user that
+  `notifyUser(userId, event, payload)` addresses (an invite sends `map:invited` to the invitee). `broadcastToMap(publicMapId, event,
 payload)` is the one function controllers call after a mutation commits; it's a no-op if `io`
   was never initialized (true under the test app), so it's safe to call unconditionally.
 - **`src/abl/errors.ts`** — shared `ValidationError` + `parseOrThrow`.
@@ -112,7 +113,10 @@ payload)` is the one function controllers call after a mutation commits; it's a 
   token (never a password), the backend verifies it against `GOOGLE_CLIENT_ID` via
   `google-auth-library`, then resolves an account by the token's `sub` claim (`User.googleId`) —
   falling back to matching by email (linking Google onto an existing password account) before
-  creating a brand-new one with a username derived from the email's local part. `User.passwordHash`
+  creating a brand-new one with a username taken from the Google profile name (else the email's
+  local part; `defaultUsername`) and `User.usernameConfirmed: false`, so the frontend offers to
+  change it once (`PATCH /api/auth/me/username`, `setUsernameAbl`). Usernames are unique regardless
+  of case; registering without one gets the email's local part. `User.passwordHash`
   is therefore optional: a Google-only account never gets one, and `loginAbl` treats that the same
   as a wrong password rather than a distinct error, so a probing login can't tell which case it hit.
 - **`src/abl/authAbl.ts`** `createDemoSessionAbl` (`POST /api/auth/demo`, no request body) — "try it

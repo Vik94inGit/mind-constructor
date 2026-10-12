@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 import * as authApi from "../api/auth";
 import { clearReadCache, setOfflineUser } from "../offline/sync";
+import { disconnectSocket } from "../api/socket";
 import type { User } from "../types";
 
 interface AuthContextValue {
@@ -18,6 +19,8 @@ interface AuthContextValue {
   tryDemo: () => Promise<string>;
   logout: () => Promise<void>;
   refreshSelf: () => Promise<void>;
+  /** Pick (or keep) your own username — see api/auth.ts's setUsername. */
+  updateUsername: (username: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -67,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await authApi.logout();
+    disconnectSocket();
     // What this browser kept of their maps isn't for whoever signs in next.
     await clearReadCache();
     setUser(null);
@@ -82,6 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (self) setUser(self);
   }, [user]);
 
+  const updateUsername = useCallback(
+    async (username: string) => {
+      const updated = await authApi.setUsername(username);
+      setUser({ ...user, ...updated } as User);
+    },
+    [user, setUser],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -93,8 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tryDemo,
       logout,
       refreshSelf,
+      updateUsername,
     }),
-    [user, loading, login, register, loginWithGoogle, tryDemo, logout, refreshSelf],
+    [user, loading, login, register, loginWithGoogle, tryDemo, logout, refreshSelf, updateUsername],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

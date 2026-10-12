@@ -14,8 +14,12 @@ import {
   setMapColorAbl,
   getMapsAbl,
   ColorTakenError,
+  NotInviterError,
+  InviteeNotFoundError,
+  AlreadyMemberError,
 } from "../src/abl/mapAbl.js";
 import { createNodeAbl } from "../src/abl/nodeAbl.js";
+import { findUserByIdDao } from "../src/dao/userDao.js";
 import { ValidationError } from "../src/abl/errors.js";
 
 vi.mock("../src/dao/mapsDao.js", () => ({
@@ -31,6 +35,10 @@ vi.mock("../src/dao/mapsDao.js", () => ({
 // mapAbl.ts's seedTemplateNodes) rather than a DAO directly — mocked here as
 // its own module so template tests can assert on calls to it without also
 // standing up createNodeAbl's own membership/parent-resolution DAOs.
+vi.mock("../src/dao/userDao.js", () => ({
+  findUserByIdDao: vi.fn(),
+}));
+
 vi.mock("../src/abl/nodeAbl.js", () => ({
   createNodeAbl: vi.fn(),
 }));
@@ -262,13 +270,46 @@ describe("mapAbl", () => {
       expect(inviteUserToMapDao).not.toHaveBeenCalled();
     });
 
+    const validId = "507f1f77bcf86cd799439011";
+    const ownMap = { ownerId: "user1", members: ["user1"] };
+
     it("invites with a well-formed user id", async () => {
-      const validId = "507f1f77bcf86cd799439011";
+      vi.mocked(getMapByIdDao).mockResolvedValue(ownMap as never);
+      vi.mocked(findUserByIdDao).mockResolvedValue({ username: "bob" } as never);
       vi.mocked(inviteUserToMapDao).mockResolvedValue({ mapId: "pub123" } as never);
 
-      await inviteUserToMapAbl("pub123", { userIdToInvite: validId }, "user1");
+      const result = await inviteUserToMapAbl("pub123", { userIdToInvite: validId }, "user1");
 
       expect(inviteUserToMapDao).toHaveBeenCalledWith("pub123", validId, "user1");
+      expect(result).toEqual({ map: { mapId: "pub123" }, invitee: { _id: validId, username: "bob" } });
+    });
+
+    it("returns null for a map you're not on", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue(null as never);
+      expect(await inviteUserToMapAbl("pub123", { userIdToInvite: validId }, "user1")).toBeNull();
+    });
+
+    it("refuses a member who isn't the owner", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ ownerId: "owner", members: ["owner", "user1"] } as never);
+      await expect(inviteUserToMapAbl("pub123", { userIdToInvite: validId }, "user1")).rejects.toThrow(
+        NotInviterError,
+      );
+    });
+
+    it("refuses someone already on the map", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ ownerId: "user1", members: ["user1", validId] } as never);
+      await expect(inviteUserToMapAbl("pub123", { userIdToInvite: validId }, "user1")).rejects.toThrow(
+        AlreadyMemberError,
+      );
+    });
+
+    it("refuses an unknown or blocked user", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue(ownMap as never);
+      vi.mocked(findUserByIdDao).mockResolvedValue({ isBlocked: true } as never);
+      await expect(inviteUserToMapAbl("pub123", { userIdToInvite: validId }, "user1")).rejects.toThrow(
+        InviteeNotFoundError,
+      );
+      expect(inviteUserToMapDao).not.toHaveBeenCalled();
     });
   });
 

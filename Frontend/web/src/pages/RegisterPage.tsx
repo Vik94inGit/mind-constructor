@@ -62,11 +62,13 @@ export function RegisterPage() {
             </label>
             <input
               id="username"
-              required
+              maxLength={32}
               value={username}
+              placeholder={email.includes("@") ? email.split("@")[0] : undefined}
               onChange={(e) => setUsername(e.target.value)}
               className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
             />
+            <span className="text-[0.75rem] text-ink-soft">{t.auth.register.usernameHint}</span>
           </div>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="email" className="text-[0.8rem] font-semibold text-ink-soft">

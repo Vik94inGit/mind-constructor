@@ -15,7 +15,12 @@ interface CreateGoogleUserInput {
   username: string;
   email: string;
   googleId: string;
+  usernameConfirmed?: boolean;
 }
+
+// User input goes into a RegExp below — escape it so "a.b" or "(" match
+// themselves instead of being read as a pattern (or throwing).
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 interface UpdateUserInput {
   username?: string;
@@ -47,6 +52,34 @@ export const findUserByUsernameDao = async (username: string) => {
   return User.findOne({ username });
 };
 
+// Case-insensitive — "Alice" and "alice" would be two different rows to
+// the unique index, but the same person to anyone searching for them, so
+// a username counts as taken regardless of case.
+export const findUserByUsernameInsensitiveDao = async (username: string) => {
+  return User.findOne({ username: new RegExp(`^${escapeRegExp(username)}$`, "i") }).select("-passwordHash");
+};
+
+export const setUsernameDao = async (id: string, username: string) => {
+  return User.findByIdAndUpdate(id, { username, usernameConfirmed: true }, { new: true }).select("-passwordHash");
+};
+
+// The invite box's search: a username containing the query, or an email
+// starting with it. Blocked and throwaway demo accounts never show up —
+// nobody can sign in as the first or would ever come back as the second.
+export const searchUsersDao = async (query: string, excludeIds: string[], limit: number) => {
+  const q = escapeRegExp(query);
+  return await User.find({
+    _id: { $nin: excludeIds },
+    isBlocked: { $ne: true },
+    isDemo: { $ne: true },
+    $or: [{ username: new RegExp(q, "i") }, { email: new RegExp(`^${q}`, "i") }],
+  })
+    .select("_id username email")
+    .sort({ username: 1 })
+    .limit(limit)
+    .lean();
+};
+
 // No passwordHash at all — this account only ever signs in via a verified
 // Google ID token (see authAbl.ts's googleAuthAbl), never email+password.
 export const createGoogleUserDao = async (data: CreateGoogleUserInput) => {
@@ -54,6 +87,7 @@ export const createGoogleUserDao = async (data: CreateGoogleUserInput) => {
     username: data.username,
     email: data.email,
     googleId: data.googleId,
+    usernameConfirmed: data.usernameConfirmed ?? true,
   });
   return user;
 };

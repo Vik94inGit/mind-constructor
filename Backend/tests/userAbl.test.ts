@@ -3,16 +3,19 @@ import {
   findUserByIdDao,
   deleteUserDao,
   setUserBlockedDao,
+  searchUsersDao,
 } from "../src/dao/userDao.js";
 import {
   listMapsByOwnerDao,
   deleteMapDao,
   removeUserFromMapsDao,
+  getMapByIdDao,
 } from "../src/dao/mapsDao.js";
 import {
   blockUserAbl,
   unblockUserAbl,
   adminDeleteUserAbl,
+  searchUsersAbl,
   CannotActOnSelfError,
   UserNotFoundError,
 } from "../src/abl/userAbl.js";
@@ -21,11 +24,13 @@ vi.mock("../src/dao/userDao.js", () => ({
   findUserByIdDao: vi.fn(),
   deleteUserDao: vi.fn(),
   setUserBlockedDao: vi.fn(),
+  searchUsersDao: vi.fn(),
 }));
 vi.mock("../src/dao/mapsDao.js", () => ({
   listMapsByOwnerDao: vi.fn(),
   deleteMapDao: vi.fn(),
   removeUserFromMapsDao: vi.fn(),
+  getMapByIdDao: vi.fn(),
 }));
 
 describe("userAbl", () => {
@@ -112,6 +117,23 @@ describe("userAbl", () => {
       expect(removeUserFromMapsDao).toHaveBeenCalledWith("user1");
       expect(deleteUserDao).toHaveBeenCalledWith("user1");
       expect(result).toEqual({ deletedUserId: "user1", deletedOwnedMaps: 2 });
+    });
+  });
+
+  describe("searchUsersAbl", () => {
+    it("returns nothing for a query under 2 characters", async () => {
+      expect(await searchUsersAbl("me", { q: " a " })).toEqual([]);
+      expect(searchUsersDao).not.toHaveBeenCalled();
+    });
+
+    it("leaves out yourself and the map's current members", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ members: ["me", "m2"] } as never);
+      vi.mocked(searchUsersDao).mockResolvedValue([] as never);
+
+      await searchUsersAbl("me", { q: "ali", mapId: "pub1" });
+
+      expect(getMapByIdDao).toHaveBeenCalledWith("pub1", "me");
+      expect(searchUsersDao).toHaveBeenCalledWith("ali", ["me", "me", "m2"], 10);
     });
   });
 });

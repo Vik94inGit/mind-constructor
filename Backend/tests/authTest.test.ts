@@ -44,6 +44,11 @@ vi.mock("../src/dao/userDao.js", () => ({
     return rest;
   }),
   findUserByUsernameDao: vi.fn(async (username: string) => users.find((u) => u.username === username) ?? null),
+  findUserByUsernameInsensitiveDao: vi.fn(
+    async (username: string) => users.find((u) => u.username.toLowerCase() === username.toLowerCase()) ?? null,
+  ),
+  setUsernameDao: vi.fn(),
+  searchUsersDao: vi.fn(),
   findUserByGoogleIdDao: vi.fn(),
   createGoogleUserDao: vi.fn(),
   createDemoUserDao: vi.fn(),

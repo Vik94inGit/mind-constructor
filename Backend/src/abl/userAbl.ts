@@ -3,16 +3,20 @@
 // stay thin (one query each). This is the layer that decides *what should
 // happen*, including anything that spans more than one collection.
 
+import { z } from "zod";
 import {
   findUserByIdDao,
   deleteUserDao,
   setUserBlockedDao,
+  searchUsersDao,
 } from "../dao/userDao.js";
 import {
   listMapsByOwnerDao,
   deleteMapDao,
   removeUserFromMapsDao,
+  getMapByIdDao,
 } from "../dao/mapsDao.js";
+import { parseOrThrow } from "./errors.js";
 
 export class CannotActOnSelfError extends Error {}
 export class UserNotFoundError extends Error {}
@@ -60,4 +64,27 @@ export const adminDeleteUserAbl = async (targetUserId: string, adminId: string) 
   await deleteUserDao(targetUserId);
 
   return { deletedUserId: targetUserId, deletedOwnedMaps: ownedMaps.length };
+};
+
+const searchUsersSchema = z.object({
+  q: z.string().trim().max(64).default(""),
+  mapId: z.string().optional(),
+});
+
+const SEARCH_LIMIT = 10;
+
+// The invite box's search. Never returns the caller themselves, and, given
+// a map they're on, none of its current members either — so every result is
+// someone who can actually still be invited. Under 2 characters returns
+// nothing rather than paging through every account.
+export const searchUsersAbl = async (currentUserId: string, input: unknown) => {
+  const { q, mapId } = parseOrThrow(searchUsersSchema, input);
+  if (q.length < 2) return [];
+
+  const exclude = [currentUserId.toString()];
+  if (mapId) {
+    const map = await getMapByIdDao(mapId, currentUserId);
+    if (map) exclude.push(...map.members.map((m: unknown) => String(m)));
+  }
+  return await searchUsersDao(q, exclude, SEARCH_LIMIT);
 };

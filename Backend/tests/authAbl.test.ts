@@ -1,9 +1,17 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 import bcrypt from "bcryptjs";
-import { createUserDao, findUserByEmailDao } from "../src/dao/userDao.js";
+import {
+  createUserDao,
+  findUserByEmailDao,
+  findUserByUsernameInsensitiveDao,
+  setUsernameDao,
+} from "../src/dao/userDao.js";
 import {
   registerAbl,
   loginAbl,
+  setUsernameAbl,
+  defaultUsername,
+  UsernameTakenError,
   EmailAlreadyInUseError,
   InvalidCredentialsError,
   AccountBlockedError,
@@ -13,6 +21,8 @@ import { ValidationError } from "../src/abl/errors.js";
 vi.mock("../src/dao/userDao.js", () => ({
   createUserDao: vi.fn(),
   findUserByEmailDao: vi.fn(),
+  findUserByUsernameInsensitiveDao: vi.fn(),
+  setUsernameDao: vi.fn(),
 }));
 
 describe("authAbl", () => {
@@ -81,6 +91,71 @@ describe("authAbl", () => {
         username: "alice", email: "alice@test.com", password: "secret123",
       });
       expect(result.user._id).toBe("u1");
+    });
+  });
+
+  describe("registerAbl usernames", () => {
+    it("rejects a username someone else already has, whatever its case", async () => {
+      vi.mocked(findUserByEmailDao).mockResolvedValue(null as never);
+      vi.mocked(findUserByUsernameInsensitiveDao).mockResolvedValue({ _id: "u2" } as never);
+
+      await expect(
+        registerAbl({ username: "Alice", email: "alice@test.com", password: "secret123" }),
+      ).rejects.toThrow(UsernameTakenError);
+      expect(createUserDao).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the email's part before the @ when no username is given", async () => {
+      vi.mocked(findUserByEmailDao).mockResolvedValue(null as never);
+      vi.mocked(findUserByUsernameInsensitiveDao).mockResolvedValue(null as never);
+      vi.mocked(createUserDao).mockResolvedValue({ _id: "u1" } as never);
+
+      await registerAbl({ username: "  ", email: "viktor.h@test.com", password: "secret123" });
+
+      expect(createUserDao).toHaveBeenCalledWith({
+        username: "viktor.h", email: "viktor.h@test.com", password: "secret123",
+      });
+    });
+  });
+
+  describe("defaultUsername", () => {
+    it("prefers the Google profile name", async () => {
+      vi.mocked(findUserByUsernameInsensitiveDao).mockResolvedValue(null as never);
+      expect(await defaultUsername({ name: "Віктор Hash", email: "v@test.com" })).toBe("Віктор Hash");
+    });
+
+    it("uses the email prefix when the name has nothing usable", async () => {
+      vi.mocked(findUserByUsernameInsensitiveDao).mockResolvedValue(null as never);
+      expect(await defaultUsername({ name: "🙂", email: "vik94@test.com" })).toBe("vik94");
+    });
+
+    it("numbers a taken name", async () => {
+      vi.mocked(findUserByUsernameInsensitiveDao)
+        .mockResolvedValueOnce({ _id: "x" } as never)
+        .mockResolvedValueOnce(null as never);
+      expect(await defaultUsername({ email: "alice@test.com" })).toBe("alice2");
+    });
+  });
+
+  describe("setUsernameAbl", () => {
+    it("lets you keep your own username", async () => {
+      vi.mocked(findUserByUsernameInsensitiveDao).mockResolvedValue({ _id: "u1" } as never);
+      vi.mocked(setUsernameDao).mockResolvedValue({ _id: "u1", username: "alice" } as never);
+
+      await setUsernameAbl("u1", { username: "alice" });
+
+      expect(setUsernameDao).toHaveBeenCalledWith("u1", "alice");
+    });
+
+    it("refuses someone else's", async () => {
+      vi.mocked(findUserByUsernameInsensitiveDao).mockResolvedValue({ _id: "u2" } as never);
+
+      await expect(setUsernameAbl("u1", { username: "alice" })).rejects.toThrow(UsernameTakenError);
+      expect(setUsernameDao).not.toHaveBeenCalled();
+    });
+
+    it("refuses markup characters", async () => {
+      await expect(setUsernameAbl("u1", { username: "<b>hi</b>" })).rejects.toThrow(ValidationError);
     });
   });
 

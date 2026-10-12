@@ -17,6 +17,9 @@ let io: SocketIOServer | null = null;
 const roomFor = (publicMapId: string) => `map:${publicMapId}`;
 // The map owner also sits in this room, which gets the events about branches hidden from everyone else.
 const ownerRoomFor = (publicMapId: string) => `map:${publicMapId}:owner`;
+// Every socket a user has open, whatever page it's on — for events about
+// the user themselves (an invite) rather than about one map.
+const userRoomFor = (userId: string) => `user:${userId}`;
 
 // sessionMiddleware: the *same* express-session instance server.ts builds
 // and mounts on the REST API — sharing it (rather than each side building
@@ -62,6 +65,8 @@ export function initRealtime(httpServer: HTTPServer, sessionMiddleware: RequestH
   });
 
   io.on("connection", (socket: Socket) => {
+    socket.join(userRoomFor(socket.data.userId as string));
+
     // A tab can have several maps open across its lifetime (navigating
     // the dashboard, back to a map, a different map) — join/leave per map
     // rather than binding a whole connection to one room.
@@ -128,4 +133,9 @@ export function broadcastToMap(publicMapId: string, event: string, payload: unkn
   void next.finally(() => {
     if (queues.get(publicMapId) === next) queues.delete(publicMapId);
   });
+}
+
+// Same courtesy-layer contract as broadcastToMap: a no-op without `io`.
+export function notifyUser(userId: string, event: string, payload: unknown) {
+  io?.to(userRoomFor(String(userId))).emit(event, payload);
 }

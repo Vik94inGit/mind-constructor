@@ -72,7 +72,12 @@ export interface User {
   isBlocked?: boolean;
   /** A throwaway "try without registering" account (see Backend's createDemoSessionAbl) — gates ProtectedRoute's dashboard/home redirect. */
   isDemo?: boolean;
+  /** false: the username was picked for them on a first Google sign-in, and the app offers to change it once. */
+  usernameConfirmed?: boolean;
 }
+
+/** One result of the invite box's search (GET /api/auth/users/search). */
+export type UserSearchResult = Pick<User, "_id" | "username" | "email">;
 
 export interface MemberColor {
   userId: string;

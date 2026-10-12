@@ -5,7 +5,8 @@ import {
   createUserDao,
   findUserByEmailDao,
   findUserByGoogleIdDao,
-  findUserByUsernameDao,
+  findUserByUsernameInsensitiveDao,
+  setUsernameDao,
   createGoogleUserDao,
   createDemoUserDao,
   linkGoogleIdDao,
@@ -22,6 +23,7 @@ export class AccountBlockedError extends Error {}
 // of the specifics are actionable for the caller, and folding them together
 // avoids leaking *why* verification failed to whatever sent the token.
 export class GoogleTokenInvalidError extends Error {}
+export class UsernameTakenError extends Error {}
 
 // MongoDB's `unique` index on `email` is case-sensitive, so without
 // normalizing, "Alice@Test.com" and "alice@test.com" would pass the
@@ -30,8 +32,21 @@ export class GoogleTokenInvalidError extends Error {}
 // same way a write did, or login stops finding accounts it just created.
 const normalizeEmail = (v: string) => v.trim().toLowerCase();
 
+// What a username may be: letters (any script, so a Google name like
+// "Віктор" survives as-is), digits, spaces, and . _ - — enough for a real
+// name, nothing that reads as markup or breaks a mention.
+const USERNAME_CHARS = /^[\p{L}\p{N} ._-]+$/u;
+const usernameSchema = z
+  .string()
+  .trim()
+  .min(2, "Username must be at least 2 characters")
+  .max(32, "Username must be at most 32 characters")
+  .regex(USERNAME_CHARS, "Username may only use letters, numbers, spaces, and . _ -");
+
 const registerSchema = z.object({
-  username: z.string().min(1, "username is required"),
+  // Optional: left blank, the account gets the email's part before the @
+  // (see defaultUsername) and can change it later.
+  username: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), usernameSchema.optional()),
   // Normalize before validating format, not after — " Alice@Test.com " is a
   // valid email once trimmed, but `.email()` would reject the raw string.
   email: z
@@ -56,20 +71,35 @@ const googleAuthSchema = z.object({
 // Google's public signing keys internally.
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// A brand-new Google sign-in has no username of its own to offer — derive
-// one from the email's local part, falling back to a numbered variant only
-// on an actual collision (the common case needs no suffix at all, so this
-// doesn't tack on noise for the first person named e.g. "alice").
-const usernameFromEmail = async (email: string): Promise<string> => {
-  const base = email.split("@")[0].replace(/[^a-zA-Z0-9_-]/g, "") || "user";
-  if (!(await findUserByUsernameDao(base))) return base;
+// Strips whatever a username can't hold and collapses spaces — "" when
+// nothing usable is left (an all-emoji Google name, say).
+const sanitizeUsername = (raw: string) =>
+  raw
+    .replace(/[^\p{L}\p{N} ._-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 28);
+
+// The first free variant of `base` — the common case needs no suffix at
+// all, so this doesn't tack on noise for the first person named "alice".
+const uniqueUsername = async (base: string): Promise<string> => {
+  if (!(await findUserByUsernameInsensitiveDao(base))) return base;
   for (let i = 2; i < 1000; i++) {
     const candidate = `${base}${i}`;
-    if (!(await findUserByUsernameDao(candidate))) return candidate;
+    if (!(await findUserByUsernameInsensitiveDao(candidate))) return candidate;
   }
-  // Astronomically unlikely (999 collisions on the same email prefix) — a
-  // random suffix beats looping forever.
+  // Astronomically unlikely (999 collisions on the same base) — a random
+  // suffix beats looping forever.
   return `${base}${Math.random().toString(36).slice(2, 8)}`;
+};
+
+// A username picked for someone who didn't type one: their Google profile
+// name when there is one, otherwise their email up to the @.
+export const defaultUsername = async ({ name, email }: { name?: string | null; email: string }) => {
+  const fromName = sanitizeUsername(name ?? "");
+  const fromEmail = sanitizeUsername(email.split("@")[0]);
+  const base = fromName.length >= 2 ? fromName : fromEmail.length >= 2 ? fromEmail : "user";
+  return uniqueUsername(base);
 };
 
 export const registerAbl = async (input: unknown) => {
@@ -78,7 +108,15 @@ export const registerAbl = async (input: unknown) => {
   const existing = await findUserByEmailDao(email);
   if (existing) throw new EmailAlreadyInUseError();
 
-  const user = await createUserDao({ username, email, password });
+  let finalUsername: string;
+  if (username) {
+    if (await findUserByUsernameInsensitiveDao(username)) throw new UsernameTakenError();
+    finalUsername = username;
+  } else {
+    finalUsername = await defaultUsername({ email });
+  }
+
+  const user = await createUserDao({ username: finalUsername, email, password });
 
   return { user };
 };
@@ -143,8 +181,10 @@ export const googleAuthAbl = async (input: unknown) => {
       // anyway.
       user = await linkGoogleIdDao(existingByEmail._id.toString(), googleId);
     } else {
-      const username = await usernameFromEmail(email);
-      user = await createGoogleUserDao({ username, email, googleId });
+      // Picked for them, so the frontend offers to change it once (see
+      // User.usernameConfirmed).
+      const username = await defaultUsername({ name: payload.name, email });
+      user = await createGoogleUserDao({ username, email, googleId, usernameConfirmed: false });
     }
   }
   if (!user) throw new GoogleTokenInvalidError();
@@ -177,4 +217,15 @@ export const createDemoSessionAbl = async () => {
   );
 
   return { user, map };
+};
+
+const setUsernameSchema = z.object({ username: usernameSchema });
+
+// Picking (or keeping) your own username. Keeping the current one is fine —
+// it only counts as taken when it belongs to someone else.
+export const setUsernameAbl = async (userId: string, input: unknown) => {
+  const { username } = parseOrThrow(setUsernameSchema, input);
+  const holder = await findUserByUsernameInsensitiveDao(username);
+  if (holder && holder._id.toString() !== userId.toString()) throw new UsernameTakenError();
+  return await setUsernameDao(userId, username);
 };
