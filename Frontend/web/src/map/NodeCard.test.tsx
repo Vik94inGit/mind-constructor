@@ -289,4 +289,9 @@ describe("NodeCard", () => {
       expect(screen.getAllByText("shown text")).toHaveLength(1);
     });
   });
+  it("cuts a member's text to one line in the mixed view", () => {
+    const node = makeNode({ nodeId: "a", text: "a long member text that would wrap" });
+    renderNode({ node, groupSentiment: "positive", readingMode: "mixed" });
+    expect(screen.getByText("a long member text that would wrap").className).toContain("truncate");
+  });
 });
