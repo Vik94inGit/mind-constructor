@@ -29,6 +29,16 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
+      # Node pictures' file storage (Backend/src/config/fileStorage.ts) —
+      # optional; unset keeps pictures in MongoDB.
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
 
   # Session store (see Backend/src/config/redis.ts) — Render's own free-tier
   # Redis-compatible Key Value store. ipAllowList: [] keeps it reachable only

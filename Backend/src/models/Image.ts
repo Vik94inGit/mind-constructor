@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 
-// A node's picture, kept in its own collection rather than inline on the
-// Node document: the node stores only the picture's address
+// A node's picture, kept out of the Node document — its bytes in the file
+// storage bucket (config/fileStorage.ts), or in this collection when no bucket
+// is configured: the node stores only the picture's address
 // (IMAGE_URL_PREFIX + imageId), so node documents, the map's node list and
 // every realtime node event stay small however many pictures a map holds.
 // Served by GET /api/images/:imageId (imageController.ts) to members of the
@@ -18,9 +19,12 @@ const ImageSchema = new mongoose.Schema(
     nodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // who added it
     mime: { type: String, enum: IMAGE_MIME_TYPES, required: true },
-    // The decoded bytes — a quarter smaller than the base64 data URL a
-    // frontend sends.
-    data: { type: Buffer, required: true },
+    // Where the bytes are: the object's key in the file storage bucket
+    // (config/fileStorage.ts) when one is configured, otherwise `data` —
+    // the decoded bytes kept right here, a quarter smaller than the base64
+    // data URL a frontend sends.
+    storageKey: { type: String, default: null },
+    data: { type: Buffer, default: null },
   },
   {
     timestamps: true,

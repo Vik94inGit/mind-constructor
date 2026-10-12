@@ -41,13 +41,14 @@ npm run test:run          # vitest, single run (use this one for CI-style checks
 npx vitest run tests/nodeAbl.test.ts        # single test file
 npx vitest run -t "test name substring"     # single test by name
 npm run admin:promote -- someone@example.com  # promote a user to admin (no in-app endpoint for this, by design)
-npm run images:move       # move pictures still saved inline on nodes into the image store
+npm run images:move       # move inline pictures into the image store, and MongoDB-kept ones into the bucket
 ```
 
 Requires a `.env` with `PORT`, `MONGO_URI`, `SESSION_SECRET`, `REDIS_URL`, `GOOGLE_CLIENT_ID` (the
 OAuth client id "Sign in with Google" ID tokens are verified against — see `authAbl.ts`'s
 `googleAuthAbl`). `REDIS_URL` may be left unset locally (sessions fall back to an in-memory store —
-see `server.ts`), but is required in production.
+see `server.ts`), but is required in production. `S3_*` (optional) turns on file storage for node
+pictures — see the image store below.
 `test-db.ts` is a standalone connectivity check (`npx tsx test-db.ts`), not part of the test suite.
 
 Tests mock the DAO layer with `vi.mock(...)` (see any file in `tests/`) rather than hitting a real
@@ -149,16 +150,21 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   node's icon as a two-sided card: the emoji on one face, the type's symbol on the other. Like `title`,
   it is *not* stripped from `GET /:mapId/nodes`.
 - **Image store** (`models/Image.ts`, `dao/imageDao.ts`, `abl/imageAbl.ts`, `imageController.ts`,
-  `routes/imageRoute.ts`) — a node's pictures live in their own `Image` collection (the decoded bytes,
-  the mime type, and the map/node/user they belong to), not on the Node document. A frontend still
+  `routes/imageRoute.ts`, `config/fileStorage.ts`) — a node's pictures live outside the Node document:
+  an `Image` record (mime type and the map/node/user it belongs to) per picture, its bytes in an
+  S3-compatible file storage bucket (Cloudflare R2 suggested; `S3_BUCKET`, `S3_ENDPOINT`,
+  `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, optional `S3_REGION` — see `.env.example`) under
+  `images/<imageId>`, or in the record itself (`Image.data`) when no bucket is configured. The bucket
+  stays private; the backend reads pictures back itself. A frontend still
   sends pictures as data URLs; `updateNodeAbl` stores each one and saves its address
   (`/api/images/<imageId>`) on the node instead, accepts an address back only for a picture stored for
   that same node (`"unknown picture"` otherwise), and deletes any of the node's pictures it no longer
   points at. `GET /api/images/:imageId` serves the image itself (not JSON), with a long private cache,
   to whoever may open its node (`findNodeDao`'s membership and hidden-branch rules); 404 otherwise.
-  Pictures go with their node (`deleteNodeDao`'s cascade, including the weapon/protection nodes it
+  Pictures (and their bucket files) go with their node (`deleteNodeDao`'s cascade, including the weapon/protection nodes it
   takes along) and with their map (`deleteMapDao`). Nodes saved before the store existed may still hold
-  inline data URLs (both kinds are valid); `npm run images:move` moves them into the store.
+  inline data URLs (both kinds are valid); `npm run images:move` moves them into the store, and moves
+  pictures still kept in MongoDB into the bucket once one is configured.
 - **`Node.iconImage`** — an optional small square thumbnail (sent as a JPEG/PNG/WebP data URL of at
   most `MAX_ICON_IMAGE_CHARS` = 40 000 chars, kept in the image store; `""` = none; `iconImageSchema` in
   `nodeAbl.ts`) set via `PATCH /api/nodes/:nodeId`. A frontend cuts it from one of the node's pictures
