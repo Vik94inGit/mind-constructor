@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { User } from "../models/User.js";
 import { Map } from "../models/Map.js";
 import { Node } from "../models/Node.js";
+import { Image } from "../models/Image.js";
 
 interface CreateUserInput {
   username: string;
@@ -113,6 +114,7 @@ export const deleteAllDao = async () => {
     User.deleteMany({}),
     Map.deleteMany({}),
     Node.deleteMany({}),
+    Image.deleteMany({}),
   ]);
   console.log(`Deleted ${users.deletedCount} users`);
   console.log(`Deleted ${maps.deletedCount} maps`);

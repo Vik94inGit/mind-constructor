@@ -18,7 +18,11 @@ import {
   getMapSummaryDao,
   setMemberColorMutationDao,
 } from "../src/dao/mapsDao.js";
+import { deleteImagesByMapDao } from "../src/dao/imageDao.js";
 
+vi.mock("../src/dao/imageDao.js", () => ({
+  deleteImagesByMapDao: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("../src/dao/visibilityDao.js", () => ({
   getHiddenNodesDao: vi.fn().mockResolvedValue({ ids: new Set(["hidden1"]), publicIds: new Set(["h"]) }),
 }));
@@ -303,6 +307,7 @@ describe("mapsDao", () => {
     expect(Edge.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
     expect(Line.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
     expect(Node.deleteMany).toHaveBeenCalledWith({ mapId: "m1" });
+    expect(deleteImagesByMapDao).toHaveBeenCalledWith("m1");
     expect(Folder.updateMany).toHaveBeenCalledWith({ mapIds: "pub123" }, { $pull: { mapIds: "pub123" } });
     expect(Map.findByIdAndDelete).toHaveBeenCalledWith("m1");
     expect(result).toEqual(map);

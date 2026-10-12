@@ -14,7 +14,8 @@
     "build": "tsc",
     "start": "tsx server.ts",
     "admin:promote": "tsx scripts/promoteAdmin.ts",
-    "db:stats": "tsx scripts/dbStats.ts"
+    "db:stats": "tsx scripts/dbStats.ts",
+    "images:move": "tsx scripts/moveImages.ts"
   },
   "keywords": [],
   "author": "",

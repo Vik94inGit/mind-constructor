@@ -13,7 +13,7 @@ import { NetworkError } from "../offline/sync";
 // third-party, which Safari (iPhone, iPad and Mac) blocks outright — signing
 // in "works", then every request after it fails as "Not authorized". Chrome
 // still allowed it, which is how that setting could go unnoticed.
-const API_URL: string =
+export const API_URL: string =
   import.meta.env.PROD && import.meta.env.VITE_API_DIRECT !== "true" ? "" : import.meta.env.VITE_API_URL || "";
 
 // The one map a demo session (see api/auth.ts's tryDemo) is ever allowed

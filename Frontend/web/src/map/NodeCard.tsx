@@ -25,6 +25,7 @@ import { chaosStyle, flightOffset } from "./nodeCardMotion";
 import { useInlineEditDraft } from "./useInlineEditDraft";
 import type { AttackIndicator, NodeDoc, NodeType } from "../types";
 import { nodeSizeMultiplier } from "../utils/nodePriority";
+import { imageSrc } from "../utils/images";
 import type { ReadingMode } from "../utils/readingMode";
 
 
@@ -755,7 +756,7 @@ export const NodeCard = memo(function NodeCard({
           >
             {node.cardImage && (
               // The picture card, at the top of the puzzle piece.
-              <img src={node.cardImage} alt="" className="mb-[0.3rem] block max-h-[110px] w-full rounded-[4px] object-cover" draggable={false} />
+              <img src={imageSrc(node.cardImage)} alt="" className="mb-[0.3rem] block max-h-[110px] w-full rounded-[4px] object-cover" draggable={false} />
             )}
             {trimmedTitle && (
               <div className={`text-[0.78rem] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}>{trimmedTitle}</div>
@@ -822,7 +823,7 @@ export const NodeCard = memo(function NodeCard({
                 // A picture icon (NodeDoc.iconImage) stands in for the type's
                 // symbol; the ring's color still says the type.
                 const typeFace = node.iconImage ? (
-                  <img src={node.iconImage} alt="" className="h-full w-full rounded-full object-cover" draggable={false} />
+                  <img src={imageSrc(node.iconImage)} alt="" className="h-full w-full rounded-full object-cover" draggable={false} />
                 ) : isOutcome ? (
                   <OutcomeBadge
                     type={displayType as OutcomeType}
@@ -939,7 +940,7 @@ export const NodeCard = memo(function NodeCard({
           }}
           data-testid="node-picture-card"
         >
-          <img src={node.cardImage} alt="" className="block max-h-[120px] w-full object-cover" draggable={false} />
+          <img src={imageSrc(node.cardImage)} alt="" className="block max-h-[120px] w-full object-cover" draggable={false} />
         </div>
       )}
       {isNamedZone && !puzzle && !compact && !selected && !inlineEditing && (

@@ -59,7 +59,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   sees how many do and chooses which pieces to pack into the main node. See `src/map/TextToNodesModal.tsx`.
 - **Pictures on nodes** — the node panel's Info tab shows the text and its pictures in one box, like
   a post: screenshots pasted with Ctrl+V, images dropped on the box or picked with its 🖼️ button land
-  under the text; each is shrunk before upload (`utils/images.ts`). See
+  under the text; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
+  their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
+  that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
 - **Emoji cards** — a node can carry an emoji (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the
   emoji ghost ring below); its icon is then a two-sided card that turns over once, to the emoji and

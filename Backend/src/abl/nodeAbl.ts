@@ -9,7 +9,9 @@ import {
   findNodeByPublicIdDao,
   setBranchHiddenMutationDao,
 } from "../dao/nodeDao.js";
-import { parseOrThrow } from "./errors.js";
+import { parseOrThrow, ValidationError } from "./errors.js";
+import { IMAGE_URL_PREFIX } from "../models/Image.js";
+import { createImageDao, findNodeImageIdsDao, deleteNodeImagesExceptDao } from "../dao/imageDao.js";
 
 // z.enum only accepts strings (or a TS enum object) in the zod version this
 // repo pins — SIZE_TIERS is a numeric tuple, so this needs a union of
@@ -47,41 +49,98 @@ const orderSchema = z
   .min(1, "order must be at least 1")
   .max(9999, "order must be at most 9999");
 
-// Node.images — each one an image data URL. The frontend shrinks a picture
-// to fit well under this before sending it; the cap keeps a single node from
-// growing without bound. MAX_NODE_IMAGES × MAX_IMAGE_CHARS stays under the
-// JSON body limit in server.ts.
+// A picture already in the image store (models/Image.ts): what a node keeps
+// once updateNodeAbl has stored the data URL a frontend sent. Sending one back
+// unchanged (say, the rest of the picture list after removing one) keeps it.
+const STORED_IMAGE = String.raw`\/api\/images\/[A-Za-z0-9_-]{8,32}`;
+const imageRegex = (types: string) => new RegExp(`^(data:image\\/(${types});base64,[A-Za-z0-9+/=]+|${STORED_IMAGE})$`);
+const STORED_IMAGE_RE = new RegExp(`^${STORED_IMAGE}$`);
+
+// Node.images — each one an image data URL (stored on arrival) or a stored
+// picture's address. The frontend shrinks a picture to fit well under this
+// before sending it; the cap keeps a single picture from growing without
+// bound. MAX_NODE_IMAGES × MAX_IMAGE_CHARS stays under the JSON body limit in
+// server.ts.
 export const MAX_NODE_IMAGES = 6;
 export const MAX_IMAGE_CHARS = 400_000;
 const imageSchema = z
   .string()
   .max(MAX_IMAGE_CHARS, "image is too large")
-  .regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/, "image must be a PNG, JPEG, WebP or GIF data URL");
+  .regex(imageRegex("png|jpeg|webp|gif"), "image must be a PNG, JPEG, WebP or GIF data URL");
 const imagesSchema = z.array(imageSchema).max(MAX_NODE_IMAGES, `at most ${MAX_NODE_IMAGES} images per node`);
 
 // Node.iconImage — a small square thumbnail (a frontend cuts it from one of
-// the node's pictures) drawn as the node's icon. Small enough to ride along
-// on the map's node list. "" removes it.
+// the node's pictures) drawn as the node's icon. Stored like the pictures, so
+// the map's node list carries only its address. "" removes it.
 export const MAX_ICON_IMAGE_CHARS = 40_000;
 const iconImageSchema = z.union([
   z.literal(""),
   z
     .string()
     .max(MAX_ICON_IMAGE_CHARS, "icon image is too large")
-    .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, "icon image must be a PNG, JPEG or WebP data URL"),
+    .regex(imageRegex("png|jpeg|webp"), "icon image must be a PNG, JPEG or WebP data URL"),
 ]);
 
 // Node.cardImage — a small copy of one of the pictures (its own shape, not
 // cut square) drawn on the map as a picture card under the node, with or
-// without a picture icon. Also kept on the map's node list. "" removes it.
+// without a picture icon. Stored like iconImage. "" removes it.
 export const MAX_CARD_IMAGE_CHARS = 80_000;
 const cardImageSchema = z.union([
   z.literal(""),
   z
     .string()
     .max(MAX_CARD_IMAGE_CHARS, "card image is too large")
-    .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, "card image must be a PNG, JPEG or WebP data URL"),
+    .regex(imageRegex("png|jpeg|webp"), "card image must be a PNG, JPEG or WebP data URL"),
 ]);
+
+const IMAGE_FIELDS = ["images", "iconImage", "cardImage"] as const;
+
+const storedImageId = (ref: string) => ref.slice(IMAGE_URL_PREFIX.length);
+
+// Every stored picture id a node points at, across all three picture fields.
+const referencedImageIds = (node: { images?: string[]; iconImage?: string; cardImage?: string }) =>
+  [...(node.images ?? []), node.iconImage ?? "", node.cardImage ?? ""]
+    .filter((ref) => STORED_IMAGE_RE.test(ref))
+    .map(storedImageId);
+
+// Moves every data URL among the picture fields of `updates` into the image
+// store and puts its address in its place. A stored address is accepted only
+// when it belongs to this node, so a node can't borrow another map's picture.
+export const storeImageFields = async (
+  updates: Record<string, unknown>,
+  node: { _id: unknown; mapId: unknown },
+  userId: string,
+) => {
+  const refs = IMAGE_FIELDS.flatMap((f) => {
+    const v = updates[f];
+    return v === undefined ? [] : Array.isArray(v) ? (v as string[]) : [v as string];
+  });
+  const claimed = refs.filter((ref) => STORED_IMAGE_RE.test(ref)).map(storedImageId);
+  const known = await findNodeImageIdsDao(node._id as string, claimed);
+  if (claimed.some((id) => !known.has(id))) throw new ValidationError("unknown picture");
+
+  const stored = new Map<string, string>();
+  const store = async (ref: string) => {
+    if (!ref.startsWith("data:")) return ref;
+    const cached = stored.get(ref);
+    if (cached) return cached;
+    const comma = ref.indexOf(",");
+    const url = await createImageDao({
+      mapId: node.mapId as string,
+      nodeId: node._id as string,
+      userId,
+      mime: ref.slice("data:".length, ref.indexOf(";")),
+      data: Buffer.from(ref.slice(comma + 1), "base64"),
+    });
+    stored.set(ref, url);
+    return url;
+  };
+  for (const f of IMAGE_FIELDS) {
+    const v = updates[f];
+    if (v === undefined) continue;
+    updates[f] = Array.isArray(v) ? await Promise.all((v as string[]).map(store)) : await store(v as string);
+  }
+};
 
 const createNodeSchema = z.object({
   text: z.string().min(1, "text is required"),
@@ -220,7 +279,21 @@ export const updateNodeAbl = async (
     }
   }
 
-  return await updateNodeDao(publicNodeId, userId, definedUpdates);
+  if (!IMAGE_FIELDS.some((f) => f in definedUpdates)) {
+    return await updateNodeDao(publicNodeId, userId, definedUpdates);
+  }
+
+  // Pictures go to the image store, and the node keeps their addresses.
+  // Only the node's creator may edit it — the same rule updateNodeDao's own
+  // filter applies, checked first here so nobody else can store pictures.
+  const node = await findNodeByPublicIdDao(publicNodeId);
+  if (!node || node.userId.toString() !== userId.toString()) return null;
+  await storeImageFields(definedUpdates, node, userId);
+  const updated = await updateNodeDao(publicNodeId, userId, definedUpdates);
+  // Whatever the node no longer points at (a removed picture, a replaced
+  // icon) is deleted from the store.
+  await deleteNodeImagesExceptDao(node._id, referencedImageIds(updated ?? node));
+  return updated;
 };
 
 const setBranchHiddenSchema = z.object({ hidden: z.boolean({ error: () => "hidden must be true or false" }) });

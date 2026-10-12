@@ -83,20 +83,22 @@ export const NodeSchema = new mongoose.Schema(
     // other. Empty (the default) means none. Small, so it rides along on the
     // map's node list like `title`.
     emoji: { type: String, default: "", trim: true, maxlength: 32 },
-    // Pictures attached to the node — screenshots, photos, sketches — as
-    // image data URLs (a frontend shrinks and re-encodes each one before
-    // sending it, see nodeAbl.ts's imageSchema for the caps). Stripped from
-    // the map's node list like `text` (see getNodesByMapDao): a frontend
-    // fetches them with the single node when its panel opens.
+    // Pictures attached to the node — screenshots, photos, sketches. Each
+    // entry is a stored picture's address (/api/images/<imageId>, see
+    // models/Image.ts — updateNodeAbl moves every data URL it receives into
+    // the image store); older nodes may still hold inline data URLs until
+    // `npm run images:move` runs. Stripped from the map's node list like
+    // `text` (see getNodesByMapDao): a frontend fetches them with the single
+    // node when its panel opens.
     images: { type: [String], default: [] },
     // A small square thumbnail cut from one of the pictures, drawn as the
-    // node's icon instead of its type symbol. "" (the default) means none.
-    // Kept on the map's node list (unlike `images`) — it's capped small
-    // (MAX_ICON_IMAGE_CHARS in nodeAbl.ts).
+    // node's icon instead of its type symbol. Stored like `images`, so only
+    // its address rides along on the map's node list. "" (the default)
+    // means none.
     iconImage: { type: String, default: "" },
     // A small copy of one of the pictures shown on the map as a picture card
-    // under the node (MAX_CARD_IMAGE_CHARS in nodeAbl.ts). "" means none;
-    // independent of iconImage, so a node can show either or both.
+    // under the node, stored like `iconImage`. "" means none; independent of
+    // iconImage, so a node can show either or both.
     cardImage: { type: String, default: "" },
     type: { type: String, enum: NODE_TYPES, required: true }, // mandatory: forces the author to categorize every node
     x: Number, // Coordinates for the UI

@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import { getHiddenNodesDao } from "./visibilityDao.js";
 import { removeMapFromAllFoldersDao } from "./folderDao.js";
 import { removeMapViewStatesDao } from "./userStateDao.js";
+import { deleteImagesByMapDao } from "./imageDao.js";
 
 export const findMapByPublicIdDao = async (publicMapId: string) => {
   return await Map.findOne({ mapId: publicMapId });
@@ -292,6 +293,7 @@ export const deleteMapDao = async (publicMapId: string, userId: string) => {
   await Edge.deleteMany({ mapId: map._id });
   await Line.deleteMany({ mapId: map._id });
   await Node.deleteMany({ mapId: map._id });
+  await deleteImagesByMapDao(map._id);
   await removeMapFromAllFoldersDao(publicMapId);
   await removeMapViewStatesDao(publicMapId);
 
