@@ -45,8 +45,9 @@ const PUZZLE_MAX_WIDTH = 240;
 const PUZZLE_SELECTED_MAX_WIDTH = 180;
 // iconText captions: a little wider and taller than the default chip.
 const ICON_TEXT_CAPTION_WIDTH = 176;
-// A picture card (NodeDoc.cardImage) above the icon, on screen.
+// A picture card (NodeDoc.cardImage) in place of the icon, on screen.
 const CARD_IMAGE_WIDTH = 120;
+const CARD_IMAGE_MAX_HEIGHT = 120;
 
 
 interface Props {
@@ -571,6 +572,11 @@ export const NodeCard = memo(function NodeCard({
   // proportional automatically instead of needing separately-tuned numbers.
   const inverseScaleStyle: CSSProperties = { transform: `scale(${sizeMultiplier / zoom})` };
 
+  // A picture card (NodeDoc.cardImage) takes the round icon's place, so the
+  // node shows one picture rather than a card stacked over an icon. Selecting
+  // or editing the node brings the icon back (type, health, wings).
+  const showPictureCard = !!node.cardImage && !puzzle && !selected && !inlineEditing;
+
   return (
     <div
       className={`${classes} ${flying ? "animate-weapon-fly-in" : ""}`}
@@ -627,7 +633,7 @@ export const NodeCard = memo(function NodeCard({
           pointer (the outer div is pointer-events-none — see its class
           list). Handlers all live on that outer div and reach it by
           bubbling from here. */}
-      <div className={`pointer-events-auto relative ${puzzle ? "" : "h-[48px] w-[48px]"}`}>
+      <div className={`pointer-events-auto relative ${puzzle || showPictureCard ? "" : "h-[48px] w-[48px]"}`}>
         {indicator && (
           <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
             {indicator.incomingNegativeEdges}
@@ -702,14 +708,14 @@ export const NodeCard = memo(function NodeCard({
         {/* Halo/horns — see NodeCrown's own doc comment; shared with
             QuickAddGhosts so a ghost previews this too, not just the bare
             symbol. */}
-        {!puzzle && !calm && (!compact || triumphant) && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
+        {!puzzle && !showPictureCard && !calm && (!compact || triumphant) && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
         {/* Wings — see NodeWings's own doc comment for why this is a
             separate, never-resized overlay rather than living inside
             OutcomeBadge. Placed before the bordered circle below in DOM
             order (both z-index:auto) so the circle paints over the
             wings' own base, same "flanking the head, not stamped on top
             of it" look the wings always had. */}
-        {!puzzle && !calm && (!compact || triumphant) && (
+        {!puzzle && !showPictureCard && !calm && (!compact || triumphant) && (
           <NodeWings type={displayType} show={selected || triumphant} symbolOverride={node.symbolOverride} />
         )}
         {/* No weapon-type badge here — which weapon landed shows via the
@@ -778,6 +784,28 @@ export const NodeCard = memo(function NodeCard({
               </div>
             )}
           </PuzzleCard>
+        ) : showPictureCard ? (
+          // The picture card, in the icon's place: framed in the type's color,
+          // with the selection outline and glows the round icon would carry.
+          // Undoes the size tier, so it's one size on screen.
+          <div
+            className={`overflow-hidden rounded-md border-2 bg-surface shadow-card transition-transform duration-150 ease-[ease] group-hover:scale-[1.04] ${ringStateClass}`}
+            style={{
+              width: CARD_IMAGE_WIDTH / sizeMultiplier,
+              borderColor: circleBorderColor,
+              outline: ringStyle.outline,
+              outlineOffset: 2,
+            }}
+            data-testid="node-picture-card"
+          >
+            <img
+              src={imageSrc(node.cardImage!)}
+              alt=""
+              className="block w-full object-cover"
+              style={{ maxHeight: CARD_IMAGE_MAX_HEIGHT / sizeMultiplier }}
+              draggable={false}
+            />
+          </div>
         ) : (
         <div
           className={`flex h-full w-full items-center justify-center rounded-full p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
@@ -926,24 +954,6 @@ export const NodeCard = memo(function NodeCard({
           ) : (
             captionLabel
           )}
-        </div>
-      )}
-      {node.cardImage && !puzzle && !selected && !inlineEditing && (
-        // A picture card (NodeDoc.cardImage) stands above the icon, clear of
-        // its crown — hidden while selected, when the ghosts ring the node.
-        // Undoes the size tier like the caption, so it's one size on screen.
-        <div
-          className="pointer-events-none absolute bottom-full left-1/2 overflow-hidden rounded-md border-2 bg-surface shadow-card"
-          style={{
-            width: CARD_IMAGE_WIDTH,
-            marginBottom: compact ? 8 : 22,
-            borderColor: circleBorderColor,
-            transform: `translateX(-50%) scale(${1 / sizeMultiplier})`,
-            transformOrigin: "50% 100%",
-          }}
-          data-testid="node-picture-card"
-        >
-          <img src={imageSrc(node.cardImage)} alt="" className="block max-h-[120px] w-full object-cover" draggable={false} />
         </div>
       )}
       {isNamedZone && !puzzle && !compact && !selected && !inlineEditing && (

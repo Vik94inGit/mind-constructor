@@ -60,18 +60,32 @@ describe("NodeCard", () => {
   describe("pictures", () => {
     const jpeg = "data:image/jpeg;base64,/9j/4AAQ";
 
-    it("shows a picture card above the icon, and hides it while selected", () => {
-      const node = makeNode({ nodeId: "a", text: "hello", cardImage: jpeg });
+    const png = "data:image/png;base64,iVBORw0KGgo";
+
+    it("shows a picture card in place of the icon, and the icon again while selected", () => {
+      const node = makeNode({ nodeId: "a", text: "hello", iconImage: png, cardImage: jpeg });
       const shown = renderNode({ node });
       expect(shown.getByTestId("node-picture-card").querySelector("img")!.getAttribute("src")).toBe(jpeg);
+      expect(shown.container.querySelector(`img[src="${png}"]`)).toBeNull();
       shown.unmount();
-      expect(renderNode({ node, selected: true }).queryByTestId("node-picture-card")).toBeNull();
+      const selected = renderNode({ node, selected: true });
+      expect(selected.queryByTestId("node-picture-card")).toBeNull();
+      expect(selected.container.querySelector(`img[src="${png}"]`)).not.toBeNull();
     });
 
-    it("can show the same picture as the icon and as a card at once", () => {
-      const node = makeNode({ nodeId: "a", text: "hello", iconImage: jpeg, cardImage: jpeg });
-      const { container } = renderNode({ node });
-      expect(container.querySelectorAll(`img[src="${jpeg}"]`)).toHaveLength(2);
+    it("shows the picture icon when there's no card", () => {
+      const node = makeNode({ nodeId: "a", text: "hello", iconImage: png });
+      const { container, queryByTestId } = renderNode({ node });
+      expect(queryByTestId("node-picture-card")).toBeNull();
+      expect(container.querySelector(`img[src="${png}"]`)).not.toBeNull();
+    });
+
+    it("still takes a click on the picture card", async () => {
+      const user = userEvent.setup();
+      const node = makeNode({ nodeId: "a", text: "hello", cardImage: jpeg });
+      const { onClick, getByTestId } = renderNode({ node });
+      await user.click(getByTestId("node-picture-card"));
+      expect(onClick).toHaveBeenCalledTimes(1);
     });
   });
 
