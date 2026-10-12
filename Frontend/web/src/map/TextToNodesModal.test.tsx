@@ -50,4 +50,46 @@ describe("TextToNodesModal", () => {
     expect(screen.getByText(en.ui.textNodes.noRoom)).toBeTruthy();
     expect(onCreate).not.toHaveBeenCalled();
   });
+
+  it("marks a piece by tapping its first and last word, then its type, and splits it into its own bubble", async () => {
+    const onCreate = vi.fn(async () => {});
+    const onClose = vi.fn();
+    render(
+      <I18nProvider>
+        <TextToNodesModal findSpots={(n) => Array.from({ length: n }, (_, i) => ({ x: i * 200, y: 0 }))} onCreate={onCreate} onClose={onClose} />
+      </I18nProvider>,
+    );
+    fireEvent.change(screen.getByPlaceholderText(en.split.textPlaceholder), { target: { value: "I am tired. Maybe rest today." } });
+    fireEvent.click(screen.getByText(en.ui.textNodes.next));
+    // Last word first works too.
+    fireEvent.click(screen.getByText("today."));
+    expect(screen.getByText(en.split.startAt("today."))).toBeTruthy();
+    fireEvent.click(screen.getByText("Maybe"));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(en.ui.types.Option) }));
+    const bubbles = screen.getAllByTestId("piece-bubble");
+    expect(bubbles).toHaveLength(1);
+    expect(bubbles[0].textContent).toContain("Maybe rest today.");
+    fireEvent.click(screen.getByText(en.ui.textNodes.add(2)));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const plan = (onCreate.mock.calls[0] as unknown[])[0] as { pieces: { text: string; type: string }[] };
+    expect(plan.pieces).toEqual([expect.objectContaining({ text: "Maybe rest today.", type: "Option" })]);
+  });
+
+  it("won't mark a piece across one already marked", () => {
+    render(
+      <I18nProvider>
+        <TextToNodesModal findSpots={() => []} onCreate={vi.fn(async () => {})} onClose={vi.fn()} />
+      </I18nProvider>,
+    );
+    fireEvent.change(screen.getByPlaceholderText(en.split.textPlaceholder), { target: { value: "one two three" } });
+    fireEvent.click(screen.getByText(en.ui.textNodes.next));
+    fireEvent.click(screen.getByText("two"));
+    fireEvent.click(screen.getByText("two"));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(en.ui.types.Option) }));
+    // "two" is its own bubble now, between the bubbles holding "one" and "three".
+    fireEvent.click(screen.getByText("one"));
+    fireEvent.click(screen.getByText("three"));
+    expect(screen.getByText(en.split.overlap)).toBeTruthy();
+    expect(screen.getAllByTestId("piece-bubble")).toHaveLength(1);
+  });
 });

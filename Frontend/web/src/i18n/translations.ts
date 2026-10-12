@@ -177,7 +177,8 @@ export interface Translation {
     clearSelection: string;
     overlap: string;
     pieces: (count: number) => string;
-    noPieces: string;
+    /** Shown once a piece's first word is tapped, until its last one is. */
+    startAt: (word: string) => string;
     remove: string;
     create: string;
     creating: (done: number, total: number) => string;
@@ -357,13 +358,13 @@ const en: Translation = {
     next: "Next: mark pieces →",
     back: "← Back",
     markTitle: "Mark the pieces",
-    markHint: "Select part of the text with the cursor (or hold and drag on a phone), then choose what it is. Each piece becomes a node under the main one.",
+    markHint: "Tap the word a piece starts on, then the word it ends on, and choose what it is. It splits off as its own bubble and becomes a node under the main one; then mark the next.",
     mainNode: "Main node — the whole text",
     selected: "Selected",
     clearSelection: "Clear selection",
     overlap: "That overlaps a piece you already marked — remove it first or select something else.",
     pieces: (count) => `Pieces (${count})`,
-    noPieces: "No pieces yet — select some text above.",
+    startAt: (word) => `Starts at “${word}” — now tap the word it ends on.`,
     remove: "Remove",
     create: "Create map",
     creating: (done, total) => `Creating… ${done} of ${total}`,
@@ -533,13 +534,13 @@ const cs: Translation = {
     next: "Dál: označit části →",
     back: "← Zpět",
     markTitle: "Označte části",
-    markHint: "Vyberte část textu kurzorem (na telefonu podržte a táhněte) a zvolte, co to je. Každá část bude uzlem pod hlavním.",
+    markHint: "Klepněte na slovo, kterým část začíná, pak na slovo, kterým končí, a zvolte, co to je. Oddělí se jako samostatná bublina a stane se uzlem pod hlavním; pak označte další.",
     mainNode: "Hlavní uzel — celý text",
     selected: "Vybráno",
     clearSelection: "Zrušit výběr",
     overlap: "To se překrývá s už označenou částí — nejdřív ji odeberte, nebo vyberte něco jiného.",
     pieces: (count) => `Části (${count})`,
-    noPieces: "Zatím žádné části — vyberte nahoře kus textu.",
+    startAt: (word) => `Začíná na „${word}“ — teď klepněte na slovo, kterým končí.`,
     remove: "Odebrat",
     create: "Vytvořit mapu",
     creating: (done, total) => `Vytvářím… ${done} z ${total}`,
@@ -709,13 +710,13 @@ const uk: Translation = {
     next: "Далі: позначити частини →",
     back: "← Назад",
     markTitle: "Позначте частини",
-    markHint: "Виділіть частину тексту курсором (на телефоні — затисніть і потягніть) і виберіть, що це. Кожна частина стане вузлом під головним.",
+    markHint: "Торкніться слова, з якого починається частина, потім слова, яким вона закінчується, і виберіть, що це. Вона відокремиться окремою бульбашкою і стане вузлом під головним; далі позначте наступну.",
     mainNode: "Головний вузол — увесь текст",
     selected: "Виділено",
     clearSelection: "Скасувати виділення",
     overlap: "Це перетинається з уже позначеною частиною — спершу приберіть її або виділіть інше.",
     pieces: (count) => `Частини (${count})`,
-    noPieces: "Частин поки немає — виділіть текст угорі.",
+    startAt: (word) => `Починається з «${word}» — тепер торкніться слова, яким закінчується.`,
     remove: "Прибрати",
     create: "Створити карту",
     creating: (done, total) => `Створюю… ${done} з ${total}`,
@@ -885,13 +886,13 @@ const ru: Translation = {
     next: "Далее: отметить части →",
     back: "← Назад",
     markTitle: "Отметьте части",
-    markHint: "Выделите часть текста курсором (на телефоне — зажмите и потяните) и выберите, что это. Каждая часть станет узлом под главным.",
+    markHint: "Нажмите на слово, с которого начинается часть, затем на слово, которым она заканчивается, и выберите, что это. Она отделится отдельным пузырём и станет узлом под главным; затем отметьте следующую.",
     mainNode: "Главный узел — весь текст",
     selected: "Выделено",
     clearSelection: "Снять выделение",
     overlap: "Это пересекается с уже отмеченной частью — сначала уберите её или выделите другое.",
     pieces: (count) => `Части (${count})`,
-    noPieces: "Частей пока нет — выделите текст выше.",
+    startAt: (word) => `Начинается с «${word}» — теперь нажмите на слово, которым заканчивается.`,
     remove: "Убрать",
     create: "Создать карту",
     creating: (done, total) => `Создаю… ${done} из ${total}`,

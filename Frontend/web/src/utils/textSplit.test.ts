@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addPiece, autoPieces, splitToThoughtDraft, textSegments, trimRange } from "./textSplit";
+import { addPiece, autoPieces, spanBetween, splitToThoughtDraft, textSegments, trimRange, wordRanges } from "./textSplit";
 import type { TextPiece } from "./textSplit";
 
 const piece = (id: string, start: number, end: number): TextPiece => ({ id, start, end, type: "Option" });
@@ -78,5 +78,18 @@ describe("autoPieces", () => {
     const out = autoPieces(text, existing, "lines", "unknown", id);
     expect(out[0]).toBe(existing[0]);
     expect(slices(out)).toEqual(["First", "Second one!", "Third? And more."]);
+  });
+});
+
+describe("wordRanges / spanBetween", () => {
+  it("finds each word and spans from one tapped word to another in either order", () => {
+    const words = wordRanges(" ab  cd\nef");
+    expect(words).toEqual([
+      { start: 1, end: 3 },
+      { start: 5, end: 7 },
+      { start: 8, end: 10 },
+    ]);
+    expect(spanBetween(words[2], words[0])).toEqual({ start: 1, end: 10 });
+    expect(spanBetween(words[1], words[1])).toEqual({ start: 5, end: 7 });
   });
 });
