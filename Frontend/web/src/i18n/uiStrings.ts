@@ -276,6 +276,11 @@ export interface UiStrings {
     hidden: (n: number) => string;
     lessDetail: string;
     moreDetail: string;
+    view: string;
+    moreText: string;
+    lessText: string;
+    minimap: string;
+    menu: string;
   };
   panelDragHandle: string;
   panelResizeHandle: string;
@@ -739,6 +744,11 @@ const en: UiStrings = {
     hidden: (n) => `${n} hidden`,
     lessDetail: "Fewer levels",
     moreDetail: "More levels",
+    view: "View",
+    moreText: "More text",
+    lessText: "Simpler",
+    minimap: "Minimap",
+    menu: "View controls: detail, view and minimap",
   },
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
@@ -1187,6 +1197,11 @@ const cs: UiStrings = {
     hidden: (n) => `skryto: ${n}`,
     lessDetail: "Méně úrovní",
     moreDetail: "Více úrovní",
+    view: "Zobrazení",
+    moreText: "Více textu",
+    lessText: "Jednodušší",
+    minimap: "Minimapa",
+    menu: "Ovládání zobrazení: detail, zobrazení a minimapa",
   },
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
@@ -1634,6 +1649,11 @@ const uk: UiStrings = {
     hidden: (n) => `приховано: ${n}`,
     lessDetail: "Менше рівнів",
     moreDetail: "Більше рівнів",
+    view: "Вигляд",
+    moreText: "Більше тексту",
+    lessText: "Простіше",
+    minimap: "Мінімапа",
+    menu: "Керування виглядом: деталі, вигляд і мінімапа",
   },
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
@@ -2084,6 +2104,11 @@ const ru: UiStrings = {
     hidden: (n) => `скрыто: ${n}`,
     lessDetail: "Меньше уровней",
     moreDetail: "Больше уровней",
+    view: "Вид",
+    moreText: "Больше текста",
+    lessText: "Проще",
+    minimap: "Миникарта",
+    menu: "Управление видом: детали, вид и миникарта",
   },
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",

@@ -15,6 +15,11 @@ export type ReadingMode = "puzzle" | "mixed" | "iconText" | "actual";
 // Menu order: the most text-heavy first.
 export const READING_MODES: ReadingMode[] = ["puzzle", "mixed", "iconText", "actual"];
 
+// The view slider's order: from the most text on screen to the most minimal —
+// whole-text cards, icons with their text, icons with captions only where the
+// zone rules show them, then bare icons with only the zone parents named.
+export const VIEW_SCALE: ReadingMode[] = ["puzzle", "iconText", "actual", "mixed"];
+
 import { isMobileViewport } from "./canvasLayout";
 
 const STORAGE_KEY = "mc_reading_mode";

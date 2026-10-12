@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { NODE_TYPE_COLORS, ZONE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
@@ -125,6 +125,8 @@ interface Props {
   blockLocked?: boolean;
   /** Puzzle cards only: locks/unlocks this block. Unset when it isn't this viewer's to lock. */
   onToggleBlockLock?: () => void;
+  /** Asks for this node's text to be loaded (it loads lazily) — fired when hovering a node that shows no caption, so its hover label has something to say. */
+  onHoverText?: () => void;
 }
 
 export const NodeCard = memo(function NodeCard({
@@ -170,6 +172,7 @@ export const NodeCard = memo(function NodeCard({
   onConnectStart,
   blockLocked = false,
   onToggleBlockLock,
+  onHoverText,
 }: Props) {
   const { t } = useI18n();
   const particlesRef = useRef<HTMLDivElement | null>(null);
@@ -299,6 +302,17 @@ export const NodeCard = memo(function NodeCard({
   // start of its text (the line-clamp on the chip is what cuts it off, so
   // "first words" needs no separate truncation here).
   const captionLabel = node.title?.trim() || node.text;
+  // An icon drawn with no caption shows its text in a small label on hover
+  // instead (the same label a zoomed-out dot shows) — so a quiet map can still
+  // be read node by node. Not while selected or editing: the panel and the
+  // edit input already show it.
+  const hoverLabel = !showCaption && !puzzle && !selected && !inlineEditing;
+  // Mounted only while hovered, so a map of quiet icons doesn't carry a
+  // hidden label per node.
+  const [hovered, setHovered] = useState(false);
+  const requestText = () => {
+    if (!node.text) onHoverText?.();
+  };
   const trimmedTitle = node.title?.trim() ?? "";
   const healthPct = Math.max(0, Math.min(100, node.health));
   // Opacity/cursor each have one property multiple states could set — CSS
@@ -592,7 +606,7 @@ export const NodeCard = memo(function NodeCard({
       onAnimationEnd={() => {
         if (flying) burstParticles(particlesRef.current, WEAPON_PARTICLE_COLORS, 10, 40);
       }}
-      title={node.text}
+      title={hoverLabel || dotted ? undefined : node.text}
     >
       {/* See inverseScaleStyle's own comment above for why this is a
           separate element from the outer positioning div rather than
@@ -615,7 +629,7 @@ export const NodeCard = memo(function NodeCard({
         // The selected node too, ringed by its selection outline.
         // Hovering a dot shows the node's title above it, so a zoomed-out
         // map can still be read point by point.
-        <div className="group/dot relative flex justify-center">
+        <div className="group/dot relative flex justify-center" onPointerEnter={requestText}>
           <div
             data-dot
             className="pointer-events-auto h-3 w-3 rounded-full border border-surface"
@@ -633,7 +647,20 @@ export const NodeCard = memo(function NodeCard({
           pointer (the outer div is pointer-events-none — see its class
           list). Handlers all live on that outer div and reach it by
           bubbling from here. */}
-      <div className={`pointer-events-auto relative ${puzzle || showPictureCard ? "" : "h-[48px] w-[48px]"}`}>
+      <div
+        className={`pointer-events-auto relative ${puzzle || showPictureCard ? "" : "h-[48px] w-[48px]"}`}
+        onPointerEnter={(e) => {
+          if (!hoverLabel || e.pointerType === "touch") return;
+          setHovered(true);
+          requestText();
+        }}
+        onPointerLeave={() => setHovered(false)}
+      >
+        {hoverLabel && hovered && captionLabel && (
+          <div className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-[6] max-w-[220px] -translate-x-1/2 truncate rounded-md border border-line bg-surface px-2 py-[0.15rem] text-[0.75rem] font-semibold whitespace-nowrap text-ink shadow-card">
+            {captionLabel}
+          </div>
+        )}
         {indicator && (
           <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
             {indicator.incomingNegativeEdges}
@@ -810,7 +837,7 @@ export const NodeCard = memo(function NodeCard({
         <div
           className={`flex h-full w-full items-center justify-center rounded-full p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
           style={ringStyle}
-          title={showHealth ? undefined : t.ui.node.selectToSeeHealth}
+          title={showHealth || hoverLabel ? undefined : t.ui.node.selectToSeeHealth}
         >
           {inlineEditing ? (
             <button
