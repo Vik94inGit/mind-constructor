@@ -1,8 +1,5 @@
-import { isMobileViewport } from "./canvasLayout";
-
 // Whether the minimap is shown — a per-viewer choice from the view corner's
-// menu, kept in this browser. Until one is made it's on for a wider screen and
-// off on a phone, where it's too small to steer by.
+// menu, kept in this browser. Off until the viewer turns it on.
 const KEY = "mc_minimap_shown";
 
 export function loadMinimapShown(): boolean {
@@ -13,7 +10,7 @@ export function loadMinimapShown(): boolean {
   } catch {
     // storage blocked or unavailable — fall through to the default
   }
-  return !isMobileViewport();
+  return false;
 }
 
 export function saveMinimapShown(shown: boolean): void {
