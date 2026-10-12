@@ -41,12 +41,14 @@ npm run test:run          # vitest, single run (use this one for CI-style checks
 npx vitest run tests/nodeAbl.test.ts        # single test file
 npx vitest run -t "test name substring"     # single test by name
 npm run admin:promote -- someone@example.com  # promote a user to admin (no in-app endpoint for this, by design)
+npm run images:move       # move inline pictures into the image store, and MongoDB-kept ones into the bucket
 ```
 
 Requires a `.env` with `PORT`, `MONGO_URI`, `SESSION_SECRET`, `REDIS_URL`, `GOOGLE_CLIENT_ID` (the
 OAuth client id "Sign in with Google" ID tokens are verified against — see `authAbl.ts`'s
 `googleAuthAbl`). `REDIS_URL` may be left unset locally (sessions fall back to an in-memory store —
-see `server.ts`), but is required in production.
+see `server.ts`), but is required in production. `S3_*` (optional) turns on file storage for node
+pictures — see the image store below.
 `test-db.ts` is a standalone connectivity check (`npx tsx test-db.ts`), not part of the test suite.
 
 Tests mock the DAO layer with `vi.mock(...)` (see any file in `tests/`) rather than hitting a real
@@ -59,7 +61,7 @@ Strict layering, one direction only: **routes → controllers → abl → dao �
 - **`src/routes/*.ts`** (`authRoutes.ts`, `mapRoute.ts`, `nodeRoute.ts`, `edgeRoute.ts`, `lineRoute.ts`) — wires
   URLs to controller functions, applies `protect` (and `requireAdmin` where needed) from
   `src/middleware/auth.ts`. No logic here. Mounted in [server.ts](server.ts) as `/api/auth`,
-  `/api/nodes`, `/api/edges`, `/api/lines`, `/api/state` (the signed-in user's own state, so they pick up where they left off on any device — `GET /` preferences + last map, `PATCH /preferences`, `GET`/`PATCH /maps/:mapId` their view of a map, `GET`/`PATCH`/`DELETE /drafts/:kind`; see `models/UserState.ts`), `/api/folders` (a user's own dashboard folders — `GET`/`POST /`, `PATCH`/`DELETE /:folderId`, and `PATCH /maps/:mapId` with `{ folderId | null }` to file a map; mounted before the map routes so `folders` isn't read as a mapId), and `/api` (map routes — note the mount point itself has no `/maps`
+  `/api/nodes`, `/api/edges`, `/api/lines`, `/api/images` (`GET /:imageId`, a stored node picture — see the image store below), `/api/state` (the signed-in user's own state, so they pick up where they left off on any device — `GET /` preferences + last map, `PATCH /preferences`, `GET`/`PATCH /maps/:mapId` their view of a map, `GET`/`PATCH`/`DELETE /drafts/:kind`; see `models/UserState.ts`), `/api/folders` (a user's own dashboard folders — `GET`/`POST /`, `PATCH`/`DELETE /:folderId`, and `PATCH /maps/:mapId` with `{ folderId | null }` to file a map; mounted before the map routes so `folders` isn't read as a mapId), and `/api` (map routes — note the mount point itself has no `/maps`
   segment, so these resolve as `/api/{mapId}/{nodes,edges,lines,circles/select,circles/deselect,
 attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (body: `{ nodeIds }`)
   is the bulk counterpart of `DELETE /api/nodes/:nodeId` — one request for a multi-select delete
@@ -80,10 +82,10 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (
   calls. Each module defines its own domain-specific error classes (e.g. `MapNotFoundError`,
   `ParentNotOwnedError`) that the matching controller knows how to map to a status code. Modules:
   `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `lineAbl`,
-  `attackAbl`, `attackIndicatorAbl`, `circleAbl`, `packAbl`.
-- **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`) — the only layer
+  `attackAbl`, `attackIndicatorAbl`, `circleAbl`, `packAbl`, `imageAbl`.
+- **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`, `imageDao`) — the only layer
   that touches Mongoose models directly.
-- **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Line`, `Attack`) — schemas. Each one strips
+- **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Line`, `Attack`, `Image`) — schemas. Each one strips
   `_id`/`__v` in its `toJSON` transform and exposes only a public id instead (`nodeId`, `mapId`,
   `edgeId` — nanoids, not Mongo ObjectIds). **This public/internal id split is load-bearing
   everywhere**: DAOs take a public id in, resolve it to an internal `ObjectId` to query with;
@@ -147,20 +149,38 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `emojiSchema` in `nodeAbl.ts`) set via `POST`/`PATCH /api/nodes`, owner-only. A frontend draws the
   node's icon as a two-sided card: the emoji on one face, the type's symbol on the other. Like `title`,
   it is *not* stripped from `GET /:mapId/nodes`.
-- **`Node.iconImage`** — an optional small square thumbnail (a JPEG/PNG/WebP data URL, at most
-  `MAX_ICON_IMAGE_CHARS` = 40 000 chars, `""` = none; `iconImageSchema` in `nodeAbl.ts`) set via
-  `PATCH /api/nodes/:nodeId`. A frontend cuts it from one of the node's pictures and draws it as the
-  node's icon in place of the type's symbol. Unlike `images`, it is kept on `GET /:mapId/nodes`.
+- **Image store** (`models/Image.ts`, `dao/imageDao.ts`, `abl/imageAbl.ts`, `imageController.ts`,
+  `routes/imageRoute.ts`, `config/fileStorage.ts`) — a node's pictures live outside the Node document:
+  an `Image` record (mime type and the map/node/user it belongs to) per picture, its bytes in an
+  S3-compatible file storage bucket (Cloudflare R2 suggested; `S3_BUCKET`, `S3_ENDPOINT`,
+  `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, optional `S3_REGION` — see `.env.example`) under
+  `images/<imageId>`, or in the record itself (`Image.data`) when no bucket is configured. The bucket
+  stays private; the backend reads pictures back itself. A frontend still
+  sends pictures as data URLs; `updateNodeAbl` stores each one and saves its address
+  (`/api/images/<imageId>`) on the node instead, accepts an address back only for a picture stored for
+  that same node (`"unknown picture"` otherwise), and deletes any of the node's pictures it no longer
+  points at. `GET /api/images/:imageId` serves the image itself (not JSON), with a long private cache,
+  to whoever may open its node (`findNodeDao`'s membership and hidden-branch rules); 404 otherwise.
+  Pictures (and their bucket files) go with their node (`deleteNodeDao`'s cascade, including the weapon/protection nodes it
+  takes along) and with their map (`deleteMapDao`). Nodes saved before the store existed may still hold
+  inline data URLs (both kinds are valid); `npm run images:move` moves them into the store, and moves
+  pictures still kept in MongoDB into the bucket once one is configured.
+- **`Node.iconImage`** — an optional small square thumbnail (sent as a JPEG/PNG/WebP data URL of at
+  most `MAX_ICON_IMAGE_CHARS` = 40 000 chars, kept in the image store; `""` = none; `iconImageSchema` in
+  `nodeAbl.ts`) set via `PATCH /api/nodes/:nodeId`. A frontend cuts it from one of the node's pictures
+  and draws it as the node's icon in place of the type's symbol. Unlike `images`, it is kept on
+  `GET /:mapId/nodes`.
 - **`Node.cardImage`** — like `iconImage`, but a small copy of a picture in its own shape (at most
   `MAX_CARD_IMAGE_CHARS` = 80 000 chars), drawn as a picture card under the node. Independent of
   `iconImage` (a node can show either or both) and also kept on `GET /:mapId/nodes`.
-- **`Node.images`** — pictures attached to a node (screenshots, photos): an array of image data URLs
-  (`data:image/png|jpeg|webp|gif;base64,…`), at most `MAX_NODE_IMAGES` (6), each at most
-  `MAX_IMAGE_CHARS` characters (`imagesSchema` in `nodeAbl.ts`). Set via `PATCH /api/nodes/:nodeId`
-  with the whole list (`[]` removes them all), owner-only like every node edit; the frontend shrinks
-  and re-encodes each picture before sending it. Like `text`, stripped from `GET /:mapId/nodes`
-  (`.select("-text -images")`) — a frontend fetches them with the single node (`GET /api/nodes/:nodeId`)
-  when its panel opens. The JSON body limit in `server.ts` (3 MB) is sized to fit a full list.
+- **`Node.images`** — pictures attached to a node (screenshots, photos), sent as image data URLs
+  (`data:image/png|jpeg|webp|gif;base64,…`) and kept in the image store: at most `MAX_NODE_IMAGES` (6),
+  each at most `MAX_IMAGE_CHARS` characters (`imagesSchema` in `nodeAbl.ts`). Set via
+  `PATCH /api/nodes/:nodeId` with the whole list (`[]` removes them all; a picture already stored is
+  sent back as its address), owner-only like every node edit; the frontend shrinks and re-encodes each
+  picture before sending it. Like `text`, stripped from `GET /:mapId/nodes` (`.select("-text -images")`)
+  — a frontend fetches them with the single node (`GET /api/nodes/:nodeId`) when its panel opens. The
+  JSON body limit in `server.ts` (3 MB) is sized to fit a full list.
 - **`Node.title`** — an optional short label (max 80 chars, `""` = none) a frontend shows under a node
   in place of the start of its `text`. Set via `POST`/`PATCH /api/nodes` (`titleSchema` in
   `nodeAbl.ts`; an empty string on PATCH clears it). Unlike `text`, it is *not* stripped from

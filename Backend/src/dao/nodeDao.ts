@@ -4,6 +4,7 @@ import { Node, type NodeType, type WeaponIcon } from "../models/Node.js";
 import { Edge } from "../models/Edge.js";
 import { isMapMemberDao, getMapByInternalIdDao } from "./mapsDao.js";
 import { getHiddenNodesDao } from "./visibilityDao.js";
+import { deleteImagesByNodesDao } from "./imageDao.js";
 
 type MapInternalId = mongoose.Types.ObjectId | string;
 
@@ -313,7 +314,19 @@ const cascadeAfterNodeDeleted = async (node: InstanceType<typeof Node>) => {
     }
   }
 
+  // The weapon and protection nodes deleted below go with their pictures too.
+  const dependents = await Node.find(
+    {
+      $or: [
+        { mapId: node.mapId, isWeapon: true, targetNodeId: node._id },
+        { isProtection: true, protectsNodeId: node._id },
+      ],
+    },
+    "_id",
+  ).lean();
+
   await Promise.all([
+    deleteImagesByNodesDao([node._id, ...dependents.map((d) => d._id)]),
     Edge.deleteMany({ $or: [{ fromNodeId: node._id }, { toNodeId: node._id }] }),
     // Scoped to the deleted node's own map — without mapId these two would
     // scan every node in the whole database looking for a matching

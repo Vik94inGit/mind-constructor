@@ -2,15 +2,21 @@ import { describe, beforeEach, it, expect, vi } from "vitest";
 import { Node } from "../src/models/Node.js";
 import { Edge } from "../src/models/Edge.js";
 import { deleteNodeDao, incrementBlockedDamageDao } from "../src/dao/nodeDao.js";
+import { deleteImagesByNodesDao } from "../src/dao/imageDao.js";
 
 vi.mock("../src/models/Node.js", () => ({
   Node: {
     findOneAndDelete: vi.fn(),
+    // The cascade's lookup of the weapon/protection nodes going with it.
+    find: vi.fn(() => ({ lean: vi.fn().mockResolvedValue([{ _id: "w1" }]) })),
     findById: vi.fn(),
     findByIdAndUpdate: vi.fn(),
     updateMany: vi.fn().mockResolvedValue(undefined),
     deleteMany: vi.fn().mockResolvedValue(undefined),
   },
+}));
+vi.mock("../src/dao/imageDao.js", () => ({
+  deleteImagesByNodesDao: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("../src/models/Edge.js", () => ({
   Edge: { deleteMany: vi.fn().mockResolvedValue(undefined) },
@@ -59,6 +65,8 @@ describe("nodeDao", () => {
       expect(result).toEqual({ node: expect.objectContaining({ _id: "n1" }), damagedProtectedNode: null });
       // The usual cascade still runs regardless, scoped to the node's own map.
       expect(Edge.deleteMany).toHaveBeenCalled();
+      // Its pictures go too, along with those of the weapon nodes aimed at it.
+      expect(deleteImagesByNodesDao).toHaveBeenCalledWith(["n1", "w1"]);
       expect(Node.updateMany).toHaveBeenCalledWith(
         { mapId: "map1", parentId: "n1" },
         { $set: { parentId: null } },

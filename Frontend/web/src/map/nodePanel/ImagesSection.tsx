@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useI18n } from "../../i18n/I18nContext";
-import { MAX_NODE_IMAGES } from "../../utils/images";
+import { MAX_NODE_IMAGES, imageSrc } from "../../utils/images";
 
 interface Props {
   /** null while they're still being fetched. */
@@ -57,7 +57,7 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
                   onClick={() => setOpen(i)}
                 >
                   <img
-                    src={src}
+                    src={imageSrc(src)}
                     alt=""
                     className={`block w-full object-cover ${list.length === 1 ? "max-h-[220px]" : "h-[110px]"}`}
                   />
@@ -120,7 +120,7 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
           {iconImage && onSetIcon && (
             // The picture icon in use, and a way back to the type's symbol.
             <span className="inline-flex items-center gap-[0.3rem] rounded-full border border-line bg-surface-2 py-[0.1rem] pr-[0.2rem] pl-[0.1rem] text-[0.68rem] font-semibold text-ink">
-              <img src={iconImage} alt="" className="h-[1.3rem] w-[1.3rem] rounded-full object-cover" />
+              <img src={imageSrc(iconImage)} alt="" className="h-[1.3rem] w-[1.3rem] rounded-full object-cover" />
               {s.isIcon}
               <button
                 type="button"
@@ -136,7 +136,7 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
           {cardImage && onSetCard && (
             // The picture card in use, and a way to take it off the map.
             <span className="inline-flex items-center gap-[0.3rem] rounded-full border border-line bg-surface-2 py-[0.1rem] pr-[0.2rem] pl-[0.1rem] text-[0.68rem] font-semibold text-ink">
-              <img src={cardImage} alt="" className="h-[1.3rem] w-[1.8rem] rounded-[3px] object-cover" />
+              <img src={imageSrc(cardImage)} alt="" className="h-[1.3rem] w-[1.8rem] rounded-[3px] object-cover" />
               {s.isCard}
               <button
                 type="button"
@@ -172,7 +172,7 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
           aria-label={s.title}
           onClick={() => setOpen(null)}
         >
-          <img src={list[open]} alt="" className="max-h-full max-w-full rounded-md object-contain shadow-card" />
+          <img src={imageSrc(list[open])} alt="" className="max-h-full max-w-full rounded-md object-contain shadow-card" />
           <button
             type="button"
             autoFocus

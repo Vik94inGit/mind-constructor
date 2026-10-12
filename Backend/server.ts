@@ -15,6 +15,7 @@ import nodeRoute from "./src/routes/nodeRoute.js";
 import edgeRoute from "./src/routes/edgeRoute.js";
 import lineRoute from "./src/routes/lineRoute.js";
 import folderRoute from "./src/routes/folderRoute.js";
+import imageRoute from "./src/routes/imageRoute.js";
 import userStateRoute from "./src/routes/userStateRoute.js";
 import { initRealtime } from "./src/realtime/io.js";
 import { createRedisClient } from "./src/config/redis.js";
@@ -123,6 +124,8 @@ app.use("/api/lines", lineRoute);
 app.use("/api/folders", folderRoute);
 // Also before the map routes, for the same reason.
 app.use("/api/state", userStateRoute);
+// Also before the map routes: a node's stored pictures (models/Image.ts).
+app.use("/api/images", imageRoute);
 app.use("/api", mapRoute);
 
 // Socket.IO attaches to the same HTTP server Express listens on — one

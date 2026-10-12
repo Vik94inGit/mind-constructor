@@ -19,6 +19,7 @@ import {
   SelfParentError,
 } from "../src/abl/nodeAbl.js";
 import { ValidationError } from "../src/abl/errors.js";
+import { createImageDao, findNodeImageIdsDao, deleteNodeImagesExceptDao } from "../src/dao/imageDao.js";
 
 vi.mock("../src/dao/mapsDao.js", () => ({
   getMapByIdDao: vi.fn(),
@@ -31,6 +32,21 @@ vi.mock("../src/dao/nodeDao.js", () => ({
   findNodeByPublicIdDao: vi.fn(),
   setBranchHiddenMutationDao: vi.fn(),
 }));
+
+vi.mock("../src/dao/imageDao.js", () => ({
+  createImageDao: vi.fn(),
+  findNodeImageIdsDao: vi.fn(),
+  deleteNodeImagesExceptDao: vi.fn(),
+}));
+
+// The node a picture edit is made on, owned by user1.
+const pictureNode = { _id: "n1", mapId: "m1", userId: "user1", images: [], iconImage: "", cardImage: "" };
+function mockImageStore(known: string[] = []) {
+  let next = 0;
+  vi.mocked(findNodeByPublicIdDao).mockResolvedValue(pictureNode as never);
+  vi.mocked(createImageDao).mockImplementation(async () => `/api/images/stored0000${++next}`);
+  vi.mocked(findNodeImageIdsDao).mockImplementation(async (_n, ids) => new Set(ids.filter((id) => known.includes(id))));
+}
 
 describe("nodeAbl", () => {
   beforeEach(() => {
@@ -198,13 +214,34 @@ describe("nodeAbl", () => {
       ).rejects.toThrow(ValidationError);
     });
 
-    it("passes a list of image data URLs through, and rejects anything that isn't one", async () => {
-      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+    it("stores pictures in the image store and keeps only their addresses on the node", async () => {
+      mockImageStore(["kept000001"]);
+      vi.mocked(updateNodeDao).mockImplementation(async (_id, _u, updates) => ({ ...pictureNode, ...updates }) as never);
       const png = "data:image/png;base64,iVBORw0KGgo=";
 
-      await updateNodeAbl("node1", "user1", { images: [png] });
-      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { images: [png] });
+      await updateNodeAbl("node1", "user1", { images: ["/api/images/kept000001", png] });
 
+      expect(createImageDao).toHaveBeenCalledWith({
+        mapId: "m1",
+        nodeId: "n1",
+        userId: "user1",
+        mime: "image/png",
+        data: Buffer.from("iVBORw0KGgo=", "base64"),
+      });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", {
+        images: ["/api/images/kept000001", "/api/images/stored00001"],
+      });
+      // Whatever the node no longer points at is deleted from the store.
+      expect(deleteNodeImagesExceptDao).toHaveBeenCalledWith("n1", ["kept000001", "stored00001"]);
+    });
+
+    it("refuses a stored picture that isn't this node's, and anything that isn't a picture", async () => {
+      mockImageStore();
+      const png = "data:image/png;base64,iVBORw0KGgo=";
+
+      await expect(updateNodeAbl("node1", "user1", { images: ["/api/images/someoneelse"] })).rejects.toThrow(
+        "unknown picture",
+      );
       await expect(updateNodeAbl("node1", "user1", { images: ["https://example.com/a.png"] })).rejects.toThrow(
         ValidationError,
       );
@@ -212,6 +249,18 @@ describe("nodeAbl", () => {
         ValidationError,
       );
       await expect(updateNodeAbl("node1", "user1", { images: Array(7).fill(png) })).rejects.toThrow(ValidationError);
+      expect(createImageDao).not.toHaveBeenCalled();
+      expect(updateNodeDao).not.toHaveBeenCalled();
+    });
+
+    it("stores nothing for someone who doesn't own the node", async () => {
+      mockImageStore();
+
+      const result = await updateNodeAbl("node1", "user2", { images: ["data:image/png;base64,iVBORw0KGgo="] });
+
+      expect(result).toBeNull();
+      expect(createImageDao).not.toHaveBeenCalled();
+      expect(updateNodeDao).not.toHaveBeenCalled();
     });
 
     it("passes an emoji through, \"\" to clear it, and refuses plain text", async () => {
@@ -228,11 +277,12 @@ describe("nodeAbl", () => {
     });
 
     it("passes a picture icon through, \"\" to clear it, and refuses a non-image or a too-large one", async () => {
+      mockImageStore();
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
       const jpeg = "data:image/jpeg;base64,/9j/4AAQ";
 
       await updateNodeAbl("node1", "user1", { iconImage: jpeg });
-      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { iconImage: jpeg });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { iconImage: "/api/images/stored00001" });
       await updateNodeAbl("node1", "user1", { iconImage: "" });
       expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { iconImage: "" });
 
@@ -243,11 +293,12 @@ describe("nodeAbl", () => {
     });
 
     it("passes a picture card through, \"\" to clear it, and refuses a non-image or a too-large one", async () => {
+      mockImageStore();
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
       const jpeg = "data:image/jpeg;base64,/9j/4AAQ";
 
       await updateNodeAbl("node1", "user1", { cardImage: jpeg });
-      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { cardImage: jpeg });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { cardImage: "/api/images/stored00001" });
       await updateNodeAbl("node1", "user1", { cardImage: "" });
       expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { cardImage: "" });
 

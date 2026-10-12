@@ -2,6 +2,32 @@
 // or picked/dropped files. Each one is shrunk and re-encoded here before it is
 // sent, so it fits the backend's per-image cap (nodeAbl.ts MAX_IMAGE_CHARS)
 // and a node with a few of them still loads quickly.
+// The backend keeps each one in its image store and hands the node back its
+// address instead (/api/images/…); imageSrc turns either kind into an <img> src.
+
+import { API_URL } from "../api/client";
+
+/**
+ * An <img> src for a node picture: a stored picture's address (/api/images/…)
+ * goes to the backend the same way API requests do; a data URL (a picture
+ * saved before the image store existed, or one not sent yet) is used as is.
+ */
+export function imageSrc(ref: string): string {
+  return ref.startsWith("/api/") ? API_URL + ref : ref;
+}
+
+// Loads a picture to draw it onto a canvas. A stored picture may come from the
+// backend's own domain (a local dev setup), so it's fetched with CORS and the
+// session cookie, which keeps the canvas readable.
+function loadPicture(src: string): Promise<HTMLImageElement> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    if (!src.startsWith("data:")) el.crossOrigin = "use-credentials";
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("not an image"));
+    el.src = imageSrc(src);
+  });
+}
 
 /** Mirrors the backend's MAX_NODE_IMAGES. */
 export const MAX_NODE_IMAGES = 6;
@@ -84,16 +110,11 @@ const ICON_SIDE = 112;
 
 /**
  * A node's picture icon (NodeDoc.iconImage): the middle square of `src` (one
- * of the node's pictures, a data URL), scaled down to ICON_SIDE and encoded
+ * of the node's pictures), scaled down to ICON_SIDE and encoded
  * small enough for the map's node list.
  */
 export async function makeIconImage(src: string): Promise<string> {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error("not an image"));
-    el.src = src;
-  });
+  const img = await loadPicture(src);
   const side = Math.min(img.naturalWidth, img.naturalHeight);
   if (!side) throw new Error("not an image");
   const canvas = document.createElement("canvas");
@@ -117,16 +138,11 @@ const CARD_SIDE = 320;
 
 /**
  * A node's picture card (NodeDoc.cardImage): `src` (one of the node's
- * pictures, a data URL) in its own shape, scaled to fit CARD_SIDE and encoded
+ * pictures) in its own shape, scaled to fit CARD_SIDE and encoded
  * small enough for the map's node list.
  */
 export async function makeCardImage(src: string): Promise<string> {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error("not an image"));
-    el.src = src;
-  });
+  const img = await loadPicture(src);
   if (!img.naturalWidth || !img.naturalHeight) throw new Error("not an image");
   let side = CARD_SIDE;
   for (let round = 0; round < 3; round++) {
