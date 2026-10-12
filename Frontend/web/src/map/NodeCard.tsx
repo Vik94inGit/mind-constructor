@@ -291,15 +291,15 @@ export const NodeCard = memo(function NodeCard({
   // close is exactly when every member's own text actually matters.
   // Reading modes override that: "icons + text" shows every node's text; the
   // puzzle cards have no caption at all, the card *is* the node. The mixed
-  // mode draws only a circle's parent as a card and every other node as a
-  // bare icon with no caption, so a map reads as a few named pieces with
-  // their members around them. A node mid-edit falls back to the icon +
+  // mode draws only a circle's parent as a card and every other node as an
+  // icon with a one-line cut of its text, so a map reads as a few named
+  // pieces with their members around them. A node mid-edit falls back to the icon +
   // input either way (see `puzzle`).
   const mixed = readingMode === "mixed";
   const puzzle = (readingMode === "puzzle" || (mixed && !!parentCrownSentiment)) && !inlineEditing;
   const iconText = readingMode === "iconText";
   const showCaption =
-    !hideCaption && !mixed && (puzzle ? false : iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle);
+    !hideCaption && !puzzle && (mixed || iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle);
   // What the caption says: the node's own title if it has one, otherwise the
   // start of its text (the line-clamp on the chip is what cuts it off, so
   // "first words" needs no separate truncation here).
@@ -969,7 +969,7 @@ export const NodeCard = memo(function NodeCard({
           // than the spacing getNodeMinDist() budgets for (CAPTION_WIDTH),
           // and wide enough to run into its own children. The chip stays
           // CAPTION_WIDTH on screen at every size.
-          className={`absolute top-full left-1/2 ${isNamedZone && !puzzle && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium break-words text-ink ${iconText ? "line-clamp-4" : "line-clamp-2"}`}
+          className={`absolute top-full left-1/2 ${isNamedZone && !puzzle && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium text-ink ${iconText ? "line-clamp-4 break-words" : mixed ? "truncate whitespace-nowrap" : "line-clamp-2 break-words"}`}
           style={{
             width: iconText ? ICON_TEXT_CAPTION_WIDTH : CAPTION_WIDTH,
             // translateX(-50%) centers it under the icon (left-1/2 puts its

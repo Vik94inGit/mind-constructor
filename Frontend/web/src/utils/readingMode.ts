@@ -6,7 +6,7 @@
 //              showing its whole text (and title), with far fewer limits on
 //              length.
 //  - mixed:    the quiet one — a circle's parent as a puzzle card, every
-//              other node a bare icon with no caption.
+//              other node an icon with a one-line cut of its text.
 //  - iconText: the usual icon, with its text always shown beside it.
 //  - actual:   the app's own default — icons, with captions only where the
 //              zone/selection rules say to show them.
@@ -17,7 +17,8 @@ export const READING_MODES: ReadingMode[] = ["puzzle", "mixed", "iconText", "act
 
 // The view slider's order: from the most text on screen to the most minimal —
 // whole-text cards, icons with their text, icons with captions only where the
-// zone rules show them, then bare icons with only the zone parents named.
+// zone rules show them, then the zone parents as cards and every other node
+// cut to one line.
 export const VIEW_SCALE: ReadingMode[] = ["puzzle", "iconText", "actual", "mixed"];
 
 import { isMobileViewport } from "./canvasLayout";

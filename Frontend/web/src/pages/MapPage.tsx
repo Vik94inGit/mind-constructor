@@ -723,13 +723,12 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  // The two text-heavy reading modes draw every node's text, so all of it is
-  // needed up front (one bulk request for whatever hasn't loaded yet). The
-  // mixed mode only shows circle parents' text, which the circle-root
-  // backfill above already covers.
+  // Every reading mode but the default draws every node's text (whole, or
+  // cut to one line in the mixed mode), so all of it is needed up front (one
+  // bulk request for whatever hasn't loaded yet).
   useEffect(() => {
     const ids = visibleNodes
-      .filter((n) => !["actual", "mixed"].includes(modeOf(n.nodeId)))
+      .filter((n) => modeOf(n.nodeId) !== "actual")
       .map((n) => n.nodeId);
     if (ids.length > 0) ensureNodeText(ids);
     // eslint-disable-next-line react-hooks/exhaustive-deps
