@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NodeCard } from "./NodeCard";
 import { I18nProvider } from "../i18n/I18nContext";
@@ -265,6 +265,28 @@ describe("NodeCard", () => {
       const node = makeNode({ nodeId: "a", text: "x" });
       const { container } = renderNode({ node, selected: true, discussionMode: false });
       expect(container.querySelector(`[title="${healthHint}"]`)).not.toBeNull();
+    });
+  });
+  describe("hover label", () => {
+    const icon = (container: HTMLElement) => container.querySelector("[data-reveal-node] .pointer-events-auto")!;
+
+    it("shows a captionless icon's text on hover and asks for it to load", () => {
+      const onHoverText = vi.fn();
+      const node = makeNode({ nodeId: "a", text: "" , title: "Quiet one" });
+      const { container } = renderNode({ node, groupSentiment: "positive", onHoverText });
+      expect(screen.queryByText("Quiet one")).not.toBeInTheDocument();
+      fireEvent.pointerEnter(icon(container));
+      expect(screen.getByText("Quiet one")).toBeInTheDocument();
+      expect(onHoverText).toHaveBeenCalled();
+      fireEvent.pointerLeave(icon(container));
+      expect(screen.queryByText("Quiet one")).not.toBeInTheDocument();
+    });
+
+    it("adds no hover label where the caption already shows", () => {
+      const node = makeNode({ nodeId: "a", text: "shown text" });
+      const { container } = renderNode({ node });
+      fireEvent.pointerEnter(icon(container));
+      expect(screen.getAllByText("shown text")).toHaveLength(1);
     });
   });
 });

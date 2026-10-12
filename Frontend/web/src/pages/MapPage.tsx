@@ -14,7 +14,7 @@ import { usePuzzleConnect } from "../hooks/usePuzzleConnect";
 import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
-import { useDesktopLayout, useMobileLayout } from "../hooks/useDesktopLayout";
+import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
 import { useChosenCircle } from "../hooks/useChosenCircle";
 import { usePackMode } from "../hooks/usePackMode";
@@ -43,7 +43,8 @@ import { useFlipSequence } from "../hooks/useFlipSequence";
 import { NodeContextMenu } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
-import { AbstractionControl } from "../map/AbstractionControl";
+import { ViewCorner } from "../map/ViewCorner";
+import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
 import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
@@ -113,7 +114,6 @@ export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
   const desktopLayout = useDesktopLayout();
-  const mobileLayout = useMobileLayout();
   // A back swipe / back button doesn't leave the map — only the toolbar's ←
   // does (see useBackGuard).
   useBackGuard();
@@ -337,7 +337,7 @@ export function MapPage() {
   // render it.
   //
   // The level of abstraction (see utils/abstractionLevel.ts, set from the
-  // phone's AbstractionControl) hides everything deeper than the chosen
+  // view corner's Detail slider) hides everything deeper than the chosen
   // parentId level the same way — except the open node, so a child just
   // added or picked from search doesn't vanish from under the viewer.
   const [abstractionLevel, setAbstractionLevelState] = useState<AbstractionLevel>(() => loadAbstractionLevel(mapId));
@@ -348,9 +348,15 @@ export function MapPage() {
   }
   const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
   const depthByNode = useMemo(() => nodeDepths(unpackedNodes), [unpackedNodes]);
-  // Only on a phone, where the control lives — a wider screen has no way to
-  // change it, so it always shows every level.
-  const activeLevel = mobileLayout ? abstractionLevel : null;
+  const activeLevel = abstractionLevel;
+  // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.
+  const [minimapShown, setMinimapShown] = useState<boolean>(loadMinimapShown);
+  function toggleMinimap() {
+    setMinimapShown((v) => {
+      saveMinimapShown(!v);
+      return !v;
+    });
+  }
   const visibleNodes = useMemo(
     () =>
       activeLevel === null
@@ -1855,6 +1861,7 @@ export function MapPage() {
                   onConnectStart={
                     isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
                   }
+                  onHoverText={() => void ensureNodeText([node.nodeId])}
                 />
               );
             })}
@@ -1966,16 +1973,17 @@ export function MapPage() {
               uses for NodePanel. */}
           {!presenting && (
             <>
-              {/* On a phone the minimap is too small to steer by, so its
-                  corner holds the level-of-abstraction control instead. */}
-              {mobileLayout ? (
-                <AbstractionControl
-                  level={abstractionLevel}
-                  levels={levelCount(depthByNode)}
-                  hiddenCount={unpackedNodes.length - visibleNodes.length}
-                  onChange={setAbstractionLevel}
-                />
-              ) : (
+              <ViewCorner
+                level={abstractionLevel}
+                levels={levelCount(depthByNode)}
+                hiddenCount={unpackedNodes.length - visibleNodes.length}
+                onLevelChange={setAbstractionLevel}
+                readingMode={readingMode}
+                onReadingModeChange={setReadingMode}
+                minimapShown={minimapShown}
+                onToggleMinimap={toggleMinimap}
+              />
+              {minimapShown && (
               <MiniMap
                 wrapRef={wrapRef}
                 nodes={visibleNodes}
@@ -2027,7 +2035,7 @@ export function MapPage() {
                 onZoomOut={() => zoomFromCenter(-ZOOM_STEP)}
                 onZoomIn={() => zoomFromCenter(ZOOM_STEP)}
                 onReset={() => zoomFromCenter(0, 1)}
-                compact={mobileLayout}
+                minimapShown={minimapShown}
               />
             </>
           )}

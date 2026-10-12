@@ -190,7 +190,8 @@ export const MiniMap = memo(function MiniMap({
 
   return (
     <div
-      // bottom-3 right-3: anchored to the bottom-right corner rather than
+      // bottom-[56px] right-3: anchored to the bottom-right corner, just
+      // above the view corner's eye button (see ViewCorner), rather than
       // top-right — out of the way of the toolbar's own top-left "back"
       // link and the map name up there, and clear of the top-of-screen
       // controls generally.
@@ -208,7 +209,7 @@ export const MiniMap = memo(function MiniMap({
       // it's open. (An earlier z-[70] here overshot past z-50 too, leaving
       // the minimap floating on top of an open modal instead of properly
       // covered by it.)
-      className="absolute bottom-3 right-3 z-45 overflow-hidden rounded-card border border-line bg-surface shadow-card"
+      className="absolute bottom-[56px] right-3 z-45 overflow-hidden rounded-card border border-line bg-surface shadow-card"
       title={t.ui.minimapTitle}
     >
       <svg

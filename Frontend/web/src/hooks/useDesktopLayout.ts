@@ -6,10 +6,6 @@ import { useEffect, useState } from "react";
 // Phones, tablets and narrow windows keep the compact floating cluster.
 export const DESKTOP_QUERY = "(min-width: 1024px) and (pointer: fine)";
 
-// A phone-sized screen — the same 640px cut-off as canvasLayout's
-// isMobileViewport. The minimap gives way to the abstraction control there.
-export const MOBILE_QUERY = "(max-width: 640px)";
-
 function matches(query: string): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.(query).matches;
 }
@@ -29,8 +25,4 @@ function useMediaQuery(query: string): boolean {
 
 export function useDesktopLayout(): boolean {
   return useMediaQuery(DESKTOP_QUERY);
-}
-
-export function useMobileLayout(): boolean {
-  return useMediaQuery(MOBILE_QUERY);
 }
