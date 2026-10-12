@@ -62,15 +62,15 @@ describe("NodeCard", () => {
 
     const png = "data:image/png;base64,iVBORw0KGgo";
 
-    it("shows a picture card in place of the icon, and the icon again while selected", () => {
+    it("shows a picture card in place of the icon, selected or not", () => {
       const node = makeNode({ nodeId: "a", text: "hello", iconImage: png, cardImage: jpeg });
       const shown = renderNode({ node });
       expect(shown.getByTestId("node-picture-card").querySelector("img")!.getAttribute("src")).toBe(jpeg);
       expect(shown.container.querySelector(`img[src="${png}"]`)).toBeNull();
       shown.unmount();
       const selected = renderNode({ node, selected: true });
-      expect(selected.queryByTestId("node-picture-card")).toBeNull();
-      expect(selected.container.querySelector(`img[src="${png}"]`)).not.toBeNull();
+      expect(selected.getByTestId("node-picture-card").querySelector("img")!.getAttribute("src")).toBe(jpeg);
+      expect(selected.container.querySelector(`img[src="${png}"]`)).toBeNull();
     });
 
     it("shows the picture icon when there's no card", () => {

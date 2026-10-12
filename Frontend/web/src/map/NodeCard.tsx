@@ -48,6 +48,8 @@ const ICON_TEXT_CAPTION_WIDTH = 176;
 // A picture card (NodeDoc.cardImage) in place of the icon, on screen.
 const CARD_IMAGE_WIDTH = 120;
 const CARD_IMAGE_MAX_HEIGHT = 120;
+// Smaller while selected, so the quick-add ghosts ringing the node stay clear of it.
+const CARD_IMAGE_SELECTED_SIZE = 72;
 
 
 interface Props {
@@ -573,9 +575,12 @@ export const NodeCard = memo(function NodeCard({
   const inverseScaleStyle: CSSProperties = { transform: `scale(${sizeMultiplier / zoom})` };
 
   // A picture card (NodeDoc.cardImage) takes the round icon's place, so the
-  // node shows one picture rather than a card stacked over an icon. Selecting
-  // or editing the node brings the icon back (type, health, wings).
-  const showPictureCard = !!node.cardImage && !puzzle && !selected && !inlineEditing;
+  // node shows one picture rather than a card stacked over an icon, selected
+  // or not. Editing the node inline brings the icon back, since clicking it
+  // there cycles the type.
+  const showPictureCard = !!node.cardImage && !puzzle && !inlineEditing;
+  const cardWidth = selected ? CARD_IMAGE_SELECTED_SIZE : CARD_IMAGE_WIDTH;
+  const cardMaxHeight = selected ? CARD_IMAGE_SELECTED_SIZE : CARD_IMAGE_MAX_HEIGHT;
 
   return (
     <div
@@ -791,7 +796,7 @@ export const NodeCard = memo(function NodeCard({
           <div
             className={`overflow-hidden rounded-md border-2 bg-surface shadow-card transition-transform duration-150 ease-[ease] group-hover:scale-[1.04] ${ringStateClass}`}
             style={{
-              width: CARD_IMAGE_WIDTH / sizeMultiplier,
+              width: cardWidth / sizeMultiplier,
               borderColor: circleBorderColor,
               outline: ringStyle.outline,
               outlineOffset: 2,
@@ -802,7 +807,7 @@ export const NodeCard = memo(function NodeCard({
               src={imageSrc(node.cardImage!)}
               alt=""
               className="block w-full object-cover"
-              style={{ maxHeight: CARD_IMAGE_MAX_HEIGHT / sizeMultiplier }}
+              style={{ maxHeight: cardMaxHeight / sizeMultiplier }}
               draggable={false}
             />
           </div>
