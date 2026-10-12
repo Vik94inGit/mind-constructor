@@ -3,8 +3,8 @@ import type { ThoughtDraft } from "./thoughtFlow";
 import type { NodeType } from "../types";
 
 // "Text → map" (pages/SplitTextPage.tsx): a whole text becomes the map's main
-// node, and each piece of it the user selects with the cursor and gives a
-// type becomes a node hanging from it. Pieces are character ranges into the
+// node, and each piece of it the user marks (tapping the word it starts on,
+// then the word it ends on) and gives a type becomes a node hanging from it. Pieces are character ranges into the
 // text; they never overlap, so every character belongs to at most one.
 
 export interface TextPiece {
@@ -45,6 +45,16 @@ export function overlapsPiece(pieces: TextPiece[], start: number, end: number): 
 export function addPiece(pieces: TextPiece[], piece: TextPiece): TextPiece[] | null {
   if (overlapsPiece(pieces, piece.start, piece.end)) return null;
   return [...pieces, piece].sort((a, b) => a.start - b.start);
+}
+
+/** Every word of the text (a run of non-whitespace) as a [start, end) range — what a tap marks a piece's start or finish on. */
+export function wordRanges(text: string): { start: number; end: number }[] {
+  return [...text.matchAll(/\S+/g)].map((m) => ({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length }));
+}
+
+/** The piece from one tapped word to another, whichever order they were tapped in, both words included. */
+export function spanBetween(a: { start: number; end: number }, b: { start: number; end: number }): { start: number; end: number } {
+  return { start: Math.min(a.start, b.start), end: Math.max(a.end, b.end) };
 }
 
 /** The text cut into runs, each either one piece or the plain text between pieces. */

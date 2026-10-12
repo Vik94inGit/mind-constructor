@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
@@ -19,13 +19,14 @@ import type { SplitDraft } from "../utils/textSplit";
 import { btnGhost, btnPrimary, inputCls } from "../think/thinkStyles";
 import { useDraftSync } from "../hooks/useDraftSync";
 import { StepHeader, StepNav } from "../think/StepChrome";
-import { MarkedText, PieceList, SelectionPicker, TypePicker, useTextPieceSelection } from "../think/TextMarking";
+import { MessageText, SelectionPicker, TypePicker, useTapMarking } from "../think/TextMarking";
 
 // "Text → map": the whole text becomes the map's main node; pieces of it,
-// picked out with the cursor and given a type, become the nodes hanging from
-// it (utils/textSplit.ts).
+// marked by tapping where each starts and ends and given a type, become the
+// nodes hanging from it (utils/textSplit.ts).
 //   1. Write — paste the text, name the map, choose the main node's type.
-//   2. Mark — select a piece, tap its type; repeat. Then create the map.
+//   2. Mark — tap a piece's first word, then its last, then its type; it
+//      splits off as its own bubble. Repeat, then create the map.
 // The draft is kept in this browser until the map is made.
 export function SplitTextPage() {
   const { user } = useAuth();
@@ -36,7 +37,6 @@ export function SplitTextPage() {
   const [draft, setDraft] = useState<SplitDraft>(() => loadSplitDraft(userId) ?? emptySplitDraft());
   const [building, setBuilding] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const textRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!building) saveSplitDraft(userId, draft);
@@ -54,7 +54,7 @@ export function SplitTextPage() {
 
   const update = (patch: Partial<SplitDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
-  const { selection, notice, setNotice, clearSelection } = useTextPieceSelection(textRef, draft.text, draft.pieces, draft.step === 1);
+  const { start, selection, notice, setNotice, tapWord, clearSelection } = useTapMarking(draft.pieces);
 
   function markAs(type: NodeType) {
     if (!selection) return;
@@ -160,11 +160,17 @@ export function SplitTextPage() {
               <NodeTypeIcon type={draft.rootType} size={16} />
               {ts.mainNode} · {typeLabel(draft.rootType)}
             </div>
-            <MarkedText ref={textRef} text={draft.text} pieces={draft.pieces} />
+            <MessageText
+              text={draft.text}
+              pieces={draft.pieces}
+              start={start}
+              selection={selection}
+              onTapWord={tapWord}
+              onChange={(pieces) => update({ pieces })}
+            />
           </section>
 
-          <h2 className="mt-6 mb-2 text-[1rem] font-bold">{ts.pieces(draft.pieces.length)}</h2>
-          <PieceList text={draft.text} pieces={draft.pieces} onChange={(pieces) => update({ pieces })} />
+          <p className="mt-4 mb-0 text-[0.9rem] font-semibold text-ink-soft">{ts.pieces(draft.pieces.length)}</p>
 
           <StepNav
             back={
@@ -179,13 +185,14 @@ export function SplitTextPage() {
             }
           />
 
-          {/* What to call the selected piece — pinned to the bottom so it's
-              in reach on a phone, clear of the browser's own selection menu. */}
-          {selection && (
+          {/* The piece being marked — pinned to the bottom so it's in reach on
+              a phone. */}
+          {start && (
             <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-card">
               <div className="mx-auto max-w-[760px]">
                 <SelectionPicker
                   text={draft.text}
+                  start={start}
                   selection={selection}
                   notice={notice}
                   onPick={markAs}

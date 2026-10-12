@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { ApiRequestError } from "../api/client";
 import { NodeTypeIcon } from "./NodeTypeIcon";
@@ -8,7 +8,7 @@ import { addPiece, autoPieces } from "../utils/textSplit";
 import type { TextPiece } from "../utils/textSplit";
 import { newThoughtId } from "../utils/thoughtFlow";
 import { btnGhost, btnPrimary, inputCls } from "../think/thinkStyles";
-import { MarkedText, PieceList, SelectionPicker, TypePicker, useTextPieceSelection } from "../think/TextMarking";
+import { MessageText, SelectionPicker, TypePicker, useTapMarking } from "../think/TextMarking";
 
 type Pt = { x: number; y: number };
 
@@ -24,8 +24,8 @@ interface Props {
 // but the nodes land on the current map, around the point that was clicked,
 // instead of making a new map.
 //   1. Write — the text, and whether it stays on as a main node.
-//   2. Mark — select pieces and give each a type, or cut the text up by
-//      lines/sentences in one go.
+//   2. Mark — tap where a piece starts and ends and give it a type (it splits
+//      off as its own bubble), or cut the text up by lines/sentences in one go.
 //   3. Only when the map has no room for every new node: say how many fit,
 //      and let the user choose which pieces to pack into the main node.
 export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
@@ -41,8 +41,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
   const [packed, setPacked] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const textRef = useRef<HTMLDivElement | null>(null);
-  const { selection, notice, setNotice, clearSelection } = useTextPieceSelection(textRef, text, pieces, step === "mark");
+  const { start, selection, notice, setNotice, tapWord, clearSelection } = useTapMarking(pieces);
 
   const needed = (root: boolean) => (root ? 1 : 0) + pieces.length;
 
@@ -182,15 +181,22 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
                     {t.split.mainNode} · {t.ui.types[rootType]}
                   </div>
                 )}
-                <MarkedText ref={textRef} text={text} pieces={pieces} className="max-h-[30dvh] overflow-y-auto text-[0.95rem]" />
+                <MessageText
+                  text={text}
+                  pieces={pieces}
+                  start={start}
+                  selection={selection}
+                  onTapWord={tapWord}
+                  onChange={setPieces}
+                  className="max-h-[42dvh] overflow-y-auto"
+                />
               </section>
-              {selection && (
+              {start && (
                 <div className="mt-3 rounded-lg border border-accent bg-surface p-3">
-                  <SelectionPicker text={text} selection={selection} notice={notice} onPick={markAs} onClear={clearSelection} />
+                  <SelectionPicker text={text} start={start} selection={selection} notice={notice} onPick={markAs} onClear={clearSelection} />
                 </div>
               )}
-              <h3 className="mt-4 mb-2 text-[0.95rem] font-bold">{t.split.pieces(pieces.length)}</h3>
-              <PieceList text={text} pieces={pieces} onChange={setPieces} />
+              <p className="mt-3 mb-0 text-[0.85rem] font-semibold text-ink-soft">{t.split.pieces(pieces.length)}</p>
             </>
           )}
 
