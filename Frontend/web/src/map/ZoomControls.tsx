@@ -6,6 +6,8 @@ interface Props {
   onZoomOut: () => void;
   onZoomIn: () => void;
   onReset: () => void;
+  /** Sits above the shorter AbstractionControl (phones) instead of the minimap. */
+  compact?: boolean;
 }
 
 const stepBtn =
@@ -16,12 +18,13 @@ const stepBtn =
 // split across the screen. bottom-[150px]: the minimap's own
 // bottom-3 (12px) plus its ~122px rendered height (120px MINIMAP_H + its 1px
 // border each side) plus a small gap, so this sits just above it rather than
-// touching. Same z-[45] reasoning as the minimap: above the canvas/panel,
+// touching (bottom-[104px] above the shorter abstraction control on a
+// phone). Same z-[45] reasoning as the minimap: above the canvas/panel,
 // below a real modal.
-export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset }: Props) {
+export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset, compact }: Props) {
   const { t } = useI18n();
   return (
-    <div className="absolute bottom-[150px] right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card">
+    <div className={`absolute ${compact ? "bottom-[104px]" : "bottom-[150px]"} right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card`}>
       <button type="button" className={stepBtn} disabled={zoom <= MIN_ZOOM} title={t.map.toolbar.zoomOut} onClick={onZoomOut}>
         −
       </button>
