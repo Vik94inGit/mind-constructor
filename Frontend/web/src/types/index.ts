@@ -82,7 +82,7 @@ export interface User {
 }
 
 /** One result of the invite box's search (GET /api/auth/users/search). */
-export type UserSearchResult = Pick<User, "_id" | "username" | "email">;
+export type UserSearchResult = Pick<User, "_id" | "username">;
 
 export interface MemberColor {
   userId: string;

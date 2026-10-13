@@ -64,17 +64,19 @@ export const setUsernameDao = async (id: string, username: string) => {
 };
 
 // The invite box's search: a username containing the query, or an email
-// starting with it. Blocked and throwaway demo accounts never show up —
-// nobody can sign in as the first or would ever come back as the second.
+// matching it exactly. Never a partial email match and never the email in
+// the result, so nobody can list other people's addresses by typing letters.
+// Blocked and throwaway demo accounts never show up — nobody can sign in as
+// the first or would ever come back as the second.
 export const searchUsersDao = async (query: string, excludeIds: string[], limit: number) => {
   const q = escapeRegExp(query);
   return await User.find({
     _id: { $nin: excludeIds },
     isBlocked: { $ne: true },
     isDemo: { $ne: true },
-    $or: [{ username: new RegExp(q, "i") }, { email: new RegExp(`^${q}`, "i") }],
+    $or: [{ username: new RegExp(q, "i") }, { email: query.trim().toLowerCase() }],
   })
-    .select("_id username email")
+    .select("_id username")
     .sort({ username: 1 })
     .limit(limit)
     .lean();

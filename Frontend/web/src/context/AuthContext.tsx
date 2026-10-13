@@ -76,13 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  // Unlike login/register, this needs the *full* record (e.g. isBlocked),
-  // which the auth endpoints still don't return — so this one legitimately
-  // still goes through the full user listing.
+  // Re-reads the signed-in user from /me (the full user list is admin-only).
   const refreshSelf = useCallback(async () => {
     if (!user) return;
-    const all = await authApi.listUsers();
-    const self = all.find((u) => u._id === user._id);
+    const self = await authApi.me();
     if (self) setUser(self);
   }, [user]);
 

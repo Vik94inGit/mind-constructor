@@ -574,7 +574,7 @@ const en: UiStrings = {
   invite: {
     title: (name) => `Invite to "${name}"`,
     search: "Find someone",
-    placeholder: "Username or email",
+    placeholder: "Username or full email",
     typeMore: "Type at least 2 letters of a username or email.",
     searching: "Searching…",
     noResults: "Nobody found who isn't already on this map.",
@@ -1543,7 +1543,7 @@ const uk: UiStrings = {
   invite: {
     title: (name) => `Запросити до «${name}»`,
     search: "Знайти користувача",
-    placeholder: "Ім'я користувача або email",
+    placeholder: "Ім'я користувача або повний email",
     typeMore: "Введіть щонайменше 2 символи імені або email.",
     searching: "Пошук…",
     noResults: "Нікого, хто ще не на цій мапі, не знайдено.",
@@ -2030,7 +2030,7 @@ const ru: UiStrings = {
   invite: {
     title: (name) => `Пригласить в «${name}»`,
     search: "Найти пользователя",
-    placeholder: "Имя пользователя или email",
+    placeholder: "Имя пользователя или полный email",
     typeMore: "Введите хотя бы 2 символа имени или email.",
     searching: "Поиск…",
     noResults: "Никого, кто ещё не на этой карте, не найдено.",

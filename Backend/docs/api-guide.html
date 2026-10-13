@@ -565,20 +565,21 @@ sequenceDiagram
     <section class="uc" id="auth-users-list">
       <div class="uc-head">
         <span class="pill pill-get">GET</span><span class="path">/api/auth/users</span>
-        <span class="tag">Any signed-in user</span>
+        <span class="tag">Admin only</span>
       </div>
       <h3 class="uc-title">List all users</h3>
       <p>Returns every registered user, with <code>passwordHash</code> stripped by <code>toPublicUser()</code> before it leaves the controller.</p>
       <div class="pipeline">
         <span class="node">GET /api/auth/users</span><span class="arrow">&rarr;</span>
         <span class="node">protect</span><span class="arrow">&rarr;</span>
+        <span class="node">requireAdmin</span><span class="arrow">&rarr;</span>
         <span class="node">getAllUsers()</span><span class="arrow">&rarr;</span>
         <span class="node">getAllUsersDao()</span><span class="arrow">&rarr;</span>
         <span class="node">User.find({})</span>
       </div>
       <div class="callout">
-        Not admin-gated. The invite box uses <a href="#auth-users-search">Search users</a> instead.
-        Everything below it, on the other hand, is admin-only.
+        Admin-only, because it carries every user's email. The invite box uses
+        <a href="#auth-users-search">Search users</a> instead, and the signed-in user reads themselves from <code>/api/auth/me</code>.
       </div>
     </section>
 
@@ -588,7 +589,7 @@ sequenceDiagram
         <span class="tag">Any signed-in user</span>
       </div>
       <h3 class="uc-title">Search users</h3>
-      <p>The invite box's search: up to 10 users whose username contains <code>q</code> (any case) or whose email starts with it. Never returns the caller, blocked or demo accounts, and, with <code>mapId</code>, none of that map's current members. Under 2 characters returns <code>[]</code>.</p>
+      <p>The invite box's search: up to 10 users whose username contains <code>q</code> (any case) or whose email is exactly <code>q</code>. Results carry only <code>_id</code> and <code>username</code>, never an email, so nobody can collect other users' addresses. Never returns the caller, blocked or demo accounts, and, with <code>mapId</code>, none of that map's current members. Under 2 characters returns <code>[]</code>.</p>
       <div class="pipeline">
         <span class="node">protect</span><span class="arrow">&rarr;</span>
         <span class="node">searchUsers()</span><span class="arrow">&rarr;</span>
@@ -597,7 +598,7 @@ sequenceDiagram
       </div>
       <div class="io-grid">
         <div class="snippet"><span class="cap">RESPONSE 200</span>
-<pre><code>{ "success": true, "users": [{ "_id": "665abc...", "username": "alice", "email": "alice@test.com" }] }</code></pre></div>
+<pre><code>{ "success": true, "users": [{ "_id": "665abc...", "username": "alice" }] }</code></pre></div>
       </div>
     </section>
 

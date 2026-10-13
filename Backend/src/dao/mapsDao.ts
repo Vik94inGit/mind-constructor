@@ -276,7 +276,7 @@ export const inviteUserToMapDao = async (
       $addToSet: { members: userIdToInvite },
     },
     { new: true },
-  ).populate("members", "username email");
+  ).populate("members", "username");
 };
 
 export const deleteMapDao = async (publicMapId: string, userId: string) => {

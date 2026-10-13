@@ -18,7 +18,7 @@ describe("InviteMemberModal", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("searches by what's typed and invites the picked user", async () => {
-    vi.mocked(authApi.searchUsers).mockResolvedValue([{ _id: "u2", username: "alice", email: "a@test.com" }]);
+    vi.mocked(authApi.searchUsers).mockResolvedValue([{ _id: "u2", username: "alice" }]);
     vi.mocked(mapsApi.inviteMember).mockResolvedValue({ ...map, members: ["u1", "u2"] } as MapDoc);
     const onInvited = vi.fn();
     render(

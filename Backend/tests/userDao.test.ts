@@ -12,6 +12,7 @@ import {
   findUserByIdDao,
   updateUserDao,
   getAllUsersDao,
+  searchUsersDao,
   setUserBlockedDao,
   linkGoogleIdDao,
   deleteAllDao,
@@ -133,6 +134,20 @@ describe("userDao", () => {
     expect(User.find).toHaveBeenCalledWith({});
     expect(select).toHaveBeenCalledWith("-passwordHash");
     expect(users).toEqual([{ _id: "u1" }]);
+  });
+
+  it("searchUsersDao never returns emails and matches an email only in full", async () => {
+    const lean = vi.fn().mockResolvedValue([]);
+    const limit = vi.fn().mockReturnValue({ lean });
+    const sort = vi.fn().mockReturnValue({ limit });
+    const select = vi.fn().mockReturnValue({ sort });
+    vi.mocked(User.find).mockReturnValue({ select } as never);
+
+    await searchUsersDao(" Ali@Test.com ", ["me"], 8);
+
+    expect(select).toHaveBeenCalledWith("_id username");
+    const filter = vi.mocked(User.find).mock.calls[0][0] as any;
+    expect(filter.$or[1]).toEqual({ email: "ali@test.com" });
   });
 
   it("setUserBlockedDao returns the updated user", async () => {
