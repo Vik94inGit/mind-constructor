@@ -222,6 +222,12 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `PATCH /api/nodes/:nodeId`, owner-only, same gating as `symbolOverride`; `null` removes it. If a
   node happens to have both an automatic circle *and* a manual zone at once, a frontend draws both —
   they're independent layers, not mutually exclusive.
+- **`Node.cardX` / `Node.cardY`** — where the node sits while a frontend draws it as a puzzle card,
+  kept apart from `x`/`y` (the icon's spot) because a card is far bigger than an icon. `null` (the
+  default) means never placed as a card, and a frontend falls back to `x`/`y`. Plain
+  `PATCH /api/nodes/:nodeId`, owner-only like `x`/`y`; `null` forgets it.
+- **`Node.shape`** — `circle | square | triangle` (`NODE_SHAPES`), the node's outline on the canvas;
+  `null` (the default) is the usual circle. Plain `PATCH /api/nodes/:nodeId`, owner-only. Purely visual.
 - **`src/models/Attack.ts`** (`WEAPONS`) — the weapon catalog (label, damage). Damage is snapshotted
   onto each `Attack` document at attack time, so rebalancing a weapon later doesn't rewrite history.
   No cooldown field — combat has none to track (see `attackAbl.ts` below).

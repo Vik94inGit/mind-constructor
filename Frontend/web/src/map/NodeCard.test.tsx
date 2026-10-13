@@ -57,6 +57,19 @@ describe("NodeCard", () => {
     });
   });
 
+  describe("shape", () => {
+    it("draws a circle by default, a rounded square, or a triangle outline", () => {
+      const circle = renderNode({ node: makeNode({ nodeId: "a", text: "x" }) });
+      expect(circle.container.querySelector(".rounded-\\[24\\%\\]")).toBeNull();
+      expect(circle.queryByTestId("node-shape-triangle")).toBeNull();
+      circle.unmount();
+      const square = renderNode({ node: makeNode({ nodeId: "a", text: "x", shape: "square" }) });
+      expect(square.container.querySelector(".rounded-\\[24\\%\\]")).not.toBeNull();
+      square.unmount();
+      expect(renderNode({ node: makeNode({ nodeId: "a", text: "x", shape: "triangle" }) }).queryByTestId("node-shape-triangle")).not.toBeNull();
+    });
+  });
+
   describe("pictures", () => {
     const jpeg = "data:image/jpeg;base64,/9j/4AAQ";
 

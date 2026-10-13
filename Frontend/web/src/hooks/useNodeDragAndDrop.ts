@@ -14,6 +14,7 @@ import {
 import type { NodeGroup, ViewportBounds } from "../utils/canvasLayout";
 import type { MovingNode } from "../utils/zoneRules";
 import { nodeRefId } from "../utils/nodeType";
+import { storedSpots } from "../utils/cardSpace";
 import { sleep } from "../utils/sleep";
 import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
@@ -62,6 +63,8 @@ interface Params {
   // which this hook now owns outright (see hooks/dragUIState.ts).
   suppressNextClick: MutableRefObject<boolean>;
   t: Translation;
+  /** The fields that save a move of `node` to `pt` — its puzzle-card spot or its icon spot (utils/cardSpace.ts). Plain x/y when absent. */
+  spotFor?: (node: NodeDoc, pt: Pt) => Partial<NodeDoc>;
   /** Puzzle cards click together (utils/puzzleSnap.ts): where `node` dragged to (x,y) snaps to, if a fitting piece is close. */
   snapFor?: (node: NodeDoc, x: number, y: number) => Snap | null;
   /** A piece was dropped clicked into another (`snap.partnerId`). */
@@ -106,6 +109,7 @@ export function useNodeDragAndDrop({
   setMultiSelectIds,
   suppressNextClick,
   t,
+  spotFor = (_node, pt) => ({ x: pt.x, y: pt.y }),
   snapFor,
   onSnapped,
   clusterFor,
@@ -283,7 +287,7 @@ export function useNodeDragAndDrop({
         zoomToEditAt(leaderTarget.x, leaderTarget.y);
 
         const leaderDone = nodesApi
-          .updateNode(node.nodeId, { x: leaderTarget.x, y: leaderTarget.y })
+          .updateNode(node.nodeId, spotFor(node, leaderTarget))
           .then(upsertNode)
           .catch((err) => setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes));
 
@@ -308,7 +312,9 @@ export function useNodeDragAndDrop({
             if (step < GROUP_FOLLOW_STEPS) await sleep(GROUP_FOLLOW_STEP_DELAY_MS);
           }
           try {
-            const updated = await nodesApi.updateNode(id, { x: target.x, y: target.y });
+            const member = nodes.find((n) => n.nodeId === id);
+            if (!member) return;
+            const updated = await nodesApi.updateNode(id, spotFor(member, target));
             if (groupDragToken.current === token) upsertNode(updated);
           } catch (err) {
             setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
@@ -522,15 +528,17 @@ export function useNodeDragAndDrop({
       const y = p.y - offsetY;
       if (clusterStart && dragMoved.current) {
         const moved = movedCluster(x - start.x, y - start.y);
-        const before = new Map(nodes.filter((n) => moved.has(n.nodeId)).map((n) => [n.nodeId, { x: n.x, y: n.y }]));
+        const members = nodes.filter((n) => moved.has(n.nodeId));
+        const before = new Map(members.map((n) => [n.nodeId, storedSpots(n)]));
+        const spots = new Map(members.map((n) => [n.nodeId, spotFor(n, moved.get(n.nodeId)!)]));
         dispatch({ type: "reset" });
-        setNodes((prev) => prev.map((n) => (moved.has(n.nodeId) ? { ...n, ...moved.get(n.nodeId)! } : n)));
+        setNodes((prev) => prev.map((n) => (spots.has(n.nodeId) ? { ...n, ...spots.get(n.nodeId)! } : n)));
         setActionError(null);
         const failed: string[] = [];
         await Promise.all(
-          Array.from(moved, ([id, pt]) =>
+          Array.from(spots, ([id, spot]) =>
             nodesApi
-              .updateNode(id, pt)
+              .updateNode(id, spot)
               .then(upsertNode)
               .catch(() => failed.push(id)),
           ),
@@ -548,12 +556,13 @@ export function useNodeDragAndDrop({
         // against its partner (no overlap nudging — sitting right against it
         // is the point), and the caller links the two.
         dispatch({ type: "reset" });
-        const before = { x: node.x, y: node.y };
-        setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, x: snap.x, y: snap.y } : n)));
+        const before = storedSpots(node);
+        const spot = spotFor(node, snap);
+        setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...spot } : n)));
         navigator.vibrate?.(20);
         onSnapped?.(node, snap);
         try {
-          upsertNode(await nodesApi.updateNode(node.nodeId, { x: snap.x, y: snap.y }));
+          upsertNode(await nodesApi.updateNode(node.nodeId, spot));
         } catch (err) {
           setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
           setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
@@ -593,8 +602,7 @@ export function useNodeDragAndDrop({
           );
           try {
             const updated = await nodesApi.updateNode(node.nodeId, {
-              x: placed.x,
-              y: placed.y,
+              ...spotFor(node, placed),
               parentId: target.nodeId,
             });
             upsertNode(updated);
@@ -639,18 +647,19 @@ export function useNodeDragAndDrop({
         // silent mismatch (until the next reload happened to fix it) was the
         // real bug: a courtesy update still has to be honest about whether
         // it landed.
-        const before = { x: node.x, y: node.y, parentId: node.parentId };
+        const before = { ...storedSpots(node), parentId: node.parentId };
+        const spot = spotFor(node, dropped);
         setNodes((prev) =>
           prev.map((n) =>
-            n.nodeId === node.nodeId ? { ...n, x: dropped.x, y: dropped.y, ...(leftCircle ? { parentId: null } : {}) } : n,
+            n.nodeId === node.nodeId ? { ...n, ...spot, ...(leftCircle ? { parentId: null } : {}) } : n,
           ),
         );
         try {
           if (leftCircle) {
-            const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y, parentId: null });
+            const updated = await nodesApi.updateNode(node.nodeId, { ...spot, parentId: null });
             upsertNode(updated);
           } else {
-            const updated = await nodesApi.updateNode(node.nodeId, { x: dropped.x, y: dropped.y });
+            const updated = await nodesApi.updateNode(node.nodeId, spot);
             upsertNode(updated);
           }
         } catch (err) {

@@ -25,6 +25,7 @@ import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
+import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
 import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } from "../utils/nodePriority";
 import type { CaptionSpec } from "../utils/nodePriority";
 import { useAuth } from "../context/AuthContext";
@@ -325,9 +326,6 @@ export function MapPage() {
   // Where every node sits, the node the panel is showing, and the scrolling/
   // zooming viewport onto the canvas — all derived before anything below
   // reads them.
-  const positions = useMemo(() => computeBasePositions(nodes), [nodes]);
-  // Each node's drift during the map's opening animation — see posFor.
-  const introOffset = useIntroMigration(loading ? null : (mapId ?? null), positions);
   // Filters packed-away members out of every canvas rendering loop. Packing
   // (packAbl.ts) still exists as a relationship regardless — a container's
   // own count badge, and its "Packed (N)" unpack list in NodePanel, both
@@ -365,6 +363,27 @@ export function MapPage() {
         : unpackedNodes.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel)),
     [unpackedNodes, depthByNode, activeLevel, selectedId],
   );
+  // A node drawn as a puzzle card sits at its own card spot, apart from the
+  // icon's — see utils/cardSpace.ts. Worked out from the same display choices
+  // modeOf reads below, with zones taken by membership alone (their outline
+  // follows these very positions).
+  const cardSpace = useMemo(() => {
+    const zones =
+      Object.keys(zoneDisplay).length > 0
+        ? zoneModeByNode(computeNodeGroups(visibleNodes, nodes, new Map()), zoneDisplay)
+        : new Map<string, ZoneMode>();
+    return cardSpaceIds(nodes, (id) => {
+      const zone = zones.get(id);
+      return nodeDisplay[id] ?? (zone ? (zone === "dots" ? "actual" : zone) : readingMode);
+    });
+  }, [nodes, visibleNodes, nodeDisplay, zoneDisplay, readingMode]);
+  const positions = useMemo(() => computeBasePositions(withCardSpots(nodes, cardSpace)), [nodes, cardSpace]);
+  // What saves a move of `node` to `pt`: its card spot or its icon spot.
+  function spotFor(node: NodeDoc, pt: { x: number; y: number }) {
+    return spotFields(cardSpace.has(node.nodeId), pt);
+  }
+  // Each node's drift during the map's opening animation — see posFor.
+  const introOffset = useIntroMigration(loading ? null : (mapId ?? null), positions);
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
   // NodePanel/PackPickerPanel's bottom sheet physically covers the bottom
   // third (half on mobile) of the screen while it's open. Skipped for the
@@ -946,9 +965,14 @@ export function MapPage() {
     if (moved.length === 0) return;
     setNodes((prev) => prev.map((n) => {
       const at = moved.find(([id]) => id === n.nodeId)?.[1];
-      return at ? { ...n, x: at.x, y: at.y } : n;
+      return at ? { ...n, ...spotFor(n, at) } : n;
     }));
-    await Promise.all(moved.map(([id, at]) => nodesApi.updateNode(id, at).then(upsertNode).catch(() => {})));
+    await Promise.all(
+      moved.map(([id, at]) => {
+        const n = nodes.find((m) => m.nodeId === id);
+        return n ? nodesApi.updateNode(id, spotFor(n, at)).then(upsertNode).catch(() => {}) : undefined;
+      }),
+    );
   }
   function attachPiece(nodeId: string) {
     setPiecesDetached([nodeId], false);
@@ -981,6 +1005,7 @@ export function MapPage() {
     setMultiSelectIds,
     suppressNextClick,
     t,
+    spotFor,
     snapFor: puzzleSnapFor,
     // A piece clicked into another is in a puzzle again, detached or not.
     onSnapped: (node, snap) => {

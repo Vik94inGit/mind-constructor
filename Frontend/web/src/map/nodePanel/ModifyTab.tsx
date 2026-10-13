@@ -1,7 +1,7 @@
 import { nodeRefId, ZONE_COLORS } from "../../utils/nodeType";
 import { EmojiPicker } from "./EmojiPicker";
-import { MANUAL_ZONE_COLORS, SIZE_TIERS } from "../../types";
-import type { EdgeDoc, ManualZoneColor, NodeDoc, SizeTier, SymbolOverride } from "../../types";
+import { MANUAL_ZONE_COLORS, NODE_SHAPES, SIZE_TIERS } from "../../types";
+import type { EdgeDoc, ManualZoneColor, NodeDoc, NodeShape, SizeTier, SymbolOverride } from "../../types";
 import { useI18n } from "../../i18n/I18nContext";
 
 // Same 100%/115%/130% scale NodeCard's own SIZE_MULTIPLIERS uses, just for
@@ -10,6 +10,8 @@ import { useI18n } from "../../i18n/I18nContext";
 // internals isn't a pattern this codebase otherwise uses; this pairing is
 // simple enough not to be worth a shared constants file).
 const SIZE_TIER_LABEL: Record<SizeTier, string> = { 1: "100%", 2: "115%", 3: "130%" };
+// Each shape button shows the shape itself; its name is the tooltip.
+const SHAPE_GLYPH: Record<NodeShape, string> = { circle: "●", square: "■", triangle: "▲" };
 
 interface Props {
   node: NodeDoc;
@@ -40,6 +42,7 @@ interface Props {
   onToggleHidden: () => Promise<void>;
   onSetSize: (tier: SizeTier) => void;
   onSetZone: (zone: ManualZoneColor | null) => void;
+  onSetShape: (shape: NodeShape | null) => void;
   onSetSymbol: (symbol: SymbolOverride | null) => void;
   onDeleteEdge: (edgeId: string) => void;
   onSelectNode: (nodeId: string) => void;
@@ -53,7 +56,7 @@ interface Props {
 // NodePanel's "Modify" tab: health, what a weapon/shield points at, the
 // owner's title/zone name/step number/size/zone/symbol controls, branch
 // visibility, choosing and packing, and this node's links.
-export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutcome, busy, target, protectedTarget, protectors, connectedEdges, nodeById, titleDraft, setTitleDraft, zoneNameDraft, setZoneNameDraft, orderDraft, setOrderDraft, onTitleSave, onSetEmoji, onZoneNameSave, onOrderSave, onToggleHidden, onSetSize, onSetZone, onSetSymbol, onDeleteEdge, onSelectNode, onEdit, onStartPack, onStartChoose, onExtractText, onClose }: Props) {
+export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutcome, busy, target, protectedTarget, protectors, connectedEdges, nodeById, titleDraft, setTitleDraft, zoneNameDraft, setZoneNameDraft, orderDraft, setOrderDraft, onTitleSave, onSetEmoji, onZoneNameSave, onOrderSave, onToggleHidden, onSetSize, onSetZone, onSetShape, onSetSymbol, onDeleteEdge, onSelectNode, onEdit, onStartPack, onStartChoose, onExtractText, onClose }: Props) {
   const { t } = useI18n();
   return (
     <div className="mt-4">
@@ -247,6 +250,31 @@ export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutc
               disabled={busy}
             >
               {SIZE_TIER_LABEL[tier]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* The node's outline on the map — circle (the default), square or triangle. */}
+      {isCreator && (
+        <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{t.ui.node.shape}</span>
+          {NODE_SHAPES.map((shape) => (
+            <button
+              key={shape}
+              type="button"
+              className={`inline-flex cursor-pointer items-center justify-center rounded-lg border px-[0.55rem] py-[0.3rem] text-[0.8rem] font-semibold transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 ${
+                (node.shape ?? "circle") === shape
+                  ? "border-accent bg-accent-soft text-accent-ink"
+                  : "border-line bg-surface text-ink enabled:hover:bg-surface-2"
+              }`}
+              title={t.ui.node.shapes[shape]}
+              aria-label={t.ui.node.shapes[shape]}
+              aria-pressed={(node.shape ?? "circle") === shape}
+              onClick={() => onSetShape(shape === "circle" ? null : shape)}
+              disabled={busy}
+            >
+              {SHAPE_GLYPH[shape]}
             </button>
           ))}
         </div>

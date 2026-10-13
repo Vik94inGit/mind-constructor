@@ -324,6 +324,27 @@ describe("nodeAbl", () => {
       expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { symbolOverride: null });
     });
 
+    it("passes a puzzle-card position through apart from x/y, and null to forget it", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      await updateNodeAbl("node1", "user1", { cardX: 120, cardY: 340 });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { cardX: 120, cardY: 340 });
+
+      await updateNodeAbl("node1", "user1", { cardX: null, cardY: null });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { cardX: null, cardY: null });
+    });
+
+    it("passes a valid shape through, null back to the circle, and rejects anything else", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      await updateNodeAbl("node1", "user1", { shape: "triangle" });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { shape: "triangle" });
+      await updateNodeAbl("node1", "user1", { shape: null });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { shape: null });
+
+      await expect(updateNodeAbl("node1", "user1", { shape: "hexagon" })).rejects.toThrow(ValidationError);
+    });
+
     it("rejects an order that isn't a whole number from 1 to 9999", async () => {
       for (const order of [0, -1, 1.5, 10000, "3"]) {
         await expect(updateNodeAbl("node1", "user1", { order })).rejects.toThrow(ValidationError);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type mongoose from "mongoose";
-import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS } from "../models/Node.js";
+import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS, NODE_SHAPES } from "../models/Node.js";
 import { getMapByIdDao, getMapByInternalIdDao } from "../dao/mapsDao.js";
 import {
   createNodeMutationDao,
@@ -224,6 +224,10 @@ const updateNodeSchema = z
     }).optional(),
     x: z.number().optional(),
     y: z.number().optional(),
+    // Puzzle-card position (see Node.cardX) — null forgets it, so the card
+    // goes back to sitting at x/y.
+    cardX: z.number().nullish(),
+    cardY: z.number().nullish(),
     color: z.string().optional(),
     parentId: z.string().nullish(),
     // null explicitly clears back to "use the type's own default symbol" —
@@ -238,6 +242,8 @@ const updateNodeSchema = z
     // null explicitly removes a manual zone ring — same nullish-vs-absent
     // convention symbolOverride already uses.
     manualZone: z.enum(MANUAL_ZONE_COLORS).nullish(),
+    // null goes back to the usual circle.
+    shape: z.enum(NODE_SHAPES).nullish(),
   })
   .refine((fields) => Object.values(fields).some((v) => v !== undefined), {
     error: "No fields to update",
