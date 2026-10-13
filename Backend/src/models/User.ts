@@ -24,6 +24,11 @@ const UserSchema = new mongoose.Schema(
     // flagged so it can be told apart later (e.g. a future cleanup pass;
     // none exists yet).
     isDemo: { type: Boolean, default: false },
+    // False only for an account whose username was picked for the person
+    // (a first Google sign-in: their Google name, else their email up to
+    // the @) — the frontend offers to change it once, then this flips to
+    // true. Absent on older accounts, which reads the same as true.
+    usernameConfirmed: { type: Boolean, default: true },
   },
   {
     toJSON: {

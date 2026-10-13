@@ -1,9 +1,9 @@
 import { apiRequest, setDemoMapId, clearDemoMapId } from "./client";
-import type { User } from "../types";
+import type { User, UserSearchResult } from "../types";
 
 interface AuthResponse {
   success: boolean;
-  user: Pick<User, "_id" | "username" | "email" | "role" | "isDemo">;
+  user: Pick<User, "_id" | "username" | "email" | "role" | "isDemo" | "usernameConfirmed">;
 }
 
 export async function register(username: string, email: string, password: string) {
@@ -66,6 +66,29 @@ export async function me(): Promise<User | null> {
   } catch {
     return null;
   }
+}
+
+// Pick your own username, or keep the one picked for you — either way the
+// app stops offering to change it (usernameConfirmed).
+export async function setUsername(username: string): Promise<User> {
+  const res = await apiRequest<{ success: boolean; user: User }>("/api/auth/me/username", {
+    method: "PATCH",
+    body: { username },
+  });
+  return res.user;
+}
+
+// The invite box's search: by username, or by the start of an email. With a
+// mapId the map's current members are left out, so every result can still
+// be invited.
+export async function searchUsers(q: string, mapId?: string): Promise<UserSearchResult[]> {
+  const params = new URLSearchParams({ q });
+  if (mapId) params.set("mapId", mapId);
+  const res = await apiRequest<{ success: boolean; users: UserSearchResult[] }>(
+    `/api/auth/users/search?${params}`,
+    { cache: false },
+  );
+  return res.users;
 }
 
 export async function listUsers(): Promise<User[]> {

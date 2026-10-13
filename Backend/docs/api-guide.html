@@ -577,10 +577,37 @@ sequenceDiagram
         <span class="node">User.find({})</span>
       </div>
       <div class="callout">
-        Deliberately <em>not</em> admin-gated &mdash; every other user needs this to find an id for
-        <a href="#map-invite">Invite a member</a>. Gating it would break invites, not tighten security.
+        Not admin-gated. The invite box uses <a href="#auth-users-search">Search users</a> instead.
         Everything below it, on the other hand, is admin-only.
       </div>
+    </section>
+
+    <section class="uc" id="auth-users-search">
+      <div class="uc-head">
+        <span class="pill pill-get">GET</span><span class="path">/api/auth/users/search?q=&amp;mapId=</span>
+        <span class="tag">Any signed-in user</span>
+      </div>
+      <h3 class="uc-title">Search users</h3>
+      <p>The invite box's search: up to 10 users whose username contains <code>q</code> (any case) or whose email starts with it. Never returns the caller, blocked or demo accounts, and, with <code>mapId</code>, none of that map's current members. Under 2 characters returns <code>[]</code>.</p>
+      <div class="pipeline">
+        <span class="node">protect</span><span class="arrow">&rarr;</span>
+        <span class="node">searchUsers()</span><span class="arrow">&rarr;</span>
+        <span class="node">searchUsersAbl()</span><span class="arrow">&rarr;</span>
+        <span class="node">searchUsersDao()</span>
+      </div>
+      <div class="io-grid">
+        <div class="snippet"><span class="cap">RESPONSE 200</span>
+<pre><code>{ "success": true, "users": [{ "_id": "665abc...", "username": "alice", "email": "alice@test.com" }] }</code></pre></div>
+      </div>
+    </section>
+
+    <section class="uc" id="auth-me-username">
+      <div class="uc-head">
+        <span class="pill pill-patch">PATCH</span><span class="path">/api/auth/me/username</span>
+        <span class="tag">Any signed-in user</span>
+      </div>
+      <h3 class="uc-title">Pick your username</h3>
+      <p>Body <code>{ "username": "..." }</code>: 2&ndash;32 letters, digits, spaces or <code>. _ -</code>. Unique regardless of case (409 when someone else has it; keeping your own is fine). Sets <code>usernameConfirmed: true</code>. A first Google sign-in gets a username picked for it (Google profile name, else the email up to the @) with <code>usernameConfirmed: false</code>, and the frontend offers to change it once. Registering without a username gets the email up to the @.</p>
     </section>
 
     <section class="uc" id="auth-users-delete">
@@ -910,7 +937,7 @@ export const createMapAbl = async (input: unknown, ownerId: string) => {
         <span class="tag">Map owner</span>
       </div>
       <h3 class="uc-title">Invite a member</h3>
-      <p>Adds another user's id to the map's <code>members</code> array (via <code>$addToSet</code>, so inviting the same person twice is harmless). Only the owner can invite.</p>
+      <p>Adds another user's id to the map's <code>members</code> array. Only the owner can invite (403 for any other member, 404 for a non-member). 409 if they're already a member, 404 if the user doesn't exist or is blocked. On success the invitee's open tabs get a <code>map:invited</code> socket event (<code>{ mapId, name, invitedBy }</code>, sent to their own <code>user:{id}</code> room).</p>
 
       <figure>
         <pre class="mermaid">
@@ -921,18 +948,18 @@ sequenceDiagram
   participant DB as MongoDB
 
   C->>Ctrl: POST /api/{mapId}/invite {userIdToInvite}
-  Ctrl->>Dao: inviteUserToMapDao(mapId, userIdToInvite, currentUserId)
-  Dao->>DB: Map.findOne({mapId})
-  DB-->>Dao: map
-  Dao->>DB: findOneAndUpdate({_id: map._id, ownerId: currentUserId}, addToSet members)
-  alt caller is owner
-    DB-->>Dao: updated map
-    Dao-->>Ctrl: map
-    Ctrl-->>C: 200 {map}
-  else caller is not owner
-    DB-->>Dao: null
-    Dao-->>Ctrl: null
+  Ctrl->>Dao: getMapByIdDao(mapId, currentUserId)
+  alt not on the map
     Ctrl-->>C: 404 Map not found
+  else not the owner
+    Ctrl-->>C: 403
+  else already a member / unknown user
+    Ctrl-->>C: 409 / 404
+  else
+    Dao->>DB: findOneAndUpdate(addToSet members)
+    DB-->>Dao: updated map
+    Ctrl-->>Ctrl: notifyUser(invitee, "map:invited")
+    Ctrl-->>C: 200 {map}
   end
         </pre>
       </figure>

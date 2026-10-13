@@ -8,6 +8,7 @@ import * as foldersApi from "../api/folders";
 import { buildNodeClipboard, writeNodeClipboard } from "../utils/nodeClipboard";
 import { useAuth } from "../context/AuthContext";
 import { InviteMemberModal } from "../components/InviteMemberModal";
+import { connectSocket } from "../api/socket";
 import { MapSummaryModal } from "../components/MapSummaryModal";
 import { MapPeopleModal } from "../components/MapPeopleModal";
 import { ApiRequestError } from "../api/client";
@@ -68,6 +69,18 @@ export function DashboardPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
+  // Invited to a map while looking at the list — show it without a reload
+  // (InviteNotice shows the notice itself).
+  useEffect(() => {
+    const socket = connectSocket();
+    const onInvited = () => void load();
+    socket.on("map:invited", onInvited);
+    return () => {
+      socket.off("map:invited", onInvited);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 

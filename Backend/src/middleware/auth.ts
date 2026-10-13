@@ -12,6 +12,7 @@ declare global {
         email: string;
         role: UserRole;
         isDemo: boolean;
+        usernameConfirmed: boolean;
       };
     }
   }
@@ -58,6 +59,7 @@ export const protect = async (
       email: user.email,
       role: user.role,
       isDemo: user.isDemo,
+      usernameConfirmed: user.usernameConfirmed !== false,
     };
 
     next();

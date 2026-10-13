@@ -8,6 +8,8 @@ import {
   InvalidCredentialsError,
   AccountBlockedError,
   GoogleTokenInvalidError,
+  UsernameTakenError,
+  setUsernameAbl,
 } from "../abl/authAbl.js";
 import { handleAblError } from "./errorHandling.js";
 import { createSocketToken } from "../realtime/socketToken.js";
@@ -57,13 +59,17 @@ export const register = async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         isDemo: user.isDemo,
+        usernameConfirmed: user.usernameConfirmed,
       },
     });
   } catch (error) {
     return handleAblError(
       res,
       error,
-      [[EmailAlreadyInUseError, 409, "Email already in use"]],
+      [
+        [EmailAlreadyInUseError, 409, "Email already in use"],
+        [UsernameTakenError, 409, "That username is already taken"],
+      ],
       { message: "Internal Server Error", logLabel: "register" },
     );
   }
@@ -85,6 +91,7 @@ export const login = async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         isDemo: user.isDemo,
+        usernameConfirmed: user.usernameConfirmed,
       },
     });
   } catch (error) {
@@ -117,6 +124,7 @@ export const googleAuth = async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         isDemo: user.isDemo,
+        usernameConfirmed: user.usernameConfirmed,
       },
     });
   } catch (error) {
@@ -151,6 +159,7 @@ export const demoAuth = async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         isDemo: user.isDemo,
+        usernameConfirmed: user.usernameConfirmed,
       },
       map: { mapId: map.mapId },
     });
@@ -170,6 +179,23 @@ export const demoAuth = async (req: Request, res: Response) => {
 // endpoint to ask the server instead.
 export const me = async (req: Request, res: Response) => {
   return res.status(200).json({ success: true, user: req.user });
+};
+
+// ========== MY USERNAME ==========
+// Pick a new username, or keep the one picked for you on a first Google
+// sign-in — either way it stops being offered again (usernameConfirmed).
+export const updateMyUsername = async (req: Request, res: Response) => {
+  try {
+    const user = await setUsernameAbl(String(req.user!._id), req.body);
+    return res.status(200).json({ success: true, user });
+  } catch (error) {
+    return handleAblError(
+      res,
+      error,
+      [[UsernameTakenError, 409, "That username is already taken"]],
+      { message: "Internal Server Error", logLabel: "updateMyUsername" },
+    );
+  }
 };
 
 // A short-lived token for the Socket.IO handshake — see

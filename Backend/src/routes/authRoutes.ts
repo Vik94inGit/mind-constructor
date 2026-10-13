@@ -1,8 +1,18 @@
 import { Router } from "express";
-import { register, login, googleAuth, demoAuth, logout, me, socketToken } from "../controllers/authController.js";
+import {
+  register,
+  login,
+  googleAuth,
+  demoAuth,
+  logout,
+  me,
+  updateMyUsername,
+  socketToken,
+} from "../controllers/authController.js";
 import { protect, requireAdmin } from "../middleware/auth.js";
 import {
   getAllUsers,
+  searchUsers,
   deleteAll,
   deleteUser,
   blockUser,
@@ -18,12 +28,17 @@ router.post("/logout", logout);
 // Who the current session cookie belongs to — see authController.ts's own
 // doc comment on `me`.
 router.get("/me", protect, me);
+// Pick your own username (or keep the one picked for you) — see
+// authAbl.ts's setUsernameAbl.
+router.patch("/me/username", protect, updateMyUsername);
 // A short-lived token the frontend hands to the Socket.IO handshake, which
 // can't count on the session cookie — see realtime/socketToken.ts.
 router.get("/socket-token", protect, socketToken);
 
-// Any signed-in user can list users — needed to look up an id to invite to
-// a map. Everything below is admin-only.
+// Find someone to invite to a map, by username or email — see
+// userAbl.ts's searchUsersAbl. Any signed-in user.
+router.get("/users/search", protect, searchUsers);
+// Any signed-in user can list users. Everything below is admin-only.
 router.get("/users", protect, getAllUsers);
 router.delete("/users", protect, requireAdmin, deleteAll);
 router.delete<{ id: string }>("/users/:id", protect, requireAdmin, deleteUser);

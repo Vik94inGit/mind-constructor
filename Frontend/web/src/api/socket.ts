@@ -34,6 +34,15 @@ function getSocket(): Socket {
   return socket;
 }
 
+// Connects without joining any map — for events about the signed-in user
+// themselves (an invite), which the server sends to every socket they have
+// open, whatever page it's on.
+export function connectSocket(): Socket {
+  const s = getSocket();
+  if (!s.connected) s.connect();
+  return s;
+}
+
 export function joinMap(mapId: string) {
   const s = getSocket();
   if (!s.connected) s.connect();
@@ -42,6 +51,12 @@ export function joinMap(mapId: string) {
 
 export function leaveMap(mapId: string) {
   if (socket?.connected) socket.emit("leave-map", mapId);
+}
+
+// On logout: the connection was authenticated as the user leaving, so the
+// next one (whoever signs in) has to start a fresh handshake.
+export function disconnectSocket() {
+  socket?.disconnect();
 }
 
 export { getSocket };

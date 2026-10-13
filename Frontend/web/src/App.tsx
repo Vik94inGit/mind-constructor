@@ -1,6 +1,9 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Navbar } from "./components/Navbar";
 import { OfflineBanner } from "./components/OfflineBanner";
+import { InviteNotice } from "./components/InviteNotice";
+import { UsernameModal } from "./components/UsernameModal";
+import { useAuth } from "./context/AuthContext";
 import { ProtectedRoute, AdminRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -17,6 +20,10 @@ export default function App() {
   // on a small screen, costs a whole row of vertical space the canvas needs
   // more. Hidden only on that one route; every other page keeps it.
   const onMapPage = /^\/maps\/[^/]+$/.test(location.pathname);
+  const { user } = useAuth();
+  // A first Google sign-in picked a username for them — offer to change it
+  // once (see UsernameModal). Demo accounts are never asked.
+  const offerUsername = !!user && user.usernameConfirmed === false && !user.isDemo;
 
   return (
     <div className="flex h-full flex-col">
@@ -41,6 +48,8 @@ export default function App() {
         </Routes>
       </main>
       <OfflineBanner />
+      <InviteNotice />
+      {offerUsername && <UsernameModal onClose={() => {}} />}
     </div>
   );
 }

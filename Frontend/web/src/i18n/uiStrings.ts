@@ -90,15 +90,32 @@ export interface UiStrings {
   };
   invite: {
     title: (mapName: string) => string;
-    loadingMembers: string;
-    everyoneMember: string;
-    user: string;
-    choose: string;
+    search: string;
+    placeholder: string;
+    typeMore: string;
+    searching: string;
+    noResults: string;
+    searchFailed: string;
     inviting: string;
     invite: string;
     invited: (username: string | null) => string;
     failed: string;
-    membersFailed: string;
+    /** The live notice an invited user gets on whatever page they have open. */
+    notice: (invitedBy: string, mapName: string) => string;
+    open: string;
+    dismiss: string;
+  };
+  /** Picking your own username — offered once after a first Google sign-in, and from the navbar any time. */
+  username: {
+    title: string;
+    intro: string;
+    label: string;
+    hint: string;
+    save: string;
+    saving: string;
+    keep: string;
+    failed: string;
+    change: string;
   };
   sentiments: { neutral: string; positive: string; negative: string };
   node: {
@@ -537,15 +554,30 @@ const en: UiStrings = {
   },
   invite: {
     title: (name) => `Invite to "${name}"`,
-    loadingMembers: "Loading current members…",
-    everyoneMember: "Everyone is already a member.",
-    user: "User",
-    choose: "Choose a user…",
+    search: "Find someone",
+    placeholder: "Username or email",
+    typeMore: "Type at least 2 letters of a username or email.",
+    searching: "Searching…",
+    noResults: "Nobody found who isn't already on this map.",
+    searchFailed: "Search failed",
     inviting: "Inviting…",
     invite: "Invite",
     invited: (username) => `${username ?? "User"} invited.`,
     failed: "Failed to invite",
-    membersFailed: "Failed to load current members",
+    notice: (by, name) => `${by} invited you to "${name}".`,
+    open: "Open",
+    dismiss: "Dismiss",
+  },
+  username: {
+    title: "Choose your username",
+    intro: "This is the name others see and search for when they invite you. We filled in your Google name — keep it or pick another.",
+    label: "Username",
+    hint: "2–32 characters: letters, numbers, spaces, . _ -",
+    save: "Save",
+    saving: "Saving…",
+    keep: "Keep this one",
+    failed: "Could not save the username",
+    change: "Change username",
   },
   sentiments: { neutral: "neutral", positive: "positive", negative: "negative" },
   node: {
@@ -993,15 +1025,30 @@ const cs: UiStrings = {
   },
   invite: {
     title: (name) => `Pozvat do „${name}“`,
-    loadingMembers: "Načítání současných členů…",
-    everyoneMember: "Všichni už jsou členy.",
-    user: "Uživatel",
-    choose: "Vyberte uživatele…",
+    search: "Najít uživatele",
+    placeholder: "Uživatelské jméno nebo e-mail",
+    typeMore: "Napište alespoň 2 znaky jména nebo e-mailu.",
+    searching: "Hledání…",
+    noResults: "Nikdo, kdo ještě není na této mapě, nebyl nalezen.",
+    searchFailed: "Hledání se nezdařilo",
     inviting: "Zvání…",
     invite: "Pozvat",
     invited: (username) => `${username ?? "Uživatel"} byl(a) pozván(a).`,
     failed: "Pozvání se nepodařilo",
-    membersFailed: "Nepodařilo se načíst současné členy",
+    notice: (by, name) => `${by} vás pozval(a) do „${name}“.`,
+    open: "Otevřít",
+    dismiss: "Zavřít",
+  },
+  username: {
+    title: "Zvolte si uživatelské jméno",
+    intro: "Pod tímto jménem vás ostatní uvidí a najdou, když vás budou zvát. Předvyplnili jsme jméno z Googlu — ponechte ho, nebo zvolte jiné.",
+    label: "Uživatelské jméno",
+    hint: "2–32 znaků: písmena, číslice, mezery, . _ -",
+    save: "Uložit",
+    saving: "Ukládání…",
+    keep: "Ponechat",
+    failed: "Uživatelské jméno se nepodařilo uložit",
+    change: "Změnit uživatelské jméno",
   },
   sentiments: { neutral: "neutrální", positive: "pozitivní", negative: "negativní" },
   node: {
@@ -1448,15 +1495,30 @@ const uk: UiStrings = {
   },
   invite: {
     title: (name) => `Запросити до «${name}»`,
-    loadingMembers: "Завантаження поточних учасників…",
-    everyoneMember: "Усі вже є учасниками.",
-    user: "Користувач",
-    choose: "Оберіть користувача…",
+    search: "Знайти користувача",
+    placeholder: "Ім'я користувача або email",
+    typeMore: "Введіть щонайменше 2 символи імені або email.",
+    searching: "Пошук…",
+    noResults: "Нікого, хто ще не на цій мапі, не знайдено.",
+    searchFailed: "Пошук не вдався",
     inviting: "Запрошення…",
     invite: "Запросити",
     invited: (username) => `${username ?? "Користувача"} запрошено.`,
     failed: "Не вдалося запросити",
-    membersFailed: "Не вдалося завантажити поточних учасників",
+    notice: (by, name) => `${by} запросив(ла) вас до «${name}».`,
+    open: "Відкрити",
+    dismiss: "Закрити",
+  },
+  username: {
+    title: "Оберіть ім'я користувача",
+    intro: "Під цим ім'ям вас бачать і шукають інші, коли запрошують. Ми підставили ім'я з Google — залиште його або оберіть інше.",
+    label: "Ім'я користувача",
+    hint: "2–32 символи: літери, цифри, пробіли, . _ -",
+    save: "Зберегти",
+    saving: "Збереження…",
+    keep: "Залишити",
+    failed: "Не вдалося зберегти ім'я користувача",
+    change: "Змінити ім'я користувача",
   },
   sentiments: { neutral: "нейтральний", positive: "позитивний", negative: "негативний" },
   node: {
@@ -1906,15 +1968,30 @@ const ru: UiStrings = {
   },
   invite: {
     title: (name) => `Пригласить в «${name}»`,
-    loadingMembers: "Загрузка текущих участников…",
-    everyoneMember: "Все уже являются участниками.",
-    user: "Пользователь",
-    choose: "Выберите пользователя…",
+    search: "Найти пользователя",
+    placeholder: "Имя пользователя или email",
+    typeMore: "Введите хотя бы 2 символа имени или email.",
+    searching: "Поиск…",
+    noResults: "Никого, кто ещё не на этой карте, не найдено.",
+    searchFailed: "Поиск не удался",
     inviting: "Приглашение…",
     invite: "Пригласить",
     invited: (username) => `${username ?? "Пользователь"} приглашён.`,
     failed: "Не удалось пригласить",
-    membersFailed: "Не удалось загрузить текущих участников",
+    notice: (by, name) => `${by} пригласил(а) вас в «${name}».`,
+    open: "Открыть",
+    dismiss: "Закрыть",
+  },
+  username: {
+    title: "Выберите имя пользователя",
+    intro: "Под этим именем вас видят и ищут другие, когда приглашают. Мы подставили имя из Google — оставьте его или выберите другое.",
+    label: "Имя пользователя",
+    hint: "2–32 символа: буквы, цифры, пробелы, . _ -",
+    save: "Сохранить",
+    saving: "Сохранение…",
+    keep: "Оставить",
+    failed: "Не удалось сохранить имя пользователя",
+    change: "Изменить имя пользователя",
   },
   sentiments: { neutral: "нейтральный", positive: "позитивный", negative: "негативный" },
   node: {

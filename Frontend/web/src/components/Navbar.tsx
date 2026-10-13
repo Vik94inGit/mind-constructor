@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { UsernameModal } from "./UsernameModal";
 
 // A plain target/bullseye — same concentric-rings-plus-center-dot shape
 // OutcomeBadge's own GoalSymbol draws for a Solution node (the app's own
@@ -24,6 +26,7 @@ function TargetLogo() {
 export function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const { t } = useI18n();
+  const [editName, setEditName] = useState(false);
   if (!user) return null;
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -72,7 +75,14 @@ export function Navbar() {
             few characters than just left off a cramped header entirely;
             it's still shown in full elsewhere (Info tab's "by <username>"
             on any node, the members list). */}
-        <span className="hidden sm:inline text-[0.85rem] text-ink-soft">{user.username}</span>
+        <button
+          type="button"
+          title={t.ui.username.change}
+          className="hidden sm:inline cursor-pointer rounded-md px-1 text-[0.85rem] text-ink-soft hover:bg-surface-2 hover:text-ink"
+          onClick={() => setEditName(true)}
+        >
+          {user.username}
+        </button>
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-120ms enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => logout()}
@@ -80,6 +90,7 @@ export function Navbar() {
           {t.nav.logout}
         </button>
       </div>
+      {editName && <UsernameModal onClose={() => setEditName(false)} />}
     </header>
   );
 }

@@ -11,6 +11,7 @@ import {
   blockUserAbl,
   unblockUserAbl,
   adminDeleteUserAbl,
+  searchUsersAbl,
   CannotActOnSelfError,
   UserNotFoundError,
 } from "../abl/userAbl.js";
@@ -67,6 +68,19 @@ export const getAllUsers = async (req: Request, res: Response) => {
     return handleAblError(res, error, [], {
       message: "Internal Server Error",
       logLabel: "getAllUsers",
+    });
+  }
+};
+
+// GET /api/auth/users/search?q=ali&mapId=abc — see searchUsersAbl.
+export const searchUsers = async (req: Request, res: Response) => {
+  try {
+    const users = await searchUsersAbl(req.user!._id, req.query);
+    return res.status(200).json({ success: true, users });
+  } catch (error) {
+    return handleAblError(res, error, [], {
+      message: "Internal Server Error",
+      logLabel: "searchUsers",
     });
   }
 };

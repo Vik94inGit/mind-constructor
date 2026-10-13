@@ -11,6 +11,9 @@ import {
   createMapAbl,
   updateMapAbl,
   inviteUserToMapAbl,
+  NotInviterError,
+  InviteeNotFoundError,
+  AlreadyMemberError,
   setMapColorAbl,
   getMapsAbl,
   ColorTakenError,
@@ -21,7 +24,7 @@ import {
   CircleNotFoundError,
 } from "../abl/circleAbl.js";
 import { computeAttackIndicatorsAbl } from "../abl/attackIndicatorAbl.js";
-import { broadcastToMap } from "../realtime/io.js";
+import { broadcastToMap, notifyUser } from "../realtime/io.js";
 import { handleAblError } from "./errorHandling.js";
 
 // ========== CREATE MAP ==========
@@ -99,21 +102,35 @@ export const inviteUserToMap = async (req: Request, res: Response) => {
         .json({ success: false, error: "Not authenticated" });
     }
 
-    const updatedMap = await inviteUserToMapAbl(resolvedMapId, req.body, currentUserId);
+    const result = await inviteUserToMapAbl(resolvedMapId, req.body, currentUserId);
 
-    if (!updatedMap) {
+    if (!result) {
       return res.status(404).json({ success: false, error: "Map not found" });
     }
 
+    // Lets the invitee's open tabs show the map straight away, without a
+    // reload — see io.ts's notifyUser.
+    notifyUser(result.invitee._id, "map:invited", {
+      mapId: result.map.mapId,
+      name: result.map.name,
+      invitedBy: req.user!.username,
+    });
+
     return res.status(200).json({
       success: true,
-      map: updatedMap,
+      map: result.map,
     });
   } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Server error",
-      logLabel: "inviteUserToMap",
-    });
+    return handleAblError(
+      res,
+      error,
+      [
+        [NotInviterError, 403, "Only the map's owner can invite people"],
+        [InviteeNotFoundError, 404, "User not found"],
+        [AlreadyMemberError, 409, "Already a member of this map"],
+      ],
+      { message: "Server error", logLabel: "inviteUserToMap" },
+    );
   }
 };
 
