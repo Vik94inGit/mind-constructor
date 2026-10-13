@@ -19,10 +19,10 @@ vi.stubGlobal(
 const zones: NamedZone[] = [
   { rootId: "near", name: "Near zone", sentiment: "positive", variant: false },
   { rootId: "far", name: "Far zone", sentiment: "negative", variant: true },
-  { rootId: "also", name: "Also near", sentiment: "negative", variant: true },
+  { rootId: "also", name: "Also near", sentiment: "negative", variant: true, style: { pattern: null, color: null, autoColor: "red" } },
 ];
 
-function renderNames(onGo = vi.fn(), onSetMode?: (rootId: string, mode: string | null) => void) {
+function renderNames(onGo = vi.fn(), onSetMode?: (rootId: string, mode: string | null) => void, onSetStyle?: (rootId: string, patch: object) => void) {
   const wrap = document.createElement("div");
   render(
     <I18nProvider>
@@ -42,6 +42,7 @@ function renderNames(onGo = vi.fn(), onSetMode?: (rootId: string, mode: string |
       onGo={onGo}
       modes={{ near: "dots" }}
       onSetMode={onSetMode}
+      onSetStyle={onSetStyle}
     />
     </I18nProvider>,
   );
@@ -71,5 +72,18 @@ describe("ZoneNames", () => {
     await user.click(screen.getByRole("button", { name: /Also near.$/ }));
     await user.click(screen.getByRole("menuitemradio", { name: /Puzzle cards/ }));
     expect(onSetMode).toHaveBeenCalledWith("also", "puzzle");
+  });
+
+  it("offers the zone's pattern and colour only where its parent is yours", async () => {
+    const onSetStyle = vi.fn();
+    renderNames(vi.fn(), vi.fn(), onSetStyle);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /Near zone.$/ }));
+    expect(screen.queryByRole("radio", { name: "Stripes" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Also near.$/ }));
+    await user.click(screen.getByRole("radio", { name: "Stripes" }));
+    expect(onSetStyle).toHaveBeenCalledWith("also", { zonePattern: "stripes" });
+    await user.click(screen.getByRole("radio", { name: "Lavender" }));
+    expect(onSetStyle).toHaveBeenCalledWith("also", { zoneColor: "lavender" });
   });
 });

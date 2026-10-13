@@ -7,6 +7,8 @@ import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
 import type { ZoneLayout, ZoneLayouts } from "../utils/zoneLayout";
 import { KnightHelmet } from "./KnightHelmet";
 import type { Sentiment } from "../utils/nodeType";
+import type { ZonePaletteColor, ZonePattern } from "../types";
+import { ZoneStylePicker } from "./ZoneStylePicker";
 
 export interface NamedZone {
   rootId: string;
@@ -14,6 +16,8 @@ export interface NamedZone {
   sentiment: Sentiment;
   /** A circle parent that itself hangs from another node: helmet instead of crown. */
   variant: boolean;
+  /** The zone's own look, set when this viewer may change it (they own its parent). */
+  style?: { pattern: ZonePattern | null; color: ZonePaletteColor | null; autoColor: string };
 }
 
 interface Props {
@@ -33,6 +37,8 @@ interface Props {
   layouts?: ZoneLayouts;
   /** A zone's layout was picked — null goes back to following its parents / the map. */
   onSetLayout?: (rootId: string, layout: ZoneLayout | null) => void;
+  /** A zone's pattern or colour was picked — saved on its parent (Node.zonePattern / zoneColor). */
+  onSetStyle?: (rootId: string, patch: { zonePattern?: ZonePattern | null; zoneColor?: ZonePaletteColor | null }) => void;
 }
 
 // A glyph per view for the chip's view button — short enough to sit beside
@@ -62,6 +68,7 @@ export function ZoneNames({
   onSetMode,
   layouts = {},
   onSetLayout,
+  onSetStyle,
 }: Props) {
   const { t } = useI18n();
   // The zone whose view menu is open, and where to draw the menu (fixed to
@@ -243,6 +250,23 @@ export function ZoneNames({
               })}
             </>
           )}
+          {(() => {
+            const style = zones.find((z) => z.rootId === menu.rootId)?.style;
+            if (!style || !onSetStyle) return null;
+            return (
+              <>
+                <div className="my-[0.15rem] border-t border-line" />
+                <ZoneStylePicker
+                  idPrefix={`zone-menu-${menu.rootId}`}
+                  pattern={style.pattern}
+                  color={style.color}
+                  autoColor={style.autoColor}
+                  onPattern={(p) => onSetStyle(menu.rootId, { zonePattern: p })}
+                  onColor={(c) => onSetStyle(menu.rootId, { zoneColor: c })}
+                />
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

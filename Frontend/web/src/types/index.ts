@@ -69,6 +69,13 @@ export type ManualZoneColor = (typeof MANUAL_ZONE_COLORS)[number];
 export const NODE_SHAPES = ["circle", "square", "triangle"] as const;
 export type NodeShape = (typeof NODE_SHAPES)[number];
 
+// A zone's own look, set on its parent — Node.ZONE_PATTERNS / ZONE_PALETTE on
+// the backend. null (or absent) keeps no pattern / the sentiment colour.
+export const ZONE_PATTERNS = ["dots", "stripes", "grid", "chess"] as const;
+export type ZonePattern = (typeof ZONE_PATTERNS)[number];
+export const ZONE_PALETTE = ["sand", "sage", "sky", "lavender", "rose", "slate"] as const;
+export type ZonePaletteColor = (typeof ZONE_PALETTE)[number];
+
 export interface User {
   _id: string;
   username: string;
@@ -220,6 +227,10 @@ export interface NodeDoc {
   manualZone?: ManualZoneColor | null;
   /** The node's outline (Node.shape) — null / absent is the usual circle. */
   shape?: NodeShape | null;
+  /** A circle parent's zone pattern (Node.zonePattern) — null / absent: none. */
+  zonePattern?: ZonePattern | null;
+  /** A circle parent's zone colour from the calm palette (Node.zoneColor) — null / absent: the sentiment colour. */
+  zoneColor?: ZonePaletteColor | null;
   /** Where the node sits while drawn as a puzzle card (Node.cardX/cardY), apart from the icon's x/y. null / absent: never placed as a card, so it sits at x/y. */
   cardX?: number | null;
   cardY?: number | null;

@@ -314,6 +314,16 @@ export interface UiStrings {
     levels: string;
     fineTune: string;
   };
+  /** A zone's own pattern and colour (map/ZoneStylePicker.tsx). */
+  zoneStyle: {
+    pattern: string;
+    color: string;
+    none: string;
+    auto: string;
+    autoHint: string;
+    patterns: Record<"dots" | "stripes" | "grid" | "chess", string>;
+    colors: Record<"sand" | "sage" | "sky" | "lavender" | "rose" | "slate", string>;
+  };
   panelDragHandle: string;
   panelResizeHandle: string;
   /** The panel a new node is written in before it exists — map/NewNodePanel.tsx. */
@@ -819,6 +829,7 @@ const en: UiStrings = {
     levels: "Levels",
     fineTune: "Fine-tune",
   },
+  zoneStyle: { pattern: "Pattern", color: "Colour", none: "None", auto: "Auto", autoHint: "Colour by sentiment", patterns: { dots: "Dots", stripes: "Stripes", grid: "Grid", chess: "Chess" }, colors: { sand: "Sand", sage: "Sage", sky: "Sky", lavender: "Lavender", rose: "Rose", slate: "Slate" } },
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
   newNode: { title: "New node", placeholder: "Write your thought…", create: "Create", hint: "Enter creates it, Shift+Enter adds a line" },
@@ -1308,6 +1319,7 @@ const cs: UiStrings = {
     levels: "Úrovně",
     fineTune: "Doladit",
   },
+  zoneStyle: { pattern: "Vzor", color: "Barva", none: "Žádný", auto: "Auto", autoHint: "Barva podle nálady", patterns: { dots: "Tečky", stripes: "Pruhy", grid: "Mřížka", chess: "Šachovnice" }, colors: { sand: "Písková", sage: "Šalvějová", sky: "Nebeská", lavender: "Levandulová", rose: "Růžová", slate: "Břidlicová" } },
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
   newNode: { title: "Nový uzel", placeholder: "Napište svou myšlenku…", create: "Vytvořit", hint: "Enter vytvoří, Shift+Enter přidá řádek" },
@@ -1796,6 +1808,7 @@ const uk: UiStrings = {
     levels: "Рівні",
     fineTune: "Точніше",
   },
+  zoneStyle: { pattern: "Візерунок", color: "Колір", none: "Немає", auto: "Авто", autoHint: "Колір за настроєм", patterns: { dots: "Крапки", stripes: "Смуги", grid: "Сітка", chess: "Шахи" }, colors: { sand: "Пісок", sage: "Шавлія", sky: "Небо", lavender: "Лаванда", rose: "Троянда", slate: "Графіт" } },
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
   newNode: { title: "Новий вузол", placeholder: "Напишіть свою думку…", create: "Створити", hint: "Enter створює, Shift+Enter додає рядок" },
@@ -2287,6 +2300,7 @@ const ru: UiStrings = {
     levels: "Уровни",
     fineTune: "Точнее",
   },
+  zoneStyle: { pattern: "Узор", color: "Цвет", none: "Нет", auto: "Авто", autoHint: "Цвет по настроению", patterns: { dots: "Точки", stripes: "Полосы", grid: "Сетка", chess: "Шахматы" }, colors: { sand: "Песок", sage: "Шалфей", sky: "Небо", lavender: "Лаванда", rose: "Роза", slate: "Графит" } },
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",
   newNode: { title: "Новый узел", placeholder: "Напишите свою мысль…", create: "Создать", hint: "Enter создаёт, Shift+Enter добавляет строку" },

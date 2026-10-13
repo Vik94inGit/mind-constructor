@@ -55,6 +55,14 @@ export type ManualZoneColor = (typeof MANUAL_ZONE_COLORS)[number];
 export const NODE_SHAPES = ["circle", "square", "triangle"] as const;
 export type NodeShape = (typeof NODE_SHAPES)[number];
 
+// A zone's own look, set on the parent it radiates from: a faint pattern over
+// the fill and a colour from a small calm palette in place of the sentiment
+// colour. null on either keeps the default (no pattern / sentiment colour).
+export const ZONE_PATTERNS = ["dots", "stripes", "grid", "chess"] as const;
+export type ZonePattern = (typeof ZONE_PATTERNS)[number];
+export const ZONE_PALETTE = ["sand", "sage", "sky", "lavender", "rose", "slate"] as const;
+export type ZonePaletteColor = (typeof ZONE_PALETTE)[number];
+
 export const NodeSchema = new mongoose.Schema(
   {
     nodeId: { type: String, required: true, unique: true }, // public id, safe to expose in URLs/JSON
@@ -189,6 +197,10 @@ export const NodeSchema = new mongoose.Schema(
 
     // See NODE_SHAPES above — settable through plain PATCH by the owner.
     shape: { type: String, enum: NODE_SHAPES, default: null },
+
+    // See ZONE_PATTERNS / ZONE_PALETTE above — plain owner-only PATCH fields.
+    zonePattern: { type: String, enum: ZONE_PATTERNS, default: null },
+    zoneColor: { type: String, enum: ZONE_PALETTE, default: null },
   },
   {
     timestamps: true,

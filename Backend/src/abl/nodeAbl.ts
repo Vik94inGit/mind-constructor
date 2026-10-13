@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type mongoose from "mongoose";
-import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS, NODE_SHAPES } from "../models/Node.js";
+import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS, NODE_SHAPES, ZONE_PATTERNS, ZONE_PALETTE } from "../models/Node.js";
 import { getMapByIdDao, getMapByInternalIdDao } from "../dao/mapsDao.js";
 import {
   createNodeMutationDao,
@@ -244,6 +244,9 @@ const updateNodeSchema = z
     manualZone: z.enum(MANUAL_ZONE_COLORS).nullish(),
     // null goes back to the usual circle.
     shape: z.enum(NODE_SHAPES).nullish(),
+    // null goes back to no pattern / the sentiment colour.
+    zonePattern: z.enum(ZONE_PATTERNS).nullish(),
+    zoneColor: z.enum(ZONE_PALETTE).nullish(),
   })
   .refine((fields) => Object.values(fields).some((v) => v !== undefined), {
     error: "No fields to update",

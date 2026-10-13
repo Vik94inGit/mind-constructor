@@ -5,6 +5,8 @@ import type { NodeGroup } from "../utils/canvasLayout";
 import { nodeRefId, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
+import { zoneColorFor } from "../utils/zoneStyle";
+import { ZonePatternDef } from "./ZonePattern";
 
 interface Props {
   nodeGroups: NodeGroup[];
@@ -83,7 +85,9 @@ export function CanvasBackdrop({
         snapshot. Same "click to stabilize" control the old plain-circle backdrop had.
       */}
       {nodeGroups.map((g) => {
-        const color = ZONE_COLORS[g.sentiment];
+        // A zone's own look lives on its parent (Node.zoneColor/zonePattern).
+        const root = visibleNodes.find((n) => n.nodeId === g.rootId);
+        const color = zoneColorFor(root, g.sentiment);
         // Same "chosen one stays fuller-opacity, every other zone
         // dims" spotlight the branch-arrow lines below (and the
         // minimap's own zones) use — one shared signal for which
@@ -91,37 +95,53 @@ export function CanvasBackdrop({
         const isStabilized = selectedCircle?.rootId === g.rootId;
         const dimmed = selectedCircle ? !isStabilized : !!focusedZones && !focusedZones.has(g.rootId);
         const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+        const patternId = root?.zonePattern ? `zone-pattern-${g.rootId}` : null;
         return (
-          <polygon
-            key={`zone-${g.rootId}`}
-            points={zonePoints}
-            // Tagged for the sentiment show (see applyRevealFrame): each
-            // corner follows its own node, so the zone stretches and shrinks
-            // as they move and is redrawn from data-base when they're home.
-            data-reveal-points={g.outlineIds?.join(" ")}
-            data-base={zonePoints}
-            fill={color}
-            fillOpacity={dimmed ? 0.06 : 0.14}
-            stroke={color}
-            strokeOpacity={dimmed ? 0.25 : 0.5}
-            strokeWidth={2.5}
-            // The whole overlay SVG is pointer-events-none (so its
-            // decorative shapes never steal a drag/click from a
-            // NodeCard div sitting underneath) — a zone is one of
-            // the few things in it that's actually meant to be
-            // clicked, so it has to explicitly opt back in.
-            style={interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
-            onClick={(e) => {
-              e.stopPropagation();
-              onCircleClick(g.rootId);
-            }}
-          >
-            <title>
-              {isStabilized
-                ? t.ui.canvas.stabilized
-                : t.ui.canvas.stabilizeZone}
-            </title>
-          </polygon>
+          <g key={`zone-${g.rootId}`}>
+            <polygon
+              points={zonePoints}
+              // Tagged for the sentiment show (see applyRevealFrame): each
+              // corner follows its own node, so the zone stretches and shrinks
+              // as they move and is redrawn from data-base when they're home.
+              data-reveal-points={g.outlineIds?.join(" ")}
+              data-base={zonePoints}
+              fill={color}
+              fillOpacity={dimmed ? 0.06 : 0.14}
+              stroke={color}
+              strokeOpacity={dimmed ? 0.25 : 0.5}
+              strokeWidth={2.5}
+              // The whole overlay SVG is pointer-events-none (so its
+              // decorative shapes never steal a drag/click from a
+              // NodeCard div sitting underneath) — a zone is one of
+              // the few things in it that's actually meant to be
+              // clicked, so it has to explicitly opt back in.
+              style={interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCircleClick(g.rootId);
+              }}
+            >
+              <title>
+                {isStabilized
+                  ? t.ui.canvas.stabilized
+                  : t.ui.canvas.stabilizeZone}
+              </title>
+            </polygon>
+            {root?.zonePattern && patternId && (
+              <>
+                <defs>
+                  <ZonePatternDef id={patternId} pattern={root.zonePattern} color={color} />
+                </defs>
+                <polygon
+                  points={zonePoints}
+                  data-reveal-points={g.outlineIds?.join(" ")}
+                  data-base={zonePoints}
+                  fill={`url(#${patternId})`}
+                  opacity={dimmed ? 0.4 : 1}
+                />
+              </>
+            )}
+          </g>
         );
       })}
       {/*
@@ -191,7 +211,7 @@ export function CanvasBackdrop({
         .filter((n) => circleRootSentimentByNode.has(n.nodeId))
         .map((n) => {
           const p = posFor(n);
-          const color = ZONE_COLORS[circleRootSentimentByNode.get(n.nodeId)!];
+          const color = zoneColorFor(n, circleRootSentimentByNode.get(n.nodeId)!);
           return (
             <circle
               key={`circle-parent-ring-${n.nodeId}`}
@@ -262,7 +282,7 @@ export function CanvasBackdrop({
         const a = posFor(parentNode);
         const b = posFor(node);
         const group = nodeGroups.find((g) => g.rootId === parentId);
-        const color = group ? ZONE_COLORS[group.sentiment] : "var(--accent)";
+        const color = group ? zoneColorFor(parentNode, group.sentiment) : "var(--accent)";
         // Same "chosen one stays full-opacity, every other circle
         // dims" spotlight the old backdrop drew — see its own
         // removed comment for why. Ungrouped branches never dim for
