@@ -50,6 +50,7 @@ import { ViewCorner } from "../map/ViewCorner";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
 import type { AbstractionLevel } from "../utils/abstractionLevel";
+import { stepNode } from "../utils/nodeOrder";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { MapBanner } from "../map/MapBanner";
@@ -1881,7 +1882,10 @@ export function MapPage() {
               }}
               lines={lines}
               canDeleteLine={canDeleteLine}
-              onLineClick={handleLineClick}
+              // With a node's panel open, a tap on a separator line is a tap
+              // outside the panel too: it closes it rather than offering to
+              // delete the line.
+              onLineClick={(line) => (selectedId ? setSelectedId(null) : handleLineClick(line))}
               interactive={!drawMode}
               compact={compactView || dotZoom}
               solvedZones={solvedZones}
@@ -2279,6 +2283,13 @@ export function MapPage() {
                 isMapOwner={isOwner}
                 onApplyTemplate={(kind) => applyTemplate(kind, selectedNode)}
                 onClose={() => setSelectedId(null)}
+                onStepNode={(dir) => {
+                  const next = stepNode(visibleNodes, selectedNode.nodeId, dir);
+                  if (!next) return;
+                  setSelectedId(next);
+                  centerOnNode(next);
+                  setFocusTextNodeId(next);
+                }}
                 onSelectNode={(id) => {
                   setSelectedId(id);
                   // Same "chosen node is always centered" rule handleNodeClick

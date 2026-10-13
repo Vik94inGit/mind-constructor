@@ -141,9 +141,12 @@ interface Props {
   /** Set right after this node was created: open on its text, focused, ready to write more. Fired back through onAutoFocused once done. */
   autoFocusText?: boolean;
   onAutoFocused?: () => void;
+  /** Opens the previous (-1) or next (1) node in reading order (utils/nodeOrder.ts) — the text's arrow keys. */
+  onStepNode?: (dir: -1 | 1) => void;
 }
 
 export function NodePanel({
+  onStepNode,
   node,
   nodes,
   edges,
@@ -956,6 +959,7 @@ export function NodePanel({
           copied={copied}
           templateKind={templateKind}
           onTextSave={handleTextSave}
+          onStepNode={onStepNode}
           onCopyText={handleCopyText}
           onDelete={handleDelete}
           onTemplate={handleTemplate}
