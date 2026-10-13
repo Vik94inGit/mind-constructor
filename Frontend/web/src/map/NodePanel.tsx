@@ -4,7 +4,7 @@ import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf } from "../utils/nodeType";
 import type { TemplateKind } from "../utils/templates";
-import { NodeTypeIcon } from "./NodeTypeIcon";
+import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ringKindFor } from "./OutcomeBadge";
 import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
 import { TypePicker } from "./TypePicker";
@@ -893,7 +893,7 @@ export function NodePanel({
                 className="flex items-center text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase"
                 title={t.ui.types[node.type]}
               >
-                <NodeTypeIcon type={node.type} />
+                <NodeTypeSymbol type={node.type} size={17} />
               </div>
             )}
             {/* No title/caption here any more — the node's own text is

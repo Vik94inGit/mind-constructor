@@ -1,6 +1,6 @@
 import { useI18n } from "../i18n/I18nContext";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
-import { NodeTypeIcon } from "./NodeTypeIcon";
+import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import type { NodeDoc } from "../types";
 
 interface Props {
@@ -53,7 +53,7 @@ export function PresentationOverlay({ slides, index, onIndexChange, onExit }: Pr
           className="flex h-16 w-16 items-center justify-center rounded-full border-2"
           style={{ borderColor: NODE_TYPE_COLORS[node.type] }}
         >
-          <NodeTypeIcon type={node.type} size={34} />
+          <NodeTypeSymbol type={node.type} size={34} />
         </div>
         <span
           className="text-[1rem] font-bold tracking-[0.05em] uppercase"

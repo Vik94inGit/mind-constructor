@@ -582,6 +582,15 @@ export function useNodeDragAndDrop({
           const placed = placeNode({ x, y }, [{ nodeId: node.nodeId, parentId: target.nodeId }]);
           setActionError(null);
           zoomToEditAt(placed.x, placed.y);
+          // Moved over right away, same as a plain drop below — waiting for
+          // the server left the node flashing back at its old spot (dragState
+          // is already cleared above) until the response landed.
+          const before = { x: node.x, y: node.y, parentId: node.parentId };
+          setNodes((prev) =>
+            prev.map((n) =>
+              n.nodeId === node.nodeId ? { ...n, x: placed.x, y: placed.y, parentId: target.nodeId } : n,
+            ),
+          );
           try {
             const updated = await nodesApi.updateNode(node.nodeId, {
               x: placed.x,
@@ -590,6 +599,7 @@ export function useNodeDragAndDrop({
             });
             upsertNode(updated);
           } catch (err) {
+            setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
             setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.joinCircle);
           }
           return;

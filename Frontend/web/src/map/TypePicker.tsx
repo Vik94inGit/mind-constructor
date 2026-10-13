@@ -1,6 +1,6 @@
 import type { NodeType } from "../types";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
-import { NodeTypeIcon } from "./NodeTypeIcon";
+import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { useI18n } from "../i18n/I18nContext";
 
 interface Props {
@@ -11,8 +11,9 @@ interface Props {
   disabled?: boolean;
 }
 
-// A row of the node types' icons, the current one ringed in its color — how
-// the node panels (NodePanel, NewNodePanel) change a node's type.
+// A row of the node types' symbols, the current one ringed in its color — how
+// the node panels (NodePanel, NewNodePanel) change a node's type. Same
+// symbols the node itself and the quick-add ghosts draw (NodeTypeSymbol).
 export function TypePicker({ value, types, onChange, disabled = false }: Props) {
   const { t } = useI18n();
   return (
@@ -34,7 +35,7 @@ export function TypePicker({ value, types, onChange, disabled = false }: Props) 
             style={{ borderColor: active ? NODE_TYPE_COLORS[type] : "var(--line)" }}
             onClick={() => !active && onChange(type)}
           >
-            <NodeTypeIcon type={type} size={15} />
+            <NodeTypeSymbol type={type} size={17} />
           </button>
         );
       })}
