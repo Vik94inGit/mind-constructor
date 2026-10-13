@@ -136,7 +136,7 @@ export interface Translation {
       zoomReset: string;
       zoomIn: string;
       expandToolbar: string;
-      readingMode: string;
+      displayMenu: string;
       readingPuzzle: string;
       readingMixed: string;
       readingIconText: string;
@@ -331,7 +331,7 @@ const en: Translation = {
       zoomReset: "Reset zoom",
       zoomIn: "Zoom in",
       expandToolbar: "Show toolbar",
-      readingMode: "Reading mode",
+      displayMenu: "Display options",
       readingPuzzle: "Puzzle cards",
       readingMixed: "Mixed: zone cards + icons",
       readingIconText: "Icons + text",
@@ -512,7 +512,7 @@ const cs: Translation = {
       zoomReset: "Obnovit přiblížení",
       zoomIn: "Přiblížit",
       expandToolbar: "Zobrazit panel nástrojů",
-      readingMode: "Režim čtení",
+      displayMenu: "Možnosti zobrazení",
       readingPuzzle: "Karty puzzle",
       readingMixed: "Smíšený: karty zón + ikony",
       readingIconText: "Ikony + text",
@@ -693,7 +693,7 @@ const uk: Translation = {
       zoomReset: "Скинути масштаб",
       zoomIn: "Збільшити",
       expandToolbar: "Показати панель інструментів",
-      readingMode: "Режим читання",
+      displayMenu: "Параметри відображення",
       readingPuzzle: "Картки-пазли",
       readingMixed: "Змішаний: картки зон + іконки",
       readingIconText: "Іконки + текст",
@@ -874,7 +874,7 @@ const ru: Translation = {
       zoomReset: "Сбросить масштаб",
       zoomIn: "Увеличить",
       expandToolbar: "Показать панель инструментов",
-      readingMode: "Режим чтения",
+      displayMenu: "Параметры отображения",
       readingPuzzle: "Карточки-пазлы",
       readingMixed: "Смешанный: карточки зон + иконки",
       readingIconText: "Иконки + текст",

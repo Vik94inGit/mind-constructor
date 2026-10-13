@@ -1685,8 +1685,6 @@ export function MapPage() {
       onToggleMove={() => setMoveMode((v) => !v)}
       drawMode={drawMode}
       onToggleDraw={toggleDrawMode}
-      readingMode={readingMode}
-      onPickReadingMode={setReadingMode}
       compact={compactView}
       onToggleCompact={toggleCompactView}
       emojiFirst={emojiFirst}
