@@ -44,6 +44,11 @@ const OUTCOME_BADGE_SIZE = 26;
 // (whose ghost ring and panel already surround it) is held to the compact one.
 const PUZZLE_MAX_WIDTH = 240;
 const PUZZLE_SELECTED_MAX_WIDTH = 180;
+// A puzzle card shows about this many characters of its text on the canvas
+// (a node holds up to 1000); the rest scrolls inside the card. At the card's
+// text size about 36 characters fit a line, so this is its height in lines.
+export const PUZZLE_VISIBLE_CHARS = 500;
+const PUZZLE_TEXT_MAX_LINES = Math.ceil(PUZZLE_VISIBLE_CHARS / 36);
 // iconText captions: a little wider and taller than the default chip.
 const ICON_TEXT_CAPTION_WIDTH = 176;
 // A picture card (NodeDoc.cardImage) in place of the icon, on screen.
@@ -814,7 +819,13 @@ export const NodeCard = memo(function NodeCard({
               <div className={`text-[0.78rem] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}>{trimmedTitle}</div>
             )}
             <div
-              className={`text-[0.72rem] leading-[1.35] break-words whitespace-pre-wrap ${cardFill ? "" : "text-ink"} ${selected ? "line-clamp-3" : ""}`}
+              data-testid="puzzle-card-text"
+              className={`text-[0.72rem] leading-[1.35] break-words whitespace-pre-wrap ${cardFill ? "" : "text-ink"} ${
+                selected ? "line-clamp-3" : "overflow-y-auto overscroll-contain pr-[2px]"
+              }`}
+              // Longer text scrolls inside the card; overscroll-contain keeps
+              // the wheel from scrolling the canvas once it reaches the end.
+              style={selected ? undefined : { maxHeight: `${(PUZZLE_TEXT_MAX_LINES * 1.35).toFixed(2)}em` }}
             >
               {node.text || (trimmedTitle ? "" : "…")}
             </div>
