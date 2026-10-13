@@ -35,9 +35,30 @@ describe("ViewCorner", () => {
     expect(screen.getByText(s.minimap)).toBeInTheDocument();
   });
 
+  it("steps one simpler / more detail equalizer: levels first, then text", async () => {
+    const props = renderCorner({ level: 2, readingMode: "mixed" });
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    expect(screen.getByText(s.level(2, 3))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: s.richer }));
+    expect(props.onLevelChange).toHaveBeenLastCalledWith(null);
+    expect(props.onReadingModeChange).toHaveBeenLastCalledWith("mixed");
+    await userEvent.click(screen.getByRole("button", { name: s.simpler }));
+    expect(props.onLevelChange).toHaveBeenLastCalledWith(1);
+    expect(props.onReadingModeChange).toHaveBeenLastCalledWith("mixed");
+  });
+
+  it("keeps the separate level and view steppers under Fine-tune", async () => {
+    renderCorner();
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    expect(screen.queryByRole("button", { name: s.moreDetail })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: s.fineTune }));
+    expect(screen.getByRole("button", { name: s.moreDetail })).toBeInTheDocument();
+  });
+
   it("steps the detail level, with the top step meaning every level", async () => {
     const props = renderCorner({ level: 2 });
     await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    await userEvent.click(screen.getByRole("button", { name: s.fineTune }));
     await userEvent.click(screen.getByRole("button", { name: s.moreDetail }));
     expect(props.onLevelChange).toHaveBeenLastCalledWith(null);
     await userEvent.click(screen.getByRole("button", { name: s.lessDetail }));
@@ -47,6 +68,7 @@ describe("ViewCorner", () => {
   it("steps the view from minimal to text-heavy", async () => {
     const props = renderCorner({ readingMode: "actual" });
     await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    await userEvent.click(screen.getByRole("button", { name: s.fineTune }));
     await userEvent.click(screen.getByRole("button", { name: s.moreText }));
     expect(props.onReadingModeChange).toHaveBeenLastCalledWith("iconText");
     await userEvent.click(screen.getByRole("button", { name: s.lessText }));

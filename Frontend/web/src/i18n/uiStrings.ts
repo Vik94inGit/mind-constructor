@@ -309,6 +309,10 @@ export interface UiStrings {
     lessText: string;
     minimap: string;
     menu: string;
+    simpler: string;
+    richer: string;
+    levels: string;
+    fineTune: string;
   };
   panelDragHandle: string;
   panelResizeHandle: string;
@@ -807,9 +811,13 @@ const en: UiStrings = {
     moreDetail: "More levels",
     view: "View",
     moreText: "More text",
-    lessText: "Simpler",
+    lessText: "Less text",
     minimap: "Minimap",
     menu: "View controls: detail, view and minimap",
+    simpler: "Simpler",
+    richer: "More detail",
+    levels: "Levels",
+    fineTune: "Fine-tune",
   },
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
@@ -1292,9 +1300,13 @@ const cs: UiStrings = {
     moreDetail: "Více úrovní",
     view: "Zobrazení",
     moreText: "Více textu",
-    lessText: "Jednodušší",
+    lessText: "Méně textu",
     minimap: "Minimapa",
     menu: "Ovládání zobrazení: detail, zobrazení a minimapa",
+    simpler: "Jednodušší",
+    richer: "Více detailů",
+    levels: "Úrovně",
+    fineTune: "Doladit",
   },
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
@@ -1776,9 +1788,13 @@ const uk: UiStrings = {
     moreDetail: "Більше рівнів",
     view: "Вигляд",
     moreText: "Більше тексту",
-    lessText: "Простіше",
+    lessText: "Менше тексту",
     minimap: "Мінімапа",
     menu: "Керування виглядом: деталі, вигляд і мінімапа",
+    simpler: "Простіше",
+    richer: "Більше деталей",
+    levels: "Рівні",
+    fineTune: "Точніше",
   },
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
@@ -2263,9 +2279,13 @@ const ru: UiStrings = {
     moreDetail: "Больше уровней",
     view: "Вид",
     moreText: "Больше текста",
-    lessText: "Проще",
+    lessText: "Меньше текста",
     minimap: "Миникарта",
     menu: "Управление видом: детали, вид и миникарта",
+    simpler: "Проще",
+    richer: "Больше деталей",
+    levels: "Уровни",
+    fineTune: "Точнее",
   },
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",
