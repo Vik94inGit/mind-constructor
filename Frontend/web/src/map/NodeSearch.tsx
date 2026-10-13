@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
-import { NodeTypeIcon } from "./NodeTypeIcon";
+import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import type { NodeDoc } from "../types";
 
 interface Props {
@@ -103,7 +103,7 @@ export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, onClose, sid
             }}
           >
             <span className="flex-shrink-0">
-              <NodeTypeIcon type={n.type} size={16} />
+              <NodeTypeSymbol type={n.type} size={16} />
             </span>
             <span className="min-w-0 flex-1 truncate">{n.title?.trim() || n.text}</span>
           </button>

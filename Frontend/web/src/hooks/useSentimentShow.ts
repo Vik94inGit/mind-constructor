@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { computeDominantSentiment } from "../utils/canvasLayout";
 import {
@@ -82,17 +82,21 @@ export function useSentimentShow({
     setActive(false);
   }
 
-  function tick() {
-    const r = running.current;
-    const root = canvasRef.current;
-    if (!r || !root) return;
-    const now = performance.now();
+  function paint(r: Running, root: HTMLElement, now: number) {
     applyRevealFrame(root, (id) => {
       const v = r.plan.vectors.get(id);
       if (!v) return null;
       const s = amount(r, id, now);
       return s > 0 ? { x: v.x * s, y: v.y * s } : null;
     });
+  }
+
+  function tick() {
+    const r = running.current;
+    const root = canvasRef.current;
+    if (!r || !root) return;
+    const now = performance.now();
+    paint(r, root, now);
     const done = r.skip ? now - r.skip.at >= SKIP_MS : now - r.startedAt >= showEndMs(r.plan);
     if (done) stop();
     else raf.current = requestAnimationFrame(tick);
@@ -107,6 +111,16 @@ export function useSentimentShow({
     for (const id of r.plan.vectors.keys()) from.set(id, amount(r, id, now));
     r.skip = { at: now, from };
   }
+
+  // A re-render while the show runs (the opening drift, a live update)
+  // writes the zones' and links' own un-moved points back onto the SVG, so
+  // they flashed back to their resting shape until the next frame. Put the
+  // current frame straight back before the browser paints.
+  useLayoutEffect(() => {
+    const r = running.current;
+    const root = canvasRef.current;
+    if (r && root) paint(r, root, performance.now());
+  });
 
   useEffect(
     () => () => {

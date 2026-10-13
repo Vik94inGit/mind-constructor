@@ -113,6 +113,16 @@ describe("NodeCard", () => {
       expect(onDoubleClick).toHaveBeenCalledTimes(1);
     });
 
+    it("ignores a double tap on touch (Safari turns two taps into a dblclick)", () => {
+      const onDoubleClick = vi.fn();
+      const node = makeNode({ nodeId: "a", text: "hello" });
+      const { container } = renderNode({ node, onDoubleClick });
+      const el = container.querySelector('[title="hello"]')!;
+      fireEvent.pointerDown(el, { pointerType: "touch" });
+      fireEvent.doubleClick(el);
+      expect(onDoubleClick).not.toHaveBeenCalled();
+    });
+
     it("fires onContextMenu on a right click, without letting it reach the canvas", () => {
       const onContextMenu = vi.fn();
       const node = makeNode({ nodeId: "a", text: "hello" });

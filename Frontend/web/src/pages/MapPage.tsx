@@ -1678,6 +1678,11 @@ export function MapPage() {
               "0 0" keeps that scaling anchored at this wrapper's own
               top-left. */}
           <div
+            // A tap on the blind zone around the canvas is outside the node
+            // panel too — closes it, same as empty canvas.
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !drawMode && !chooseMode && !packMode) setSelectedId(null);
+            }}
             style={{
               position: "relative",
               width: CANVAS_W + hScrollMargin * 2,
@@ -1781,6 +1786,13 @@ export function MapPage() {
                 // zone's normal stabilize/release behavior while it's active.
                 if (chooseMode) {
                   exitChooseMode();
+                  return;
+                }
+                // With a node's panel open, a tap on a zone is a tap outside
+                // the panel: it closes it, same as empty canvas, instead of
+                // also stabilizing the zone underneath.
+                if (selectedId) {
+                  setSelectedId(null);
                   return;
                 }
                 handleCircleBackdropClick(rootId);

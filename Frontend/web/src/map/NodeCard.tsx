@@ -403,7 +403,7 @@ export const NodeCard = memo(function NodeCard({
     // Only the icon circle takes the pointer (pointer-events-auto on it
     // below); the handlers stay on this div and still fire, by bubbling up
     // from that circle.
-    "group pointer-events-none absolute flex w-[74px] touch-none [transform:translate(-50%,-50%)] select-none flex-col items-center",
+    "group pointer-events-none absolute flex w-[74px] touch-none [transform:translate(-50%,-50%)] select-none [-webkit-touch-callout:none] flex-col items-center",
     zIndexClass,
     transitionClass,
     cursorClass,
@@ -425,12 +425,24 @@ export const NodeCard = memo(function NodeCard({
     onClick(e);
   };
 
+  // What the last press on this node was made with — see handleDoubleClick.
+  const lastPointerType = useRef<string>("mouse");
+  const handlePointerDown = (e: ReactPointerEvent) => {
+    lastPointerType.current = e.pointerType;
+    onPointerDown?.(e);
+  };
+
   const handleDoubleClick = (e: ReactMouseEvent) => {
     // Same stopPropagation reasoning as click/contextmenu — a double-click
     // is preceded by two ordinary clicks (already handled above), so this
     // only needs to keep the *dblclick* event itself from reaching the
     // canvas, which has no use for it anyway.
     e.stopPropagation();
+    // Only a mouse double-click starts editing. Safari on iPhone/iPad turns
+    // two quick taps into a dblclick, so tapping a node to get its menu
+    // opened the text editor instead; on touch, editing stays behind the
+    // panel's own Edit button.
+    if (lastPointerType.current !== "mouse") return;
     onDoubleClick?.();
   };
 
@@ -604,7 +616,7 @@ export const NodeCard = memo(function NodeCard({
       // the individual CSS `translate` property, which composes with the
       // `transform` the centering and the chaos-drift/fly-in keyframes own.
       data-reveal-node={node.nodeId}
-      onPointerDown={onPointerDown}
+      onPointerDown={handlePointerDown}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
