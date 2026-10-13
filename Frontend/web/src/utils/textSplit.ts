@@ -13,6 +13,12 @@ export interface TextPiece {
   start: number;
   end: number;
   type: NodeType;
+  /**
+   * What it hangs from: another piece's id (that piece becomes a parent), or
+   * — on a map (map/TextToNodesModal.tsx) — a node already there. Absent: the
+   * main node.
+   */
+  parentId?: string;
 }
 
 export interface SplitDraft {
@@ -47,6 +53,58 @@ export function addPiece(pieces: TextPiece[], piece: TextPiece): TextPiece[] | n
   return [...pieces, piece].sort((a, b) => a.start - b.start);
 }
 
+/** Whether `id` hangs, directly or further down, from `ancestorId` (through other pieces). */
+function hangsFrom(pieces: TextPiece[], id: string, ancestorId: string): boolean {
+  const byId = new Map(pieces.map((p) => [p.id, p]));
+  const seen = new Set<string>();
+  let cur = byId.get(id)?.parentId;
+  while (cur && !seen.has(cur)) {
+    if (cur === ancestorId) return true;
+    seen.add(cur);
+    cur = byId.get(cur)?.parentId;
+  }
+  return false;
+}
+
+/** The pieces `id` can hang from: every other one that doesn't already hang from it. */
+export function parentCandidates(pieces: TextPiece[], id: string): TextPiece[] {
+  return pieces.filter((p) => p.id !== id && !hangsFrom(pieces, p.id, id));
+}
+
+function withParent(piece: TextPiece, parentId: string | undefined): TextPiece {
+  const { parentId: _old, ...rest } = piece;
+  return parentId ? { ...rest, parentId } : rest;
+}
+
+/** `id` hung from `parentId` (undefined: the main node); unchanged when that would make a loop. */
+export function setPieceParent(pieces: TextPiece[], id: string, parentId: string | undefined): TextPiece[] {
+  if (parentId && (parentId === id || hangsFrom(pieces, parentId, id))) return pieces;
+  return pieces.map((p) => (p.id === id ? withParent(p, parentId) : p));
+}
+
+/** `pieces` without `id`; the ones that hung from it go up to whatever it hung from. */
+export function removePiece(pieces: TextPiece[], id: string): TextPiece[] {
+  const gone = pieces.find((p) => p.id === id);
+  return pieces.filter((p) => p.id !== id).map((p) => (p.parentId === id ? withParent(p, gone?.parentId) : p));
+}
+
+/** Parents before the pieces that hang from them (otherwise text order). */
+export function piecesParentsFirst<T extends { id: string; parentId?: string }>(pieces: T[]): T[] {
+  const ids = new Set(pieces.map((p) => p.id));
+  const out: T[] = [];
+  const placed = new Set<string>();
+  const visit = (p: T, trail: Set<string>) => {
+    if (placed.has(p.id) || trail.has(p.id)) return;
+    trail.add(p.id);
+    const parent = p.parentId && ids.has(p.parentId) ? pieces.find((x) => x.id === p.parentId) : undefined;
+    if (parent) visit(parent, trail);
+    placed.add(p.id);
+    out.push(p);
+  };
+  for (const p of pieces) visit(p, new Set());
+  return out;
+}
+
 /** Every word of the text (a run of non-whitespace) as a [start, end) range — what a tap marks a piece's start or finish on. */
 export function wordRanges(text: string): { start: number; end: number }[] {
   return [...text.matchAll(/\S+/g)].map((m) => ({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length }));
@@ -78,7 +136,7 @@ export function splitToThoughtDraft(draft: SplitDraft): ThoughtDraft {
       id: p.id,
       text: draft.text.slice(p.start, p.end),
       type: p.type,
-      parentId: ROOT_ID,
+      parentId: p.parentId && draft.pieces.some((x) => x.id === p.parentId) ? p.parentId : ROOT_ID,
       prompt: "anythingElse",
     })),
   };

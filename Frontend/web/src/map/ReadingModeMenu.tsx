@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { READING_MODES } from "../utils/readingMode";
 import type { ReadingMode } from "../utils/readingMode";
+import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
+import type { ZoneLayout } from "../utils/zoneLayout";
 
 interface Props {
   mode: ReadingMode;
@@ -11,6 +13,9 @@ interface Props {
   /** "Emoji first": a node with an emoji shows it face up, its type on the back. */
   emojiFirst: boolean;
   onToggleEmojiFirst: () => void;
+  /** How the whole map draws its zones (utils/zoneLayout.ts); a parent's own choice still wins for its branch. */
+  zoneLayout?: ZoneLayout;
+  onPickZoneLayout?: (layout: ZoneLayout) => void;
   /** Enters presentation mode — folded into this same "view" dropdown
    *  rather than its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
@@ -23,7 +28,7 @@ interface Props {
 // utils/readingMode.ts), plus the entry point into presentation mode. Same
 // open-downward, dismiss-on-outside-click/Escape pattern as AddMenu,
 // positioned by a `relative` wrapper around its trigger.
-export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, emojiFirst, onToggleEmojiFirst, onPresent, onClose, side = "below" }: Props) {
+export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, emojiFirst, onToggleEmojiFirst, zoneLayout, onPickZoneLayout, onPresent, onClose, side = "below" }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -95,6 +100,29 @@ export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, emojiF
         <span className="flex-1">{t.ui.emoji.first}</span>
         {emojiFirst && <span aria-hidden>✓</span>}
       </button>
+      {zoneLayout && onPickZoneLayout && (
+        <>
+          <div className="my-[0.15rem] border-t border-line" />
+          <div className="px-[0.7rem] pt-[0.3rem] pb-[0.1rem] text-[0.72rem] font-semibold tracking-wide text-ink-soft uppercase">
+            {t.ui.display.mapZones}
+          </div>
+          {ZONE_LAYOUTS.map((l) => (
+            <button
+              key={l}
+              type="button"
+              role="menuitemradio"
+              aria-checked={l === zoneLayout}
+              className={`flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] hover:bg-surface-2 ${
+                l === zoneLayout ? "font-semibold text-accent-ink" : "text-ink"
+              }`}
+              onClick={() => onPickZoneLayout(l)}
+            >
+              <span className="flex-1">{zoneLayoutLabel(t.ui.display, l)}</span>
+              {l === zoneLayout && <span aria-hidden>✓</span>}
+            </button>
+          ))}
+        </>
+      )}
       <div className="my-[0.15rem] border-t border-line" />
       <button
         type="button"

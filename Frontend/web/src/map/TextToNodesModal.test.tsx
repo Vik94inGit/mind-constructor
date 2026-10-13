@@ -93,3 +93,38 @@ describe("TextToNodesModal", () => {
     expect(screen.getAllByTestId("piece-bubble")).toHaveLength(1);
   });
 });
+
+describe("TextToNodesModal parents", () => {
+  it("hangs a piece from another piece or a node on the map, which then needs no spot", async () => {
+    const onCreate = vi.fn(async () => {});
+    const onClose = vi.fn();
+    const findSpots = vi.fn((n: number) => Array.from({ length: n }, (_, i) => ({ x: i * 200, y: 0 })));
+    render(
+      <I18nProvider>
+        <TextToNodesModal
+          findSpots={findSpots}
+          onCreate={onCreate}
+          onClose={onClose}
+          mapNodes={[{ id: "existing", label: "Old child" }]}
+        />
+      </I18nProvider>,
+    );
+    fireEvent.change(screen.getByPlaceholderText(en.split.textPlaceholder), { target: { value: "one\ntwo\nthree" } });
+    fireEvent.click(screen.getByText(en.ui.textNodes.next));
+    fireEvent.click(screen.getByText(en.ui.textNodes.splitLines));
+    const selects = screen.getAllByLabelText(en.split.hangsFrom) as HTMLSelectElement[];
+    expect(selects).toHaveLength(3);
+    const firstId = Array.from(selects[1].options).find((o) => o.text === "one")!.value;
+    fireEvent.change(selects[1], { target: { value: firstId } });
+    fireEvent.change(selects[2], { target: { value: "existing" } });
+    fireEvent.click(screen.getByText(en.ui.textNodes.add(4)));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    // Main node + "one" + "two" on spots; "three" goes beside the map node.
+    expect(findSpots).toHaveBeenCalledWith(3);
+    const plan = (onCreate.mock.calls[0] as unknown[])[0] as { pieces: { id: string; text: string; parentId?: string }[] };
+    const byText = Object.fromEntries(plan.pieces.map((p) => [p.text, p]));
+    expect(byText.one.parentId).toBeUndefined();
+    expect(byText.two.parentId).toBe(byText.one.id);
+    expect(byText.three.parentId).toBe("existing");
+  });
+});

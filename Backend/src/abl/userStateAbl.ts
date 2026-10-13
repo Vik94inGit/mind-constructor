@@ -9,7 +9,7 @@ import {
   updateMapViewStateDao,
   updatePreferencesDao,
 } from "../dao/userStateDao.js";
-import { DRAFT_KINDS, LANGUAGES, READING_MODES, THEMES, ZONE_MODES } from "../models/UserState.js";
+import { DRAFT_KINDS, LANGUAGES, READING_MODES, THEMES, ZONE_LAYOUTS, ZONE_MODES } from "../models/UserState.js";
 import type { DraftKind } from "../models/UserState.js";
 import { ValidationError, parseOrThrow } from "./errors.js";
 
@@ -41,6 +41,7 @@ const mapViewSchema = z
   .object({
     nodeDisplay: idRecord(z.enum(READING_MODES)),
     zoneDisplay: idRecord(z.enum(ZONE_MODES)),
+    zoneLayout: idRecord(z.enum(ZONE_LAYOUTS)),
     cardFills: idRecord(z.string().regex(/^#[0-9a-fA-F]{6}$/, "a fill is a #rrggbb color")),
     blockLocks: z.array(z.string().max(64)).max(MAX_ENTRIES),
     detachedPieces: z.array(z.string().max(64)).max(MAX_ENTRIES),

@@ -229,3 +229,48 @@ describe("getCirclePackSpacing", () => {
     expect(packed).toBeGreaterThanOrEqual(CAPTION_WIDTH);
   });
 });
+
+describe("computeNodeGroups with zone layouts", () => {
+  // root → a, b; a → a1, a2: a zone at root and a sub-zone at a.
+  const nodes: NodeDoc[] = [
+    makeNode({ nodeId: "root" }),
+    makeNode({ nodeId: "a", parentId: "root" }),
+    makeNode({ nodeId: "b", parentId: "root" }),
+    makeNode({ nodeId: "a1", parentId: "a" }),
+    makeNode({ nodeId: "a2", parentId: "a" }),
+  ];
+  const positions = new Map([
+    ["root", { x: 0, y: 0 }],
+    ["a", { x: 100, y: 0 }],
+    ["b", { x: 0, y: 100 }],
+    ["a1", { x: 200, y: -50 }],
+    ["a2", { x: 200, y: 50 }],
+  ]);
+  const ids = (layouts: Record<string, "zones" | "nested" | "none">) =>
+    computeNodeGroups(nodes, nodes, positions, 1000, layouts).map((g) => [g.rootId, g.members.map((m) => m.nodeId).sort()]);
+
+  it("draws separate zones by default", () => {
+    expect(ids({})).toEqual([
+      ["root", ["a", "b", "root"]],
+      ["a", ["a", "a1", "a2"]],
+    ]);
+  });
+
+  it("draws no zones for the whole map, unless a parent asks for its own", () => {
+    expect(ids({ "*": "none" })).toEqual([]);
+    expect(ids({ "*": "none", a: "zones" })).toEqual([["a", ["a", "a1", "a2"]]]);
+  });
+
+  it("wraps a nested parent's whole branch, with its sub-zones inside, first", () => {
+    const groups = computeNodeGroups(nodes, nodes, positions, 1000, { root: "nested" });
+    expect(groups.map((g) => g.rootId)).toEqual(["root", "a"]);
+    expect(groups[0].members.map((m) => m.nodeId).sort()).toEqual(["a", "a1", "a2", "b", "root"]);
+    // The outline is the branch's hull: a sits inside it, not on it.
+    expect(groups[0].outlineIds?.sort()).toEqual(["a1", "a2", "b", "root"]);
+  });
+
+  it("drops a parent's branch zones when it says none", () => {
+    expect(ids({ root: "none" })).toEqual([]);
+    expect(ids({ a: "none" })).toEqual([["root", ["a", "b", "root"]]]);
+  });
+});

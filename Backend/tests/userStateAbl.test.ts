@@ -77,6 +77,7 @@ describe("userStateAbl", () => {
       const fields = {
         nodeDisplay: { a: "puzzle" },
         zoneDisplay: { r: "dots" },
+        zoneLayout: { "*": "none", r: "nested" },
         cardFills: { a: "#fde68a" },
         blockLocks: ["a"],
         detachedPieces: ["b"],
@@ -91,6 +92,7 @@ describe("userStateAbl", () => {
       await expect(updateMapViewStateAbl("m1", { nodeDisplay: { a: "huge" } }, "u1")).rejects.toThrow(ValidationError);
       await expect(updateMapViewStateAbl("m1", { cardFills: { a: "red" } }, "u1")).rejects.toThrow(ValidationError);
       await expect(updateMapViewStateAbl("m1", { zoom: 2 }, "u1")).rejects.toThrow(ValidationError);
+      await expect(updateMapViewStateAbl("m1", { zoneLayout: { r: "flat" } }, "u1")).rejects.toThrow(ValidationError);
     });
   });
 

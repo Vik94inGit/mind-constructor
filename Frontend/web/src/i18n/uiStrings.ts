@@ -48,6 +48,14 @@ export interface UiStrings {
     choose: string;
     delete: string;
     attack: string;
+    /** "Remove links ›": the node's links, each with its own remove row. */
+    unlink: string;
+    unlinkFromParent: (name: string) => string;
+    unlinkChild: (name: string) => string;
+    unlinkEdge: (name: string) => string;
+    unlinkAll: string;
+    /** "Zones ›": how this parent's branch draws its zones (utils/zoneLayout.ts). */
+    zones: string;
   };
   selection: {
     tapToChoose: string;
@@ -217,7 +225,7 @@ export interface UiStrings {
   };
   loadingMap: string;
   /** Showing the chosen nodes in their own reading mode, zooming in when their text would overlap. */
-  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; dots: string; zoneView: (zone: string) => string; lockBlock: string; unlockBlock: string; blockLocked: string; detachPiece: string; takePuzzleApart: string; attachPiece: string; zonesInView: string };
+  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; dots: string; zoneView: (zone: string) => string; lockBlock: string; unlockBlock: string; blockLocked: string; detachPiece: string; takePuzzleApart: string; attachPiece: string; zonesInView: string; mapZones: string; zoneLayoutZones: string; zoneLayoutNested: string; zoneLayoutNone: string };
   /** Separator lines drawn between groups of nodes. */
   lines: {
     toolbar: string;
@@ -359,6 +367,8 @@ export interface UiStrings {
     title: string;
     hint: string;
     withRoot: string;
+    /** The main node can hang from a node already on the map. */
+    rootHangsFrom: string;
     next: string;
     back: string;
     markHint: string;
@@ -495,6 +505,12 @@ const en: UiStrings = {
     choose: "Choose…",
     delete: "Delete",
     attack: "Attack",
+    unlink: "Remove links",
+    unlinkFromParent: (n) => `Unhook from “${n}”`,
+    unlinkChild: (n) => `Unhook child “${n}”`,
+    unlinkEdge: (n) => `Remove link with “${n}”`,
+    unlinkAll: "Remove all links",
+    zones: "Zones",
   },
   selection: {
     tapToChoose: "Tap your nodes to choose them",
@@ -686,6 +702,10 @@ const en: UiStrings = {
     attachPiece: "Put back into the puzzle",
     blockLocked: "Locked — unlock to move or edit it",
     zonesInView: "Zones in view",
+    mapZones: "Zones on this map",
+    zoneLayoutZones: "Separate zones",
+    zoneLayoutNested: "Sub-zones inside the zone",
+    zoneLayoutNone: "No zones",
     zoneView: (z) => `View of “${z}”`,
     zoomedToFit: "Zoomed in so the nodes don't overlap.",
     stillOverlap: "Zoomed in as far as possible — a few nodes still overlap.",
@@ -823,6 +843,7 @@ const en: UiStrings = {
     title: "Text → nodes",
     hint: "Paste or write a text. Pick out its pieces — each one becomes a node right where you clicked.",
     withRoot: "Keep the whole text as a main node (the pieces hang from it)",
+    rootHangsFrom: "The main node hangs from",
     next: "Next: mark pieces →",
     back: "← Back",
     markHint: "Tap where a piece starts and where it ends, then choose what it is — or cut the text up automatically.",
@@ -951,6 +972,12 @@ const cs: UiStrings = {
     choose: "Vybrat…",
     delete: "Smazat",
     attack: "Napadnout",
+    unlink: "Odebrat spojení",
+    unlinkFromParent: (n) => `Odpojit od „${n}“`,
+    unlinkChild: (n) => `Odpojit potomka „${n}“`,
+    unlinkEdge: (n) => `Odebrat spojení s „${n}“`,
+    unlinkAll: "Odebrat všechna spojení",
+    zones: "Zóny",
   },
   selection: {
     tapToChoose: "Klepnutím na své uzly je vyberete",
@@ -1142,6 +1169,10 @@ const cs: UiStrings = {
     attachPiece: "Vrátit do puzzle",
     blockLocked: "Zamčeno — odemkněte pro přesun nebo úpravy",
     zonesInView: "Zóny v zobrazení",
+    mapZones: "Zóny na této mapě",
+    zoneLayoutZones: "Samostatné zóny",
+    zoneLayoutNested: "Podzóny uvnitř zóny",
+    zoneLayoutNone: "Bez zón",
     zoneView: (z) => `Zobrazení „${z}“`,
     zoomedToFit: "Přiblíženo, aby se uzly nepřekrývaly.",
     stillOverlap: "Přiblíženo na maximum — několik uzlů se stále překrývá.",
@@ -1279,6 +1310,7 @@ const cs: UiStrings = {
     title: "Text → uzly",
     hint: "Vložte nebo napište text. Vyberte z něj části — každá se stane uzlem přímo tam, kam jste klikli.",
     withRoot: "Ponechat celý text jako hlavní uzel (části z něj vycházejí)",
+    rootHangsFrom: "Hlavní uzel visí na",
     next: "Dál: označit části →",
     back: "← Zpět",
     markHint: "Klepněte, kde část začíná a kde končí, a zvolte, co to je — nebo text rozdělte automaticky.",
@@ -1406,6 +1438,12 @@ const uk: UiStrings = {
     choose: "Обрати…",
     delete: "Видалити",
     attack: "Атакувати",
+    unlink: "Прибрати зв’язки",
+    unlinkFromParent: (n) => `Відчепити від «${n}»`,
+    unlinkChild: (n) => `Відчепити дитину «${n}»`,
+    unlinkEdge: (n) => `Прибрати зв’язок з «${n}»`,
+    unlinkAll: "Прибрати всі зв’язки",
+    zones: "Зони",
   },
   selection: {
     tapToChoose: "Торкайтеся своїх вузлів, щоб обрати їх",
@@ -1597,6 +1635,10 @@ const uk: UiStrings = {
     attachPiece: "Повернути в пазл",
     blockLocked: "Заблоковано — розблокуйте, щоб рухати чи редагувати",
     zonesInView: "Зони в полі зору",
+    mapZones: "Зони на цій мапі",
+    zoneLayoutZones: "Окремі зони",
+    zoneLayoutNested: "Підзони всередині зони",
+    zoneLayoutNone: "Без зон",
     zoneView: (z) => `Вигляд «${z}»`,
     zoomedToFit: "Наближено, щоб вузли не перекривалися.",
     stillOverlap: "Наближено до максимуму — кілька вузлів усе ще перекриваються.",
@@ -1734,6 +1776,7 @@ const uk: UiStrings = {
     title: "Текст → вузли",
     hint: "Вставте або напишіть текст. Виберіть його частини — кожна стане вузлом саме там, де ви клацнули.",
     withRoot: "Залишити весь текст головним вузлом (частини відходять від нього)",
+    rootHangsFrom: "Головний вузол висить на",
     next: "Далі: позначити частини →",
     back: "← Назад",
     markHint: "Торкніться, де частина починається і де закінчується, і оберіть, що це — або розріжте текст автоматично.",
@@ -1864,6 +1907,12 @@ const ru: UiStrings = {
     choose: "Выбрать…",
     delete: "Удалить",
     attack: "Атаковать",
+    unlink: "Убрать связи",
+    unlinkFromParent: (n) => `Отцепить от «${n}»`,
+    unlinkChild: (n) => `Отцепить ребёнка «${n}»`,
+    unlinkEdge: (n) => `Убрать связь с «${n}»`,
+    unlinkAll: "Убрать все связи",
+    zones: "Зоны",
   },
   selection: {
     tapToChoose: "Касайтесь своих узлов, чтобы выбрать их",
@@ -2055,6 +2104,10 @@ const ru: UiStrings = {
     attachPiece: "Вернуть в пазл",
     blockLocked: "Заблокировано — разблокируйте, чтобы двигать или править",
     zonesInView: "Зоны в поле зрения",
+    mapZones: "Зоны на этой карте",
+    zoneLayoutZones: "Отдельные зоны",
+    zoneLayoutNested: "Подзоны внутри зоны",
+    zoneLayoutNone: "Без зон",
     zoneView: (z) => `Вид «${z}»`,
     zoomedToFit: "Приближено, чтобы узлы не перекрывались.",
     stillOverlap: "Приближено до максимума — несколько узлов всё ещё перекрываются.",
@@ -2192,6 +2245,7 @@ const ru: UiStrings = {
     title: "Текст → узлы",
     hint: "Вставьте или напишите текст. Выберите его части — каждая станет узлом прямо там, где вы щёлкнули.",
     withRoot: "Оставить весь текст главным узлом (части отходят от него)",
+    rootHangsFrom: "Главный узел висит на",
     next: "Далее: отметить части →",
     back: "← Назад",
     markHint: "Нажмите, где часть начинается и где заканчивается, и выберите, что это — или разрежьте текст автоматически.",
