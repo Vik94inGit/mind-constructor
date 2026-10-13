@@ -174,6 +174,12 @@ export interface Translation {
     markTitle: string;
     markHint: string;
     mainNode: string;
+    /** A piece hangs from the main node, another piece, or (on a map) a node already there. */
+    hangsFrom: string;
+    piecesGroup: string;
+    mapGroup: string;
+    /** No parent at all. */
+    noParent: string;
     selected: string;
     clearSelection: string;
     overlap: string;
@@ -362,6 +368,10 @@ const en: Translation = {
     markTitle: "Mark the pieces",
     markHint: "Tap the word a piece starts on, then the word it ends on, and choose what it is. It splits off as its own bubble and becomes a node under the main one; then mark the next.",
     mainNode: "Main node — the whole text",
+    hangsFrom: "Hangs from",
+    piecesGroup: "Pieces",
+    mapGroup: "On the map",
+    noParent: "Nothing",
     selected: "Selected",
     clearSelection: "Clear selection",
     overlap: "That overlaps a piece you already marked — remove it first or select something else.",
@@ -539,6 +549,10 @@ const cs: Translation = {
     markTitle: "Označte části",
     markHint: "Klepněte na slovo, kterým část začíná, pak na slovo, kterým končí, a zvolte, co to je. Oddělí se jako samostatná bublina a stane se uzlem pod hlavním; pak označte další.",
     mainNode: "Hlavní uzel — celý text",
+    hangsFrom: "Visí na",
+    piecesGroup: "Části",
+    mapGroup: "Na mapě",
+    noParent: "Ničem",
     selected: "Vybráno",
     clearSelection: "Zrušit výběr",
     overlap: "To se překrývá s už označenou částí — nejdřív ji odeberte, nebo vyberte něco jiného.",
@@ -716,6 +730,10 @@ const uk: Translation = {
     markTitle: "Позначте частини",
     markHint: "Торкніться слова, з якого починається частина, потім слова, яким вона закінчується, і виберіть, що це. Вона відокремиться окремою бульбашкою і стане вузлом під головним; далі позначте наступну.",
     mainNode: "Головний вузол — увесь текст",
+    hangsFrom: "Висить на",
+    piecesGroup: "Частини",
+    mapGroup: "На мапі",
+    noParent: "Нічому",
     selected: "Виділено",
     clearSelection: "Скасувати виділення",
     overlap: "Це перетинається з уже позначеною частиною — спершу приберіть її або виділіть інше.",
@@ -893,6 +911,10 @@ const ru: Translation = {
     markTitle: "Отметьте части",
     markHint: "Нажмите на слово, с которого начинается часть, затем на слово, которым она заканчивается, и выберите, что это. Она отделится отдельным пузырём и станет узлом под главным; затем отметьте следующую.",
     mainNode: "Главный узел — весь текст",
+    hangsFrom: "Висит на",
+    piecesGroup: "Части",
+    mapGroup: "На карте",
+    noParent: "Ни на чём",
     selected: "Выделено",
     clearSelection: "Снять выделение",
     overlap: "Это пересекается с уже отмеченной частью — сначала уберите её или выделите другое.",

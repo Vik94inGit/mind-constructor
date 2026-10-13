@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { addPiece, autoPieces, spanBetween, splitToThoughtDraft, textSegments, trimRange, wordRanges } from "./textSplit";
+import {
+  addPiece,
+  autoPieces,
+  parentCandidates,
+  piecesParentsFirst,
+  removePiece,
+  setPieceParent,
+  spanBetween,
+  splitToThoughtDraft,
+  textSegments,
+  trimRange,
+  wordRanges,
+} from "./textSplit";
 import type { TextPiece } from "./textSplit";
 
 const piece = (id: string, start: number, end: number): TextPiece => ({ id, start, end, type: "Option" });
@@ -91,5 +103,37 @@ describe("wordRanges / spanBetween", () => {
     ]);
     expect(spanBetween(words[2], words[0])).toEqual({ start: 1, end: 10 });
     expect(spanBetween(words[1], words[1])).toEqual({ start: 5, end: 7 });
+  });
+});
+
+describe("piece parents", () => {
+  const three = [piece("a", 0, 1), piece("b", 2, 3), piece("c", 4, 5)];
+
+  it("hangs a piece from another, and refuses a loop", () => {
+    const hung = setPieceParent(three, "b", "a");
+    expect(hung.find((p) => p.id === "b")?.parentId).toBe("a");
+    // a can't hang from b now: b already hangs from a.
+    expect(setPieceParent(hung, "a", "b")).toBe(hung);
+    expect(parentCandidates(hung, "a").map((p) => p.id)).toEqual(["c"]);
+    // Back to the main node.
+    expect(setPieceParent(hung, "b", undefined).find((p) => p.id === "b")).not.toHaveProperty("parentId");
+  });
+
+  it("moves a removed piece's children up to its own parent", () => {
+    const chain = setPieceParent(setPieceParent(three, "b", "a"), "c", "b");
+    const out = removePiece(chain, "b");
+    expect(out.map((p) => p.id)).toEqual(["a", "c"]);
+    expect(out.find((p) => p.id === "c")?.parentId).toBe("a");
+  });
+
+  it("orders parents before the pieces hanging from them", () => {
+    const pieces = [{ id: "c", parentId: "b" }, { id: "b", parentId: "a" }, { id: "a" }, { id: "d", parentId: "map-node" }];
+    expect(piecesParentsFirst(pieces).map((p) => p.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("keeps a piece's parent in the map draft", () => {
+    const pieces = setPieceParent([piece("a", 0, 5), piece("b", 6, 11)], "b", "a");
+    const draft = splitToThoughtDraft({ name: "", text: "hello world", rootType: "Problem", pieces, step: 1 });
+    expect(draft.thoughts.map((t) => t.parentId)).toEqual(["root", "a"]);
   });
 });

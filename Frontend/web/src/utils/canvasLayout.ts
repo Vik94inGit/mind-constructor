@@ -6,6 +6,8 @@
 import { nodeRefId, sentimentOf } from "./nodeType";
 import type { Sentiment } from "./nodeType";
 import type { EdgeDoc, NodeDoc, NodeType } from "../types";
+import { zoneLayoutResolver } from "./zoneLayout";
+import type { ZoneLayouts } from "./zoneLayout";
 
 export const CANVAS_W = 2400;
 export const CANVAS_H = 1600;
@@ -531,28 +533,121 @@ export function zoneCorners(pts: Pt[], reach: number = getZoneReach()): number[]
   return outlineOrder(near.map((i) => pts[i])).map((k) => near[k]);
 }
 
+// The convex hull of `pts` (indexes into it), counter-clockwise; fewer than
+// 3 when they're all on one line.
+function hullOrder(pts: Pt[], idx: number[]): number[] {
+  const sorted = [...idx].sort((a, b) => pts[a].x - pts[b].x || pts[a].y - pts[b].y);
+  const turn = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const half = (list: number[]) => {
+    const out: number[] = [];
+    for (const i of list) {
+      while (out.length >= 2 && turn(pts[out[out.length - 2]], pts[out[out.length - 1]], pts[i]) <= 0) out.pop();
+      out.push(i);
+    }
+    out.pop();
+    return out;
+  };
+  return [...half(sorted), ...half([...sorted].reverse())];
+}
+
+// The corners of a zone that wraps a whole branch (ZoneLayout "nested"),
+// given its members' positions with the root first and each member's
+// parent's index in `parentIdx` (parents before children): every member
+// within `reach` of its own parent, as long as that parent made it too, and
+// the outline is their convex hull, so the sub-zones inside it never poke
+// out. Indexes into `pts`, like zoneCorners.
+export function branchCorners(pts: Pt[], parentIdx: number[], reach: number = getZoneReach()): number[] {
+  const near = new Set<number>([0]);
+  for (let i = 1; i < pts.length; i++) {
+    const p = parentIdx[i];
+    if (near.has(p) && Math.hypot(pts[i].x - pts[p].x, pts[i].y - pts[p].y) <= reach) near.add(i);
+  }
+  if (near.size < 3) return [];
+  const hull = hullOrder(pts, [...near]);
+  return hull.length >= 3 ? hull : zoneCorners(pts, reach);
+}
+
+export interface ZoneMembership {
+  rootId: string;
+  /** Root first, then its members — breadth first, so a parent is always before its children. */
+  ids: string[];
+  /** Each member's parent's index in `ids` (-1 for the root). */
+  parentIdx: number[];
+  /** Wraps the whole branch (ZoneLayout "nested") rather than just the direct children. */
+  nested: boolean;
+}
+
+/**
+ * Which zones there are, and who's in each: every node with 2+ children,
+ * unless its layout (see utils/zoneLayout.ts) says no zone. A "nested" zone
+ * holds the whole branch below its root; any other just the root and its
+ * direct children. Nested zones come first, biggest first, so the sub-zones
+ * inside them draw (and get clicked) on top. Shared by the drawn zones
+ * (computeNodeGroups) and the placement rules (zoneRules.ts), so both see the
+ * same zones.
+ */
+export function zoneMemberships(
+  childrenOf: Map<string, string[]>,
+  isNode: (id: string) => boolean,
+  parentOf: (id: string) => string | null | undefined,
+  layouts: ZoneLayouts = {},
+): ZoneMembership[] {
+  const layoutOf = zoneLayoutResolver(layouts, parentOf);
+  const out: ZoneMembership[] = [];
+  for (const [rootId, children] of childrenOf) {
+    if (children.length < 2 || !isNode(rootId)) continue;
+    const layout = layoutOf(rootId);
+    if (layout === "none") continue;
+    const nested = layout === "nested";
+    const ids = [rootId];
+    const parentIdx = [-1];
+    const seen = new Set(ids);
+    for (let i = 0; i < ids.length; i++) {
+      if (i > 0 && !nested) break;
+      for (const child of childrenOf.get(ids[i]) ?? []) {
+        if (seen.has(child)) continue;
+        seen.add(child);
+        ids.push(child);
+        parentIdx.push(i);
+      }
+    }
+    out.push({ rootId, ids, parentIdx, nested });
+  }
+  const nestedFirst = out.filter((z) => z.nested).sort((a, b) => b.ids.length - a.ids.length);
+  return nestedFirst.length ? [...nestedFirst, ...out.filter((z) => !z.nested)] : out;
+}
+
+/** A zone's corners in outline order (indexes into `pts`, which follow `zone.ids`). */
+export function zoneShape(zone: ZoneMembership, pts: Pt[], reach: number = getZoneReach()): number[] {
+  return zone.nested ? branchCorners(pts, zone.parentIdx, reach) : zoneCorners(pts, reach);
+}
+
 export function computeNodeGroups(
   visibleNodes: NodeDoc[],
   allNodes: NodeDoc[],
   positions: Map<string, { x: number; y: number }>,
   reach: number = getZoneReach(),
+  layouts: ZoneLayouts = {},
 ): NodeGroup[] {
-  const childrenByParent = new Map<string, NodeDoc[]>();
+  const childrenByParent = new Map<string, string[]>();
+  const byId = new Map(allNodes.map((n) => [n.nodeId, n]));
   for (const n of visibleNodes) {
+    byId.set(n.nodeId, byId.get(n.nodeId) ?? n);
     const parentId = nodeRefId(n.parentId);
     if (!parentId) continue;
     if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
-    childrenByParent.get(parentId)!.push(n);
+    childrenByParent.get(parentId)!.push(n.nodeId);
   }
+  const parentOf = (id: string) => {
+    const n = byId.get(id);
+    return n ? nodeRefId(n.parentId) : null;
+  };
   const groups: NodeGroup[] = [];
-  for (const [rootId, children] of childrenByParent) {
-    if (children.length < 2) continue;
-    const root = allNodes.find((n) => n.nodeId === rootId);
-    if (!root) continue;
-    const members = [root, ...children];
+  for (const zone of zoneMemberships(childrenByParent, (id) => byId.has(id), parentOf, layouts)) {
+    const members = zone.ids.map((id) => byId.get(id)!);
     const sentiment = circleSentiment(members);
     const all = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-    const order = zoneCorners(all, reach);
+    const order = zoneShape(zone, all, reach);
     // Centre and radius follow the drawn zone; with no outline, just the root.
     const pts = order.length ? order.map((i) => all[i]) : [all[0]];
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -564,11 +659,10 @@ export function computeNodeGroups(
     const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 70;
     const outline = order.map((i) => all[i]);
     const outlineIds = order.map((i) => members[i].nodeId);
-    groups.push({ rootId, members, sentiment, cx, cy, r, outline, outlineIds });
+    groups.push({ rootId: zone.rootId, members, sentiment, cx, cy, r, outline, outlineIds });
   }
   return groups;
 }
-
 
 // Any closed loop in the Link graph (not branch-arrows, not weapon marks —
 // specifically Edge documents "Link nodes" creates) reads as a "figure" and

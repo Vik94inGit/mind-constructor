@@ -3,6 +3,8 @@ import { ZONE_COLORS } from "../utils/nodeType";
 import { ZONE_MODES } from "../utils/zoneDisplay";
 import type { ZoneDisplay, ZoneMode } from "../utils/zoneDisplay";
 import { useI18n } from "../i18n/I18nContext";
+import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
+import type { ZoneLayout, ZoneLayouts } from "../utils/zoneLayout";
 import { KnightHelmet } from "./KnightHelmet";
 import type { Sentiment } from "../utils/nodeType";
 
@@ -27,6 +29,10 @@ interface Props {
   modes?: ZoneDisplay;
   /** A zone's view was picked — null goes back to following the map's. */
   onSetMode?: (rootId: string, mode: ZoneMode | null) => void;
+  /** Each parent's own zone layout (see utils/zoneLayout.ts). */
+  layouts?: ZoneLayouts;
+  /** A zone's layout was picked — null goes back to following its parents / the map. */
+  onSetLayout?: (rootId: string, layout: ZoneLayout | null) => void;
 }
 
 // A glyph per view for the chip's view button — short enough to sit beside
@@ -54,6 +60,8 @@ export function ZoneNames({
   onGo,
   modes = {},
   onSetMode,
+  layouts = {},
+  onSetLayout,
 }: Props) {
   const { t } = useI18n();
   // The zone whose view menu is open, and where to draw the menu (fixed to
@@ -207,6 +215,34 @@ export function ZoneNames({
               </button>
             );
           })}
+          {onSetLayout && (
+            <>
+              <div className="my-[0.15rem] border-t border-line" />
+              <div className="px-[0.6rem] pt-[0.2rem] text-[0.7rem] font-semibold tracking-wide text-ink-soft uppercase">
+                {t.ui.contextMenu.zones}
+              </div>
+              {[null, ...ZONE_LAYOUTS].map((l) => {
+                const active = (layouts[menu.rootId] ?? null) === l;
+                return (
+                  <button
+                    key={l ?? "follow"}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={active}
+                    className={`flex w-full cursor-pointer items-center gap-2 rounded-[6px] px-[0.6rem] py-[0.4rem] text-left text-[0.82rem] hover:bg-surface-2 ${
+                      active ? "bg-surface-2 font-semibold text-accent" : "text-ink"
+                    }`}
+                    onClick={() => {
+                      onSetLayout(menu.rootId, l);
+                      setMenu(null);
+                    }}
+                  >
+                    {l ? zoneLayoutLabel(t.ui.display, l) : t.ui.display.followMap}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       )}
     </div>

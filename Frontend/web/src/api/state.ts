@@ -4,6 +4,7 @@ import type { ReadingMode } from "../utils/readingMode";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import type { ZoneDisplay } from "../utils/zoneDisplay";
 import type { CardFills } from "../utils/cardFill";
+import type { ZoneLayouts } from "../utils/zoneLayout";
 
 // The signed-in user's own state on the server (Backend: /api/state), so they
 // pick up on any device where they left off.
@@ -18,6 +19,8 @@ export interface Preferences {
 export interface MapViewState {
   nodeDisplay?: NodeDisplay;
   zoneDisplay?: ZoneDisplay;
+  /** How zones are drawn, per parent and ("*") for the whole map (see utils/zoneLayout.ts). */
+  zoneLayout?: ZoneLayouts;
   cardFills?: CardFills;
   /** Locked puzzle pieces' nodeIds. */
   blockLocks?: string[];

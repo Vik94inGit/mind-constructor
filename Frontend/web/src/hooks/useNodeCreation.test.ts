@@ -103,4 +103,35 @@ describe("useNodeCreation", () => {
     expect(nodesApi.packNodes).toHaveBeenCalledWith("n1", ["n3"]);
     expect(params.showNodes).toHaveBeenCalledWith(["n1", "n2"]);
   });
+
+  it("hangs text pieces from other pieces and from nodes already on the map", async () => {
+    const { result, params } = setup();
+    params.positions.set("old", { x: 900, y: 900 });
+    await act(() =>
+      result.current.createFromText({
+        text: "Whole text",
+        rootType: "Problem",
+        withRoot: true,
+        rootParentId: "top",
+        pieces: [
+          { id: "child", text: "Child", type: "Option", parentId: "parent" },
+          { id: "parent", text: "Parent", type: "Fail" },
+          { id: "beside", text: "Beside", type: "Success", parentId: "old" },
+        ],
+        packed: new Set(),
+        spots: [
+          { x: 100, y: 100 },
+          { x: 300, y: 100 },
+          { x: 500, y: 100 },
+        ],
+      }),
+    );
+    const calls = vi.mocked(nodesApi.createNode).mock.calls.map(([, body]) => body);
+    expect(calls[0]).toMatchObject({ text: "Whole text", parentId: "top" });
+    // The parent piece is made before the one hanging from it.
+    expect(calls[1]).toMatchObject({ text: "Parent", parentId: "n1", x: 300 });
+    expect(calls[2]).toMatchObject({ text: "Child", parentId: "n2", x: 500 });
+    // Beside the map node it hangs from, not on a spot.
+    expect(calls[3]).toMatchObject({ text: "Beside", parentId: "old", x: 900, y: 900 });
+  });
 });

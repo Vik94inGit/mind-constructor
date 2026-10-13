@@ -8,6 +8,7 @@ import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import { layoutTemplate, MAP_KIND_ROOTS } from "../utils/templates";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import { sleep } from "../utils/sleep";
+import { piecesParentsFirst } from "../utils/textSplit";
 import type { Translation } from "../i18n/translations";
 import type { MapKind, NodeDoc, NodeType } from "../types";
 
@@ -33,13 +34,19 @@ export interface PendingCreate {
 // What "Text → nodes" (map/TextToNodesModal.tsx) asks to have made: the
 // whole text as an optional main node, each marked piece as a node (hanging
 // from the main node when there is one), placed on the free spots it already
-// found — the main node on the first. Pieces listed in `packed` didn't get a
-// spot of their own: they're folded into the main node right away.
+// found — the main node on the first. A piece can instead hang from another
+// piece (which becomes its parent) or from a node already on the map, and
+// then it's placed beside that node rather than on a spot. Pieces listed in
+// `packed` didn't get a spot of their own: they're folded into the main node
+// right away.
 export interface TextNodesPlan {
   text: string;
   rootType: NodeType;
   withRoot: boolean;
-  pieces: { id: string; text: string; type: NodeType }[];
+  /** A node on the map the main node hangs from; null for none. */
+  rootParentId?: string | null;
+  /** parentId: another piece's id or a node already on the map; absent means the main node. */
+  pieces: { id: string; text: string; type: NodeType; parentId?: string }[];
   packed: Set<string>;
   spots: Pt[];
 }
@@ -275,7 +282,13 @@ export function useNodeCreation({
     let spot = 0;
     if (plan.withRoot) {
       const at = plan.spots[spot++];
-      const root = await nodesApi.createNode(mapId, { text: plan.text, type: plan.rootType, x: at.x, y: at.y, parentId: null });
+      const root = await nodesApi.createNode(mapId, {
+        text: plan.text,
+        type: plan.rootType,
+        x: at.x,
+        y: at.y,
+        parentId: plan.rootParentId ?? null,
+      });
       rootId = root.nodeId;
       upsertNode(root);
       setCelebrateIds((prev) => new Set(prev).add(root.nodeId));
@@ -284,13 +297,35 @@ export function useNodeCreation({
     }
     // Pieces that get a spot first, so the ones about to be packed (created
     // on the main node's own spot) are on the canvas for as short a moment
-    // as possible before they fold away.
-    const ordered = [...plan.pieces.filter((p) => !plan.packed.has(p.id)), ...plan.pieces.filter((p) => plan.packed.has(p.id))];
+    // as possible before they fold away — but always parents before the
+    // pieces hanging from them, so each one's parent already has its real id.
+    const pieceIds = new Set(plan.pieces.map((p) => p.id));
+    const createdIds = new Map<string, string>();
+    // New nodes placed beside a map node so far — the next one keeps clear of them.
+    const placedBeside: ExtraNode[] = [];
     const packedIds: string[] = [];
+    const ordered = piecesParentsFirst([
+      ...plan.pieces.filter((p) => !plan.packed.has(p.id)),
+      ...plan.pieces.filter((p) => plan.packed.has(p.id)),
+    ]);
     for (const piece of ordered) {
-      const isPacked = plan.packed.has(piece.id) && rootId !== null;
-      const at = isPacked ? plan.spots[0] : plan.spots[spot++];
-      const node = await nodesApi.createNode(mapId, { text: piece.text, type: piece.type, x: at.x, y: at.y, parentId: rootId });
+      const besideMapNode = !!piece.parentId && !pieceIds.has(piece.parentId);
+      const parentId = !piece.parentId
+        ? rootId
+        : pieceIds.has(piece.parentId)
+          ? (createdIds.get(piece.parentId) ?? rootId)
+          : piece.parentId;
+      const isPacked = !besideMapNode && plan.packed.has(piece.id) && rootId !== null;
+      let at: Pt;
+      if (besideMapNode) {
+        const parentAt = positions.get(piece.parentId!) ?? plan.spots[0] ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+        at = placeNode(parentAt, [{ nodeId: NEW_NODE_ID, parentId }], placedBeside);
+      } else {
+        at = isPacked ? plan.spots[0] : plan.spots[spot++];
+      }
+      const node = await nodesApi.createNode(mapId, { text: piece.text, type: piece.type, x: at.x, y: at.y, parentId });
+      createdIds.set(piece.id, node.nodeId);
+      if (besideMapNode) placedBeside.push({ nodeId: node.nodeId, parentId, pos: at });
       upsertNode(node);
       if (isPacked) {
         packedIds.push(node.nodeId);

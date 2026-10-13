@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
+import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
 import { useBackGuard } from "../hooks/useBackGuard";
@@ -42,6 +43,7 @@ import { QuickAddGhosts } from "../map/QuickAddGhosts";
 import { NewNodePanel } from "../map/NewNodePanel";
 import { useFlipSequence } from "../hooks/useFlipSequence";
 import { NodeContextMenu } from "../map/NodeContextMenu";
+import type { NodeLinkItem } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
 import { ViewCorner } from "../map/ViewCorner";
@@ -56,6 +58,7 @@ import { computePuzzleJoins } from "../utils/puzzleLinks";
 import { assemblePuzzles } from "../utils/puzzleAssembly";
 import { usePuzzleCardSizes } from "../hooks/usePuzzleCardSizes";
 import { zoneModeByNode } from "../utils/zoneDisplay";
+import { MAP_ZONE_KEY } from "../utils/zoneLayout";
 import type { ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
@@ -177,6 +180,8 @@ export function MapPage() {
     setNodeDisplay,
     zoneDisplay,
     storeZoneDisplay,
+    zoneLayouts,
+    setZoneLayout,
     blockLocks,
     toggleBlockLock: toggleStoredBlockLock,
     cardFills,
@@ -590,7 +595,7 @@ export function MapPage() {
       [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
       MIN_NODE_GAP,
     );
-    return placeByZoneRules(desired, obstacles, viewportBounds(), makeZoneRule(visibleNodes, positions, moving, extra));
+    return placeByZoneRules(desired, obstacles, viewportBounds(), makeZoneRule(visibleNodes, positions, moving, extra, undefined, zoneLayouts));
   }
 
 
@@ -634,8 +639,8 @@ export function MapPage() {
   // matching this hook's original dependency list exactly rather than
   // changing behavior as part of a pure relocation.
   const nodeGroups = useMemo(
-    () => computeNodeGroups(visibleNodes, nodes, positions),
-    [visibleNodes, positions],
+    () => computeNodeGroups(visibleNodes, nodes, positions, undefined, zoneLayouts),
+    [visibleNodes, positions, zoneLayouts],
   );
 
   // Zoomed out to 50%: no icons anywhere on the canvas — nodes are plain
@@ -1309,6 +1314,58 @@ export function MapPage() {
     }
   }
 
+  // Taking links apart from a node's right-click menu ("Remove links ›"): its
+  // own tie to its parent, each of its children's ties to it (only the
+  // children that are yours — a parent link is the child's own field), and
+  // every link edge it's on. Unhooking a parent link leaves the node where
+  // it is, just with no parent.
+  async function unhook(child: NodeDoc) {
+    const updated = await nodesApi.updateNode(child.nodeId, { parentId: null });
+    upsertNode(updated);
+  }
+  async function removeEdge(edgeId: string) {
+    await edgesApi.deleteEdge(edgeId);
+    setEdges((prev) => prev.filter((e) => e.edgeId !== edgeId));
+  }
+  function linkLabel(id: string | null | undefined): string {
+    const n = id ? nodes.find((x) => x.nodeId === id) : undefined;
+    if (!n) return "…";
+    const text = (n.title || n.text || t.ui.types[n.type]).replace(/\s+/g, " ").trim();
+    return text.length > 28 ? `${text.slice(0, 27)}…` : text;
+  }
+  function nodeLinkActions(node: NodeDoc): { key: string; label: string; run: () => Promise<void> }[] {
+    const out: { key: string; label: string; run: () => Promise<void> }[] = [];
+    const parentId = nodeRefId(node.parentId);
+    if (parentId) {
+      out.push({ key: `p-${parentId}`, label: t.ui.contextMenu.unlinkFromParent(linkLabel(parentId)), run: () => unhook(node) });
+    }
+    for (const child of nodes) {
+      if (nodeRefId(child.parentId) !== node.nodeId || child.isWeapon || !isOwnNode(child)) continue;
+      out.push({ key: `c-${child.nodeId}`, label: t.ui.contextMenu.unlinkChild(linkLabel(child.nodeId)), run: () => unhook(child) });
+    }
+    for (const e of edges) {
+      const from = nodeRefId(e.fromNodeId);
+      const to = nodeRefId(e.toNodeId);
+      if (from !== node.nodeId && to !== node.nodeId) continue;
+      const other = from === node.nodeId ? to : from;
+      out.push({ key: `e-${e.edgeId}`, label: t.ui.contextMenu.unlinkEdge(linkLabel(other)), run: () => removeEdge(e.edgeId) });
+    }
+    return out;
+  }
+  async function runUnlinks(actions: { run: () => Promise<void> }[]) {
+    setActionError(null);
+    try {
+      for (const a of actions) await a.run();
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.removeLink);
+    } finally {
+      if (mapId) refreshInsights(mapId);
+    }
+  }
+  function nodeLinkItems(node: NodeDoc): NodeLinkItem[] {
+    return nodeLinkActions(node).map((a) => ({ key: a.key, label: a.label, onRemove: () => void runUnlinks([a]) }));
+  }
+
   // Shared by the side panel's own Delete button and the context menu's —
   // whichever surface the delete was actually requested from, the local
   // state cleanup (and the resulting deselect) is identical.
@@ -1634,6 +1691,8 @@ export function MapPage() {
       onToggleCompact={toggleCompactView}
       emojiFirst={emojiFirst}
       onToggleEmojiFirst={toggleEmojiFirst}
+      zoneLayout={zoneLayouts[MAP_ZONE_KEY] ?? "zones"}
+      onPickZoneLayout={(layout) => setZoneLayout(MAP_ZONE_KEY, layout === "zones" ? null : layout)}
       nodes={visibleNodes}
       onLoadTexts={async () => {
         await ensureNodeText(visibleNodes.map((n) => n.nodeId));
@@ -2096,6 +2155,8 @@ export function MapPage() {
                 // doesn't fit), without selecting anything.
                 modes={zoneDisplay}
                 onSetMode={setZoneMode}
+                layouts={zoneLayouts}
+                onSetLayout={setZoneLayout}
                 onGo={(rootId) => {
                   const group = nodeGroups.find((g) => g.rootId === rootId);
                   if (!group) return;
@@ -2292,6 +2353,16 @@ export function MapPage() {
               : undefined
           }
           nodeType={contextMenu.node.type}
+          links={isOwnNode(contextMenu.node) ? nodeLinkItems(contextMenu.node) : undefined}
+          onRemoveAllLinks={() => void runUnlinks(nodeLinkActions(contextMenu.node))}
+          zoneLayout={
+            nodes.some((n) => nodeRefId(n.parentId) === contextMenu.node.nodeId)
+              ? {
+                  value: zoneLayouts[contextMenu.node.nodeId] ?? null,
+                  onPick: (layout) => setZoneLayout(contextMenu.node.nodeId, layout),
+                }
+              : undefined
+          }
           onClose={() => setContextMenu(null)}
           onCreate={() => {
             const anchor = contextMenu.node;
@@ -2374,6 +2445,7 @@ export function MapPage() {
           }
           onCreate={createFromText}
           onClose={() => setTextNodesAt(null)}
+          mapNodes={visibleNodes.filter((n) => !n.isWeapon).map((n) => ({ id: n.nodeId, label: linkLabel(n.nodeId) }))}
         />
       )}
 

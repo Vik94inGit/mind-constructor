@@ -8,6 +8,7 @@ import { ReadingModeMenu } from "./ReadingModeMenu";
 import { NodeSearch } from "./NodeSearch";
 import type { NodeDoc } from "../types";
 import type { ReadingMode } from "../utils/readingMode";
+import type { ZoneLayout } from "../utils/zoneLayout";
 
 interface Props {
   /** A demo session has exactly the one map it was seeded with — no way back to a dashboard. */
@@ -28,6 +29,9 @@ interface Props {
   onToggleCompact: () => void;
   emojiFirst: boolean;
   onToggleEmojiFirst: () => void;
+  /** How the whole map draws its zones — see ReadingModeMenu. */
+  zoneLayout?: ZoneLayout;
+  onPickZoneLayout?: (layout: ZoneLayout) => void;
   /** Node search (see NodeSearch). */
   nodes: NodeDoc[];
   onLoadTexts: () => Promise<void>;
@@ -75,6 +79,8 @@ export function MapToolbar({
   onToggleCompact,
   emojiFirst,
   onToggleEmojiFirst,
+  zoneLayout,
+  onPickZoneLayout,
   nodes,
   onLoadTexts,
   onSearchMatches,
@@ -206,6 +212,8 @@ export function MapToolbar({
                 onToggleCompact={onToggleCompact}
                 emojiFirst={emojiFirst}
                 onToggleEmojiFirst={onToggleEmojiFirst}
+                zoneLayout={zoneLayout}
+                onPickZoneLayout={onPickZoneLayout}
                 onPick={(mode) => {
                   onPickReadingMode(mode);
                   setShowReadingMenu(false);

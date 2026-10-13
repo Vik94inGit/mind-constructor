@@ -155,3 +155,20 @@ describe("placeByZoneRules", () => {
     expect(Math.max(gapX, gapY)).toBeGreaterThanOrEqual(MIN_NODE_GAP - 0.01);
   });
 });
+
+describe("makeZoneRule with zone layouts", () => {
+  it("lets anything in where the map has no zones", () => {
+    const { nodes, positions } = triangleMap();
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], WIDE, { "*": "none" });
+    expect(rule.fits({ x: 1000, y: 750 })).toBe(true);
+  });
+
+  it("lets a grandchild into a nested zone, but still keeps strangers out", () => {
+    const { nodes, positions } = triangleMap();
+    const inside = { x: 1000, y: 750 };
+    const child = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: "a" }], [], WIDE, { r: "nested" });
+    expect(child.fits(inside)).toBe(true);
+    const stranger = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], WIDE, { r: "nested" });
+    expect(stranger.fits(inside)).toBe(false);
+  });
+});

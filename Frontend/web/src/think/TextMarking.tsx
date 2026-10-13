@@ -5,7 +5,7 @@ import { NodeTypeIcon } from "../map/NodeTypeIcon";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
-import { overlapsPiece, spanBetween, textSegments, wordRanges } from "../utils/textSplit";
+import { overlapsPiece, parentCandidates, removePiece, setPieceParent, spanBetween, textSegments, wordRanges } from "../utils/textSplit";
 import type { TextPiece } from "../utils/textSplit";
 
 // The pieces of "Text → map" shared by its own page (pages/SplitTextPage.tsx)
@@ -50,6 +50,11 @@ export function useTapMarking(pieces: TextPiece[]) {
   return { start, selection, notice, setNotice, tapWord, clearSelection };
 }
 
+const short = (s: string, n = 40) => {
+  const flat = s.replace(/\s+/g, " ").trim();
+  return flat.length > n ? `${flat.slice(0, n - 1)}…` : flat;
+};
+
 const tint = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
 /**
@@ -66,6 +71,8 @@ export function MessageText({
   onTapWord,
   onChange,
   className = "",
+  mainLabel,
+  mapNodes = [],
 }: {
   text: string;
   pieces: TextPiece[];
@@ -74,6 +81,10 @@ export function MessageText({
   onTapWord: (word: Range) => void;
   onChange: (pieces: TextPiece[]) => void;
   className?: string;
+  /** What a piece with no parent of its own hangs from: the main node, or nothing when there isn't one. */
+  mainLabel?: string;
+  /** Nodes already on the map a piece can hang from (the in-map version). */
+  mapNodes?: { id: string; label: string }[];
 }) {
   const { t } = useI18n();
   const ts = t.split;
@@ -120,12 +131,46 @@ export function MessageText({
                   className="ml-auto cursor-pointer rounded-md border-0 bg-transparent px-[0.35rem] text-[0.95rem] leading-none text-ink-soft hover:text-danger"
                   aria-label={ts.remove}
                   title={ts.remove}
-                  onClick={() => onChange(pieces.filter((x) => x.id !== p.id))}
+                  onClick={() => onChange(removePiece(pieces, p.id))}
                 >
                   ×
                 </button>
               </div>
               <div className="text-[0.95rem] leading-[1.6] break-words whitespace-pre-wrap text-ink">{text.slice(p.start, p.end)}</div>
+              {(pieces.length > 1 || mapNodes.length > 0) && (
+                // What it hangs from: the main node, another piece (which
+                // then becomes a parent), or a node already on the map.
+                <label className="mt-1 flex min-w-0 items-center gap-[0.35rem] text-[0.75rem] text-ink-soft">
+                  <span aria-hidden>↳</span>
+                  <span className="shrink-0">{ts.hangsFrom}</span>
+                  <select
+                    className="min-w-0 flex-1 truncate rounded-md border border-line bg-surface py-0 pr-1 text-[0.75rem] text-ink"
+                    value={p.parentId ?? ""}
+                    aria-label={ts.hangsFrom}
+                    onChange={(e) => onChange(setPieceParent(pieces, p.id, e.target.value || undefined))}
+                  >
+                    <option value="">{mainLabel ?? ts.mainNode}</option>
+                    {parentCandidates(pieces, p.id).length > 0 && (
+                      <optgroup label={ts.piecesGroup}>
+                        {parentCandidates(pieces, p.id).map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {short(text.slice(c.start, c.end))}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {mapNodes.length > 0 && (
+                      <optgroup label={ts.mapGroup}>
+                        {mapNodes.map((n) => (
+                          <option key={n.id} value={n.id}>
+                            {n.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </label>
+              )}
             </div>
           );
         }

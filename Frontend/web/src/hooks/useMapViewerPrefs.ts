@@ -6,6 +6,8 @@ import { loadNodeDisplay, saveNodeDisplay } from "../utils/nodeDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { loadZoneDisplay, saveZoneDisplay } from "../utils/zoneDisplay";
 import type { ZoneDisplay } from "../utils/zoneDisplay";
+import { loadZoneLayouts, parseZoneLayouts, saveZoneLayouts, withZoneLayout } from "../utils/zoneLayout";
+import type { ZoneLayout, ZoneLayouts } from "../utils/zoneLayout";
 import { loadBlockLocks, saveBlockLocks } from "../utils/blockLock";
 import type { BlockLocks } from "../utils/blockLock";
 import { loadCardFills, saveCardFills } from "../utils/cardFill";
@@ -58,6 +60,16 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     setZoneDisplay(next);
     saveZoneDisplay(mapId, next);
   }
+  // How zones are drawn, for the whole map and per parent — see utils/zoneLayout.ts.
+  const [zoneLayouts, setZoneLayouts] = useState<ZoneLayouts>(() => loadZoneLayouts(mapId));
+  /** `id` is a parent's nodeId, or MAP_ZONE_KEY for the whole map; null goes back to following. */
+  function setZoneLayout(id: string, layout: ZoneLayout | null) {
+    setZoneLayouts((prev) => {
+      const next = withZoneLayout(prev, id, layout);
+      saveZoneLayouts(mapId, next);
+      return next;
+    });
+  }
   // Puzzle pieces locked against moving and editing — see utils/blockLock.ts.
   const [blockLocks, setBlockLocks] = useState<BlockLocks>(() => loadBlockLocks(mapId));
   function toggleBlockLock(nodeId: string) {
@@ -106,6 +118,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   const fromServerRef = useRef<{
     nodeDisplay?: unknown;
     zoneDisplay?: unknown;
+    zoneLayouts?: unknown;
     cardFills?: unknown;
     blockLocks?: unknown;
     detachedPieces?: unknown;
@@ -142,14 +155,17 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
         if (view) {
           const nd = view.nodeDisplay ?? {};
           const zd = view.zoneDisplay ?? {};
+          const zl = parseZoneLayouts(view.zoneLayout);
           const cf = view.cardFills ?? {};
           const bl: BlockLocks = Object.fromEntries((view.blockLocks ?? []).map((id) => [id, true as const]));
           const dp: DetachedPieces = Object.fromEntries((view.detachedPieces ?? []).map((id) => [id, true as const]));
-          fromServerRef.current = { nodeDisplay: nd, zoneDisplay: zd, cardFills: cf, blockLocks: bl, detachedPieces: dp };
+          fromServerRef.current = { nodeDisplay: nd, zoneDisplay: zd, zoneLayouts: zl, cardFills: cf, blockLocks: bl, detachedPieces: dp };
           setNodeDisplay(nd);
           saveNodeDisplay(mapId, nd);
           setZoneDisplay(zd);
           saveZoneDisplay(mapId, zd);
+          setZoneLayouts(zl);
+          saveZoneLayouts(mapId, zl);
           setCardFills(cf);
           saveCardFills(mapId, cf);
           setBlockLocks(bl);
@@ -165,6 +181,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
             .saveMapViewState(mapId, {
               nodeDisplay: loadNodeDisplay(mapId),
               zoneDisplay: loadZoneDisplay(mapId),
+              zoneLayout: loadZoneLayouts(mapId),
               cardFills: loadCardFills(mapId),
               blockLocks: Object.keys(loadBlockLocks(mapId)),
               detachedPieces: Object.keys(loadDetachedPieces(mapId)),
@@ -193,6 +210,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   };
   useEffect(() => sendIfChanged("nodeDisplay", nodeDisplay, { nodeDisplay }), [nodeDisplay]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("zoneDisplay", zoneDisplay, { zoneDisplay }), [zoneDisplay]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => sendIfChanged("zoneLayouts", zoneLayouts, { zoneLayout: zoneLayouts }), [zoneLayouts]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("cardFills", cardFills, { cardFills }), [cardFills]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("blockLocks", blockLocks, { blockLocks: Object.keys(blockLocks) }), [blockLocks]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(
@@ -219,6 +237,8 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     setNodeDisplay,
     zoneDisplay,
     storeZoneDisplay,
+    zoneLayouts,
+    setZoneLayout,
     blockLocks,
     toggleBlockLock,
     cardFills,

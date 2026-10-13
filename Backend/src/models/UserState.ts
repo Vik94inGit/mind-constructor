@@ -9,6 +9,8 @@ export const THEMES = ["light", "dark"] as const;
 export const LANGUAGES = ["en", "cs", "uk", "ru"] as const;
 export const READING_MODES = ["puzzle", "mixed", "iconText", "actual"] as const;
 export const ZONE_MODES = [...READING_MODES, "dots"] as const;
+// How zones are drawn — per parent, and under "*" for the whole map (see the frontend's utils/zoneLayout.ts).
+export const ZONE_LAYOUTS = ["zones", "nested", "none"] as const;
 export const DRAFT_KINDS = ["think", "textSplit"] as const;
 export type DraftKind = (typeof DRAFT_KINDS)[number];
 
@@ -36,6 +38,7 @@ const MapViewStateSchema = new mongoose.Schema(
     mapId: { type: String, required: true }, // public mapId
     nodeDisplay: { type: mongoose.Schema.Types.Mixed, default: {} }, // nodeId -> reading mode
     zoneDisplay: { type: mongoose.Schema.Types.Mixed, default: {} }, // zone root nodeId -> zone mode
+    zoneLayout: { type: mongoose.Schema.Types.Mixed, default: {} }, // parent nodeId (or "*": the whole map) -> zone layout
     cardFills: { type: mongoose.Schema.Types.Mixed, default: {} }, // nodeId -> #rrggbb
     blockLocks: { type: [String], default: [] }, // locked puzzle pieces' nodeIds
     detachedPieces: { type: [String], default: [] }, // puzzle pieces taken out of their puzzle

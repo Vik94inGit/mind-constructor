@@ -17,6 +17,8 @@ interface Props {
   findSpots: (count: number) => Pt[];
   onCreate: (plan: TextNodesPlan, onProgress: (done: number, total: number) => void) => Promise<void>;
   onClose: () => void;
+  /** Nodes already on the map that the main node or a piece can hang from (a piece hanging from one is placed beside it). */
+  mapNodes?: { id: string; label: string }[];
 }
 
 // "Text → nodes", right on the map (the canvas right-click menu): the same
@@ -28,7 +30,7 @@ interface Props {
 //      off as its own bubble), or cut the text up by lines/sentences in one go.
 //   3. Only when the map has no room for every new node: say how many fit,
 //      and let the user choose which pieces to pack into the main node.
-export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
+export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }: Props) {
   const { t } = useI18n();
   const s = t.ui.textNodes;
   const [step, setStep] = useState<"write" | "mark" | "pack">("write");
@@ -36,6 +38,8 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
   const [withRoot, setWithRoot] = useState(true);
   const [rootType, setRootType] = useState<NodeType>("Problem");
   const [pieces, setPieces] = useState<TextPiece[]>([]);
+  // A node on the map the main node hangs from; "" for none.
+  const [rootParentId, setRootParentId] = useState("");
   // Step 3: the spots the map has room for, and the pieces chosen to pack.
   const [spots, setSpots] = useState<Pt[]>([]);
   const [packed, setPacked] = useState<Set<string>>(new Set());
@@ -43,7 +47,11 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const { start, selection, notice, setNotice, tapWord, clearSelection } = useTapMarking(pieces);
 
-  const needed = (root: boolean) => (root ? 1 : 0) + pieces.length;
+  // A piece hanging from a node already on the map goes beside that node,
+  // not on one of the spots around the click.
+  const onMap = new Set(mapNodes.map((n) => n.id));
+  const spotPieces = pieces.filter((p) => !p.parentId || !onMap.has(p.parentId));
+  const needed = (root: boolean) => (root ? 1 : 0) + spotPieces.length;
 
   function markAs(type: NodeType) {
     if (!selection) return;
@@ -58,14 +66,15 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
 
   async function submit(root: boolean, at: Pt[], pack: Set<string>) {
     setError(null);
-    setProgress({ done: 0, total: needed(root) });
+    setProgress({ done: 0, total: (root ? 1 : 0) + pieces.length });
     try {
       await onCreate(
         {
           text: text.trim(),
           rootType,
           withRoot: root,
-          pieces: pieces.map((p) => ({ id: p.id, text: text.slice(p.start, p.end), type: p.type })),
+          rootParentId: root && rootParentId ? rootParentId : null,
+          pieces: pieces.map((p) => ({ id: p.id, text: text.slice(p.start, p.end), type: p.type, parentId: p.parentId })),
           packed: pack,
           spots: at,
         },
@@ -83,7 +92,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
   function check(root: boolean) {
     setError(null);
     const want = needed(root);
-    if (want === 0) {
+    if (want === 0 && pieces.length === 0) {
       setError(s.nothing);
       return;
     }
@@ -98,7 +107,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
     }
     setSpots(found);
     const need = want - found.length;
-    setPacked(new Set(pieces.slice(pieces.length - need).map((p) => p.id)));
+    setPacked(new Set(spotPieces.slice(spotPieces.length - need).map((p) => p.id)));
     setStep("pack");
   }
 
@@ -152,6 +161,23 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
                 {s.withRoot}
               </label>
               {withRoot && <TypePicker value={rootType} onPick={setRootType} />}
+              {withRoot && mapNodes.length > 0 && (
+                <label className="mt-3 flex min-w-0 items-center gap-2 text-[0.85rem]">
+                  <span className="shrink-0">{s.rootHangsFrom}</span>
+                  <select
+                    className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-[0.85rem] text-ink"
+                    value={rootParentId}
+                    onChange={(e) => setRootParentId(e.target.value)}
+                  >
+                    <option value="">{t.split.noParent}</option>
+                    {mapNodes.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </>
           )}
 
@@ -189,6 +215,8 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
                   onTapWord={tapWord}
                   onChange={setPieces}
                   className="max-h-[42dvh] overflow-y-auto"
+                  mainLabel={withRoot ? t.split.mainNode : t.split.noParent}
+                  mapNodes={mapNodes}
                 />
               </section>
               {start && (
@@ -208,7 +236,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
                   <p className="mt-0 mb-3 text-[0.85rem] text-ink-soft">{s.packHint(need)}</p>
                   <p className="mt-0 mb-2 text-[0.8rem] font-semibold text-ink-soft">{s.picked(packed.size, need)}</p>
                   <ul className="m-0 flex list-none flex-col gap-[0.35rem] p-0">
-                    {pieces.map((p) => (
+                    {spotPieces.map((p) => (
                       <li key={p.id}>
                         <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 hover:bg-surface-2">
                           <input
@@ -273,7 +301,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose }: Props) {
             )}
             {step === "mark" && (
               <button type="button" className={btnPrimary} disabled={!!progress} onClick={() => check(withRoot)}>
-                {progress ? s.adding(progress.done, progress.total) : s.add(needed(withRoot))}
+                {progress ? s.adding(progress.done, progress.total) : s.add((withRoot ? 1 : 0) + pieces.length)}
               </button>
             )}
             {step === "pack" && (

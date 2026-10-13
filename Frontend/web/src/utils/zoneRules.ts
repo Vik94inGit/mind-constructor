@@ -1,5 +1,6 @@
-import { NODE_FOOTPRINT, avoidOverlap, getZoneReach, zoneCorners } from "./canvasLayout";
-import type { Obstacle, ViewportBounds } from "./canvasLayout";
+import { NODE_FOOTPRINT, avoidOverlap, getZoneReach, zoneMemberships, zoneShape } from "./canvasLayout";
+import type { Obstacle, ViewportBounds, ZoneMembership } from "./canvasLayout";
+import type { ZoneLayouts } from "./zoneLayout";
 import { nodeRefId } from "./nodeType";
 import type { NodeDoc } from "../types";
 
@@ -140,6 +141,7 @@ export function makeZoneRule(
   moving: MovingNode[],
   extra: ExtraNode[] = [],
   reach: number = getZoneReach(),
+  layouts: ZoneLayouts = {},
 ): ZoneRule {
   const offsetOf = new Map(moving.map((m) => [m.nodeId, m.offset ?? { x: 0, y: 0 }]));
   const parentOf = new Map<string, string | null>();
@@ -168,33 +170,30 @@ export function makeZoneRule(
     if (!childrenOf.has(parentId)) childrenOf.set(parentId, []);
     childrenOf.get(parentId)!.push(id);
   }
-  // Same membership computeNodeGroups draws: a root with 2+ children.
-  const zoneMembers: { rootId: string; ids: string[] }[] = [];
-  for (const [rootId, children] of childrenOf) {
-    if (children.length >= 2 && parentOf.has(rootId)) zoneMembers.push({ rootId, ids: [rootId, ...children] });
-  }
+  // Same membership computeNodeGroups draws.
+  const zoneMembers = zoneMemberships(childrenOf, (id) => parentOf.has(id), (id) => parentOf.get(id), layouts);
 
-  const outlineOf = (ids: string[], posOf: (id: string) => Pt | undefined): Pt[] | null => {
+  const outlineOf = (zone: ZoneMembership, posOf: (id: string) => Pt | undefined): Pt[] | null => {
     const pts: Pt[] = [];
-    for (const id of ids) {
+    for (const id of zone.ids) {
       const p = posOf(id);
       if (!p) return null;
       pts.push(p);
     }
-    // ids[0] is the root. Same compact shape the map draws (see zoneCorners).
-    const order = zoneCorners(pts, reach);
+    // ids[0] is the root. Same shape the map draws (see zoneShape).
+    const order = zoneShape(zone, pts, reach);
     return order.length ? order.map((i) => pts[i]) : null;
   };
 
   // Zones none of the moving nodes are in keep their shape wherever they go.
   const fixedZones: Zone[] = [];
-  const movingZones: { rootId: string; ids: string[]; memberIds: Set<string> }[] = [];
+  const movingZones: { zone: ZoneMembership; memberIds: Set<string> }[] = [];
   for (const z of zoneMembers) {
     const memberIds = new Set(z.ids);
     if (z.ids.some((id) => offsetOf.has(id))) {
-      movingZones.push({ rootId: z.rootId, ids: z.ids, memberIds });
+      movingZones.push({ zone: z, memberIds });
     } else {
-      const outline = outlineOf(z.ids, (id) => fixedPos.get(id));
+      const outline = outlineOf(z, (id) => fixedPos.get(id));
       if (outline) fixedZones.push({ rootId: z.rootId, memberIds, outline });
     }
   }
@@ -220,9 +219,9 @@ export function makeZoneRule(
       for (const z of fixedZones) if (!z.memberIds.has(m.id) && intrudes(m.p, z)) return false;
     }
     for (const mz of movingZones) {
-      const outline = outlineOf(mz.ids, posOf);
+      const outline = outlineOf(mz.zone, posOf);
       if (!outline) continue;
-      const zone: Zone = { rootId: mz.rootId, memberIds: mz.memberIds, outline };
+      const zone: Zone = { rootId: mz.zone.rootId, memberIds: mz.memberIds, outline };
       // Rule 1, the other way round: the reshaped zone doesn't swallow anyone.
       for (const f of fixedPoints) if (!zone.memberIds.has(f.id) && intrudes(f.p, zone)) return false;
       for (const m of placed) if (!zone.memberIds.has(m.id) && intrudes(m.p, zone)) return false;
