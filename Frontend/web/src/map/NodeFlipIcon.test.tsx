@@ -39,6 +39,16 @@ describe("NodeFlipIcon", () => {
     expect(faces().root.dataset.flipped).toBe("false");
   });
 
+  it("doesn't turn over when it appears on a node that's already chosen, or when its faces change", () => {
+    const { rerender } = render(
+      <NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} selected flipToken={3} />,
+    );
+    expect(faces().root.dataset.flipped).toBe("false");
+    rerender(<NodeFlipIcon typeFace={<span>OTHER</span>} emoji="🌱" emojiFirst={false} selected flipToken={3} />);
+    expect(faces().root.dataset.flipped).toBe("false");
+    expect(faces().back.textContent).toBe("🌱");
+  });
+
   it("turns over again for each new flip token", () => {
     const { rerender } = render(
       <NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} selected={false} flipToken={0} />,

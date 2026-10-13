@@ -8,7 +8,7 @@ import { NodeTypeIcon } from "./NodeTypeIcon";
 import { ringKindFor } from "./OutcomeBadge";
 import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
 import { TypePicker } from "./TypePicker";
-import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
+import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeShape, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { usePanelSheet } from "./nodePanel/usePanelSheet";
 import { InfoTab } from "./nodePanel/InfoTab";
@@ -798,6 +798,20 @@ export function NodePanel({
     }
   }
 
+  // Owner-only, like the size — the node's outline on the map. null goes
+  // back to the usual circle.
+  async function handleSetShape(shape: NodeShape | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      onUpdated(await nodesApi.updateNode(node.nodeId, { shape }));
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.shape);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleDeleteEdge(edgeId: string) {
     try {
       await edgesApi.deleteEdge(edgeId);
@@ -998,6 +1012,7 @@ export function NodePanel({
           onToggleHidden={handleToggleHidden}
           onSetSize={handleSetSize}
           onSetZone={handleSetZone}
+          onSetShape={(shape) => void handleSetShape(shape)}
           onSetSymbol={handleSetSymbol}
           onDeleteEdge={handleDeleteEdge}
           onSelectNode={onSelectNode}

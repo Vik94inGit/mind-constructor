@@ -50,6 +50,11 @@ export type SizeTier = (typeof SIZE_TIERS)[number];
 export const MANUAL_ZONE_COLORS = ["positive", "negative"] as const;
 export type ManualZoneColor = (typeof MANUAL_ZONE_COLORS)[number];
 
+// The node's outline on the canvas — a light per-node styling choice, purely
+// visual. null (the default) means the usual circle.
+export const NODE_SHAPES = ["circle", "square", "triangle"] as const;
+export type NodeShape = (typeof NODE_SHAPES)[number];
+
 export const NodeSchema = new mongoose.Schema(
   {
     nodeId: { type: String, required: true, unique: true }, // public id, safe to expose in URLs/JSON
@@ -103,6 +108,12 @@ export const NodeSchema = new mongoose.Schema(
     type: { type: String, enum: NODE_TYPES, required: true }, // mandatory: forces the author to categorize every node
     x: Number, // Coordinates for the UI
     y: Number,
+    // Where the node sits while it's drawn as a puzzle card — kept apart from
+    // x/y because a card is far bigger than an icon, so a spot that suits one
+    // crowds (or strands) the other. null means "never placed as a card": a
+    // frontend falls back to x/y until the card is first moved.
+    cardX: { type: Number, default: null },
+    cardY: { type: Number, default: null },
     color: String,
     parentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -175,6 +186,9 @@ export const NodeSchema = new mongoose.Schema(
     // See MANUAL_ZONE_COLORS above — also settable through plain
     // PATCH /api/nodes/:nodeId, same owner-only gating as symbolOverride.
     manualZone: { type: String, enum: MANUAL_ZONE_COLORS, default: null },
+
+    // See NODE_SHAPES above — settable through plain PATCH by the owner.
+    shape: { type: String, enum: NODE_SHAPES, default: null },
   },
   {
     timestamps: true,

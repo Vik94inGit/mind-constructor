@@ -9,6 +9,7 @@ import { NodeWings } from "./NodeWings";
 import { KnightHelmet } from "./KnightHelmet";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { NodeFlipIcon } from "./NodeFlipIcon";
+import { ShapeContent, shapeBodyClass, shapeRoundClass } from "./nodeShape";
 import { PuzzleCard } from "./PuzzleCard";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
 import type { PuzzleJoins } from "../utils/puzzleLinks";
@@ -544,12 +545,10 @@ export const NodeCard = memo(function NodeCard({
             ? "animate-unsolved-pulse"
             : "";
 
-  // Every node gets the same plain circular border now, outcome types
-  // included — OutcomeBadge is just a symbol (no ring of its own any
-  // more; its own halo/horns "crown" decoration is drawn separately, see
-  // above), so there's nothing left for "outcome types skip the border
-  // entirely" to have been protecting.
-  const circleBorderClass = "overflow-hidden border-2 shadow-card";
+  // Every node gets the same plain border, outcome types included, in the
+  // outline it was given (circle by default, see map/nodeShape.tsx) —
+  // OutcomeBadge is just a symbol (no ring of its own any more; its own
+  // halo/horns "crown" decoration is drawn separately, see above).
   // under-fire (indicator) wins over the type's own color when both could
   // apply, decided in JS rather than CSS: a Tailwind class (border-danger)
   // here would lose to the *unconditional* inline `borderColor` a few
@@ -840,14 +839,14 @@ export const NodeCard = memo(function NodeCard({
           </div>
         ) : (
         <div
-          className={`flex h-full w-full items-center justify-center rounded-full p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
+          className={`flex h-full w-full items-center justify-center ${shapeRoundClass(node.shape)} p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
           style={ringStyle}
           title={showHealth || hoverLabel ? undefined : t.ui.node.selectToSeeHealth}
         >
           {inlineEditing ? (
             <button
               type="button"
-              className={`flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-[var(--node-fill)] p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${circleBorderClass}`}
+              className={`flex h-full w-full cursor-pointer items-center justify-center p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${shapeBodyClass(node.shape)}`}
               style={{ borderColor: circleBorderColor }}
               title={t.ui.node.clickToChangeType}
               onPointerDown={(e) => e.stopPropagation()}
@@ -856,15 +855,17 @@ export const NodeCard = memo(function NodeCard({
                 setDraftType(node.isWeapon ? cycleAttackNodeType : cycleNodeType);
               }}
             >
-              {isOutcome ? (
-                <OutcomeBadge
-                  type={displayType as OutcomeType}
-                  size={OUTCOME_BADGE_SIZE}
-                  symbolOverride={node.symbolOverride}
-                />
-              ) : (
-                <NodeTypeIcon type={displayType} size={21} />
-              )}
+              <ShapeContent shape={node.shape} color={circleBorderColor}>
+                {isOutcome ? (
+                  <OutcomeBadge
+                    type={displayType as OutcomeType}
+                    size={OUTCOME_BADGE_SIZE}
+                    symbolOverride={node.symbolOverride}
+                  />
+                ) : (
+                  <NodeTypeIcon type={displayType} size={21} />
+                )}
+              </ShapeContent>
             </button>
           ) : (
             <div
@@ -879,14 +880,14 @@ export const NodeCard = memo(function NodeCard({
               // the page background. Same value QuickAddGhosts' own ghost
               // fill uses, so a ghost previews a real node's actual look
               // instead of a differently-colored stand-in.
-              className={`flex h-full w-full items-center justify-center rounded-full bg-[var(--node-fill)] ${circleBorderClass}`}
+              className={`flex h-full w-full items-center justify-center ${shapeBodyClass(node.shape)}`}
               style={{ borderColor: circleBorderColor }}
             >
               {(() => {
                 // A picture icon (NodeDoc.iconImage) stands in for the type's
                 // symbol; the ring's color still says the type.
                 const typeFace = node.iconImage ? (
-                  <img src={imageSrc(node.iconImage)} alt="" className="h-full w-full rounded-full object-cover" draggable={false} />
+                  <img src={imageSrc(node.iconImage)} alt="" className={`h-full w-full ${shapeRoundClass(node.shape)} object-cover`} draggable={false} />
                 ) : isOutcome ? (
                   <OutcomeBadge
                     type={displayType as OutcomeType}
@@ -898,16 +899,20 @@ export const NodeCard = memo(function NodeCard({
                 );
                 // With an emoji the icon is a two-sided card that turns over
                 // once when the node is chosen (see NodeFlipIcon).
-                return node.emoji ? (
-                  <NodeFlipIcon
-                    typeFace={typeFace}
-                    emoji={node.emoji}
-                    emojiFirst={emojiFirst}
-                    selected={selected}
-                    flipToken={flipToken}
-                  />
-                ) : (
-                  typeFace
+                return (
+                  <ShapeContent shape={node.shape} color={circleBorderColor}>
+                    {node.emoji ? (
+                      <NodeFlipIcon
+                        typeFace={typeFace}
+                        emoji={node.emoji}
+                        emojiFirst={emojiFirst}
+                        selected={selected}
+                        flipToken={flipToken}
+                      />
+                    ) : (
+                      typeFace
+                    )}
+                  </ShapeContent>
                 );
               })()}
             </div>

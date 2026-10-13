@@ -120,6 +120,8 @@ export interface UiStrings {
     pack: string;
     packTitle: string;
     size: string;
+    shape: string;
+    shapes: { circle: string; square: string; triangle: string };
     zone: string;
     zoneTitle: (zone: "positive" | "negative") => string;
     zoneRemoveTitle: string;
@@ -187,6 +189,7 @@ export interface UiStrings {
     protect: string;
     unpack: string;
     size: string;
+    shape: string;
     type: string;
     zone: string;
     removeLink: string;
@@ -568,6 +571,8 @@ const en: UiStrings = {
     pack: "Pack…",
     packTitle: "Fold other linked/branched nodes into this one",
     size: "Size:",
+    shape: "Shape:",
+    shapes: { circle: "Circle", square: "Square", triangle: "Triangle" },
     zone: "Zone:",
     zoneTitle: (z) => `Draw a ${z} zone ring around just this node`,
     zoneRemoveTitle: "Remove this manual zone ring",
@@ -643,6 +648,7 @@ const en: UiStrings = {
     protect: "Protect failed",
     unpack: "Unpack failed",
     size: "Failed to update size",
+    shape: "Failed to change the shape",
     type: "Failed to update type",
     zone: "Failed to update zone",
     removeLink: "Failed to remove link",
@@ -1024,6 +1030,8 @@ const cs: UiStrings = {
     pack: "Sbalit…",
     packTitle: "Sbalit do tohoto uzlu další propojené nebo navazující uzly",
     size: "Velikost:",
+    shape: "Tvar:",
+    shapes: { circle: "Kruh", square: "Čtverec", triangle: "Trojúhelník" },
     zone: "Zóna:",
     zoneTitle: (z) => (z === "positive" ? "Nakreslit pozitivní zónu jen kolem tohoto uzlu" : "Nakreslit negativní zónu jen kolem tohoto uzlu"),
     zoneRemoveTitle: "Odstranit tuto ručně nakreslenou zónu",
@@ -1099,6 +1107,7 @@ const cs: UiStrings = {
     protect: "Ochranu se nepodařilo přidat",
     unpack: "Rozbalení se nezdařilo",
     size: "Velikost se nepodařilo změnit",
+    shape: "Tvar se nepodařilo změnit",
     type: "Typ se nepodařilo změnit",
     zone: "Zónu se nepodařilo změnit",
     removeLink: "Spojení se nepodařilo odstranit",
@@ -1479,6 +1488,8 @@ const uk: UiStrings = {
     pack: "Згорнути…",
     packTitle: "Згорнути в цей вузол інші з’єднані чи пов’язані гілками вузли",
     size: "Розмір:",
+    shape: "Форма:",
+    shapes: { circle: "Коло", square: "Квадрат", triangle: "Трикутник" },
     zone: "Зона:",
     zoneTitle: (z) => (z === "positive" ? "Намалювати позитивну зону лише навколо цього вузла" : "Намалювати негативну зону лише навколо цього вузла"),
     zoneRemoveTitle: "Прибрати цю зону, намальовану вручну",
@@ -1554,6 +1565,7 @@ const uk: UiStrings = {
     protect: "Не вдалося додати захист",
     unpack: "Не вдалося розгорнути",
     size: "Не вдалося змінити розмір",
+    shape: "Не вдалося змінити форму",
     type: "Не вдалося змінити тип",
     zone: "Не вдалося змінити зону",
     removeLink: "Не вдалося прибрати зв’язок",
@@ -1937,6 +1949,8 @@ const ru: UiStrings = {
     pack: "Свернуть…",
     packTitle: "Свернуть в этот узел другие связанные или соединённые ветками узлы",
     size: "Размер:",
+    shape: "Форма:",
+    shapes: { circle: "Круг", square: "Квадрат", triangle: "Треугольник" },
     zone: "Зона:",
     zoneTitle: (z) => (z === "positive" ? "Нарисовать позитивную зону только вокруг этого узла" : "Нарисовать негативную зону только вокруг этого узла"),
     zoneRemoveTitle: "Убрать эту зону, нарисованную вручную",
@@ -2012,6 +2026,7 @@ const ru: UiStrings = {
     protect: "Не удалось добавить защиту",
     unpack: "Не удалось развернуть",
     size: "Не удалось изменить размер",
+    shape: "Не удалось изменить форму",
     type: "Не удалось изменить тип",
     zone: "Не удалось изменить зону",
     removeLink: "Не удалось убрать связь",

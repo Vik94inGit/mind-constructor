@@ -7,7 +7,7 @@ interface Props {
   emoji: string;
   /** Emoji face up by default (the viewer's "emoji first" mode); otherwise the type is. */
   emojiFirst: boolean;
-  /** Turning true (the node was just chosen) flips the card over once and back. */
+  /** Turning true (the node was just chosen) flips the card over once and back — not already being true when the card appears. */
   selected: boolean;
   /** Each new non-zero value flips the card over once and back — MapPage's chosen-zone sequence (see useFlipSequence). */
   flipToken?: number;
@@ -30,11 +30,18 @@ export function NodeFlipIcon({ typeFace, emoji, emojiFirst, selected, flipToken 
     setShowBack(true);
     timer.current = setTimeout(() => setShowBack(false), FLIP_HOLD_MS);
   }
+  // Only a fresh choice turns it: the card appearing on a node that's
+  // already chosen — the owner just gave it an emoji, or swapped one in — or
+  // a new face on it doesn't. Changing the icon shows the change in place.
+  const wasSelected = useRef(selected);
   useEffect(() => {
-    if (selected) peek();
+    if (selected && !wasSelected.current) peek();
+    wasSelected.current = selected;
   }, [selected]);
+  const lastToken = useRef(flipToken);
   useEffect(() => {
-    if (flipToken) peek();
+    if (flipToken && flipToken !== lastToken.current) peek();
+    lastToken.current = flipToken;
   }, [flipToken]);
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);

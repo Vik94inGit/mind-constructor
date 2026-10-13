@@ -64,6 +64,11 @@ export type SizeTier = (typeof SIZE_TIERS)[number];
 export const MANUAL_ZONE_COLORS = ["positive", "negative"] as const;
 export type ManualZoneColor = (typeof MANUAL_ZONE_COLORS)[number];
 
+// The node's outline on the canvas — Node.NODE_SHAPES on the backend. null
+// (or absent) means the usual circle.
+export const NODE_SHAPES = ["circle", "square", "triangle"] as const;
+export type NodeShape = (typeof NODE_SHAPES)[number];
+
 export interface User {
   _id: string;
   username: string;
@@ -208,6 +213,11 @@ export interface NodeDoc {
   // symbolOverride; independent of (and drawn alongside, if both apply)
   // MapPage's own automatic nodeGroups zones.
   manualZone?: ManualZoneColor | null;
+  /** The node's outline (Node.shape) — null / absent is the usual circle. */
+  shape?: NodeShape | null;
+  /** Where the node sits while drawn as a puzzle card (Node.cardX/cardY), apart from the icon's x/y. null / absent: never placed as a card, so it sits at x/y. */
+  cardX?: number | null;
+  cardY?: number | null;
   /** Set by the map owner on the root of a branch hidden from invited members — see Node.hiddenFromMembers on the backend. */
   hiddenFromMembers?: boolean;
   /** Optional emoji — the node's icon flips between it and the type's symbol. See Backend's Node.emoji. "" / absent = none. */
