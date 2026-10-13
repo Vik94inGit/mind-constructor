@@ -14,7 +14,6 @@ function renderToolbar(overrides: Partial<React.ComponentProps<typeof MapToolbar
     onExpand: vi.fn(),
     onToggleMove: vi.fn(),
     onToggleDraw: vi.fn(),
-    onPickReadingMode: vi.fn(),
     onToggleCompact: vi.fn(),
     emojiFirst: false,
     onToggleEmojiFirst: vi.fn(),
@@ -43,7 +42,6 @@ function renderToolbar(overrides: Partial<React.ComponentProps<typeof MapToolbar
             expanded={true}
             moveMode={false}
             drawMode={false}
-            readingMode="actual"
             compact={false}
             nodes={[]}
             {...handlers}
@@ -147,11 +145,11 @@ describe("MapToolbar", () => {
     });
   });
 
-  describe("the view (reading mode) menu", () => {
+  describe("the display menu", () => {
     it("opens on click and offers Present, which fires onPresent and closes the menu", async () => {
       const user = userEvent.setup();
       const { onPresent } = renderToolbar();
-      await user.click(screen.getByTitle(t.map.toolbar.readingMode));
+      await user.click(screen.getByTitle(t.map.toolbar.displayMenu));
       const presentItem = screen.getByText(t.map.toolbar.presentation);
       expect(presentItem).toBeInTheDocument();
 
@@ -160,10 +158,12 @@ describe("MapToolbar", () => {
       expect(screen.queryByText(t.map.toolbar.presentation)).not.toBeInTheDocument();
     });
 
-    it("is highlighted once a non-default reading mode is active", () => {
-      renderToolbar({ readingMode: "puzzle" });
-      const btn = screen.getByTitle(t.map.toolbar.readingMode);
-      expect(btn.className).toContain("border-accent");
+    it("does not repeat the reading modes the bottom-right view menu already offers", async () => {
+      const user = userEvent.setup();
+      renderToolbar();
+      await user.click(screen.getByTitle(t.map.toolbar.displayMenu));
+      expect(screen.queryByText(t.map.toolbar.readingPuzzle)).not.toBeInTheDocument();
+      expect(screen.queryByText(t.map.toolbar.readingActual)).not.toBeInTheDocument();
     });
   });
 });

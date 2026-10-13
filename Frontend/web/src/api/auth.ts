@@ -78,7 +78,7 @@ export async function setUsername(username: string): Promise<User> {
   return res.user;
 }
 
-// The invite box's search: by username, or by the start of an email. With a
+// The invite box's search: by username, or by an exact email. With a
 // mapId the map's current members are left out, so every result can still
 // be invited.
 export async function searchUsers(q: string, mapId?: string): Promise<UserSearchResult[]> {

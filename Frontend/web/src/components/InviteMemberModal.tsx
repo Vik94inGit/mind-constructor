@@ -114,7 +114,6 @@ export function InviteMemberModal({
             <li key={u._id} className="flex items-center gap-3 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[0.9rem] font-semibold text-ink">{u.username}</div>
-                <div className="truncate text-[0.78rem] text-ink-soft">{u.email}</div>
               </div>
               <button
                 type="button"

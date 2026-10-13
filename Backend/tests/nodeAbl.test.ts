@@ -345,6 +345,18 @@ describe("nodeAbl", () => {
       await expect(updateNodeAbl("node1", "user1", { shape: "hexagon" })).rejects.toThrow(ValidationError);
     });
 
+    it("passes a zone pattern and palette colour through, null back to the defaults, and rejects anything else", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      await updateNodeAbl("node1", "user1", { zonePattern: "chess", zoneColor: "sage" });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { zonePattern: "chess", zoneColor: "sage" });
+      await updateNodeAbl("node1", "user1", { zonePattern: null, zoneColor: null });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { zonePattern: null, zoneColor: null });
+
+      await expect(updateNodeAbl("node1", "user1", { zonePattern: "plaid" })).rejects.toThrow(ValidationError);
+      await expect(updateNodeAbl("node1", "user1", { zoneColor: "#ff0000" })).rejects.toThrow(ValidationError);
+    });
+
     it("rejects an order that isn't a whole number from 1 to 9999", async () => {
       for (const order of [0, -1, 1.5, 10000, "3"]) {
         await expect(updateNodeAbl("node1", "user1", { order })).rejects.toThrow(ValidationError);

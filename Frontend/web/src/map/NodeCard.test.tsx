@@ -317,4 +317,19 @@ describe("NodeCard", () => {
     renderNode({ node, groupSentiment: "positive", readingMode: "mixed" });
     expect(screen.getByText("a long member text that would wrap").className).toContain("truncate");
   });
+  it("scrolls a puzzle card's long text inside a box sized for 500 characters", () => {
+    const node = makeNode({ nodeId: "p", text: "x".repeat(900) });
+    renderNode({ node, readingMode: "puzzle" });
+    const text = screen.getByTestId("puzzle-card-text");
+    expect(text.className).toContain("overflow-y-auto");
+    expect(text.style.maxHeight).toMatch(/em$/);
+  });
+
+  it("drops the scroll box on a selected puzzle card", () => {
+    const node = makeNode({ nodeId: "p", text: "x".repeat(900) });
+    renderNode({ node, readingMode: "puzzle", selected: true });
+    const text = screen.getByTestId("puzzle-card-text");
+    expect(text.className).toContain("line-clamp-3");
+    expect(text.style.maxHeight).toBe("");
+  });
 });

@@ -50,6 +50,7 @@ import { ViewCorner } from "../map/ViewCorner";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
 import type { AbstractionLevel } from "../utils/abstractionLevel";
+import { stepNode } from "../utils/nodeOrder";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { MapBanner } from "../map/MapBanner";
@@ -68,7 +69,7 @@ import { SelectionBar } from "../map/SelectionBar";
 import { MapLegend } from "../map/MapLegend";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
-import { idOf, nodeRefId } from "../utils/nodeType";
+import { idOf, nodeRefId, ZONE_COLORS } from "../utils/nodeType";
 import { useRadialBlend } from "../hooks/useRadialBlend";
 import { useSentimentShow } from "../hooks/useSentimentShow";
 import { useCanvasFraming } from "../hooks/useCanvasFraming";
@@ -104,7 +105,7 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, NodeDoc, NodeType } from "../types";
+import type { AttackIndicator, NodeDoc, NodeType, ZonePaletteColor, ZonePattern } from "../types";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -1191,6 +1192,18 @@ export function MapPage() {
 
   // Confirmed from NodeCard's inline input (see startInlineEdit) — resolves
   // straight to the API, no intermediate form.
+  // A zone's pattern or colour, saved on its parent (Node.zonePattern /
+  // zoneColor). Shown straight away, rolled back if the save fails.
+  function setZoneStyle(rootId: string, patch: { zonePattern?: ZonePattern | null; zoneColor?: ZonePaletteColor | null }) {
+    const root = nodes.find((n) => n.nodeId === rootId);
+    if (!root) return;
+    upsertNode({ ...root, ...patch });
+    nodesApi.updateNode(rootId, patch).then(upsertNode, (err) => {
+      upsertNode(root);
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
+    });
+  }
+
   async function confirmInlineEdit(node: NodeDoc, text: string, type: NodeType) {
     setActionError(null);
     try {
@@ -1685,8 +1698,6 @@ export function MapPage() {
       onToggleMove={() => setMoveMode((v) => !v)}
       drawMode={drawMode}
       onToggleDraw={toggleDrawMode}
-      readingMode={readingMode}
-      onPickReadingMode={setReadingMode}
       compact={compactView}
       onToggleCompact={toggleCompactView}
       emojiFirst={emojiFirst}
@@ -1883,7 +1894,10 @@ export function MapPage() {
               }}
               lines={lines}
               canDeleteLine={canDeleteLine}
-              onLineClick={handleLineClick}
+              // With a node's panel open, a tap on a separator line is a tap
+              // outside the panel too: it closes it rather than offering to
+              // delete the line.
+              onLineClick={(line) => (selectedId ? setSelectedId(null) : handleLineClick(line))}
               interactive={!drawMode}
               compact={compactView || dotZoom}
               solvedZones={solvedZones}
@@ -2144,7 +2158,18 @@ export function MapPage() {
                   // See zoneLabel: zoneName, else title, else text, capped.
                   const shortName = zoneLabel(root);
                   return shortName
-                    ? [{ rootId: g.rootId, name: shortName, sentiment: g.sentiment, variant: !!root!.parentId }]
+                    ? [
+                        {
+                          rootId: g.rootId,
+                          name: shortName,
+                          sentiment: g.sentiment,
+                          variant: !!root!.parentId,
+                          // Only the parent's owner may restyle its zone (an owner-only node edit).
+                          style: isOwnNode(root!)
+                            ? { pattern: root!.zonePattern ?? null, color: root!.zoneColor ?? null, autoColor: ZONE_COLORS[g.sentiment] }
+                            : undefined,
+                        },
+                      ]
                     : [];
                 })}
                 positions={positions}
@@ -2157,6 +2182,7 @@ export function MapPage() {
                 onSetMode={setZoneMode}
                 layouts={zoneLayouts}
                 onSetLayout={setZoneLayout}
+                onSetStyle={setZoneStyle}
                 onGo={(rootId) => {
                   const group = nodeGroups.find((g) => g.rootId === rootId);
                   if (!group) return;
@@ -2281,6 +2307,13 @@ export function MapPage() {
                 isMapOwner={isOwner}
                 onApplyTemplate={(kind) => applyTemplate(kind, selectedNode)}
                 onClose={() => setSelectedId(null)}
+                onStepNode={(dir) => {
+                  const next = stepNode(visibleNodes, selectedNode.nodeId, dir);
+                  if (!next) return;
+                  setSelectedId(next);
+                  centerOnNode(next);
+                  setFocusTextNodeId(next);
+                }}
                 onSelectNode={(id) => {
                   setSelectedId(id);
                   // Same "chosen node is always centered" rule handleNodeClick
@@ -2360,6 +2393,17 @@ export function MapPage() {
               ? {
                   value: zoneLayouts[contextMenu.node.nodeId] ?? null,
                   onPick: (layout) => setZoneLayout(contextMenu.node.nodeId, layout),
+                }
+              : undefined
+          }
+          zoneStyle={
+            isOwnNode(contextMenu.node) && nodeGroups.some((g) => g.rootId === contextMenu.node.nodeId)
+              ? {
+                  // The live node, so a pick shows at once while the menu stays open.
+                  pattern: nodes.find((n) => n.nodeId === contextMenu.node.nodeId)?.zonePattern ?? null,
+                  color: nodes.find((n) => n.nodeId === contextMenu.node.nodeId)?.zoneColor ?? null,
+                  autoColor: ZONE_COLORS[nodeGroups.find((g) => g.rootId === contextMenu.node.nodeId)!.sentiment],
+                  onChange: (patch) => setZoneStyle(contextMenu.node.nodeId, patch),
                 }
               : undefined
           }

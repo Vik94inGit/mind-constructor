@@ -3,6 +3,7 @@ import { nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import { roundedPath, LINE_CORNER_RADIUS } from "../utils/drawLine";
 import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc } from "../types";
+import { zoneColorFor } from "../utils/zoneStyle";
 import { useI18n } from "../i18n/I18nContext";
 
 // Smaller than the original per-node dots (which were 2.2px and colored one
@@ -249,9 +250,9 @@ export const MiniMap = memo(function MiniMap({
             points={g.outline
               .map((p) => `${p.x * scaleX},${p.y * scaleY}`)
               .join(" ")}
-            fill={ZONE_COLORS[g.sentiment]}
+            fill={zoneColorFor(nodes.find((n) => n.nodeId === g.rootId), g.sentiment)}
             fillOpacity={0.26}
-            stroke={ZONE_COLORS[g.sentiment]}
+            stroke={zoneColorFor(nodes.find((n) => n.nodeId === g.rootId), g.sentiment)}
             strokeOpacity={0.6}
             strokeWidth={0.75}
           />
@@ -397,7 +398,7 @@ export const MiniMap = memo(function MiniMap({
         {groups.map((g) => {
           const p = positions.get(g.rootId);
           if (!p) return null;
-          const color = ZONE_COLORS[g.sentiment];
+          const color = zoneColorFor(nodes.find((n) => n.nodeId === g.rootId), g.sentiment);
           const cx = p.x * scaleX;
           const cy = p.y * scaleY;
           return (

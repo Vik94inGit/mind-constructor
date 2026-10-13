@@ -1,13 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n/I18nContext";
-import { READING_MODES } from "../utils/readingMode";
-import type { ReadingMode } from "../utils/readingMode";
 import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
 import type { ZoneLayout } from "../utils/zoneLayout";
 
 interface Props {
-  mode: ReadingMode;
-  onPick: (mode: ReadingMode) => void;
   compact: boolean;
   onToggleCompact: () => void;
   /** "Emoji first": a node with an emoji shows it face up, its type on the back. */
@@ -16,19 +12,21 @@ interface Props {
   /** How the whole map draws its zones (utils/zoneLayout.ts); a parent's own choice still wins for its branch. */
   zoneLayout?: ZoneLayout;
   onPickZoneLayout?: (layout: ZoneLayout) => void;
-  /** Enters presentation mode — folded into this same "view" dropdown
-   *  rather than its own toolbar button (see MapToolbar's own comment). */
+  /** Enters presentation mode — folded into this same dropdown rather than
+   *  its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
   onClose: () => void;
   /** Where it opens from its button: below (top toolbar) or to the right (desktop side panel). */
   side?: "below" | "right";
 }
 
-// The toolbar's "view" (eye icon) dropdown — which way the map reads (see
-// utils/readingMode.ts), plus the entry point into presentation mode. Same
+// The toolbar's display (layers icon) dropdown — compact view, emoji first,
+// how the map draws its zones, and the entry point into presentation mode.
+// How much detail the map shows (reading mode, level) lives in the
+// bottom-right eye menu (ViewCorner) instead, so it isn't repeated here. Same
 // open-downward, dismiss-on-outside-click/Escape pattern as AddMenu,
 // positioned by a `relative` wrapper around its trigger.
-export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, emojiFirst, onToggleEmojiFirst, zoneLayout, onPickZoneLayout, onPresent, onClose, side = "below" }: Props) {
+export function DisplayMenu({ compact, onToggleCompact, emojiFirst, onToggleEmojiFirst, zoneLayout, onPickZoneLayout, onPresent, onClose, side = "below" }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -47,33 +45,11 @@ export function ReadingModeMenu({ mode, onPick, compact, onToggleCompact, emojiF
     };
   }, [onClose]);
 
-  const label: Record<ReadingMode, string> = {
-    puzzle: t.map.toolbar.readingPuzzle,
-    mixed: t.map.toolbar.readingMixed,
-    iconText: t.map.toolbar.readingIconText,
-    actual: t.map.toolbar.readingActual,
-  };
-
   return (
     <div
       ref={ref}
       className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex min-w-[210px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
     >
-      {READING_MODES.map((m, i) => (
-        <button
-          key={m}
-          type="button"
-          className={`flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] hover:bg-surface-2 ${
-            m === mode ? "font-semibold text-accent-ink" : "text-ink"
-          }`}
-          onClick={() => onPick(m)}
-        >
-          <span className="w-[1ch] text-ink-soft">{i + 1}</span>
-          <span className="flex-1">{label[m]}</span>
-          {m === mode && <span aria-hidden>✓</span>}
-        </button>
-      ))}
-      <div className="my-[0.15rem] border-t border-line" />
       <button
         type="button"
         role="switch"

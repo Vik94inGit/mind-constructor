@@ -35,11 +35,11 @@ router.patch("/me/username", protect, updateMyUsername);
 // can't count on the session cookie — see realtime/socketToken.ts.
 router.get("/socket-token", protect, socketToken);
 
-// Find someone to invite to a map, by username or email — see
-// userAbl.ts's searchUsersAbl. Any signed-in user.
+// Find someone to invite to a map, by username or exact email — see
+// userAbl.ts's searchUsersAbl. Any signed-in user; results carry no emails.
 router.get("/users/search", protect, searchUsers);
-// Any signed-in user can list users. Everything below is admin-only.
-router.get("/users", protect, getAllUsers);
+// The full user list (with emails) and everything below is admin-only.
+router.get("/users", protect, requireAdmin, getAllUsers);
 router.delete("/users", protect, requireAdmin, deleteAll);
 router.delete<{ id: string }>("/users/:id", protect, requireAdmin, deleteUser);
 router.patch<{ id: string }>("/users/:id/block", protect, requireAdmin, blockUser);

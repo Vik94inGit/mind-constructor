@@ -35,12 +35,14 @@ interface Props {
   imagesSection?: ReactNode;
   /** Pictures dropped anywhere on the post box. Unset when this viewer can't add any. */
   onDropImages?: (files: File[]) => void;
+  /** Saves the text, then opens the previous (-1) or next (1) node — the arrow keys at either end of the text. */
+  onStepNode?: (dir: -1 | 1) => void;
 }
 
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   return (
@@ -79,6 +81,21 @@ export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleL
             onChange={(e) => setTextDraft(e.target.value)}
             disabled={busy}
             onKeyDown={(e) => {
+              // Up/Left at the very start of the text, or Down/Right at the
+              // very end, saves and moves on to the previous/next node (see
+              // utils/nodeOrder.ts) — Alt+arrow does it from anywhere.
+              if (onStepNode && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+                const ta = e.currentTarget;
+                const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
+                const atEnd = ta.selectionStart === ta.value.length && ta.selectionEnd === ta.value.length;
+                const back = (e.key === "ArrowUp" || e.key === "ArrowLeft") && (atStart || e.altKey);
+                const forward = (e.key === "ArrowDown" || e.key === "ArrowRight") && (atEnd || e.altKey);
+                if (back || forward) {
+                  e.preventDefault();
+                  void onTextSave().then((ok) => ok && onStepNode(back ? -1 : 1));
+                  return;
+                }
+              }
               // Mobile has no Shift key to reach alongside a virtual
               // keyboard's Enter/return, so plain Enter has to behave
               // like a normal textarea there too (insert a newline,

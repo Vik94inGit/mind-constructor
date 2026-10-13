@@ -309,6 +309,20 @@ export interface UiStrings {
     lessText: string;
     minimap: string;
     menu: string;
+    simpler: string;
+    richer: string;
+    levels: string;
+    fineTune: string;
+  };
+  /** A zone's own pattern and colour (map/ZoneStylePicker.tsx). */
+  zoneStyle: {
+    pattern: string;
+    color: string;
+    none: string;
+    auto: string;
+    autoHint: string;
+    patterns: Record<"dots" | "stripes" | "grid" | "chess", string>;
+    colors: Record<"sand" | "sage" | "sky" | "lavender" | "rose" | "slate", string>;
   };
   panelDragHandle: string;
   panelResizeHandle: string;
@@ -574,7 +588,7 @@ const en: UiStrings = {
   invite: {
     title: (name) => `Invite to "${name}"`,
     search: "Find someone",
-    placeholder: "Username or email",
+    placeholder: "Username or full email",
     typeMore: "Type at least 2 letters of a username or email.",
     searching: "Searching…",
     noResults: "Nobody found who isn't already on this map.",
@@ -807,10 +821,15 @@ const en: UiStrings = {
     moreDetail: "More levels",
     view: "View",
     moreText: "More text",
-    lessText: "Simpler",
+    lessText: "Less text",
     minimap: "Minimap",
     menu: "View controls: detail, view and minimap",
+    simpler: "Simpler",
+    richer: "More detail",
+    levels: "Levels",
+    fineTune: "Fine-tune",
   },
+  zoneStyle: { pattern: "Pattern", color: "Colour", none: "None", auto: "Auto", autoHint: "Colour by sentiment", patterns: { dots: "Dots", stripes: "Stripes", grid: "Grid", chess: "Chess" }, colors: { sand: "Sand", sage: "Sage", sky: "Sky", lavender: "Lavender", rose: "Rose", slate: "Slate" } },
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
   newNode: { title: "New node", placeholder: "Write your thought…", create: "Create", hint: "Enter creates it, Shift+Enter adds a line" },
@@ -1292,10 +1311,15 @@ const cs: UiStrings = {
     moreDetail: "Více úrovní",
     view: "Zobrazení",
     moreText: "Více textu",
-    lessText: "Jednodušší",
+    lessText: "Méně textu",
     minimap: "Minimapa",
     menu: "Ovládání zobrazení: detail, zobrazení a minimapa",
+    simpler: "Jednodušší",
+    richer: "Více detailů",
+    levels: "Úrovně",
+    fineTune: "Doladit",
   },
+  zoneStyle: { pattern: "Vzor", color: "Barva", none: "Žádný", auto: "Auto", autoHint: "Barva podle nálady", patterns: { dots: "Tečky", stripes: "Pruhy", grid: "Mřížka", chess: "Šachovnice" }, colors: { sand: "Písková", sage: "Šalvějová", sky: "Nebeská", lavender: "Levandulová", rose: "Růžová", slate: "Břidlicová" } },
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
   newNode: { title: "Nový uzel", placeholder: "Napište svou myšlenku…", create: "Vytvořit", hint: "Enter vytvoří, Shift+Enter přidá řádek" },
@@ -1543,7 +1567,7 @@ const uk: UiStrings = {
   invite: {
     title: (name) => `Запросити до «${name}»`,
     search: "Знайти користувача",
-    placeholder: "Ім'я користувача або email",
+    placeholder: "Ім'я користувача або повний email",
     typeMore: "Введіть щонайменше 2 символи імені або email.",
     searching: "Пошук…",
     noResults: "Нікого, хто ще не на цій мапі, не знайдено.",
@@ -1776,10 +1800,15 @@ const uk: UiStrings = {
     moreDetail: "Більше рівнів",
     view: "Вигляд",
     moreText: "Більше тексту",
-    lessText: "Простіше",
+    lessText: "Менше тексту",
     minimap: "Мінімапа",
     menu: "Керування виглядом: деталі, вигляд і мінімапа",
+    simpler: "Простіше",
+    richer: "Більше деталей",
+    levels: "Рівні",
+    fineTune: "Точніше",
   },
+  zoneStyle: { pattern: "Візерунок", color: "Колір", none: "Немає", auto: "Авто", autoHint: "Колір за настроєм", patterns: { dots: "Крапки", stripes: "Смуги", grid: "Сітка", chess: "Шахи" }, colors: { sand: "Пісок", sage: "Шавлія", sky: "Небо", lavender: "Лаванда", rose: "Троянда", slate: "Графіт" } },
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
   newNode: { title: "Новий вузол", placeholder: "Напишіть свою думку…", create: "Створити", hint: "Enter створює, Shift+Enter додає рядок" },
@@ -2030,7 +2059,7 @@ const ru: UiStrings = {
   invite: {
     title: (name) => `Пригласить в «${name}»`,
     search: "Найти пользователя",
-    placeholder: "Имя пользователя или email",
+    placeholder: "Имя пользователя или полный email",
     typeMore: "Введите хотя бы 2 символа имени или email.",
     searching: "Поиск…",
     noResults: "Никого, кто ещё не на этой карте, не найдено.",
@@ -2263,10 +2292,15 @@ const ru: UiStrings = {
     moreDetail: "Больше уровней",
     view: "Вид",
     moreText: "Больше текста",
-    lessText: "Проще",
+    lessText: "Меньше текста",
     minimap: "Миникарта",
     menu: "Управление видом: детали, вид и миникарта",
+    simpler: "Проще",
+    richer: "Больше деталей",
+    levels: "Уровни",
+    fineTune: "Точнее",
   },
+  zoneStyle: { pattern: "Узор", color: "Цвет", none: "Нет", auto: "Авто", autoHint: "Цвет по настроению", patterns: { dots: "Точки", stripes: "Полосы", grid: "Сетка", chess: "Шахматы" }, colors: { sand: "Песок", sage: "Шалфей", sky: "Небо", lavender: "Лаванда", rose: "Роза", slate: "Графит" } },
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",
   newNode: { title: "Новый узел", placeholder: "Напишите свою мысль…", create: "Создать", hint: "Enter создаёт, Shift+Enter добавляет строку" },

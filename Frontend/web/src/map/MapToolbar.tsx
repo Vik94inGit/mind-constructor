@@ -4,10 +4,9 @@ import { useI18n } from "../i18n/I18nContext";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { AddMenu } from "./AddMenu";
-import { ReadingModeMenu } from "./ReadingModeMenu";
+import { DisplayMenu } from "./DisplayMenu";
 import { NodeSearch } from "./NodeSearch";
 import type { NodeDoc } from "../types";
-import type { ReadingMode } from "../utils/readingMode";
 import type { ZoneLayout } from "../utils/zoneLayout";
 
 interface Props {
@@ -23,13 +22,11 @@ interface Props {
   /** Drawing a separator line (see DrawLineBar). */
   drawMode: boolean;
   onToggleDraw: () => void;
-  readingMode: ReadingMode;
-  onPickReadingMode: (mode: ReadingMode) => void;
   compact: boolean;
   onToggleCompact: () => void;
   emojiFirst: boolean;
   onToggleEmojiFirst: () => void;
-  /** How the whole map draws its zones — see ReadingModeMenu. */
+  /** How the whole map draws its zones — see DisplayMenu. */
   zoneLayout?: ZoneLayout;
   onPickZoneLayout?: (layout: ZoneLayout) => void;
   /** Node search (see NodeSearch). */
@@ -48,7 +45,7 @@ interface Props {
   onExportText: () => void;
   /** Deletes the whole map (owner only — see AddMenu). */
   onDeleteMap: () => void;
-  /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay) — offered from the "view" (eye icon) menu below, alongside reading mode. Not owner-gated — anyone viewing a map should be able to self-present it. */
+  /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay) — offered from the display (layers icon) menu below. Not owner-gated — anyone viewing a map should be able to self-present it. */
   onPresent: () => void;
   /** Computer mode (see hooks/useDesktopLayout): a panel docked down the left edge instead of a floating top-left cluster. */
   vertical?: boolean;
@@ -60,7 +57,7 @@ const idle = "border-transparent bg-transparent text-ink";
 const pressed = "border-accent bg-accent-soft text-accent-ink";
 
 // The whole top toolbar collapses to this one compact floating cluster — Back
-// + a single "+" menu (Invite/Create/Node types) + Move + reading mode —
+// + a single "+" menu (Invite/Create/Node types) + Move + display options —
 // pinned top-left instead of a separate full-width bar. z-[45] like the
 // minimap/zoom-controls cluster: above canvas/panel, below a real modal.
 export function MapToolbar({
@@ -73,8 +70,6 @@ export function MapToolbar({
   onToggleMove,
   drawMode,
   onToggleDraw,
-  readingMode,
-  onPickReadingMode,
   compact,
   onToggleCompact,
   emojiFirst,
@@ -100,7 +95,7 @@ export function MapToolbar({
   const { t } = useI18n();
   // Each dropdown's own open/closed state.
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const [showReadingMenu, setShowReadingMenu] = useState(false);
+  const [showDisplayMenu, setShowDisplayMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   // A menu item closes the menu, then does its thing.
   const closeAddThen = (action: () => void) => () => {
@@ -181,48 +176,38 @@ export function MapToolbar({
               <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
             </svg>
           </button>
-          {/* "View" — the reading-mode picker (Aa: puzzle cards / icons +
-              text / actual) plus presentation mode both live behind this one
-              plain-eye icon now, instead of each getting their own toolbar
-              slot. Highlighted whenever reading mode isn't the default look,
-              same trigger as before, just under a different glyph. */}
+          {/* Display options — compact view, emoji first, zone layouts and
+              presentation. Layers icon, not an eye: the eye in the bottom-right
+              corner (ViewCorner) owns how much detail the map shows, reading
+              mode included, so this menu doesn't repeat it. */}
           <div className="relative">
             <button
               type="button"
-              className={`${iconBtn} ${readingMode !== "actual" ? pressed : idle}`}
-              title={t.map.toolbar.readingMode}
-              onClick={() => setShowReadingMenu((v) => !v)}
+              className={`${iconBtn} ${showDisplayMenu ? pressed : idle}`}
+              title={t.map.toolbar.displayMenu}
+              aria-expanded={showDisplayMenu}
+              onClick={() => setShowDisplayMenu((v) => !v)}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path
-                  d="M1 8 C3 4, 13 4, 15 8 C13 12, 3 12, 1 8 Z"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-                <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" fill="none" />
+                <path d="M8 1.8 L14.5 5 L8 8.2 L1.5 5 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+                <path d="M1.5 8 L8 11.2 L14.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
+                <path d="M1.5 11 L8 14.2 L14.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
               </svg>
             </button>
-            {showReadingMenu && (
-              <ReadingModeMenu
+            {showDisplayMenu && (
+              <DisplayMenu
                 side={side}
-                mode={readingMode}
                 compact={compact}
                 onToggleCompact={onToggleCompact}
                 emojiFirst={emojiFirst}
                 onToggleEmojiFirst={onToggleEmojiFirst}
                 zoneLayout={zoneLayout}
                 onPickZoneLayout={onPickZoneLayout}
-                onPick={(mode) => {
-                  onPickReadingMode(mode);
-                  setShowReadingMenu(false);
-                }}
                 onPresent={() => {
-                  setShowReadingMenu(false);
+                  setShowDisplayMenu(false);
                   onPresent();
                 }}
-                onClose={() => setShowReadingMenu(false)}
+                onClose={() => setShowDisplayMenu(false)}
               />
             )}
           </div>

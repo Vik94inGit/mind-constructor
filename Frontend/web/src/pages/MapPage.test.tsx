@@ -110,6 +110,26 @@ describe("MapPage", () => {
     await waitFor(() => expect(screen.queryByDisplayValue("some text")).toBeNull());
   });
 
+  it("steps to the next and previous node with the arrow keys at the ends of the text", async () => {
+    vi.mocked(nodesApi.listNodes).mockResolvedValue([
+      makeNode({ nodeId: "a", title: "Alpha", text: "text A", x: 900, y: 600 }),
+      makeNode({ nodeId: "b", title: "Beta", text: "text B", x: 1300, y: 700 }),
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => nodeEl("a"));
+    await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    const ta = (await screen.findByDisplayValue("text A")) as HTMLTextAreaElement;
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    await user.keyboard("{ArrowDown}");
+    const next = (await screen.findByDisplayValue("text B")) as HTMLTextAreaElement;
+    next.focus();
+    next.setSelectionRange(0, 0);
+    await user.keyboard("{ArrowUp}");
+    expect(await screen.findByDisplayValue("text A")).toBeInTheDocument();
+  });
+
   it("builds a group selection with shift-clicks on your own nodes only", async () => {
     const user = userEvent.setup();
     renderPage();
