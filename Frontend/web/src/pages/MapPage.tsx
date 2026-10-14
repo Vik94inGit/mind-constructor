@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import * as mapsApi from "../api/maps";
@@ -46,11 +46,14 @@ import { NodeContextMenu } from "../map/NodeContextMenu";
 import type { NodeLinkItem } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
+import { PictureViewer } from "../map/PictureViewer";
+import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
 import type { AbstractionLevel } from "../utils/abstractionLevel";
-import { stepNode } from "../utils/nodeOrder";
+import { readingOrder, stepNode } from "../utils/nodeOrder";
+import { useMoveUndo } from "../hooks/useMoveUndo";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { MapBanner } from "../map/MapBanner";
@@ -147,6 +150,11 @@ export function MapPage() {
   const drawSaving = mode.kind === "draw" ? mode.saving : false;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A node's pictures, open full size before its panel (see handleNodeClick).
+  // The time-lapse (TimeLapseBar): how many nodes, oldest first, are shown,
+  // and whether it's playing. `null` when it's off.
+  const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
+  const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
   // gated behind it (see its own comment). Arming a drag straight from the
@@ -367,13 +375,17 @@ export function MapPage() {
       return !v;
     });
   }
-  const visibleNodes = useMemo(
-    () =>
-      activeLevel === null
-        ? unpackedNodes
-        : unpackedNodes.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel)),
-    [unpackedNodes, depthByNode, activeLevel, selectedId],
-  );
+  const timeLapseNodes = useMemo(() => timeLapseOrder(unpackedNodes), [unpackedNodes]);
+  const timeLapseStep = timeLapse ? Math.min(timeLapse.step, timeLapseNodes.length) : null;
+  const visibleNodes = useMemo(() => {
+    if (timeLapseStep !== null) {
+      const shown = new Set(timeLapseNodes.slice(0, timeLapseStep).map((n) => n.nodeId));
+      return unpackedNodes.filter((n) => shown.has(n.nodeId));
+    }
+    return activeLevel === null
+      ? unpackedNodes
+      : unpackedNodes.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel));
+  }, [unpackedNodes, depthByNode, activeLevel, selectedId, timeLapseNodes, timeLapseStep]);
   // A node drawn as a puzzle card sits at its own card spot, apart from the
   // icon's — see utils/cardSpace.ts. Worked out from the same display choices
   // modeOf reads below, with zones taken by membership alone (their outline
@@ -992,6 +1004,15 @@ export function MapPage() {
   // The node drag/drop system: single-node reposition-or-join-a-circle,
   // group ("follow the leader") drag, and touch's own long-press-to-
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
+  // Undo for moves: each drag records where its nodes were; Ctrl+Z (or the
+  // toolbar's undo button) puts the last one back.
+  const { recordMove, undo: undoMove, canUndo } = useMoveUndo({
+    nodes,
+    upsertNode,
+    setActionError,
+    errorMessage: t.ui.errors.moveNodes,
+    keysEnabled: !presenting && !drawMode,
+  });
   const { onNodePointerDown, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
     nodes,
     positions,
@@ -1034,6 +1055,7 @@ export function MapPage() {
       return true;
     },
     isBlockLocked: (id) => !!blockLocks[id],
+    recordMove,
   });
 
   // Same condition that gates the quick-add ghost ring below — reused
@@ -1101,6 +1123,8 @@ export function MapPage() {
 
   function handleNodeClick(node: NodeDoc, shiftKey = false) {
     setContextMenu(null);
+    // The time-lapse is only for watching; its nodes can't be opened.
+    if (timeLapse) return;
     // While drawing a line a node is just something in the way (a click on it
     // can't place a point) — it isn't selected.
     if (drawMode) return;
@@ -1155,6 +1179,74 @@ export function MapPage() {
       return;
     }
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
+    // While reading (any view but the default icons), a node with pictures
+    // shows them first; closing them opens its panel (closePictureView).
+    if (modeOf(node.nodeId) !== "actual" && node.nodeId !== selectedId && hasPictures(node)) {
+      openPictureView(node);
+      return;
+    }
+    selectNodeFromClick(node);
+  }
+
+  // Replays the map from its first node (see TimeLapseBar). The view is
+  // cleared of any selection first; nothing on the map changes.
+  const onTimeLapseStep = useCallback((step: number) => setTimeLapse((cur) => (cur ? { ...cur, step } : cur)), []);
+  function startTimeLapse() {
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    setPictureView(null);
+    setTimeLapse({ step: 0, playing: true });
+    // The whole map in view, so it grows where it's watched.
+    showPoints(
+      unpackedNodes.map((n) => positions.get(n.nodeId)).filter((pt): pt is { x: number; y: number } => !!pt),
+      { aboveSheet: false },
+    );
+  }
+
+  // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
+  // open node to the one before or after it, or, with none open, from the
+  // first (→) or last (←) node. The panel's arrows and the keyboard's ← / →
+  // both land here; only the text field's own arrows move focus into the
+  // next node's text.
+  function stepReading(dir: -1 | 1, focusText = true) {
+    if (timeLapse) {
+      // In the time-lapse the arrows step it instead, one node at a time.
+      setTimeLapse({ playing: false, step: Math.max(0, Math.min(timeLapseNodes.length, timeLapse.step + dir)) });
+      return;
+    }
+    const order = readingOrder(visibleNodes);
+    const next = selectedId ? stepNode(visibleNodes, selectedId, dir) : (dir === 1 ? order[0] : order[order.length - 1])?.nodeId;
+    if (!next) return;
+    setPictureView(null);
+    setSelectedId(next);
+    centerOnNode(next);
+    if (focusText) setFocusTextNodeId(next);
+  }
+
+  function hasPictures(node: NodeDoc): boolean {
+    return Boolean(node.cardImage || node.iconImage || node.images?.length);
+  }
+
+  // The map's node list leaves `images` out, so they're fetched here; the
+  // card or icon picture stands in when the node has none of its own.
+  function openPictureView(node: NodeDoc) {
+    const fallback = [node.cardImage, node.iconImage].filter((src): src is string => Boolean(src));
+    setPictureView({ nodeId: node.nodeId, images: node.images?.length ? node.images : null });
+    if (node.images?.length) return;
+    nodesApi
+      .getNode(node.nodeId)
+      .then((full) => full.images?.length ? full.images : fallback)
+      .catch(() => fallback)
+      .then((images) => setPictureView((cur) => (cur?.nodeId === node.nodeId ? { ...cur, images } : cur)));
+  }
+
+  function closePictureView() {
+    const node = pictureView && nodes.find((n) => n.nodeId === pictureView.nodeId);
+    setPictureView(null);
+    if (node) selectNodeFromClick(node);
+  }
+
+  function selectNodeFromClick(node: NodeDoc) {
     setSelectedId(node.nodeId);
     releaseChosenCircleIfOutside(node.nodeId);
     // Whatever was just clicked is "chosen" now — always center the camera
@@ -1414,6 +1506,24 @@ export function MapPage() {
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text, emoji: emojiFirst ? (emoji ?? "") : undefined });
   }
 
+  // Draw first, write later: a type ghost dragged out of the selected node's
+  // ring drops an empty node of that type where it was let go (nudged clear
+  // of other nodes, see placeNode). The parent stays selected, so its ring
+  // stays up for the next branch; the new node's text is written whenever
+  // it's opened.
+  async function sketchBranch(type: NodeType, pos: { x: number; y: number }, parent: NodeDoc) {
+    if (!mapId) return;
+    setActionError(null);
+    const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
+    try {
+      const node = await nodesApi.createNode(mapId, { text: "", type, x: placed.x, y: placed.y, parentId: parent.nodeId });
+      upsertNode(node);
+      setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
+    }
+  }
+
   // ---- Separator lines ----
   // Drawing takes over the canvas clicks and the bottom sheet — see
   // hooks/useLineDrawing.ts.
@@ -1588,6 +1698,7 @@ export function MapPage() {
     copySelection,
     pasteClipboard,
     onImagePasteWithoutNode: () => showNotice(t.ui.images.selectNode),
+    stepReading: (dir) => stepReading(dir, false),
   });
 
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
@@ -1748,6 +1859,9 @@ export function MapPage() {
       onPaste={() => pasteClipboard()}
       onExportText={openExportText}
       onDeleteMap={deleteThisMap}
+      canUndo={canUndo}
+      onUndo={() => void undoMove()}
+      onTimeLapse={startTimeLapse}
       onPresent={enterPresentation}
     />
   );
@@ -2093,6 +2207,7 @@ export function MapPage() {
                 zoom={zoom}
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
+                onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
               />
             )}
 
@@ -2257,7 +2372,24 @@ export function MapPage() {
             slot from NodePanel while they're active, so the two never try to
             render at once (choosing a node from its panel drops the single
             selection — see startChooseFrom). */}
-        {drawMode ? (
+        {timeLapse && timeLapseStep !== null ? (
+          <TimeLapseBar
+            step={timeLapseStep}
+            total={timeLapseNodes.length}
+            playing={timeLapse.playing && timeLapseStep < timeLapseNodes.length}
+            at={timeLapseNodes[timeLapseStep - 1]?.createdAt}
+            onStep={onTimeLapseStep}
+            onTogglePlay={() =>
+              setTimeLapse((cur) => {
+                if (!cur) return cur;
+                const atEnd = cur.step >= timeLapseNodes.length;
+                // Play at the end starts over from the first node.
+                return atEnd ? { step: 0, playing: true } : { ...cur, playing: !cur.playing };
+              })
+            }
+            onExit={() => setTimeLapse(null)}
+          />
+        ) : drawMode ? (
           <DrawLineBar
             pointCount={drawPoints.length}
             blocked={drawBlocked}
@@ -2345,13 +2477,7 @@ export function MapPage() {
                 isMapOwner={isOwner}
                 onApplyTemplate={(kind) => applyTemplate(kind, selectedNode)}
                 onClose={() => setSelectedId(null)}
-                onStepNode={(dir) => {
-                  const next = stepNode(visibleNodes, selectedNode.nodeId, dir);
-                  if (!next) return;
-                  setSelectedId(next);
-                  centerOnNode(next);
-                  setFocusTextNodeId(next);
-                }}
+                onStepNode={stepReading}
                 onSelectNode={(id) => {
                   setSelectedId(id);
                   // Same "chosen node is always centered" rule handleNodeClick
@@ -2399,6 +2525,8 @@ export function MapPage() {
           )
         )}
       </div>
+
+      {pictureView && <PictureViewer key={pictureView.nodeId} images={pictureView.images} onClose={closePictureView} />}
 
       {contextMenu && (
         <NodeContextMenu

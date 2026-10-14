@@ -137,6 +137,13 @@ export interface Translation {
       zoomIn: string;
       expandToolbar: string;
       displayMenu: string;
+      undo: string;
+      /** The display menu's entry and the bar that replays the map node by node, oldest first. */
+      timeLapse: string;
+      timeLapsePlay: string;
+      timeLapsePause: string;
+      timeLapseExit: string;
+      timeLapseStep: (shown: number, total: number) => string;
       readingPuzzle: string;
       readingMixed: string;
       readingIconText: string;
@@ -332,6 +339,12 @@ const en: Translation = {
       zoomIn: "Zoom in",
       expandToolbar: "Show toolbar",
       displayMenu: "Display options",
+      undo: "Undo last move (Ctrl+Z)",
+      timeLapse: "Time-lapse — watch the map grow",
+      timeLapsePlay: "Play",
+      timeLapsePause: "Pause",
+      timeLapseExit: "Close",
+      timeLapseStep: (n, total) => `${n} of ${total} nodes`,
       readingPuzzle: "Puzzle cards",
       readingMixed: "Mixed: zone cards + icons",
       readingIconText: "Icons + text",
@@ -513,6 +526,12 @@ const cs: Translation = {
       zoomIn: "Přiblížit",
       expandToolbar: "Zobrazit panel nástrojů",
       displayMenu: "Možnosti zobrazení",
+      undo: "Vrátit poslední přesun (Ctrl+Z)",
+      timeLapse: "Časosběr — sledujte, jak mapa roste",
+      timeLapsePlay: "Přehrát",
+      timeLapsePause: "Pozastavit",
+      timeLapseExit: "Zavřít",
+      timeLapseStep: (n, total) => `${n} z ${total} uzlů`,
       readingPuzzle: "Karty puzzle",
       readingMixed: "Smíšený: karty zón + ikony",
       readingIconText: "Ikony + text",
@@ -694,6 +713,12 @@ const uk: Translation = {
       zoomIn: "Збільшити",
       expandToolbar: "Показати панель інструментів",
       displayMenu: "Параметри відображення",
+      undo: "Скасувати останнє переміщення (Ctrl+Z)",
+      timeLapse: "Таймлапс — подивіться, як росте мапа",
+      timeLapsePlay: "Відтворити",
+      timeLapsePause: "Пауза",
+      timeLapseExit: "Закрити",
+      timeLapseStep: (n, total) => `${n} з ${total} вузлів`,
       readingPuzzle: "Картки-пазли",
       readingMixed: "Змішаний: картки зон + іконки",
       readingIconText: "Іконки + текст",
@@ -875,6 +900,12 @@ const ru: Translation = {
       zoomIn: "Увеличить",
       expandToolbar: "Показать панель инструментов",
       displayMenu: "Параметры отображения",
+      undo: "Отменить последнее перемещение (Ctrl+Z)",
+      timeLapse: "Таймлапс — посмотрите, как растёт карта",
+      timeLapsePlay: "Воспроизвести",
+      timeLapsePause: "Пауза",
+      timeLapseExit: "Закрыть",
+      timeLapseStep: (n, total) => `${n} из ${total} узлов`,
       readingPuzzle: "Карточки-пазлы",
       readingMixed: "Смешанный: карточки зон + иконки",
       readingIconText: "Иконки + текст",

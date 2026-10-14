@@ -128,6 +128,9 @@ export interface UiStrings {
   sentiments: { neutral: string; positive: string; negative: string };
   node: {
     byUser: (name: string) => string;
+    /** The panel's buttons that read the previous / next node (← / → on the keyboard too). */
+    prevNode: string;
+    nextNode: string;
     root: string;
     healthLine: (health: number, defeated: boolean) => string;
     pointsAt: string;
@@ -173,6 +176,8 @@ export interface UiStrings {
     clickToChangeType: string;
     chooseHint: string;
     ghostAgain: string;
+    /** On a type ghost: drag it out to drop an empty node there, written later. */
+    ghostDrag: string;
     /** Starter phrases a ghost offers once it's picked out — click one to open the new node with it. */
     ghostTemplates: Record<NodeType, string[]>;
     ghostTemplatesTitle: string;
@@ -364,6 +369,9 @@ export interface UiStrings {
     remove: string;
     open: string;
     close: string;
+    /** The picture viewer's buttons for the previous / next picture. */
+    prev: string;
+    next: string;
     loading: string;
     limit: (max: number) => string;
     tooLarge: string;
@@ -617,6 +625,8 @@ const en: UiStrings = {
   sentiments: { neutral: "neutral", positive: "positive", negative: "negative" },
   node: {
     byUser: (name) => `by ${name}`,
+    prevNode: "Previous node (←)",
+    nextNode: "Next node (→)",
     root: "root",
     healthLine: (h, defeated) => `${h}/100 health${defeated ? " · defeated" : ""}`,
     pointsAt: "Points at",
@@ -664,6 +674,7 @@ const en: UiStrings = {
     clickToChangeType: "Click to change type",
     chooseHint: "choose?",
     ghostAgain: "click again to add",
+    ghostDrag: "or drag it out to sketch a branch",
     ghostTemplates: {
       "Problem": ["What's blocking us?", "Root cause:", "Risk if we do nothing"],
       "Problematic option": ["Could work, but…", "Hidden cost:", "Weak spot:"],
@@ -871,6 +882,8 @@ const en: UiStrings = {
     remove: "Remove picture",
     open: "Open full size",
     close: "Close",
+    prev: "Previous picture",
+    next: "Next picture",
     loading: "Loading pictures…",
     limit: (max) => `Up to ${max} pictures per node`,
     tooLarge: "That picture couldn't be used — try a smaller one.",
@@ -1108,6 +1121,8 @@ const cs: UiStrings = {
   sentiments: { neutral: "neutrální", positive: "pozitivní", negative: "negativní" },
   node: {
     byUser: (name) => `od ${name}`,
+    prevNode: "Předchozí uzel (←)",
+    nextNode: "Další uzel (→)",
     root: "kořen",
     healthLine: (h, defeated) => `${h}/100 zdraví${defeated ? " · poražen" : ""}`,
     pointsAt: "Míří na",
@@ -1155,6 +1170,7 @@ const cs: UiStrings = {
     clickToChangeType: "Klepnutím změníte typ",
     chooseHint: "vybrat?",
     ghostAgain: "klepnutím znovu přidáte",
+    ghostDrag: "nebo ho vytáhněte a načrtněte větev",
     ghostTemplates: {
       "Problem": ["Co nás blokuje?", "Příčina:", "Riziko, když nic neuděláme"],
       "Problematic option": ["Mohlo by fungovat, ale…", "Skrytá cena:", "Slabé místo:"],
@@ -1362,6 +1378,8 @@ const cs: UiStrings = {
     remove: "Odebrat obrázek",
     open: "Otevřít v plné velikosti",
     close: "Zavřít",
+    prev: "Předchozí obrázek",
+    next: "Další obrázek",
     loading: "Načítání obrázků…",
     limit: (max) => `Nejvýše ${max} obrázků na uzel`,
     tooLarge: "Tento obrázek nešel použít — zkuste menší.",
@@ -1598,6 +1616,8 @@ const uk: UiStrings = {
   sentiments: { neutral: "нейтральний", positive: "позитивний", negative: "негативний" },
   node: {
     byUser: (name) => `від ${name}`,
+    prevNode: "Попередній вузол (←)",
+    nextNode: "Наступний вузол (→)",
     root: "корінь",
     healthLine: (h, defeated) => `${h}/100 здоров’я${defeated ? " · переможений" : ""}`,
     pointsAt: "Націлений на",
@@ -1645,6 +1665,7 @@ const uk: UiStrings = {
     clickToChangeType: "Натисніть, щоб змінити тип",
     chooseHint: "обрати?",
     ghostAgain: "натисніть ще раз, щоб додати",
+    ghostDrag: "або витягніть, щоб накреслити гілку",
     ghostTemplates: {
       "Problem": ["Що нас блокує?", "Першопричина:", "Ризик, якщо нічого не робити"],
       "Problematic option": ["Може спрацювати, але…", "Прихована ціна:", "Слабке місце:"],
@@ -1852,6 +1873,8 @@ const uk: UiStrings = {
     remove: "Видалити зображення",
     open: "Відкрити в повному розмірі",
     close: "Закрити",
+    prev: "Попереднє зображення",
+    next: "Наступне зображення",
     loading: "Завантаження зображень…",
     limit: (max) => `Не більше ${max} зображень на вузол`,
     tooLarge: "Це зображення не вдалося використати — спробуйте менше.",
@@ -2091,6 +2114,8 @@ const ru: UiStrings = {
   sentiments: { neutral: "нейтральный", positive: "позитивный", negative: "негативный" },
   node: {
     byUser: (name) => `от ${name}`,
+    prevNode: "Предыдущий узел (←)",
+    nextNode: "Следующий узел (→)",
     root: "корень",
     healthLine: (h, defeated) => `${h}/100 здоровья${defeated ? " · побеждён" : ""}`,
     pointsAt: "Нацелен на",
@@ -2138,6 +2163,7 @@ const ru: UiStrings = {
     clickToChangeType: "Нажмите, чтобы изменить тип",
     chooseHint: "выбрать?",
     ghostAgain: "нажмите ещё раз, чтобы добавить",
+    ghostDrag: "или вытяните, чтобы набросать ветку",
     ghostTemplates: {
       "Problem": ["Что нас блокирует?", "Первопричина:", "Риск, если ничего не делать"],
       "Problematic option": ["Может сработать, но…", "Скрытая цена:", "Слабое место:"],
@@ -2345,6 +2371,8 @@ const ru: UiStrings = {
     remove: "Удалить изображение",
     open: "Открыть в полном размере",
     close: "Закрыть",
+    prev: "Предыдущее изображение",
+    next: "Следующее изображение",
     loading: "Загрузка изображений…",
     limit: (max) => `Не больше ${max} изображений на узел`,
     tooLarge: "Это изображение не удалось использовать — попробуйте поменьше.",

@@ -1137,7 +1137,7 @@ sequenceDiagram
 
   C->>Ctrl: POST /api/nodes/{mapId} {text, type, parentId, ...}
   Ctrl->>Abl: createNodeAbl(req.body, mapId, userId)
-  Abl->>Abl: zod: text + type required
+  Abl->>Abl: zod: text (may be "") + type required
   Abl->>MDao: getMapByIdDao(mapId, userId)
   MDao->>DB: Map.findOne({mapId, members: userId})
   alt caller is a member

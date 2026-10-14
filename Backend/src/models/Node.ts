@@ -66,7 +66,10 @@ export type ZonePaletteColor = (typeof ZONE_PALETTE)[number];
 export const NodeSchema = new mongoose.Schema(
   {
     nodeId: { type: String, required: true, unique: true }, // public id, safe to expose in URLs/JSON
-    text: { type: String, required: true },
+    // Empty for a node sketched on the canvas first and written later (a
+    // branch dragged out of the quick-add ring); every other way of making a
+    // node checks for text in its own ABL schema.
+    text: { type: String, default: "" },
     // An optional short label shown on the canvas in place of the text's
     // first words. Empty (the default) means "no title" — the frontend then
     // falls back to the start of `text`. Unlike `text`, this rides along on
