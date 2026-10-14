@@ -51,6 +51,7 @@ import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
 import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { stepNode } from "../utils/nodeOrder";
+import { useMoveUndo } from "../hooks/useMoveUndo";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { MapBanner } from "../map/MapBanner";
@@ -987,6 +988,15 @@ export function MapPage() {
   // The node drag/drop system: single-node reposition-or-join-a-circle,
   // group ("follow the leader") drag, and touch's own long-press-to-
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
+  // Undo for moves: each drag records where its nodes were; Ctrl+Z (or the
+  // toolbar's undo button) puts the last one back.
+  const { recordMove, undo: undoMove, canUndo } = useMoveUndo({
+    nodes,
+    upsertNode,
+    setActionError,
+    errorMessage: t.ui.errors.moveNodes,
+    keysEnabled: !presenting && !drawMode,
+  });
   const { onNodePointerDown, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
     nodes,
     positions,
@@ -1029,6 +1039,7 @@ export function MapPage() {
       return true;
     },
     isBlockLocked: (id) => !!blockLocks[id],
+    recordMove,
   });
 
   // Same condition that gates the quick-add ghost ring below — reused
@@ -1722,6 +1733,8 @@ export function MapPage() {
       onPaste={() => pasteClipboard()}
       onExportText={openExportText}
       onDeleteMap={deleteThisMap}
+      canUndo={canUndo}
+      onUndo={() => void undoMove()}
       onPresent={enterPresentation}
     />
   );

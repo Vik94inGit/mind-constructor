@@ -79,6 +79,8 @@ interface Params {
   onHold?: (node: NodeDoc, clientX: number, clientY: number) => boolean;
   /** Its owner locked this text block (utils/blockLock.ts) — held in place like Node.locked. */
   isBlockLocked?: (nodeId: string) => boolean;
+  /** A drag is about to save: the moved nodes as they were before it, for undo (hooks/useMoveUndo.ts). */
+  recordMove?: (before: NodeDoc[]) => void;
 }
 
 // The node drag/drop system: single-node reposition-or-join-a-circle,
@@ -115,6 +117,7 @@ export function useNodeDragAndDrop({
   clusterFor,
   onHold,
   isBlockLocked,
+  recordMove,
 }: Params) {
   // Held in place: a member of the chosen circle (Node.locked), or a text
   // block its owner locked.
@@ -240,6 +243,7 @@ export function useNodeDragAndDrop({
         const dx = p.x - startPt.x;
         const dy = p.y - startPt.y;
         setActionError(null);
+        recordMove?.(nodes.filter((n) => memberIds.includes(n.nodeId)));
 
         // The selection lands as one rigid shape, at the nearest spot where
         // the zone rules hold for every member at once (see placeNode): no
@@ -526,6 +530,7 @@ export function useNodeDragAndDrop({
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
+      if (dragMoved.current) recordMove?.(clusterStart ? nodes.filter((n) => clusterStart.has(n.nodeId)) : [node]);
       if (clusterStart && dragMoved.current) {
         const moved = movedCluster(x - start.x, y - start.y);
         const members = nodes.filter((n) => moved.has(n.nodeId));

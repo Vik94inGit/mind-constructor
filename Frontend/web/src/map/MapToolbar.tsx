@@ -47,6 +47,9 @@ interface Props {
   onDeleteMap: () => void;
   /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay) — offered from the display (layers icon) menu below. Not owner-gated — anyone viewing a map should be able to self-present it. */
   onPresent: () => void;
+  /** Puts the last move back (hooks/useMoveUndo.ts); the button greys out with nothing to undo. */
+  onUndo?: () => void;
+  canUndo?: boolean;
   /** Computer mode (see hooks/useDesktopLayout): a panel docked down the left edge instead of a floating top-left cluster. */
   vertical?: boolean;
 }
@@ -90,6 +93,8 @@ export function MapToolbar({
   onExportText,
   onDeleteMap,
   onPresent,
+  onUndo,
+  canUndo = false,
   vertical = false,
 }: Props) {
   const { t } = useI18n();
@@ -165,6 +170,18 @@ export function MapToolbar({
           >
             ✥
           </button>
+          {onUndo && (
+            <button
+              type="button"
+              className={`${iconBtn} ${idle} disabled:cursor-not-allowed disabled:opacity-40`}
+              title={t.map.toolbar.undo}
+              aria-label={t.map.toolbar.undo}
+              disabled={!canUndo}
+              onClick={onUndo}
+            >
+              ↶
+            </button>
+          )}
           {/* Draw a separator line: click empty spots to place its points. */}
           <button
             type="button"
