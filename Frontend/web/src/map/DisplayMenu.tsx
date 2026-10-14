@@ -15,6 +15,8 @@ interface Props {
   /** Enters presentation mode — folded into this same dropdown rather than
    *  its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
+  /** Starts the time-lapse — the map replayed node by node, oldest first. */
+  onTimeLapse?: () => void;
   onClose: () => void;
   /** Where it opens from its button: below (top toolbar) or to the right (desktop side panel). */
   side?: "below" | "right";
@@ -26,7 +28,7 @@ interface Props {
 // bottom-right eye menu (ViewCorner) instead, so it isn't repeated here. Same
 // open-downward, dismiss-on-outside-click/Escape pattern as AddMenu,
 // positioned by a `relative` wrapper around its trigger.
-export function DisplayMenu({ compact, onToggleCompact, emojiFirst, onToggleEmojiFirst, zoneLayout, onPickZoneLayout, onPresent, onClose, side = "below" }: Props) {
+export function DisplayMenu({ compact, onToggleCompact, emojiFirst, onToggleEmojiFirst, zoneLayout, onPickZoneLayout, onPresent, onTimeLapse, onClose, side = "below" }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -108,6 +110,16 @@ export function DisplayMenu({ compact, onToggleCompact, emojiFirst, onToggleEmoj
         <span aria-hidden>▶</span>
         <span className="flex-1">{t.map.toolbar.presentation}</span>
       </button>
+      {onTimeLapse && (
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
+          onClick={onTimeLapse}
+        >
+          <span aria-hidden>⏱</span>
+          <span className="flex-1">{t.map.toolbar.timeLapse}</span>
+        </button>
+      )}
     </div>
   );
 }

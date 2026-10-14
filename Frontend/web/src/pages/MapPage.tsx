@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import * as mapsApi from "../api/maps";
@@ -47,6 +47,7 @@ import type { NodeLinkItem } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
 import { PictureViewer } from "../map/PictureViewer";
+import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
@@ -148,6 +149,9 @@ export function MapPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // A node's pictures, open full size before its panel (see handleNodeClick).
+  // The time-lapse (TimeLapseBar): how many nodes, oldest first, are shown,
+  // and whether it's playing. `null` when it's off.
+  const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
   const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
@@ -366,13 +370,17 @@ export function MapPage() {
       return !v;
     });
   }
-  const visibleNodes = useMemo(
-    () =>
-      activeLevel === null
-        ? unpackedNodes
-        : unpackedNodes.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel)),
-    [unpackedNodes, depthByNode, activeLevel, selectedId],
-  );
+  const timeLapseNodes = useMemo(() => timeLapseOrder(unpackedNodes), [unpackedNodes]);
+  const timeLapseStep = timeLapse ? Math.min(timeLapse.step, timeLapseNodes.length) : null;
+  const visibleNodes = useMemo(() => {
+    if (timeLapseStep !== null) {
+      const shown = new Set(timeLapseNodes.slice(0, timeLapseStep).map((n) => n.nodeId));
+      return unpackedNodes.filter((n) => shown.has(n.nodeId));
+    }
+    return activeLevel === null
+      ? unpackedNodes
+      : unpackedNodes.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel));
+  }, [unpackedNodes, depthByNode, activeLevel, selectedId, timeLapseNodes, timeLapseStep]);
   // A node drawn as a puzzle card sits at its own card spot, apart from the
   // icon's — see utils/cardSpace.ts. Worked out from the same display choices
   // modeOf reads below, with zones taken by membership alone (their outline
@@ -1110,6 +1118,8 @@ export function MapPage() {
 
   function handleNodeClick(node: NodeDoc, shiftKey = false) {
     setContextMenu(null);
+    // The time-lapse is only for watching; its nodes can't be opened.
+    if (timeLapse) return;
     // While drawing a line a node is just something in the way (a click on it
     // can't place a point) — it isn't selected.
     if (drawMode) return;
@@ -1173,12 +1183,27 @@ export function MapPage() {
     selectNodeFromClick(node);
   }
 
+  // Replays the map from its first node (see TimeLapseBar). The view is
+  // cleared of any selection first; nothing on the map changes.
+  const onTimeLapseStep = useCallback((step: number) => setTimeLapse((cur) => (cur ? { ...cur, step } : cur)), []);
+  function startTimeLapse() {
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    setPictureView(null);
+    setTimeLapse({ step: 0, playing: true });
+  }
+
   // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
   // open node to the one before or after it, or, with none open, from the
   // first (→) or last (←) node. The panel's arrows and the keyboard's ← / →
   // both land here; only the text field's own arrows move focus into the
   // next node's text.
   function stepReading(dir: -1 | 1, focusText = true) {
+    if (timeLapse) {
+      // In the time-lapse the arrows step it instead, one node at a time.
+      setTimeLapse({ playing: false, step: Math.max(0, Math.min(timeLapseNodes.length, timeLapse.step + dir)) });
+      return;
+    }
     const order = readingOrder(visibleNodes);
     const next = selectedId ? stepNode(visibleNodes, selectedId, dir) : (dir === 1 ? order[0] : order[order.length - 1])?.nodeId;
     if (!next) return;
@@ -1805,6 +1830,7 @@ export function MapPage() {
       onDeleteMap={deleteThisMap}
       canUndo={canUndo}
       onUndo={() => void undoMove()}
+      onTimeLapse={startTimeLapse}
       onPresent={enterPresentation}
     />
   );
@@ -2303,7 +2329,24 @@ export function MapPage() {
             slot from NodePanel while they're active, so the two never try to
             render at once (choosing a node from its panel drops the single
             selection — see startChooseFrom). */}
-        {drawMode ? (
+        {timeLapse && timeLapseStep !== null ? (
+          <TimeLapseBar
+            step={timeLapseStep}
+            total={timeLapseNodes.length}
+            playing={timeLapse.playing && timeLapseStep < timeLapseNodes.length}
+            at={timeLapseNodes[timeLapseStep - 1]?.createdAt}
+            onStep={onTimeLapseStep}
+            onTogglePlay={() =>
+              setTimeLapse((cur) => {
+                if (!cur) return cur;
+                const atEnd = cur.step >= timeLapseNodes.length;
+                // Play at the end starts over from the first node.
+                return atEnd ? { step: 0, playing: true } : { ...cur, playing: !cur.playing };
+              })
+            }
+            onExit={() => setTimeLapse(null)}
+          />
+        ) : drawMode ? (
           <DrawLineBar
             pointCount={drawPoints.length}
             blocked={drawBlocked}

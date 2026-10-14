@@ -65,7 +65,10 @@ export function PictureViewer({ images, onClose }: Props) {
         type="button"
         autoFocus
         className="absolute top-3 right-3 cursor-pointer rounded-full border-0 bg-surface px-3 py-1 text-[0.85rem] font-semibold text-ink"
-        onClick={onClose}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
       >
         {s.close}
       </button>

@@ -49,6 +49,7 @@ interface Props {
   onPresent: () => void;
   /** Puts the last move back (hooks/useMoveUndo.ts); the button greys out with nothing to undo. */
   onUndo?: () => void;
+  onTimeLapse?: () => void;
   canUndo?: boolean;
   /** Computer mode (see hooks/useDesktopLayout): a panel docked down the left edge instead of a floating top-left cluster. */
   vertical?: boolean;
@@ -94,6 +95,7 @@ export function MapToolbar({
   onDeleteMap,
   onPresent,
   onUndo,
+  onTimeLapse,
   canUndo = false,
   vertical = false,
 }: Props) {
@@ -224,6 +226,13 @@ export function MapToolbar({
                   setShowDisplayMenu(false);
                   onPresent();
                 }}
+                onTimeLapse={
+                  onTimeLapse &&
+                  (() => {
+                    setShowDisplayMenu(false);
+                    onTimeLapse();
+                  })
+                }
                 onClose={() => setShowDisplayMenu(false)}
               />
             )}
