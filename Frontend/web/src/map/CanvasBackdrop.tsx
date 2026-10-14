@@ -1,3 +1,5 @@
+import { useRef } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { CANVAS_W, CANVAS_H } from "../utils/canvasLayout";
 import { roundedPath } from "../utils/drawLine";
 import { useI18n } from "../i18n/I18nContext";
@@ -24,6 +26,9 @@ interface Props {
   /** The nodes a link is being confirmed for — kept ringed while the sentiment modal is open. */
   pendingLink: NodeDoc[] | null;
   onCircleClick: (rootId: string) => void;
+  /** Right-click (long-press on touch) on a zone: opens its pattern/colour menu at that screen spot. Only zones canStyleZone allows take it — any other falls through to the canvas's own menu. */
+  onZoneMenu?: (rootId: string, clientX: number, clientY: number) => void;
+  canStyleZone?: (rootId: string) => boolean;
   /** Separator lines drawn on the map. */
   lines: LineDoc[];
   canDeleteLine: (line: LineDoc) => boolean;
@@ -39,6 +44,8 @@ interface Props {
 }
 
 const SOLVED_GOLD = "#f5b301";
+/** How long a finger rests on a zone before its menu opens. */
+export const ZONE_HOLD_MS = 500;
 
 // Everything drawn *behind* the node cards: zone polygons, manual zones and
 // circle-parent rings, link figures, branch arrows, plain edges. One overlay
@@ -63,8 +70,37 @@ export function CanvasBackdrop({
   drawing,
   compact = false,
   solvedZones,
+  onZoneMenu,
+  canStyleZone,
 }: Props) {
   const { t } = useI18n();
+  // A finger held still on a zone opens its menu (touch has no right-click).
+  // The click that follows lifting the finger is swallowed, so the hold
+  // doesn't also stabilize the zone.
+  const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const swallowClick = useRef(false);
+  const styleable = (rootId: string) => !!onZoneMenu && (canStyleZone?.(rootId) ?? true);
+  function cancelHold() {
+    if (hold.current) clearTimeout(hold.current.timer);
+    hold.current = null;
+  }
+  function startHold(rootId: string, e: ReactPointerEvent) {
+    cancelHold();
+    if (e.pointerType === "mouse" || !styleable(rootId)) return;
+    const { clientX, clientY } = e;
+    hold.current = {
+      x: clientX,
+      y: clientY,
+      timer: setTimeout(() => {
+        hold.current = null;
+        swallowClick.current = true;
+        onZoneMenu!(rootId, clientX, clientY);
+      }, ZONE_HOLD_MS),
+    };
+  }
+  function moveHold(e: ReactPointerEvent) {
+    if (hold.current && Math.hypot(e.clientX - hold.current.x, e.clientY - hold.current.y) > 8) cancelHold();
+  }
   return (
     <svg
       className="pointer-events-none absolute inset-0 h-full w-full"
@@ -115,11 +151,33 @@ export function CanvasBackdrop({
               // NodeCard div sitting underneath) — a zone is one of
               // the few things in it that's actually meant to be
               // clicked, so it has to explicitly opt back in.
-              style={interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
+              style={interactive ? { cursor: "pointer", pointerEvents: "auto", WebkitTouchCallout: "none" } : undefined}
               onClick={(e) => {
                 e.stopPropagation();
+                if (swallowClick.current) {
+                  swallowClick.current = false;
+                  return;
+                }
                 onCircleClick(g.rootId);
               }}
+              // The zone's own menu (pattern and colour): right-click, or hold
+              // a finger on it. Android also fires contextmenu for a hold —
+              // both just open the same menu at the same spot.
+              onContextMenu={(e) => {
+                if (!styleable(g.rootId)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                cancelHold();
+                onZoneMenu!(g.rootId, e.clientX, e.clientY);
+              }}
+              onPointerDown={(e) => {
+                swallowClick.current = false;
+                startHold(g.rootId, e);
+              }}
+              onPointerMove={moveHold}
+              onPointerUp={cancelHold}
+              onPointerCancel={cancelHold}
+              onPointerLeave={cancelHold}
             >
               <title>
                 {isStabilized

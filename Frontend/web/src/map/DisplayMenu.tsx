@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
 import type { ZoneLayout } from "../utils/zoneLayout";
+import { MAP_BACKGROUNDS } from "../types";
+import type { MapBackground } from "../types";
+import { mapBackgroundStyle } from "../utils/mapBackground";
 
 interface Props {
   compact: boolean;
@@ -12,6 +15,9 @@ interface Props {
   /** How the whole map draws its zones (utils/zoneLayout.ts); a parent's own choice still wins for its branch. */
   zoneLayout?: ZoneLayout;
   onPickZoneLayout?: (layout: ZoneLayout) => void;
+  /** The map's canvas (Map.background) — only passed to the map's owner, the one who may change it. */
+  background?: MapBackground | null;
+  onPickBackground?: (background: MapBackground) => void;
   /** Enters presentation mode — folded into this same dropdown rather than
    *  its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
@@ -23,12 +29,26 @@ interface Props {
 }
 
 // The toolbar's display (layers icon) dropdown — compact view, emoji first,
-// how the map draws its zones, and the entry point into presentation mode.
+// how the map draws its zones, the map's background (owner only), and the
+// entry point into presentation mode.
 // How much detail the map shows (reading mode, level) lives in the
 // bottom-right eye menu (ViewCorner) instead, so it isn't repeated here. Same
 // open-downward, dismiss-on-outside-click/Escape pattern as AddMenu,
 // positioned by a `relative` wrapper around its trigger.
-export function DisplayMenu({ compact, onToggleCompact, emojiFirst, onToggleEmojiFirst, zoneLayout, onPickZoneLayout, onPresent, onTimeLapse, onClose, side = "below" }: Props) {
+export function DisplayMenu({
+  compact,
+  onToggleCompact,
+  emojiFirst,
+  onToggleEmojiFirst,
+  zoneLayout,
+  onPickZoneLayout,
+  background,
+  onPickBackground,
+  onPresent,
+  onTimeLapse,
+  onClose,
+  side = "below",
+}: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -99,6 +119,38 @@ export function DisplayMenu({ compact, onToggleCompact, emojiFirst, onToggleEmoj
               {l === zoneLayout && <span aria-hidden>✓</span>}
             </button>
           ))}
+        </>
+      )}
+      {onPickBackground && (
+        <>
+          <div className="my-[0.15rem] border-t border-line" />
+          <div className="px-[0.7rem] pt-[0.3rem] pb-[0.1rem] text-[0.72rem] font-semibold tracking-wide text-ink-soft uppercase">
+            {t.ui.mapBackground.title}
+          </div>
+          {MAP_BACKGROUNDS.map((b) => {
+            const active = (background ?? "dots") === b;
+            const preview = mapBackgroundStyle(b);
+            return (
+              <button
+                key={b}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                className={`flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.4rem] text-left text-[0.85rem] hover:bg-surface-2 ${
+                  active ? "font-semibold text-accent-ink" : "text-ink"
+                }`}
+                onClick={() => onPickBackground(b)}
+              >
+                <span
+                  aria-hidden
+                  className={`h-5 w-7 shrink-0 rounded-[4px] border border-line ${preview.className}`}
+                  style={{ ...preview.style, backgroundSize: b === "lined" ? "100% 6px" : b === "plain" ? undefined : "5px 5px" }}
+                />
+                <span className="flex-1">{t.ui.mapBackground.options[b]}</span>
+                {active && <span aria-hidden>✓</span>}
+              </button>
+            );
+          })}
         </>
       )}
       <div className="my-[0.15rem] border-t border-line" />

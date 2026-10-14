@@ -251,6 +251,7 @@ export const updateMapDao = async (
     parentId?: string | null;
     members?: string[];
     discussionMode?: boolean;
+    background?: string | null;
   },
 ) => {
   return await Map.findOneAndUpdate(

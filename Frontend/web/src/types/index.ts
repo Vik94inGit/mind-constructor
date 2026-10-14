@@ -71,6 +71,10 @@ export type NodeShape = (typeof NODE_SHAPES)[number];
 
 // A zone's own look, set on its parent — Node.ZONE_PATTERNS / ZONE_PALETTE on
 // the backend. null (or absent) keeps no pattern / the sentiment colour.
+// Map.MAP_BACKGROUNDS — the map's canvas, see utils/mapBackground.ts.
+export const MAP_BACKGROUNDS = ["dots", "plain", "lined", "dark"] as const;
+export type MapBackground = (typeof MAP_BACKGROUNDS)[number];
+
 export const ZONE_PATTERNS = ["dots", "stripes", "grid", "chess"] as const;
 export type ZonePattern = (typeof ZONE_PATTERNS)[number];
 export const ZONE_PALETTE = ["sand", "sage", "sky", "lavender", "rose", "slate"] as const;
@@ -145,6 +149,8 @@ export interface MapDoc {
   // this isn't a one-time creation choice.
   discussionMode?: boolean;
   kind?: MapKind | null;
+  /** The canvas behind the nodes (Map.background) — null / absent: the dot grid. Owner-only to change. */
+  background?: MapBackground | null;
   createdAt?: string;
   updatedAt?: string;
 }

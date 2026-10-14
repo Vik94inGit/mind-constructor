@@ -79,7 +79,7 @@ export async function createMap(input: {
 
 export async function updateMap(
   mapId: string,
-  updates: Partial<Pick<MapDoc, "name" | "color" | "discussionMode">>,
+  updates: Partial<Pick<MapDoc, "name" | "color" | "discussionMode" | "background">>,
 ) {
   const res = await apiRequest<{ success: boolean; map: MapDoc }>(`/api/${mapId}`, {
     method: "PATCH",
