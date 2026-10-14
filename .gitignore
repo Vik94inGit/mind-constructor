@@ -6,3 +6,4 @@ Backend-accidental-empty-git/
 Backend-old-git-backup/
 Frontend/my-awesome-app/
 Frontend/package-lock.json
+.env

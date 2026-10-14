@@ -1,0 +1,48 @@
+# The whole app on one server: open on port 3000 (put an HTTPS proxy in
+# front of it). See DEPLOY.md. Settings come from .env next to this file.
+services:
+  web:
+    build:
+      context: ./Frontend/web
+      args:
+        PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build: ./Backend
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/mind-constructor}
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      CORS_ORIGIN: ${PUBLIC_URL}
+      # The site and the API are one address, so the cookie is first-party.
+      COOKIE_SAMESITE: lax
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    depends_on:
+      - mongo
+      - redis
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  redis-data:
