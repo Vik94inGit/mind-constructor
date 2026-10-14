@@ -67,6 +67,7 @@ import { MapToolbar } from "../map/MapToolbar";
 import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
 import { MapLegend } from "../map/MapLegend";
+import { ZoneStyleMenu } from "../map/ZoneStyleMenu";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId, ZONE_COLORS } from "../utils/nodeType";
@@ -105,7 +106,8 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, NodeDoc, NodeType, ZonePaletteColor, ZonePattern } from "../types";
+import type { AttackIndicator, MapBackground, NodeDoc, NodeType, ZonePaletteColor, ZonePattern } from "../types";
+import { mapBackgroundStyle } from "../utils/mapBackground";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -259,6 +261,9 @@ export function MapPage() {
   // screenX/screenY position the fixed-to-viewport menu itself (same as
   // contextMenu's own x/y), canvasX/canvasY (run through screenToCanvas)
   // are where the eventual node actually gets placed.
+  // A zone's pattern/colour menu, opened by right-clicking the zone or holding
+  // a finger on it (see CanvasBackdrop's onZoneMenu).
+  const [zoneMenu, setZoneMenu] = useState<{ rootId: string; x: number; y: number } | null>(null);
   const [canvasContextMenu, setCanvasContextMenu] = useState<{
     screenX: number;
     screenY: number;
@@ -1625,6 +1630,7 @@ export function MapPage() {
   // would collapse the undefined "never touched" default to false/Personal
   // instead of true/Discussion.
   const isDiscussionMode = map.discussionMode !== false;
+  const canvasBackground = mapBackgroundStyle(map.background);
   async function toggleMapMode() {
     if (!isOwner || !mapId) return;
     setActionError(null);
@@ -1633,6 +1639,24 @@ export function MapPage() {
       setMap(updated);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.changeMode);
+    }
+  }
+
+  // The map's canvas (Map.background), owner-only like the mode above. Shown
+  // straight away, put back if the save fails; map:updated brings it to
+  // everyone else on the map.
+  async function setMapBackground(background: MapBackground) {
+    if (!isOwner || !mapId) return;
+    const before = map?.background ?? null;
+    const next = background === "dots" ? null : background;
+    if (next === before) return;
+    setActionError(null);
+    setMap((prev) => (prev ? { ...prev, background: next } : prev));
+    try {
+      setMap(await mapsApi.updateMap(mapId, { background: next }));
+    } catch (err) {
+      setMap((prev) => (prev ? { ...prev, background: before } : prev));
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
     }
   }
 
@@ -1704,6 +1728,8 @@ export function MapPage() {
       onToggleEmojiFirst={toggleEmojiFirst}
       zoneLayout={zoneLayouts[MAP_ZONE_KEY] ?? "zones"}
       onPickZoneLayout={(layout) => setZoneLayout(MAP_ZONE_KEY, layout === "zones" ? null : layout)}
+      background={map.background}
+      onPickBackground={isOwner ? setMapBackground : undefined}
       nodes={visibleNodes}
       onLoadTexts={async () => {
         await ensureNodeText(visibleNodes.map((n) => n.nodeId));
@@ -1809,7 +1835,8 @@ export function MapPage() {
             // native selection drag can itself swallow/alter the pointer
             // event stream. NodeCard's own outer div already opts out the
             // same way for the same reason (see its own select-none).
-            className={`absolute select-none bg-paper bg-[radial-gradient(circle,var(--line)_1px,transparent_1px)] [background-size:22px_22px]${chooseMode || packMode ? " cursor-crosshair" : ""}`}
+            // The map's own background (Map.background — utils/mapBackground.ts).
+            className={`absolute select-none ${canvasBackground.className}${chooseMode || packMode ? " cursor-crosshair" : ""}`}
             // width/height stay the canvas's own native 2400x1600 — every
             // node/ghost/SVG position below is still expressed in that
             // native 0..2400 coordinate space, unaffected by this div now
@@ -1820,6 +1847,7 @@ export function MapPage() {
             // already subtract back out when converting a scroll position
             // to a real canvas coordinate.
             style={{
+              ...canvasBackground.style,
               left: hScrollMargin,
               top: vScrollMargin,
               width: CANVAS_W,
@@ -1863,6 +1891,16 @@ export function MapPage() {
             onContextMenu={onCanvasContextMenu}
           >
             <CanvasBackdrop
+              // Only the parent's owner may restyle its zone (an owner-only node edit).
+              canStyleZone={(rootId) => {
+                const root = nodes.find((n) => n.nodeId === rootId);
+                return !!root && isOwnNode(root);
+              }}
+              onZoneMenu={(rootId, x, y) => {
+                setContextMenu(null);
+                setCanvasContextMenu(null);
+                setZoneMenu({ rootId, x, y });
+              }}
               nodeGroups={nodeGroups}
               selectedCircle={map?.selectedCircle}
               focusedZones={activeFocusedZones}
@@ -2434,6 +2472,24 @@ export function MapPage() {
         />
       )}
 
+      {zoneMenu &&
+        (() => {
+          const root = nodes.find((n) => n.nodeId === zoneMenu.rootId);
+          const group = nodeGroups.find((g) => g.rootId === zoneMenu.rootId);
+          if (!root || !group) return null;
+          return (
+            <ZoneStyleMenu
+              rootId={zoneMenu.rootId}
+              x={zoneMenu.x}
+              y={zoneMenu.y}
+              pattern={root.zonePattern ?? null}
+              color={root.zoneColor ?? null}
+              autoColor={ZONE_COLORS[group.sentiment]}
+              onChange={(patch) => setZoneStyle(zoneMenu.rootId, patch)}
+              onClose={() => setZoneMenu(null)}
+            />
+          );
+        })()}
       {canvasContextMenu && (
         <CanvasContextMenu
           x={canvasContextMenu.screenX}

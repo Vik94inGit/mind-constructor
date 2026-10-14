@@ -4,6 +4,10 @@ import mongoose from "mongoose";
 // matching starter structure. Purely descriptive: nothing here is enforced.
 export const MAP_KINDS = ["problem", "decision", "goal", "retro"] as const;
 
+// The canvas behind a map's nodes, picked by the map's owner and seen by every
+// member. null (every map that never picked one) draws the dot grid.
+export const MAP_BACKGROUNDS = ["dots", "plain", "lined", "dark"] as const;
+
 export const MapSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -66,6 +70,8 @@ export const MapSchema = new mongoose.Schema(
     discussionMode: { type: Boolean, default: true },
     // See MAP_KINDS. null for a map created without one (older maps, demo).
     kind: { type: String, enum: MAP_KINDS, default: null },
+    // See MAP_BACKGROUNDS.
+    background: { type: String, enum: MAP_BACKGROUNDS, default: null },
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields
