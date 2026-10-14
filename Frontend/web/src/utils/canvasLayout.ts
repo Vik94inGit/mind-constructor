@@ -143,12 +143,13 @@ export function isMobileViewport(): boolean {
 // Read live (not memoized) since it only matters at the moment a node is
 // placed/dragged, by which point the real viewport width is already known.
 //
-// The margin is a full ~100px on desktop (it was 60): 60 left just enough
-// that two titles didn't touch, which still read as crowded — nodes packed
-// edge to edge with nothing between them to rest the eye on.
+// The margin is 40px on desktop (24 on a phone): softer than the old 100, so
+// thoughts can sit close together like strokes on a drawing. Captions are
+// mostly hidden now, and the footprint check (footprintObstacles) still
+// refuses any spot where two nodes would actually overlap.
 export const CAPTION_WIDTH = 148;
 export function getNodeMinDist() {
-  return CAPTION_WIDTH + (isMobileViewport() ? 50 : 100);
+  return CAPTION_WIDTH + (isMobileViewport() ? 24 : 40);
 }
 
 // A tighter nominal spacing for nodes *deliberately* fanned around a shared

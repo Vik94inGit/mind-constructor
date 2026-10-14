@@ -27,8 +27,8 @@ type Pt = { x: number; y: number };
 
 /** ≈ 2 cm on screen at 100% zoom (CSS px are 96 per inch). */
 export const MAX_ZONE_GAP = 76;
-/** Empty space always kept between two nodes' footprints. */
-export const MIN_NODE_GAP = 12;
+/** Empty space always kept between two nodes' footprints — small, so nodes can sit close without touching. */
+export const MIN_NODE_GAP = 4;
 /** How far a node from outside a zone keeps from the zone's lines. */
 export const ZONE_LINE_CLEARANCE = NODE_FOOTPRINT.h / 2;
 
