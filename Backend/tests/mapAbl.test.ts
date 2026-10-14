@@ -255,6 +255,21 @@ describe("mapAbl", () => {
       expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { name: "Renamed" });
       expect(result).toEqual({ mapId: "pub123", name: "Renamed" });
     });
+
+    it("accepts a known background, and null to go back to the default", async () => {
+      vi.mocked(updateMapDao).mockResolvedValue({ mapId: "pub123" } as never);
+
+      await updateMapAbl("pub123", "user1", { background: "lined" });
+      expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { background: "lined" });
+
+      await updateMapAbl("pub123", "user1", { background: null });
+      expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { background: null });
+    });
+
+    it("rejects an unknown background", async () => {
+      await expect(updateMapAbl("pub123", "user1", { background: "stars" })).rejects.toThrow(ValidationError);
+      expect(updateMapDao).not.toHaveBeenCalled();
+    });
   });
 
   describe("inviteUserToMapAbl", () => {

@@ -11,7 +11,7 @@ import { findUserByIdDao } from "../dao/userDao.js";
 import { parseOrThrow } from "./errors.js";
 import { createNodeAbl } from "./nodeAbl.js";
 import type { NodeType } from "../models/Node.js";
-import { MAP_KINDS } from "../models/Map.js";
+import { MAP_BACKGROUNDS, MAP_KINDS } from "../models/Map.js";
 
 // A Mongo ObjectId is always exactly 24 hex characters — cheap to check
 // before ever handing the value to Mongoose, which would otherwise throw its
@@ -167,6 +167,8 @@ const updateMapSchema = z
     // Toggled live from the map itself (not just at creation) — see
     // Map.discussionMode / attackAbl.ts.
     discussionMode: z.boolean().optional(),
+    // See Map.MAP_BACKGROUNDS — null goes back to the default dot grid.
+    background: z.enum(MAP_BACKGROUNDS).nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No fields to update",

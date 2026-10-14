@@ -211,6 +211,9 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   (`POST /api/` body `kind`, alongside `discussionMode`). Descriptive only; a frontend seeds the matching
   starter structure itself (`utils/seedMap.ts`), so the seeded text is in the user's language. The older
   server-side `template` seeds (blank / single-problem / decision-tree / pro-con / demo) still work.
+- **`Map.background`** — the canvas behind the nodes: `dots | plain | lined | dark` (`MAP_BACKGROUNDS`),
+  `null` = the default dot grid. Owner-only, through the same `PATCH /api/:mapId` (`map:updated` reaches
+  every member).
 - **`Node.order`** — an optional step number (whole number 1..9999, `null` = none) for describing a
   process by labeling nodes in sequence; a frontend draws it as a small numbered badge on the node.
   Set via `POST`/`PATCH /api/nodes` (`orderSchema` in `nodeAbl.ts`; explicit `null` on PATCH clears

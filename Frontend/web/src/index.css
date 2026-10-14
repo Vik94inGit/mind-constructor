@@ -72,7 +72,11 @@
    (src/theme/ThemeContext.tsx) keeps it in sync afterward, toggled from
    the navbar. A bare media query can't be overridden by an in-app choice
    at all; this can. */
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+/* A map whose owner picked the "Soft dark" background (Map.background —
+   utils/mapBackground.ts) draws its whole canvas with the dark colours, in
+   either theme, so cards, lines and labels stay readable on it. */
+.canvas-soft-dark {
   --ink: #eceef3;
     --ink-soft: #a6adbe;
     --paper: #12141b;
@@ -114,6 +118,13 @@
        black this was hardcoded to before, just expressed as a variable
        now so light mode above can differ. */
     --node-fill: #000000;
+}
+
+/* Softer than the dark theme's own near-black paper — a calm dark canvas
+   rather than the app's darkest surface. */
+.canvas-soft-dark {
+  --paper: #232733;
+  color: var(--ink);
 }
 
 @theme inline {

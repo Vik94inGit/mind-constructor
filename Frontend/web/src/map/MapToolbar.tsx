@@ -6,7 +6,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { AddMenu } from "./AddMenu";
 import { DisplayMenu } from "./DisplayMenu";
 import { NodeSearch } from "./NodeSearch";
-import type { NodeDoc } from "../types";
+import type { MapBackground, NodeDoc } from "../types";
 import type { ZoneLayout } from "../utils/zoneLayout";
 
 interface Props {
@@ -29,6 +29,9 @@ interface Props {
   /** How the whole map draws its zones — see DisplayMenu. */
   zoneLayout?: ZoneLayout;
   onPickZoneLayout?: (layout: ZoneLayout) => void;
+  /** The map's canvas — see DisplayMenu. onPickBackground only for the map's owner. */
+  background?: MapBackground | null;
+  onPickBackground?: (background: MapBackground) => void;
   /** Node search (see NodeSearch). */
   nodes: NodeDoc[];
   onLoadTexts: () => Promise<void>;
@@ -76,6 +79,8 @@ export function MapToolbar({
   onToggleEmojiFirst,
   zoneLayout,
   onPickZoneLayout,
+  background,
+  onPickBackground,
   nodes,
   onLoadTexts,
   onSearchMatches,
@@ -203,6 +208,8 @@ export function MapToolbar({
                 onToggleEmojiFirst={onToggleEmojiFirst}
                 zoneLayout={zoneLayout}
                 onPickZoneLayout={onPickZoneLayout}
+                background={background}
+                onPickBackground={onPickBackground}
                 onPresent={() => {
                   setShowDisplayMenu(false);
                   onPresent();
