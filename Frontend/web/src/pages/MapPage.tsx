@@ -51,7 +51,7 @@ import { ViewCorner } from "../map/ViewCorner";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
 import type { AbstractionLevel } from "../utils/abstractionLevel";
-import { stepNode } from "../utils/nodeOrder";
+import { readingOrder, stepNode } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
@@ -1173,6 +1173,21 @@ export function MapPage() {
     selectNodeFromClick(node);
   }
 
+  // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
+  // open node to the one before or after it, or, with none open, from the
+  // first (→) or last (←) node. The panel's arrows and the keyboard's ← / →
+  // both land here; only the text field's own arrows move focus into the
+  // next node's text.
+  function stepReading(dir: -1 | 1, focusText = true) {
+    const order = readingOrder(visibleNodes);
+    const next = selectedId ? stepNode(visibleNodes, selectedId, dir) : (dir === 1 ? order[0] : order[order.length - 1])?.nodeId;
+    if (!next) return;
+    setPictureView(null);
+    setSelectedId(next);
+    centerOnNode(next);
+    if (focusText) setFocusTextNodeId(next);
+  }
+
   function hasPictures(node: NodeDoc): boolean {
     return Boolean(node.cardImage || node.iconImage || node.images?.length);
   }
@@ -1630,6 +1645,7 @@ export function MapPage() {
     copySelection,
     pasteClipboard,
     onImagePasteWithoutNode: () => showNotice(t.ui.images.selectNode),
+    stepReading: (dir) => stepReading(dir, false),
   });
 
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
@@ -2356,13 +2372,7 @@ export function MapPage() {
                 isMapOwner={isOwner}
                 onApplyTemplate={(kind) => applyTemplate(kind, selectedNode)}
                 onClose={() => setSelectedId(null)}
-                onStepNode={(dir) => {
-                  const next = stepNode(visibleNodes, selectedNode.nodeId, dir);
-                  if (!next) return;
-                  setSelectedId(next);
-                  centerOnNode(next);
-                  setFocusTextNodeId(next);
-                }}
+                onStepNode={stepReading}
                 onSelectNode={(id) => {
                   setSelectedId(id);
                   // Same "chosen node is always centered" rule handleNodeClick

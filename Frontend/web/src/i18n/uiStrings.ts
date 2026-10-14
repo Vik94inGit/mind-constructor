@@ -128,6 +128,9 @@ export interface UiStrings {
   sentiments: { neutral: string; positive: string; negative: string };
   node: {
     byUser: (name: string) => string;
+    /** The panel's buttons that read the previous / next node (← / → on the keyboard too). */
+    prevNode: string;
+    nextNode: string;
     root: string;
     healthLine: (health: number, defeated: boolean) => string;
     pointsAt: string;
@@ -618,6 +621,8 @@ const en: UiStrings = {
   sentiments: { neutral: "neutral", positive: "positive", negative: "negative" },
   node: {
     byUser: (name) => `by ${name}`,
+    prevNode: "Previous node (←)",
+    nextNode: "Next node (→)",
     root: "root",
     healthLine: (h, defeated) => `${h}/100 health${defeated ? " · defeated" : ""}`,
     pointsAt: "Points at",
@@ -1110,6 +1115,8 @@ const cs: UiStrings = {
   sentiments: { neutral: "neutrální", positive: "pozitivní", negative: "negativní" },
   node: {
     byUser: (name) => `od ${name}`,
+    prevNode: "Předchozí uzel (←)",
+    nextNode: "Další uzel (→)",
     root: "kořen",
     healthLine: (h, defeated) => `${h}/100 zdraví${defeated ? " · poražen" : ""}`,
     pointsAt: "Míří na",
@@ -1601,6 +1608,8 @@ const uk: UiStrings = {
   sentiments: { neutral: "нейтральний", positive: "позитивний", negative: "негативний" },
   node: {
     byUser: (name) => `від ${name}`,
+    prevNode: "Попередній вузол (←)",
+    nextNode: "Наступний вузол (→)",
     root: "корінь",
     healthLine: (h, defeated) => `${h}/100 здоров’я${defeated ? " · переможений" : ""}`,
     pointsAt: "Націлений на",
@@ -2095,6 +2104,8 @@ const ru: UiStrings = {
   sentiments: { neutral: "нейтральный", positive: "позитивный", negative: "негативный" },
   node: {
     byUser: (name) => `от ${name}`,
+    prevNode: "Предыдущий узел (←)",
+    nextNode: "Следующий узел (→)",
     root: "корень",
     healthLine: (h, defeated) => `${h}/100 здоровья${defeated ? " · побеждён" : ""}`,
     pointsAt: "Нацелен на",

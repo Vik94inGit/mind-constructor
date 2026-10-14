@@ -20,6 +20,8 @@ interface Params {
   pasteClipboard: () => void;
   /** A picture was pasted with no node of your own open to take it (an open node's panel takes it itself — see NodePanel). */
   onImagePasteWithoutNode?: () => void;
+  /** ← / → (and ↑ / ↓) with nothing editable focused: read the previous / next node. */
+  stepReading?: (dir: -1 | 1) => void;
 }
 
 export function useMapKeyboard({
@@ -39,6 +41,7 @@ export function useMapKeyboard({
   copySelection,
   pasteClipboard,
   onImagePasteWithoutNode,
+  stepReading,
 }: Params) {
   // Global Ctrl/Cmd+C / Ctrl/Cmd+V for the current node selection — ignored
   // whenever focus is inside a real text field (NodePanel's textarea, the
@@ -118,6 +121,13 @@ export function useMapKeyboard({
         if (e.target instanceof HTMLElement && e.target.closest("button, a, select, [role=menu]")) return;
         e.preventDefault();
         exitChooseMode();
+        return;
+      }
+      const arrowDir = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key] as -1 | 1 | undefined;
+      if (arrowDir && stepReading && !drawMode && !chooseMode && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        if (e.target instanceof HTMLElement && e.target.closest("select, [role=menu], [role=slider], input")) return;
+        e.preventDefault();
+        stepReading(arrowDir);
         return;
       }
       if (!(e.ctrlKey || e.metaKey)) return;

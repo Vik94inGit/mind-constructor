@@ -142,7 +142,8 @@ interface Props {
   autoFocusText?: boolean;
   onAutoFocused?: () => void;
   /** Opens the previous (-1) or next (1) node in reading order (utils/nodeOrder.ts) — the text's arrow keys. */
-  onStepNode?: (dir: -1 | 1) => void;
+  /** Read the previous / next node; `focusText: false` keeps focus where it is (the header's buttons). */
+  onStepNode?: (dir: -1 | 1, focusText?: boolean) => void;
 }
 
 export function NodePanel({
@@ -932,6 +933,16 @@ export function NodePanel({
             </div>
           )}
         </div>
+        {onStepNode && (
+          <>
+            <button className={closeBtn} title={t.ui.node.prevNode} aria-label={t.ui.node.prevNode} onClick={() => onStepNode(-1, false)}>
+              ←
+            </button>
+            <button className={closeBtn} title={t.ui.node.nextNode} aria-label={t.ui.node.nextNode} onClick={() => onStepNode(1, false)}>
+              →
+            </button>
+          </>
+        )}
         <button className={closeBtn} onClick={onClose}>
           ✕
         </button>
