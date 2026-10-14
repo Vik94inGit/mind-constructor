@@ -61,6 +61,16 @@ describe("nodeAbl", () => {
       expect(getMapByIdDao).not.toHaveBeenCalled();
     });
 
+    it("accepts an empty text — a node sketched first and written later", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1" } as never);
+      vi.mocked(countNodesByMapInternalIdDao).mockResolvedValue(1 as never);
+      vi.mocked(createNodeMutationDao).mockResolvedValue({ nodeId: "n1" } as never);
+
+      await createNodeAbl({ text: "", type: "Option" }, "pub123", "user1");
+
+      expect(vi.mocked(createNodeMutationDao).mock.calls[0][1].text).toBe("");
+    });
+
     it("rejects an invalid order at creation too", async () => {
       await expect(
         createNodeAbl({ text: "Step", type: "Option", order: 0 }, "pub123", "user1"),

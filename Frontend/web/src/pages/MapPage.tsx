@@ -1471,6 +1471,24 @@ export function MapPage() {
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text, emoji: emojiFirst ? (emoji ?? "") : undefined });
   }
 
+  // Draw first, write later: a type ghost dragged out of the selected node's
+  // ring drops an empty node of that type where it was let go (nudged clear
+  // of other nodes, see placeNode). The parent stays selected, so its ring
+  // stays up for the next branch; the new node's text is written whenever
+  // it's opened.
+  async function sketchBranch(type: NodeType, pos: { x: number; y: number }, parent: NodeDoc) {
+    if (!mapId) return;
+    setActionError(null);
+    const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
+    try {
+      const node = await nodesApi.createNode(mapId, { text: "", type, x: placed.x, y: placed.y, parentId: parent.nodeId });
+      upsertNode(node);
+      setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
+    }
+  }
+
   // ---- Separator lines ----
   // Drawing takes over the canvas clicks and the bottom sheet — see
   // hooks/useLineDrawing.ts.
@@ -2120,6 +2138,7 @@ export function MapPage() {
                 zoom={zoom}
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
+                onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
               />
             )}
 

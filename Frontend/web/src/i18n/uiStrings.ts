@@ -176,6 +176,8 @@ export interface UiStrings {
     clickToChangeType: string;
     chooseHint: string;
     ghostAgain: string;
+    /** On a type ghost: drag it out to drop an empty node there, written later. */
+    ghostDrag: string;
     /** Starter phrases a ghost offers once it's picked out — click one to open the new node with it. */
     ghostTemplates: Record<NodeType, string[]>;
     ghostTemplatesTitle: string;
@@ -670,6 +672,7 @@ const en: UiStrings = {
     clickToChangeType: "Click to change type",
     chooseHint: "choose?",
     ghostAgain: "click again to add",
+    ghostDrag: "or drag it out to sketch a branch",
     ghostTemplates: {
       "Problem": ["What's blocking us?", "Root cause:", "Risk if we do nothing"],
       "Problematic option": ["Could work, but…", "Hidden cost:", "Weak spot:"],
@@ -1164,6 +1167,7 @@ const cs: UiStrings = {
     clickToChangeType: "Klepnutím změníte typ",
     chooseHint: "vybrat?",
     ghostAgain: "klepnutím znovu přidáte",
+    ghostDrag: "nebo ho vytáhněte a načrtněte větev",
     ghostTemplates: {
       "Problem": ["Co nás blokuje?", "Příčina:", "Riziko, když nic neuděláme"],
       "Problematic option": ["Mohlo by fungovat, ale…", "Skrytá cena:", "Slabé místo:"],
@@ -1657,6 +1661,7 @@ const uk: UiStrings = {
     clickToChangeType: "Натисніть, щоб змінити тип",
     chooseHint: "обрати?",
     ghostAgain: "натисніть ще раз, щоб додати",
+    ghostDrag: "або витягніть, щоб накреслити гілку",
     ghostTemplates: {
       "Problem": ["Що нас блокує?", "Першопричина:", "Ризик, якщо нічого не робити"],
       "Problematic option": ["Може спрацювати, але…", "Прихована ціна:", "Слабке місце:"],
@@ -2153,6 +2158,7 @@ const ru: UiStrings = {
     clickToChangeType: "Нажмите, чтобы изменить тип",
     chooseHint: "выбрать?",
     ghostAgain: "нажмите ещё раз, чтобы добавить",
+    ghostDrag: "или вытяните, чтобы набросать ветку",
     ghostTemplates: {
       "Problem": ["Что нас блокирует?", "Первопричина:", "Риск, если ничего не делать"],
       "Problematic option": ["Может сработать, но…", "Скрытая цена:", "Слабое место:"],

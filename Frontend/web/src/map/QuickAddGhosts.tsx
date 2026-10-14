@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
@@ -76,7 +76,16 @@ interface Props {
   compact?: boolean;
   /** The canvas zoom: the ghosts are drawn inside the zoomed canvas, so they shrink by it to stay one size on screen, as the nodes do. */
   zoom?: number;
+  /**
+   * Draw first, write later: a type ghost dragged out and let go lands here
+   * with the canvas point it was dropped on, instead of opening the writer.
+   * Without it the ghosts can only be clicked.
+   */
+  onSketch?: (type: NodeType, pos: { x: number; y: number }) => void;
 }
+
+// How far (screen px) a ghost has to travel before a press counts as a drag.
+const SKETCH_DRAG_PX = 8;
 
 // One step of the ghosts' sequence. In the intro each ghost takes two steps
 // (icon, then its name); afterwards, and whenever a node is chosen, every
@@ -105,6 +114,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   zoom = 1,
   emojiFirst = false,
   onPickEmoji,
+  onSketch,
 }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
@@ -143,6 +153,35 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
     stageAt.current = Date.now();
   }
   const pickedEmoji = picked?.emoji ?? "";
+  // A type ghost being dragged out (see onSketch): where it is now, in canvas
+  // coordinates. `dragged` swallows the click that follows the drop.
+  const [sketch, setSketch] = useState<{ type: NodeType; x: number; y: number } | null>(null);
+  const dragged = useRef(false);
+  function startSketch(e: ReactPointerEvent<HTMLButtonElement>, type: NodeType, from: { x: number; y: number }) {
+    if (!onSketch || e.button !== 0) return;
+    e.stopPropagation();
+    dragged.current = false;
+    const el = e.currentTarget;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    el.setPointerCapture(e.pointerId);
+    const at = (ev: PointerEvent) => ({ x: from.x + (ev.clientX - startX) / zoom, y: from.y + (ev.clientY - startY) / zoom });
+    function onMove(ev: PointerEvent) {
+      if (!dragged.current && Math.hypot(ev.clientX - startX, ev.clientY - startY) < SKETCH_DRAG_PX) return;
+      dragged.current = true;
+      setSketch({ type, ...at(ev) });
+    }
+    function onUp(ev: PointerEvent) {
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointercancel", onUp);
+      setSketch(null);
+      if (dragged.current && ev.type === "pointerup") onSketch?.(type, at(ev));
+    }
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+  }
   // Read live, every render — see the doc comment above RADIUS/EDGE_MARGIN's
   // old module-level home for why this can't be hoisted back out to module
   // scope.
@@ -294,10 +333,15 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
             }`}
             // touchAction: manipulation — stops a quick second tap being
             // claimed by the browser as double-tap-to-zoom on a phone.
-            style={{ left: x, top: y, touchAction: "manipulation" }}
-            title={armedType === type ? `${t.ui.types[type]} — ${t.ui.node.ghostAgain}` : t.ui.types[type]}
+            style={{ left: x, top: y, touchAction: onSketch ? "none" : "manipulation", opacity: sketch?.type === type ? 0.3 : undefined }}
+            title={armedType === type ? `${t.ui.types[type]} — ${t.ui.node.ghostAgain}` : onSketch ? `${t.ui.types[type]} — ${t.ui.node.ghostDrag}` : t.ui.types[type]}
+            onPointerDown={(e) => startSketch(e, type, { x, y })}
             onClick={(e) => {
               e.stopPropagation();
+              if (dragged.current) {
+                dragged.current = false;
+                return;
+              }
               if (Date.now() - stageAt.current < STAGE_GUARD_MS) return;
               if (armedType === type) pickType(type, { x, y });
               else setArmed({ type, x, y, angle });
@@ -362,6 +406,30 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
           </button>
         );
       })}
+      {sketch && (
+        // The branch being drawn: a dashed stroke from the node to the ghost
+        // under the pointer, in the type's colour.
+        <>
+          <svg className="pointer-events-none absolute top-0 left-0 z-[32] overflow-visible" width="1" height="1" aria-hidden>
+            <line
+              x1={ringCenter.x}
+              y1={ringCenter.y}
+              x2={sketch.x}
+              y2={sketch.y}
+              stroke={NODE_TYPE_COLORS[sketch.type]}
+              strokeWidth={3 * k}
+              strokeDasharray={`${8 * k} ${6 * k}`}
+              strokeLinecap="round"
+            />
+          </svg>
+          <div
+            className="pointer-events-none absolute z-[34] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 bg-[var(--node-fill)] shadow-card"
+            style={{ left: sketch.x, top: sketch.y, height: ICON_SIZE * GHOST_SCALE * k, width: ICON_SIZE * GHOST_SCALE * k, borderColor: NODE_TYPE_COLORS[sketch.type] }}
+          >
+            <NodeTypeIcon type={sketch.type} size={21 * k} />
+          </div>
+        </>
+      )}
       {armed && (
         <GhostTemplates
           key={armed.type}

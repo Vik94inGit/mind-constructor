@@ -185,6 +185,9 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   picture before sending it. Like `text`, stripped from `GET /:mapId/nodes` (`.select("-text -images")`)
   — a frontend fetches them with the single node (`GET /api/nodes/:nodeId`) when its panel opens. The
   JSON body limit in `server.ts` (3 MB) is sized to fit a full list.
+- **`Node.text`** — may be `""` on `POST /api/nodes/:mapId` (`createNodeSchema`): a frontend lets a
+  member sketch a branch first (drag a type out of the quick-add ring) and write it later. `PATCH`
+  still refuses an empty text, and weapon/protection nodes still require one.
 - **`Node.title`** — an optional short label (max 80 chars, `""` = none) a frontend shows under a node
   in place of the start of its `text`. Set via `POST`/`PATCH /api/nodes` (`titleSchema` in
   `nodeAbl.ts`; an empty string on PATCH clears it). Unlike `text`, it is *not* stripped from

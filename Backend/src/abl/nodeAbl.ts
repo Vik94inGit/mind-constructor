@@ -143,7 +143,8 @@ export const storeImageFields = async (
 };
 
 const createNodeSchema = z.object({
-  text: z.string().min(1, "text is required"),
+  // "" is allowed: a node can be drawn first and written later (see Node.text).
+  text: z.string(),
   title: titleSchema.optional(),
   emoji: emojiSchema.optional(),
   order: orderSchema.nullish(),
