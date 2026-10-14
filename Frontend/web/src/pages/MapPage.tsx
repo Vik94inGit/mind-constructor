@@ -46,6 +46,7 @@ import { NodeContextMenu } from "../map/NodeContextMenu";
 import type { NodeLinkItem } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
+import { PictureViewer } from "../map/PictureViewer";
 import { ViewCorner } from "../map/ViewCorner";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
@@ -146,6 +147,8 @@ export function MapPage() {
   const drawSaving = mode.kind === "draw" ? mode.saving : false;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A node's pictures, open full size before its panel (see handleNodeClick).
+  const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
   // gated behind it (see its own comment). Arming a drag straight from the
@@ -1161,6 +1164,39 @@ export function MapPage() {
       return;
     }
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
+    // While reading (any view but the default icons), a node with pictures
+    // shows them first; closing them opens its panel (closePictureView).
+    if (modeOf(node.nodeId) !== "actual" && node.nodeId !== selectedId && hasPictures(node)) {
+      openPictureView(node);
+      return;
+    }
+    selectNodeFromClick(node);
+  }
+
+  function hasPictures(node: NodeDoc): boolean {
+    return Boolean(node.cardImage || node.iconImage || node.images?.length);
+  }
+
+  // The map's node list leaves `images` out, so they're fetched here; the
+  // card or icon picture stands in when the node has none of its own.
+  function openPictureView(node: NodeDoc) {
+    const fallback = [node.cardImage, node.iconImage].filter((src): src is string => Boolean(src));
+    setPictureView({ nodeId: node.nodeId, images: node.images?.length ? node.images : null });
+    if (node.images?.length) return;
+    nodesApi
+      .getNode(node.nodeId)
+      .then((full) => full.images?.length ? full.images : fallback)
+      .catch(() => fallback)
+      .then((images) => setPictureView((cur) => (cur?.nodeId === node.nodeId ? { ...cur, images } : cur)));
+  }
+
+  function closePictureView() {
+    const node = pictureView && nodes.find((n) => n.nodeId === pictureView.nodeId);
+    setPictureView(null);
+    if (node) selectNodeFromClick(node);
+  }
+
+  function selectNodeFromClick(node: NodeDoc) {
     setSelectedId(node.nodeId);
     releaseChosenCircleIfOutside(node.nodeId);
     // Whatever was just clicked is "chosen" now — always center the camera
@@ -2374,6 +2410,8 @@ export function MapPage() {
           )
         )}
       </div>
+
+      {pictureView && <PictureViewer key={pictureView.nodeId} images={pictureView.images} onClose={closePictureView} />}
 
       {contextMenu && (
         <NodeContextMenu

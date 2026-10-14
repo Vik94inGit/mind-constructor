@@ -362,6 +362,9 @@ export interface UiStrings {
     remove: string;
     open: string;
     close: string;
+    /** The picture viewer's buttons for the previous / next picture. */
+    prev: string;
+    next: string;
     loading: string;
     limit: (max: number) => string;
     tooLarge: string;
@@ -868,6 +871,8 @@ const en: UiStrings = {
     remove: "Remove picture",
     open: "Open full size",
     close: "Close",
+    prev: "Previous picture",
+    next: "Next picture",
     loading: "Loading pictures…",
     limit: (max) => `Up to ${max} pictures per node`,
     tooLarge: "That picture couldn't be used — try a smaller one.",
@@ -1358,6 +1363,8 @@ const cs: UiStrings = {
     remove: "Odebrat obrázek",
     open: "Otevřít v plné velikosti",
     close: "Zavřít",
+    prev: "Předchozí obrázek",
+    next: "Další obrázek",
     loading: "Načítání obrázků…",
     limit: (max) => `Nejvýše ${max} obrázků na uzel`,
     tooLarge: "Tento obrázek nešel použít — zkuste menší.",
@@ -1847,6 +1854,8 @@ const uk: UiStrings = {
     remove: "Видалити зображення",
     open: "Відкрити в повному розмірі",
     close: "Закрити",
+    prev: "Попереднє зображення",
+    next: "Наступне зображення",
     loading: "Завантаження зображень…",
     limit: (max) => `Не більше ${max} зображень на вузол`,
     tooLarge: "Це зображення не вдалося використати — спробуйте менше.",
@@ -2339,6 +2348,8 @@ const ru: UiStrings = {
     remove: "Удалить изображение",
     open: "Открыть в полном размере",
     close: "Закрыть",
+    prev: "Предыдущее изображение",
+    next: "Следующее изображение",
     loading: "Загрузка изображений…",
     limit: (max) => `Не больше ${max} изображений на узел`,
     tooLarge: "Это изображение не удалось использовать — попробуйте поменьше.",
