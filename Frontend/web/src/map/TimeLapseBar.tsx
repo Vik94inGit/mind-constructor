@@ -46,7 +46,13 @@ export function TimeLapseBar({ step, total, playing, at, onStep, onTogglePlay, o
   return (
     <div className="fixed inset-x-0 bottom-0 z-[46] flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
       <button type="button" className={btn} aria-label={playing ? s.timeLapsePause : s.timeLapsePlay} title={playing ? s.timeLapsePause : s.timeLapsePlay} onClick={onTogglePlay}>
-        {playing ? "⏸" : "▶"}
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+          {playing ? (
+            <path d="M3.5 2.5 H5.5 V11.5 H3.5 Z M8.5 2.5 H10.5 V11.5 H8.5 Z" fill="currentColor" />
+          ) : (
+            <path d="M4 2.2 L11.5 7 L4 11.8 Z" fill="currentColor" />
+          )}
+        </svg>
       </button>
       <input
         type="range"

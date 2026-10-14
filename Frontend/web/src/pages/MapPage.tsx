@@ -1191,6 +1191,11 @@ export function MapPage() {
     setMultiSelectIds(new Set());
     setPictureView(null);
     setTimeLapse({ step: 0, playing: true });
+    // The whole map in view, so it grows where it's watched.
+    showPoints(
+      unpackedNodes.map((n) => positions.get(n.nodeId)).filter((pt): pt is { x: number; y: number } => !!pt),
+      { aboveSheet: false },
+    );
   }
 
   // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the

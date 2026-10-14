@@ -90,8 +90,9 @@ export function useMapData({ mapId, setSelectedId, setCelebrateIds, loadErrorMes
       // every other read of node.text in this file can keep trusting that
       // type instead of null-checking it everywhere; "" doubles as the
       // "text not loaded yet" sentinel ensureNodeText below checks for,
-      // which is safe precisely because a real node's text is never
-      // actually empty (backend validation requires non-blank text).
+      // which is safe because fetchedTextIds below tells a node that really
+      // has no text yet (one sketched on the canvas and written later) apart
+      // from one whose text just hasn't been fetched.
       // This list replaces every node with a text-less copy, so anything
       // ensureNodeText already fetched is gone from state too — forget that
       // it was fetched, or the ids stay marked "have" while their text is
@@ -121,10 +122,8 @@ export function useMapData({ mapId, setSelectedId, setCelebrateIds, loadErrorMes
   // call's own closure over `nodes` is whatever it was at render time, not
   // whatever setNodes below just applied — so it has to consume the
   // returned map instead. fetchedTextIds remembers every id this has
-  // already resolved at least once, so a node that's genuinely empty text
-  // (shouldn't happen — backend validation requires non-blank text, but
-  // this is the one thing standing between that assumption breaking and an
-  // infinite refetch loop) is never retried forever.
+  // already resolved at least once, so a node whose text is genuinely empty
+  // (a branch sketched first and written later) is never retried forever.
   const fetchedTextIds = useRef<Set<string>>(new Set());
   async function ensureNodeText(ids: string[]): Promise<Record<string, string>> {
     const have: Record<string, string> = {};
