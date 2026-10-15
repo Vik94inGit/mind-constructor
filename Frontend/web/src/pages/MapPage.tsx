@@ -70,7 +70,8 @@ import { MapToolbar } from "../map/MapToolbar";
 import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
 import { MapLegend } from "../map/MapLegend";
-import { ZoneStyleMenu } from "../map/ZoneStyleMenu";
+import { ZoneMenu } from "../map/ZoneMenu";
+import type { ZoneStylePatch } from "../map/ZoneMenuBody";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId, ZONE_COLORS } from "../utils/nodeType";
@@ -109,7 +110,7 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, MapBackground, NodeDoc, NodeType, ZonePaletteColor, ZonePattern } from "../types";
+import type { AttackIndicator, MapBackground, NodeDoc, NodeType } from "../types";
 import { mapBackgroundStyle } from "../utils/mapBackground";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
@@ -1289,9 +1290,10 @@ export function MapPage() {
 
   // Confirmed from NodeCard's inline input (see startInlineEdit) — resolves
   // straight to the API, no intermediate form.
-  // A zone's pattern or colour, saved on its parent (Node.zonePattern /
-  // zoneColor). Shown straight away, rolled back if the save fails.
-  function setZoneStyle(rootId: string, patch: { zonePattern?: ZonePattern | null; zoneColor?: ZonePaletteColor | null }) {
+  // A zone's pattern, colour or edge brightness, saved on its parent
+  // (Node.zonePattern / zoneColor / zoneEdge). Shown straight away, rolled
+  // back if the save fails.
+  function setZoneStyle(rootId: string, patch: ZoneStylePatch) {
     const root = nodes.find((n) => n.nodeId === rootId);
     if (!root) return;
     upsertNode({ ...root, ...patch });
@@ -1299,6 +1301,21 @@ export function MapPage() {
       upsertNode(root);
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
     });
+  }
+
+  // A zone's look for its menus — only the parent's owner may restyle it (an
+  // owner-only node edit), so everyone else gets no style section. Reads the
+  // live node, so a pick shows at once while a menu stays open.
+  function zoneStyleFor(rootId: string) {
+    const root = nodes.find((n) => n.nodeId === rootId);
+    const group = nodeGroups.find((g) => g.rootId === rootId);
+    if (!root || !group || !isOwnNode(root)) return undefined;
+    return {
+      pattern: root.zonePattern ?? null,
+      color: root.zoneColor ?? null,
+      edge: root.zoneEdge ?? null,
+      autoColor: ZONE_COLORS[group.sentiment],
+    };
   }
 
   async function confirmInlineEdit(node: NodeDoc, text: string, type: NodeType) {
@@ -2005,11 +2022,6 @@ export function MapPage() {
             onContextMenu={onCanvasContextMenu}
           >
             <CanvasBackdrop
-              // Only the parent's owner may restyle its zone (an owner-only node edit).
-              canStyleZone={(rootId) => {
-                const root = nodes.find((n) => n.nodeId === rootId);
-                return !!root && isOwnNode(root);
-              }}
               onZoneMenu={(rootId, x, y) => {
                 setContextMenu(null);
                 setCanvasContextMenu(null);
@@ -2317,10 +2329,7 @@ export function MapPage() {
                           name: shortName,
                           sentiment: g.sentiment,
                           variant: !!root!.parentId,
-                          // Only the parent's owner may restyle its zone (an owner-only node edit).
-                          style: isOwnNode(root!)
-                            ? { pattern: root!.zonePattern ?? null, color: root!.zoneColor ?? null, autoColor: ZONE_COLORS[g.sentiment] }
-                            : undefined,
+                          style: zoneStyleFor(g.rootId),
                         },
                       ]
                     : [];
@@ -2563,14 +2572,15 @@ export function MapPage() {
               : undefined
           }
           zoneStyle={
-            isOwnNode(contextMenu.node) && nodeGroups.some((g) => g.rootId === contextMenu.node.nodeId)
-              ? {
-                  // The live node, so a pick shows at once while the menu stays open.
-                  pattern: nodes.find((n) => n.nodeId === contextMenu.node.nodeId)?.zonePattern ?? null,
-                  color: nodes.find((n) => n.nodeId === contextMenu.node.nodeId)?.zoneColor ?? null,
-                  autoColor: ZONE_COLORS[nodeGroups.find((g) => g.rootId === contextMenu.node.nodeId)!.sentiment],
-                  onChange: (patch) => setZoneStyle(contextMenu.node.nodeId, patch),
-                }
+            zoneStyleFor(contextMenu.node.nodeId) && {
+              ...zoneStyleFor(contextMenu.node.nodeId)!,
+              onChange: (patch) => setZoneStyle(contextMenu.node.nodeId, patch),
+            }
+          }
+          // A zone's parent: how this viewer reads its zone, same as the zone's own menu.
+          zoneView={
+            nodeGroups.some((g) => g.rootId === contextMenu.node.nodeId)
+              ? { value: zoneDisplay[contextMenu.node.nodeId] ?? null, onPick: (m) => setZoneMode(contextMenu.node.nodeId, m) }
               : undefined
           }
           onClose={() => setContextMenu(null)}
@@ -2600,24 +2610,22 @@ export function MapPage() {
         />
       )}
 
-      {zoneMenu &&
-        (() => {
-          const root = nodes.find((n) => n.nodeId === zoneMenu.rootId);
-          const group = nodeGroups.find((g) => g.rootId === zoneMenu.rootId);
-          if (!root || !group) return null;
-          return (
-            <ZoneStyleMenu
-              rootId={zoneMenu.rootId}
-              x={zoneMenu.x}
-              y={zoneMenu.y}
-              pattern={root.zonePattern ?? null}
-              color={root.zoneColor ?? null}
-              autoColor={ZONE_COLORS[group.sentiment]}
-              onChange={(patch) => setZoneStyle(zoneMenu.rootId, patch)}
-              onClose={() => setZoneMenu(null)}
-            />
-          );
-        })()}
+      {zoneMenu && nodeGroups.some((g) => g.rootId === zoneMenu.rootId) && (
+        <ZoneMenu
+          rootId={zoneMenu.rootId}
+          x={zoneMenu.x}
+          y={zoneMenu.y}
+          view={{ value: zoneDisplay[zoneMenu.rootId] ?? null, onPick: (m) => setZoneMode(zoneMenu.rootId, m) }}
+          layout={{ value: zoneLayouts[zoneMenu.rootId] ?? null, onPick: (l) => setZoneLayout(zoneMenu.rootId, l) }}
+          style={
+            zoneStyleFor(zoneMenu.rootId) && {
+              ...zoneStyleFor(zoneMenu.rootId)!,
+              onChange: (patch) => setZoneStyle(zoneMenu.rootId, patch),
+            }
+          }
+          onClose={() => setZoneMenu(null)}
+        />
+      )}
       {canvasContextMenu && (
         <CanvasContextMenu
           x={canvasContextMenu.screenX}

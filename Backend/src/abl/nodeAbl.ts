@@ -248,6 +248,8 @@ const updateNodeSchema = z
     // null goes back to no pattern / the sentiment colour.
     zonePattern: z.enum(ZONE_PATTERNS).nullish(),
     zoneColor: z.enum(ZONE_PALETTE).nullish(),
+    // 0..1 — null goes back to the default outline brightness.
+    zoneEdge: z.number().min(0).max(1).nullish(),
   })
   .refine((fields) => Object.values(fields).some((v) => v !== undefined), {
     error: "No fields to update",

@@ -326,6 +326,9 @@ export interface UiStrings {
     none: string;
     auto: string;
     autoHint: string;
+    edge: string;
+    /** Heading over a zone's views in its menu (map/ZoneMenuBody.tsx). */
+    view: string;
     patterns: Record<"dots" | "stripes" | "grid" | "chess", string>;
     colors: Record<"sand" | "sage" | "sky" | "lavender" | "rose" | "slate", string>;
   };
@@ -842,7 +845,7 @@ const en: UiStrings = {
     levels: "Levels",
     fineTune: "Fine-tune",
   },
-  zoneStyle: { pattern: "Pattern", color: "Colour", none: "None", auto: "Auto", autoHint: "Colour by sentiment", patterns: { dots: "Dots", stripes: "Stripes", grid: "Grid", chess: "Chess" }, colors: { sand: "Sand", sage: "Sage", sky: "Sky", lavender: "Lavender", rose: "Rose", slate: "Slate" } },
+  zoneStyle: { pattern: "Pattern", color: "Colour", none: "None", auto: "Auto", autoHint: "Colour by sentiment", edge: "Edge brightness", view: "Show zone as", patterns: { dots: "Dots", stripes: "Stripes", grid: "Grid", chess: "Chess" }, colors: { sand: "Sand", sage: "Sage", sky: "Sky", lavender: "Lavender", rose: "Rose", slate: "Slate" } },
   mapBackground: { title: "Background", options: { dots: "Dot grid", plain: "Plain", lined: "Lined paper", dark: "Soft dark" } },
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
@@ -1338,7 +1341,7 @@ const cs: UiStrings = {
     levels: "Úrovně",
     fineTune: "Doladit",
   },
-  zoneStyle: { pattern: "Vzor", color: "Barva", none: "Žádný", auto: "Auto", autoHint: "Barva podle nálady", patterns: { dots: "Tečky", stripes: "Pruhy", grid: "Mřížka", chess: "Šachovnice" }, colors: { sand: "Písková", sage: "Šalvějová", sky: "Nebeská", lavender: "Levandulová", rose: "Růžová", slate: "Břidlicová" } },
+  zoneStyle: { pattern: "Vzor", color: "Barva", none: "Žádný", auto: "Auto", autoHint: "Barva podle nálady", edge: "Jas okraje", view: "Zobrazit zónu jako", patterns: { dots: "Tečky", stripes: "Pruhy", grid: "Mřížka", chess: "Šachovnice" }, colors: { sand: "Písková", sage: "Šalvějová", sky: "Nebeská", lavender: "Levandulová", rose: "Růžová", slate: "Břidlicová" } },
   mapBackground: { title: "Pozadí", options: { dots: "Tečkovaná mřížka", plain: "Čisté", lined: "Linkovaný papír", dark: "Jemně tmavé" } },
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
@@ -1833,7 +1836,7 @@ const uk: UiStrings = {
     levels: "Рівні",
     fineTune: "Точніше",
   },
-  zoneStyle: { pattern: "Візерунок", color: "Колір", none: "Немає", auto: "Авто", autoHint: "Колір за настроєм", patterns: { dots: "Крапки", stripes: "Смуги", grid: "Сітка", chess: "Шахи" }, colors: { sand: "Пісок", sage: "Шавлія", sky: "Небо", lavender: "Лаванда", rose: "Троянда", slate: "Графіт" } },
+  zoneStyle: { pattern: "Візерунок", color: "Колір", none: "Немає", auto: "Авто", autoHint: "Колір за настроєм", edge: "Яскравість краю", view: "Показати зону як", patterns: { dots: "Крапки", stripes: "Смуги", grid: "Сітка", chess: "Шахи" }, colors: { sand: "Пісок", sage: "Шавлія", sky: "Небо", lavender: "Лаванда", rose: "Троянда", slate: "Графіт" } },
   mapBackground: { title: "Фон", options: { dots: "Сітка з крапок", plain: "Чистий", lined: "Папір у лінійку", dark: "М’який темний" } },
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
@@ -2331,7 +2334,7 @@ const ru: UiStrings = {
     levels: "Уровни",
     fineTune: "Точнее",
   },
-  zoneStyle: { pattern: "Узор", color: "Цвет", none: "Нет", auto: "Авто", autoHint: "Цвет по настроению", patterns: { dots: "Точки", stripes: "Полосы", grid: "Сетка", chess: "Шахматы" }, colors: { sand: "Песок", sage: "Шалфей", sky: "Небо", lavender: "Лаванда", rose: "Роза", slate: "Графит" } },
+  zoneStyle: { pattern: "Узор", color: "Цвет", none: "Нет", auto: "Авто", autoHint: "Цвет по настроению", edge: "Яркость края", view: "Показать зону как", patterns: { dots: "Точки", stripes: "Полосы", grid: "Сетка", chess: "Шахматы" }, colors: { sand: "Песок", sage: "Шалфей", sky: "Небо", lavender: "Лаванда", rose: "Роза", slate: "Графит" } },
   mapBackground: { title: "Фон", options: { dots: "Сетка из точек", plain: "Чистый", lined: "Бумага в линейку", dark: "Мягкий тёмный" } },
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",

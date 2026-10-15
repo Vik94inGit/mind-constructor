@@ -19,7 +19,7 @@ vi.stubGlobal(
 const zones: NamedZone[] = [
   { rootId: "near", name: "Near zone", sentiment: "positive", variant: false },
   { rootId: "far", name: "Far zone", sentiment: "negative", variant: true },
-  { rootId: "also", name: "Also near", sentiment: "negative", variant: true, style: { pattern: null, color: null, autoColor: "red" } },
+  { rootId: "also", name: "Also near", sentiment: "negative", variant: true, style: { pattern: null, color: null, edge: null, autoColor: "red" } },
 ];
 
 function renderNames(onGo = vi.fn(), onSetMode?: (rootId: string, mode: string | null) => void, onSetStyle?: (rootId: string, patch: object) => void) {

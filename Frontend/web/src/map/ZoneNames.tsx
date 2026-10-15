@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { ZONE_COLORS } from "../utils/nodeType";
-import { ZONE_MODES } from "../utils/zoneDisplay";
 import type { ZoneDisplay, ZoneMode } from "../utils/zoneDisplay";
 import { useI18n } from "../i18n/I18nContext";
-import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
 import type { ZoneLayout, ZoneLayouts } from "../utils/zoneLayout";
 import { KnightHelmet } from "./KnightHelmet";
 import type { Sentiment } from "../utils/nodeType";
 import type { ZonePaletteColor, ZonePattern } from "../types";
-import { ZoneStylePicker } from "./ZoneStylePicker";
+import { MODE_GLYPH, ZoneMenuBody } from "./ZoneMenuBody";
+import type { ZoneStylePatch } from "./ZoneMenuBody";
 
 export interface NamedZone {
   rootId: string;
@@ -17,7 +16,7 @@ export interface NamedZone {
   /** A circle parent that itself hangs from another node: helmet instead of crown. */
   variant: boolean;
   /** The zone's own look, set when this viewer may change it (they own its parent). */
-  style?: { pattern: ZonePattern | null; color: ZonePaletteColor | null; autoColor: string };
+  style?: { pattern: ZonePattern | null; color: ZonePaletteColor | null; edge: number | null; autoColor: string };
 }
 
 interface Props {
@@ -38,18 +37,8 @@ interface Props {
   /** A zone's layout was picked — null goes back to following its parents / the map. */
   onSetLayout?: (rootId: string, layout: ZoneLayout | null) => void;
   /** A zone's pattern or colour was picked — saved on its parent (Node.zonePattern / zoneColor). */
-  onSetStyle?: (rootId: string, patch: { zonePattern?: ZonePattern | null; zoneColor?: ZonePaletteColor | null }) => void;
+  onSetStyle?: (rootId: string, patch: ZoneStylePatch) => void;
 }
-
-// A glyph per view for the chip's view button — short enough to sit beside
-// the name, distinct enough to tell the zones' views apart at a glance.
-const MODE_GLYPH: Record<ZoneMode, string> = {
-  puzzle: "🧩",
-  mixed: "◐",
-  iconText: "Aa",
-  actual: "○",
-  dots: "•••",
-};
 
 // The names of the zones in view (their parent on screen right now), listed
 // as links in a compact column just left of the minimap and no taller than
@@ -91,13 +80,6 @@ export function ZoneNames({
       window.removeEventListener("keydown", onKeyDown, true);
     };
   }, [menu]);
-  const modeLabel: Record<ZoneMode, string> = {
-    puzzle: t.map.toolbar.readingPuzzle,
-    mixed: t.map.toolbar.readingMixed,
-    iconText: t.map.toolbar.readingIconText,
-    actual: t.map.toolbar.readingActual,
-    dots: t.ui.display.dots,
-  };
   const [view, setView] = useState({ left: 0, top: 0, width: 0, height: 0 });
 
   useEffect(() => {
@@ -199,72 +181,16 @@ export function ZoneNames({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          {[null, ...ZONE_MODES].map((m) => {
-            const active = (modes[menu.rootId] ?? null) === m;
-            return (
-              <button
-                key={m ?? "map"}
-                type="button"
-                role="menuitemradio"
-                aria-checked={active}
-                className={`flex w-full cursor-pointer items-center gap-2 rounded-[6px] px-[0.6rem] py-[0.4rem] text-left text-[0.82rem] hover:bg-surface-2 ${
-                  active ? "bg-surface-2 font-semibold text-accent" : "text-ink"
-                }`}
-                onClick={() => {
-                  onSetMode(menu.rootId, m);
-                  setMenu(null);
-                }}
-              >
-                <span className="w-6 text-center text-[0.72rem]" aria-hidden>
-                  {m ? MODE_GLYPH[m] : "⋯"}
-                </span>
-                {m ? modeLabel[m] : t.ui.display.followMap}
-              </button>
-            );
-          })}
-          {onSetLayout && (
-            <>
-              <div className="my-[0.15rem] border-t border-line" />
-              <div className="px-[0.6rem] pt-[0.2rem] text-[0.7rem] font-semibold tracking-wide text-ink-soft uppercase">
-                {t.ui.contextMenu.zones}
-              </div>
-              {[null, ...ZONE_LAYOUTS].map((l) => {
-                const active = (layouts[menu.rootId] ?? null) === l;
-                return (
-                  <button
-                    key={l ?? "follow"}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={active}
-                    className={`flex w-full cursor-pointer items-center gap-2 rounded-[6px] px-[0.6rem] py-[0.4rem] text-left text-[0.82rem] hover:bg-surface-2 ${
-                      active ? "bg-surface-2 font-semibold text-accent" : "text-ink"
-                    }`}
-                    onClick={() => {
-                      onSetLayout(menu.rootId, l);
-                      setMenu(null);
-                    }}
-                  >
-                    {l ? zoneLayoutLabel(t.ui.display, l) : t.ui.display.followMap}
-                  </button>
-                );
-              })}
-            </>
-          )}
           {(() => {
             const style = zones.find((z) => z.rootId === menu.rootId)?.style;
-            if (!style || !onSetStyle) return null;
             return (
-              <>
-                <div className="my-[0.15rem] border-t border-line" />
-                <ZoneStylePicker
-                  idPrefix={`zone-menu-${menu.rootId}`}
-                  pattern={style.pattern}
-                  color={style.color}
-                  autoColor={style.autoColor}
-                  onPattern={(p) => onSetStyle(menu.rootId, { zonePattern: p })}
-                  onColor={(c) => onSetStyle(menu.rootId, { zoneColor: c })}
-                />
-              </>
+              <ZoneMenuBody
+                idPrefix={`zone-menu-${menu.rootId}`}
+                view={{ value: modes[menu.rootId] ?? null, onPick: (m) => onSetMode(menu.rootId, m) }}
+                layout={onSetLayout ? { value: layouts[menu.rootId] ?? null, onPick: (l) => onSetLayout(menu.rootId, l) } : undefined}
+                style={style && onSetStyle ? { ...style, onChange: (patch) => onSetStyle(menu.rootId, patch) } : undefined}
+                onPicked={() => setMenu(null)}
+              />
             );
           })()}
         </div>
