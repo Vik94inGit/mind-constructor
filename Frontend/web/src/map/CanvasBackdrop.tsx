@@ -37,6 +37,8 @@ interface Props {
   interactive: boolean;
   /** Zones (by root) holding a Success that solved a Problem or reached a goal — outlined in gold. */
   solvedZones?: Set<string>;
+  /** Discussion mode: every zone's outline drawn as a battlemented wall — the kingdom's (a parentless keep) thicker and doubled. */
+  walls?: boolean;
   /** The simplified view: no ring drawn around a circle's parent. */
   compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
@@ -70,6 +72,7 @@ export function CanvasBackdrop({
   drawing,
   compact = false,
   solvedZones,
+  walls = false,
   onZoneMenu,
   canStyleZone,
 }: Props) {
@@ -223,6 +226,46 @@ export function CanvasBackdrop({
               strokeLinejoin="round"
               style={{ filter: `drop-shadow(0 0 6px ${SOLVED_GOLD})` }}
             />
+          );
+        })}
+      {/*
+        Walls (discussion mode): each zone is a castle and its outline the
+        castle wall — a thick dashed line reads as battlements. A zone whose
+        parent hangs from nothing is the kingdom, so its border is heavier and
+        doubled. See utils/siege.ts.
+      */}
+      {walls &&
+        nodeGroups.map((g) => {
+          const root = visibleNodes.find((n) => n.nodeId === g.rootId);
+          const kingdom = !nodeRefId(root?.parentId);
+          const color = zoneColorFor(root, g.sentiment);
+          const dimmed = selectedCircle ? selectedCircle.rootId !== g.rootId : !!focusedZones && !focusedZones.has(g.rootId);
+          const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+          return (
+            <g key={`wall-${g.rootId}`} data-testid={kingdom ? "kingdom-wall" : "castle-wall"} opacity={dimmed ? 0.35 : 0.8}>
+              {kingdom && (
+                <polygon
+                  points={zonePoints}
+                  data-reveal-points={g.outlineIds?.join(" ")}
+                  data-base={zonePoints}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={14}
+                  strokeOpacity={0.35}
+                  strokeLinejoin="round"
+                />
+              )}
+              <polygon
+                points={zonePoints}
+                data-reveal-points={g.outlineIds?.join(" ")}
+                data-base={zonePoints}
+                fill="none"
+                stroke={color}
+                strokeWidth={kingdom ? 8 : 6}
+                strokeDasharray={kingdom ? "12 7" : "9 6"}
+                strokeLinejoin="miter"
+              />
+            </g>
           );
         })}
       {/*

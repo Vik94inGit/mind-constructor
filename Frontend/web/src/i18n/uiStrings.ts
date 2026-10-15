@@ -3,6 +3,8 @@ import type { MapKind, NodeType } from "../types";
 import type { TemplateNodeKey } from "../utils/templates";
 import { THINK_STRINGS } from "./thinkStrings";
 import type { ThinkStrings } from "./thinkStrings";
+import { SIEGE_STRINGS } from "./siegeStrings";
+import type { SiegeStrings } from "./siegeStrings";
 
 // The rest of the app's user-facing text — panels, menus, modals, and the
 // messages shown when something goes wrong. translations.ts keeps the core
@@ -349,6 +351,8 @@ export interface UiStrings {
   cardMenuLabel: string;
   /** The "Think it through" flow — see thinkStrings.ts. */
   think: ThinkStrings;
+  /** The opponent's turn in discussion mode — see siegeStrings.ts. */
+  siege: SiegeStrings;
   /** The offline / syncing indicator — see components/OfflineBanner.tsx. */
   offline: {
     offline: string;
@@ -863,6 +867,7 @@ const en: UiStrings = {
     members: (n) => `${n} member(s)`,
   },
   think: THINK_STRINGS.en,
+  siege: SIEGE_STRINGS.en,
   cardMenuLabel: "Map menu",
   offline: {
     offline: "Offline · saved on this device",
@@ -1359,6 +1364,7 @@ const cs: UiStrings = {
     members: (n) => `${n} člen(ů)`,
   },
   think: THINK_STRINGS.cs,
+  siege: SIEGE_STRINGS.cs,
   cardMenuLabel: "Nabídka mapy",
   offline: {
     offline: "Offline · ukládá se v zařízení",
@@ -1854,6 +1860,7 @@ const uk: UiStrings = {
     members: (n) => `${n} учасник(ів)`,
   },
   think: THINK_STRINGS.uk,
+  siege: SIEGE_STRINGS.uk,
   cardMenuLabel: "Меню мапи",
   offline: {
     offline: "Офлайн · зберігається на пристрої",
@@ -2352,6 +2359,7 @@ const ru: UiStrings = {
     members: (n) => `${n} участник(ов)`,
   },
   think: THINK_STRINGS.ru,
+  siege: SIEGE_STRINGS.ru,
   cardMenuLabel: "Меню карты",
   offline: {
     offline: "Офлайн · сохраняется на устройстве",

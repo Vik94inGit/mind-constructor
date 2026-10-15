@@ -56,6 +56,8 @@ import { readingOrder, stepNode } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
+import { SiegePanel } from "../map/SiegePanel";
+import { holdsOf } from "../utils/siege";
 import { MapBanner } from "../map/MapBanner";
 import { MarqueeRect, PuzzleConnectLine, ZoneLoadingSpinner } from "../map/CanvasOverlays";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
@@ -154,6 +156,8 @@ export function MapPage() {
   // The time-lapse (TimeLapseBar): how many nodes, oldest first, are shown,
   // and whether it's playing. `null` when it's off.
   const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
+  // The opponent's turn (SiegePanel) is open — discussion mode only.
+  const [siegeOpen, setSiegeOpen] = useState(false);
   const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
@@ -659,6 +663,16 @@ export function MapPage() {
   const nodeGroups = useMemo(
     () => computeNodeGroups(visibleNodes, nodes, positions, undefined, zoneLayouts),
     [visibleNodes, positions, zoneLayouts],
+  );
+  // Discussion mode reads the zones as a realm: the kingdom and its castles
+  // (utils/siege.ts), named like the zone list names them.
+  const holds = useMemo(
+    () =>
+      holdsOf(
+        nodeGroups.map((g) => g.rootId),
+        nodes,
+      ).map((h) => ({ ...h, name: zoneLabel(nodes.find((n) => n.nodeId === h.rootId)) ?? "" })),
+    [nodeGroups, nodes],
   );
 
   // Zoomed out to 50%: no icons anywhere on the canvas — nodes are plain
@@ -1851,6 +1865,10 @@ export function MapPage() {
         centerOnNode(id);
       }}
       onToggleMapMode={toggleMapMode}
+      onOpponentTurn={() => {
+        setSelectedId(null);
+        setSiegeOpen(true);
+      }}
       onExitDemo={exitDemo}
       onInvite={() => setShowInvite(true)}
       onCreateNode={startCreateNodeInView}
@@ -2053,6 +2071,7 @@ export function MapPage() {
               interactive={!drawMode}
               compact={compactView || dotZoom}
               solvedZones={solvedZones}
+              walls={isDiscussionMode}
               drawing={
                 drawMode
                   ? {
@@ -2388,6 +2407,25 @@ export function MapPage() {
               })
             }
             onExit={() => setTimeLapse(null)}
+          />
+        ) : siegeOpen && isDiscussionMode ? (
+          <SiegePanel
+            holds={holds}
+            nodes={nodes}
+            onAttacked={(res) => {
+              upsertNode(res.node);
+              upsertNode(res.weaponNode);
+              if (res.healedParent) upsertNode(res.healedParent);
+              if (res.protector) upsertNode(res.protector);
+              setCelebrateIds((prev) => new Set(prev).add(res.weaponNode.nodeId));
+              if (mapId) refreshInsights(mapId);
+            }}
+            onProtected={(res) => {
+              upsertNode(res.protectionNode);
+              upsertNode(res.healedNode);
+            }}
+            onFocus={centerOnNode}
+            onExit={() => setSiegeOpen(false)}
           />
         ) : drawMode ? (
           <DrawLineBar
