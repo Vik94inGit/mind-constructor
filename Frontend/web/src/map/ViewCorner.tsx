@@ -131,8 +131,8 @@ export function ViewCorner({ level, levels, hiddenCount, onLevelChange, readingM
 
   return (
     // With the minimap shown it takes the corner itself (~122px tall with its
-    // border), so the eye sits on top of it, beside the zoom controls.
-    <div ref={ref} className={`absolute ${minimapShown ? "bottom-[142px]" : "bottom-3"} right-3 ${open ? "z-[49]" : "z-[45]"}`}>
+    // border): the zoom controls sit on it and the eye on top of them.
+    <div ref={ref} className={`absolute ${minimapShown ? "bottom-[186px]" : "bottom-3"} right-3 ${open ? "z-[49]" : "z-[45]"}`}>
       {open && (
         <div className="absolute right-0 bottom-[calc(100%+0.4rem)] z-[60] flex w-[230px] flex-col gap-3 rounded-card border border-line bg-surface p-2 shadow-card">
           <Stepper
