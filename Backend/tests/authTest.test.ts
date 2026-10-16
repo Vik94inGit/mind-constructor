@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
+import { AUTH_MAX_ATTEMPTS } from "../src/middleware/rateLimit.js";
 
 // Runs against the real app and its real session cookie, with an in-memory
 // stand-in for the user DAO instead of MongoDB (like every other test here),
@@ -124,5 +125,20 @@ describe("Auth", () => {
 
     const me = await agent.get("/api/auth/me");
     expect(me.status).toBe(401);
+  });
+
+  it("sends security headers", async () => {
+    const res = await request(app).get("/api/auth/me");
+    expect(res.headers["x-content-type-options"]).toBe("nosniff");
+    expect(res.headers["cross-origin-resource-policy"]).toBe("cross-origin");
+  });
+
+  // Last: it spends this address's whole sign-in budget.
+  it("turns away a flood of sign-in attempts from one address", async () => {
+    let last = 0;
+    for (let i = 0; i < AUTH_MAX_ATTEMPTS + 1; i++) {
+      last = (await request(app).post("/api/auth/login").send({ email: "test@example.com", password: "wrong" })).status;
+    }
+    expect(last).toBe(429);
   });
 });

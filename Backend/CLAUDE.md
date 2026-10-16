@@ -108,6 +108,10 @@ Cross-cutting pieces:
 payload)` is the one function controllers call after a mutation commits; it's a no-op if `io`
   was never initialized (true under the test app), so it's safe to call unconditionally.
 - **`src/abl/errors.ts`** — shared `ValidationError` + `parseOrThrow`.
+- **`src/middleware/rateLimit.ts`** + `helmet` in `server.ts` — the sign-in routes (`/register`, `/login`,
+  `/google`, `/demo`) allow `AUTH_MAX_ATTEMPTS` (20) per address per 15 minutes (in-memory store, `429`
+  after); every response carries helmet's security headers, with `Cross-Origin-Resource-Policy:
+  cross-origin` so the frontend's own origin can still load `/api/images`.
 - **`src/abl/authAbl.ts`** `googleAuthAbl` — "Sign in with Google" is one endpoint
   (`POST /api/auth/google`) for both registering and logging in: the frontend hands it a Google ID
   token (never a password), the backend verifies it against `GOOGLE_CLIENT_ID` via
