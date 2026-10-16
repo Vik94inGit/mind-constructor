@@ -176,8 +176,10 @@ export function ZoneNames({
         <div
           ref={menuRef}
           role="menu"
-          className="pointer-events-auto fixed z-[60] flex min-w-[190px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
-          style={{ left: menu.left, bottom: menu.bottom }}
+          // Scrolls inside itself when it's taller than the room above its
+          // button, so a phone screen never cuts part of it off.
+          className="pointer-events-auto fixed z-[60] flex min-w-[190px] flex-col gap-[0.15rem] overflow-y-auto overscroll-contain rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
+          style={{ left: menu.left, bottom: menu.bottom, maxHeight: Math.max(160, window.innerHeight - menu.bottom - 8) }}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >

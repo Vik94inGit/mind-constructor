@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ZoneMenuBody } from "./ZoneMenuBody";
 import type { ComponentProps } from "react";
 
@@ -11,9 +11,11 @@ type Props = Omit<ComponentProps<typeof ZoneMenuBody>, "idPrefix" | "onPicked"> 
 };
 
 const MENU_W = 240;
-// About the full menu's height — enough to pull it up from the screen's
-// bottom edge; a shorter screen scrolls it instead (max-h below).
-const MENU_H = 460;
+const EDGE = 8;
+
+// The visible screen's height — on a phone the browser's own bars cover part
+// of the layout viewport, so visualViewport is what's actually on screen.
+const screenHeight = () => window.visualViewport?.height ?? window.innerHeight;
 
 // A zone's own menu, opened by right-clicking the zone or holding a finger on
 // it (CanvasBackdrop's onZoneMenu): its view, its layout and — for the
@@ -22,6 +24,27 @@ const MENU_H = 460;
 // Closes on a tap elsewhere or Escape.
 export function ZoneMenu({ rootId, x, y, onClose, ...body }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
+  // Placed once its real height is known: pulled up from the bottom edge as
+  // far as it needs, and scrolling inside itself when the screen is shorter
+  // than the whole menu — so its bottom is never cut off.
+  const [top, setTop] = useState(() => Math.max(EDGE, Math.min(y, screenHeight() - 200)));
+  const [maxHeight, setMaxHeight] = useState(() => screenHeight() - 2 * EDGE);
+  useLayoutEffect(() => {
+    function place() {
+      const h = screenHeight();
+      const menuH = ref.current?.scrollHeight ?? 0;
+      const room = h - 2 * EDGE;
+      setMaxHeight(room);
+      setTop(Math.max(EDGE, Math.min(y, h - Math.min(menuH, room) - EDGE)));
+    }
+    place();
+    window.visualViewport?.addEventListener("resize", place);
+    window.addEventListener("resize", place);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", place);
+      window.removeEventListener("resize", place);
+    };
+  }, [y]);
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -43,10 +66,11 @@ export function ZoneMenu({ rootId, x, y, onClose, ...body }: Props) {
       ref={ref}
       role="menu"
       // Scrolls inside itself rather than running off a short phone screen.
-      className="fixed z-[70] flex max-h-[calc(100vh-16px)] flex-col gap-[0.15rem] overflow-y-auto rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
+      className="fixed z-[70] flex flex-col gap-[0.15rem] overflow-y-auto rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
       style={{
-        left: Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8)),
-        top: Math.max(8, Math.min(y, window.innerHeight - MENU_H - 8)),
+        left: Math.max(EDGE, Math.min(x, window.innerWidth - MENU_W - EDGE)),
+        top,
+        maxHeight,
         width: MENU_W,
       }}
       onContextMenu={(e) => e.preventDefault()}

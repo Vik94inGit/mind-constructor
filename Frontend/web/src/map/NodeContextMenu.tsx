@@ -150,7 +150,7 @@ export function NodeContextMenu({
           : rootItemCount;
   const MENU_H = itemCount * ITEM_H + 10;
   const left = Math.min(x, window.innerWidth - MENU_W - 8);
-  const top = Math.min(y, window.innerHeight - MENU_H - 8);
+  const top = Math.max(8, Math.min(y, window.innerHeight - MENU_H - 8));
 
   const item = "block w-full cursor-pointer rounded-[6px] px-[0.6rem] py-[0.45rem] text-left text-[0.85rem] text-ink hover:bg-surface-2";
   const itemDanger = "block w-full cursor-pointer rounded-[6px] px-[0.6rem] py-[0.45rem] text-left text-[0.85rem] text-danger hover:bg-surface-2";
@@ -159,8 +159,10 @@ export function NodeContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-[60] flex min-w-[160px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
-      style={{ left, top }}
+      // Scrolls inside itself when it's taller than the room below it (its
+      // zone section can be long), so a phone screen never cuts it off.
+      className="fixed z-[60] flex min-w-[160px] flex-col gap-[0.15rem] overflow-y-auto overscroll-contain rounded-card border border-line bg-surface p-[0.35rem] shadow-card"
+      style={{ left, top, maxHeight: window.innerHeight - top - 8 }}
       onContextMenu={(e) => e.preventDefault()}
     >
       {mode === "root" && isOwner && (

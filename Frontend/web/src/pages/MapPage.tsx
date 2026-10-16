@@ -77,7 +77,7 @@ import { ZoneMenu } from "../map/ZoneMenu";
 import type { ZoneStylePatch } from "../map/ZoneMenuBody";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
-import { idOf, nodeRefId, ZONE_COLORS } from "../utils/nodeType";
+import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import { useRadialBlend } from "../hooks/useRadialBlend";
 import { useSentimentShow } from "../hooks/useSentimentShow";
 import { useCanvasFraming } from "../hooks/useCanvasFraming";
@@ -117,6 +117,7 @@ import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeType } fro
 import { battleTally, finishState, healthAt } from "../utils/finish";
 import { FinishedBanner } from "../map/FinishedBanner";
 import { HistoryPanel } from "../map/HistoryPanel";
+import { BURST_MS, NodeBurst } from "../map/NodeBurst";
 import { mapBackgroundStyle } from "../utils/mapBackground";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
@@ -690,6 +691,35 @@ export function MapPage() {
   // too, even though the function resolves each root against `nodes` —
   // matching this hook's original dependency list exactly rather than
   // changing behavior as part of a pure relocation.
+  // A node that leaves the map (deleted here, by someone else, or in a batch)
+  // pops where it stood — a boom for a negative one (map/NodeBurst.tsx).
+  // Found by comparing the node list with the last one, so every way of
+  // deleting gets it; a wholesale swap (another map, a reload) doesn't.
+  const [bursts, setBursts] = useState<{ id: string; x: number; y: number; boom: boolean }[]>([]);
+  const lastNodesRef = useRef<{ mapId: string | undefined; nodes: NodeDoc[]; positions: Map<string, { x: number; y: number }> }>({
+    mapId,
+    nodes: [],
+    positions: new Map(),
+  });
+  useEffect(() => {
+    const last = lastNodesRef.current;
+    lastNodesRef.current = { mapId, nodes, positions };
+    if (last.mapId !== mapId || last.nodes.length === 0) return;
+    const now = new Set(nodes.map((n) => n.nodeId));
+    const gone = last.nodes.filter((n) => !now.has(n.nodeId) && !nodeRefId(n.packedIntoNodeId));
+    if (gone.length === 0 || gone.length > 25 || gone.length === last.nodes.length) return;
+    const fresh = gone.flatMap((n) => {
+      const at = last.positions.get(n.nodeId);
+      return at ? [{ id: `${n.nodeId}-${Date.now()}`, x: at.x, y: at.y, boom: sentimentOf(n.type) === "negative" }] : [];
+    });
+    if (fresh.length === 0) return;
+    setBursts((prev) => [...prev, ...fresh]);
+    const ids = new Set(fresh.map((b) => b.id));
+    setTimeout(() => setBursts((prev) => prev.filter((b) => !ids.has(b.id))), BURST_MS);
+    // positions is read as of the same render; only a change of nodes matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, mapId]);
+
   // Each zone's corner order from last time — moving one node then moves only
   // its own corner (see computeNodeGroups).
   const zoneCornerOrder = useRef(new Map<string, string[]>());
@@ -2256,6 +2286,10 @@ export function MapPage() {
                   <PuzzleConnectLine from={posFor(fromNode)} connect={puzzleConnect} zoom={zoom} />
                 ) : null;
               })()}
+
+            {bursts.map((b) => (
+              <NodeBurst key={b.id} x={b.x} y={b.y} boom={b.boom} />
+            ))}
 
             {visibleNodes.map((node) => {
               const pos = posFor(node);
