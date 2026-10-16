@@ -19,6 +19,7 @@ export async function createNode(
   input: {
     text: string;
     title?: string;
+    prompt?: string;
     emoji?: string;
     order?: number | null;
     type: NodeType;
@@ -49,6 +50,8 @@ export async function createNode(
           sizeTier: null,
           symbolOverride: null,
           manualZone: null,
+          prompt: "",
+          ghost: input.text.trim() === "",
           ...input,
           parentId: input.parentId ?? null,
           nodeId: localId,
@@ -86,6 +89,7 @@ export async function updateNode(nodeId: string, updates: Partial<NodeDoc>): Pro
       optimistic: () => ({
         ...(offline.knownNode<NodeDoc>(nodeId) ?? ({ nodeId } as NodeDoc)),
         ...updates,
+        ...(typeof updates.text === "string" ? { ghost: false } : {}),
         updatedAt: new Date().toISOString(),
       }),
     },

@@ -48,6 +48,17 @@ describe("NodeCard", () => {
       expect(muted).not.toContain("opacity-50");
     });
 
+    it("fades a ghost and captions it with its prompt until it's filled in", () => {
+      const ghost = makeNode({ nodeId: "g", text: "", ghost: true, prompt: "What could go wrong?" });
+      const faded = renderNode({ node: ghost });
+      expect(root(faded.container).className).toContain("opacity-45");
+      expect(faded.getByText("What could go wrong?").className).toContain("italic");
+      faded.unmount();
+      const filled = renderNode({ node: { ...ghost, text: "The server", ghost: false } });
+      expect(root(filled.container).className).not.toContain("opacity-45");
+      expect(filled.queryByText("What could go wrong?")).toBeNull();
+    });
+
     it("leaves out a caption that would cover a parent's", () => {
       const node = makeNode({ nodeId: "a", text: "caption text" });
       const shown = renderNode({ node });

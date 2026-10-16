@@ -6,17 +6,18 @@ import type { MapKind } from "../types";
 
 // Fills a freshly created map with the starter structure for its kind: a root
 // node in the upper middle of the canvas and the kind's template grown below
-// it, every node carrying its prompt (in the user's language) as title + text.
+// it, every node a ghost: no text or title, only its prompt (in the user's
+// language), shown as a placeholder until someone writes in it.
 export async function seedMapKind(
   mapId: string,
   kind: MapKind,
-  copy: Record<TemplateNodeKey, { title: string; text: string }>,
+  prompts: Record<TemplateNodeKey, string>,
 ): Promise<void> {
   const root = MAP_KIND_ROOTS[kind];
   const rootPos = { x: CANVAS_W / 2, y: 380 };
   const rootNode = await nodesApi.createNode(mapId, {
-    text: copy[root.key].text,
-    title: copy[root.key].title,
+    text: "",
+    prompt: prompts[root.key],
     type: root.type,
     x: rootPos.x,
     y: rootPos.y,
@@ -24,8 +25,8 @@ export async function seedMapKind(
   const ids = new Map<TemplateNodeKey, string>();
   for (const p of layoutTemplate(root.template, rootPos)) {
     const node = await nodesApi.createNode(mapId, {
-      text: copy[p.key].text,
-      title: copy[p.key].title,
+      text: "",
+      prompt: prompts[p.key],
       type: p.type,
       order: p.order,
       x: p.x,

@@ -193,6 +193,11 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `nodeAbl.ts`; an empty string on PATCH clears it). Unlike `text`, it is *not* stripped from
   `GET /:mapId/nodes` — it's small enough to ride along, and it's what lets a frontend caption a node
   without the lazy `text` backfill. The `"demo"` map template seeds a couple of titles.
+- **`Node.prompt` / `Node.ghost`** — a ghost is a node made with empty text (`createNodeAbl` sets
+  `ghost` from the text); the first non-empty `text` on `PATCH` clears it. `prompt` (max 200 chars,
+  `""` = none) is the question a frontend shows as the ghost's placeholder — map templates create
+  ghosts with a prompt and no text or title. Both ride along on `GET /:mapId/nodes` like `title`:
+  the stored flag is what lets a frontend fade a ghost without the lazy `text` backfill.
 - **`Node.zoneName`** — an optional name (max 40 chars, `""` = none) for the zone a circle parent
   radiates. Set via `PATCH /api/nodes/:nodeId` (`zoneNameSchema` in `nodeAbl.ts`; an empty string
   clears it), owner-only like every node edit. A frontend shows it under the parent on the canvas and

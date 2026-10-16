@@ -29,6 +29,8 @@ export class NotMapOwnerError extends Error {}
 // Shared by create/update: same cap as Node.title's own maxlength. Empty is
 // valid (it's how "no title" is stored, and how an update clears one).
 const titleSchema = z.string().trim().max(80, "title must be at most 80 characters");
+// See Node.prompt — "" removes it.
+const promptSchema = z.string().trim().max(200, "prompt must be at most 200 characters");
 
 // Node.zoneName — same shape as the title: "" clears it.
 const zoneNameSchema = z.string().trim().max(40, "zone name must be at most 40 characters");
@@ -146,6 +148,7 @@ const createNodeSchema = z.object({
   // "" is allowed: a node can be drawn first and written later (see Node.text).
   text: z.string(),
   title: titleSchema.optional(),
+  prompt: promptSchema.optional(),
   emoji: emojiSchema.optional(),
   order: orderSchema.nullish(),
   type: z.enum(NODE_TYPES, {
@@ -197,6 +200,8 @@ export const createNodeAbl = async (
 
   return await createNodeMutationDao(map._id, {
     ...parsed,
+    // No text yet → a ghost, faded on the canvas until someone writes in it.
+    ghost: parsed.text.trim() === "",
     parentId: parentObjectId,
     userId,
     isFirstNode,
@@ -208,6 +213,7 @@ const updateNodeSchema = z
     text: z.string().min(1).optional(),
     // "" clears the title (back to the text's own first words).
     title: titleSchema.optional(),
+    prompt: promptSchema.optional(),
     zoneName: zoneNameSchema.optional(),
     // "" removes the emoji.
     emoji: emojiSchema.optional(),
@@ -264,6 +270,8 @@ export const updateNodeAbl = async (
   const definedUpdates: Record<string, unknown> = Object.fromEntries(
     Object.entries(updates).filter(([, v]) => v !== undefined),
   );
+  // Writing text into a ghost fills it in (see Node.ghost).
+  if (typeof definedUpdates.text === "string") definedUpdates.ghost = false;
 
   // parentId arrives as a public nodeId (or explicit null to clear it) —
   // this was passing it straight through unresolved, so setting a real

@@ -179,6 +179,10 @@ export interface NodeDoc {
   text: string;
   /** Optional short canvas label (see Backend's Node.title). Empty/absent means "none" — the canvas falls back to the start of `text`. Unlike `text` this arrives with the initial node list, no lazy backfill needed. */
   title?: string;
+  /** A ghost's prompt (see Backend's Node.prompt): the question shown as the node's placeholder while its text is empty. Arrives with the node list like `title`. */
+  prompt?: string;
+  /** True while the node has never been written in (see Backend's Node.ghost) — the canvas draws it faded until someone fills it. */
+  ghost?: boolean;
   /** Optional step number (1..9999) for labeling a process's steps — see Backend's Node.order. null/absent means "not numbered". */
   order?: number | null;
   type: NodeType;

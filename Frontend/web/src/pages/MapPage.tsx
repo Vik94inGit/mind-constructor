@@ -1517,7 +1517,7 @@ export function MapPage() {
     setInlineEditId(null);
     // Emoji first: the feeling was already picked (or skipped, "") on the
     // ring before the types. Otherwise it's offered around the new node.
-    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text, emoji: emojiFirst ? (emoji ?? "") : undefined });
+    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, prompt: text, emoji: emojiFirst ? (emoji ?? "") : undefined });
   }
 
   // Draw first, write later: a type ghost dragged out of the selected node's
@@ -2243,7 +2243,7 @@ export function MapPage() {
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => {
                   setActionError(null);
-                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, text, emoji: emojiFirst ? (emoji ?? "") : undefined });
+                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, prompt: text, emoji: emojiFirst ? (emoji ?? "") : undefined });
                 }}
               />
             )}
@@ -2269,7 +2269,6 @@ export function MapPage() {
                 x={pendingCreate.x}
                 y={pendingCreate.y}
                 type={pendingCreate.type}
-                initialText={pendingCreate.text}
                 emoji={pendingCreate.emoji || undefined}
                 zoom={zoom}
                 onConfirm={confirmPendingCreate}
@@ -2465,10 +2464,10 @@ export function MapPage() {
             key={`${pendingCreate.x}:${pendingCreate.y}`}
             type={pendingCreate.type}
             emoji={pendingCreate.emoji || undefined}
-            initialText={pendingCreate.text}
+            prompt={pendingCreate.prompt}
             onTypeChange={(type) => setPendingCreate((prev) => (prev ? { ...prev, type } : prev))}
             onClearEmoji={() => setPendingCreate((prev) => (prev ? { ...prev, emoji: "" } : prev))}
-            onCreate={(text, type, images) => confirmPendingCreate(text, type, images)}
+            onCreate={(text, type, images, prompt) => confirmPendingCreate(text, type, images, prompt)}
             onCancel={() => setPendingCreate(null)}
           />
         ) : (

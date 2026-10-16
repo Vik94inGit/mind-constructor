@@ -78,6 +78,8 @@ export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleL
             rows={6}
             maxLength={MAX_NODE_TEXT}
             value={textDraft}
+            // A ghost's prompt (see NodeDoc.prompt) is the question to answer here.
+            placeholder={node.prompt || undefined}
             onChange={(e) => setTextDraft(e.target.value)}
             disabled={busy}
             onKeyDown={(e) => {
@@ -122,7 +124,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleL
             className={`min-h-[8rem] w-full overflow-y-auto bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
             style={!expanded && textHeight != null ? { height: textHeight } : undefined}
           >
-            {node.text}
+            {node.text || (node.prompt ? <span className="text-ink-soft italic">{node.prompt}</span> : null)}
           </div>
         )}
         {imagesSection}
