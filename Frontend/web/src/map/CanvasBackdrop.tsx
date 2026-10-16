@@ -7,7 +7,7 @@ import type { NodeGroup } from "../utils/canvasLayout";
 import { nodeRefId, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
-import { zoneColorFor } from "../utils/zoneStyle";
+import { ZONE_EDGE_DEFAULT, zoneColorFor } from "../utils/zoneStyle";
 import { ZonePatternDef } from "./ZonePattern";
 
 interface Props {
@@ -26,9 +26,8 @@ interface Props {
   /** The nodes a link is being confirmed for — kept ringed while the sentiment modal is open. */
   pendingLink: NodeDoc[] | null;
   onCircleClick: (rootId: string) => void;
-  /** Right-click (long-press on touch) on a zone: opens its pattern/colour menu at that screen spot. Only zones canStyleZone allows take it — any other falls through to the canvas's own menu. */
+  /** Right-click (long-press on touch) on a zone: opens that zone's menu at that screen spot. */
   onZoneMenu?: (rootId: string, clientX: number, clientY: number) => void;
-  canStyleZone?: (rootId: string) => boolean;
   /** Separator lines drawn on the map. */
   lines: LineDoc[];
   canDeleteLine: (line: LineDoc) => boolean;
@@ -74,7 +73,6 @@ export function CanvasBackdrop({
   solvedZones,
   walls = false,
   onZoneMenu,
-  canStyleZone,
 }: Props) {
   const { t } = useI18n();
   // A finger held still on a zone opens its menu (touch has no right-click).
@@ -82,14 +80,13 @@ export function CanvasBackdrop({
   // doesn't also stabilize the zone.
   const hold = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
   const swallowClick = useRef(false);
-  const styleable = (rootId: string) => !!onZoneMenu && (canStyleZone?.(rootId) ?? true);
   function cancelHold() {
     if (hold.current) clearTimeout(hold.current.timer);
     hold.current = null;
   }
   function startHold(rootId: string, e: ReactPointerEvent) {
     cancelHold();
-    if (e.pointerType === "mouse" || !styleable(rootId)) return;
+    if (e.pointerType === "mouse" || !onZoneMenu) return;
     const { clientX, clientY } = e;
     hold.current = {
       x: clientX,
@@ -147,7 +144,8 @@ export function CanvasBackdrop({
               fill={color}
               fillOpacity={dimmed ? 0.06 : 0.14}
               stroke={color}
-              strokeOpacity={dimmed ? 0.25 : 0.5}
+              // The parent's own edge brightness (Node.zoneEdge), halved when dimmed.
+              strokeOpacity={(root?.zoneEdge ?? ZONE_EDGE_DEFAULT) * (dimmed ? 0.5 : 1)}
               strokeWidth={2.5}
               // The whole overlay SVG is pointer-events-none (so its
               // decorative shapes never steal a drag/click from a
@@ -163,11 +161,11 @@ export function CanvasBackdrop({
                 }
                 onCircleClick(g.rootId);
               }}
-              // The zone's own menu (pattern and colour): right-click, or hold
+              // The zone's own menu (view, layout, look): right-click, or hold
               // a finger on it. Android also fires contextmenu for a hold —
               // both just open the same menu at the same spot.
               onContextMenu={(e) => {
-                if (!styleable(g.rootId)) return;
+                if (!onZoneMenu) return;
                 e.preventDefault();
                 e.stopPropagation();
                 cancelHold();

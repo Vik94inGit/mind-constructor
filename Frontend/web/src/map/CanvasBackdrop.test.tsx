@@ -36,7 +36,6 @@ function renderBackdrop(overrides: Partial<React.ComponentProps<typeof CanvasBac
     interactive: true,
     drawing: null,
     onZoneMenu: vi.fn(),
-    canStyleZone: () => true,
     ...overrides,
   };
   const { container } = render(
@@ -60,20 +59,25 @@ if (!("PointerEvent" in window)) {
   (window as unknown as { PointerEvent: unknown }).PointerEvent = PointerEventShim;
 }
 
+describe("CanvasBackdrop zone edge", () => {
+  it("draws the outline at the parent's edge brightness, 0.5 by default", () => {
+    expect(renderBackdrop().zone.getAttribute("stroke-opacity")).toBe("0.5");
+  });
+
+  it("follows Node.zoneEdge", () => {
+    const root = { nodeId: "root", zoneEdge: 0.9 } as never;
+    expect(renderBackdrop({ visibleNodes: [root] }).zone.getAttribute("stroke-opacity")).toBe("0.9");
+  });
+});
+
 describe("CanvasBackdrop zone menu", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("opens a zone's menu on right-click, any zone you may style, named or not", () => {
+  it("opens a zone's menu on right-click, any zone, named or not", () => {
     const { props, zone } = renderBackdrop();
     fireEvent.contextMenu(zone, { clientX: 30, clientY: 40 });
     expect(props.onZoneMenu).toHaveBeenCalledWith("root", 30, 40);
-  });
-
-  it("leaves right-click to the canvas on a zone you may not style", () => {
-    const { props, zone } = renderBackdrop({ canStyleZone: () => false });
-    fireEvent.contextMenu(zone, { clientX: 30, clientY: 40 });
-    expect(props.onZoneMenu).not.toHaveBeenCalled();
   });
 
   it("opens it on a long press, and the lift doesn't also stabilize the zone", () => {

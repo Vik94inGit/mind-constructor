@@ -5,7 +5,10 @@ import type { NodeType } from "../types";
 import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
 import type { ZoneLayout } from "../utils/zoneLayout";
 import type { ZonePaletteColor, ZonePattern } from "../types";
-import { ZoneStylePicker } from "./ZoneStylePicker";
+import { ZoneMenuBody } from "./ZoneMenuBody";
+import type { ZoneStylePatch } from "./ZoneMenuBody";
+import { ZONE_MODES } from "../utils/zoneDisplay";
+import type { ZoneMode } from "../utils/zoneDisplay";
 
 /** One of the node's links, as a row in the "Remove links" submenu. */
 export interface NodeLinkItem {
@@ -53,13 +56,16 @@ interface Props {
   onRemoveAllLinks?: () => void;
   /** A parent only: how its branch draws zones — its own choice, or null when it follows the map. */
   zoneLayout?: { value: ZoneLayout | null; onPick: (layout: ZoneLayout | null) => void };
-  /** A parent you own: its zone's pattern and colour, shown under the layouts in the Zones submenu. */
+  /** A parent you own: its zone's pattern, colour and edge brightness, shown under the layouts in the Zones submenu. */
   zoneStyle?: {
     pattern: ZonePattern | null;
     color: ZonePaletteColor | null;
+    edge: number | null;
     autoColor: string;
-    onChange: (patch: { zonePattern?: ZonePattern | null; zoneColor?: ZonePaletteColor | null }) => void;
+    onChange: (patch: ZoneStylePatch) => void;
   };
+  /** A zone's parent: how this viewer reads the zone — the same views as the zone's own menu. */
+  zoneView?: { value: ZoneMode | null; onPick: (mode: ZoneMode | null) => void };
   onClose: () => void;
 }
 
@@ -86,6 +92,7 @@ export function NodeContextMenu({
   onRemoveAllLinks,
   zoneLayout,
   zoneStyle,
+  zoneView,
 }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -139,7 +146,7 @@ export function NodeContextMenu({
       : mode === "links"
         ? linkItemCount + 1
         : mode === "zones"
-          ? ZONE_LAYOUTS.length + 2 + (zoneStyle ? 4 : 0)
+          ? ZONE_LAYOUTS.length + 3 + (zoneView ? ZONE_MODES.length + 2 : 0) + (zoneStyle ? 6 : 0)
           : rootItemCount;
   const MENU_H = itemCount * ITEM_H + 10;
   const left = Math.min(x, window.innerWidth - MENU_W - 8);
@@ -270,33 +277,14 @@ export function NodeContextMenu({
           <button className={item} onClick={() => setMode("root")}>
             ‹ {t.ui.contextMenu.back}
           </button>
-          {[null, ...ZONE_LAYOUTS].map((l) => (
-            <button
-              key={l ?? "map"}
-              role="menuitemradio"
-              aria-checked={zoneLayout.value === l}
-              className={zoneLayout.value === l ? itemActive : item}
-              onClick={() => {
-                zoneLayout.onPick(l);
-                onClose();
-              }}
-            >
-              {l === null ? t.ui.display.followMap : zoneLayoutLabel(t.ui.display, l)}
-            </button>
-          ))}
-          {zoneStyle && (
-            <>
-              <div className="my-[0.15rem] border-t border-line" />
-              <ZoneStylePicker
-                idPrefix="node-menu-zone"
-                pattern={zoneStyle.pattern}
-                color={zoneStyle.color}
-                autoColor={zoneStyle.autoColor}
-                onPattern={(p) => zoneStyle.onChange({ zonePattern: p })}
-                onColor={(c) => zoneStyle.onChange({ zoneColor: c })}
-              />
-            </>
-          )}
+          {/* The same body as the zone's own right-click / long-press menu. */}
+          <ZoneMenuBody
+            idPrefix="node-menu-zone"
+            view={zoneView}
+            layout={zoneLayout}
+            style={zoneStyle}
+            onPicked={onClose}
+          />
         </>
       )}
       {mode === "type" && (

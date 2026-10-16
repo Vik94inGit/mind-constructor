@@ -1,7 +1,8 @@
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { ZONE_PALETTE, ZONE_PATTERNS } from "../types";
 import type { ZonePaletteColor, ZonePattern } from "../types";
-import { ZONE_PALETTE_HEX } from "../utils/zoneStyle";
+import { ZONE_EDGE_DEFAULT, ZONE_PALETTE_HEX } from "../utils/zoneStyle";
 import { ZonePatternDef } from "./ZonePattern";
 
 interface Props {
@@ -13,7 +14,13 @@ interface Props {
   autoColor: string;
   onPattern: (pattern: ZonePattern | null) => void;
   onColor: (color: ZonePaletteColor | null) => void;
+  /** How bright the zone's outline is (Node.zoneEdge, 0..1) — null: the default. Left out: no slider. */
+  edge?: number | null;
+  onEdge?: (edge: number) => void;
 }
+
+/** A drag of the edge slider saves once it rests this long, not on every step. */
+export const EDGE_SAVE_DELAY_MS = 300;
 
 const swatch =
   "flex h-7 w-7 cursor-pointer items-center justify-center overflow-hidden rounded-md border-2 p-0 text-[0.62rem] font-semibold text-ink-soft";
@@ -22,9 +29,16 @@ const swatch =
 // pattern swatches and a row of calm-palette colours, each with a "none" /
 // "auto" swatch that goes back to the default. Used in the zone's ⋯ menu and
 // the parent node's right-click Zones submenu.
-export function ZoneStylePicker({ idPrefix, pattern, color, autoColor, onPattern, onColor }: Props) {
+export function ZoneStylePicker({ idPrefix, pattern, color, autoColor, onPattern, onColor, edge, onEdge }: Props) {
   const { t } = useI18n();
   const s = t.ui.zoneStyle;
+  // The slider moves at once; the save waits for the drag to settle.
+  const [edgeValue, setEdgeValue] = useState(edge ?? ZONE_EDGE_DEFAULT);
+  useEffect(() => setEdgeValue(edge ?? ZONE_EDGE_DEFAULT), [edge]);
+  const edgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (edgeTimer.current) clearTimeout(edgeTimer.current);
+  }, []);
   const shown = color ? ZONE_PALETTE_HEX[color] : autoColor;
   const ring = (active: boolean) => (active ? "border-accent" : "border-line");
   return (
@@ -87,6 +101,29 @@ export function ZoneStylePicker({ idPrefix, pattern, color, autoColor, onPattern
           ))}
         </div>
       </div>
+      {onEdge && (
+        <label className="flex flex-col gap-1">
+          <span className="flex items-center text-[0.7rem] font-semibold tracking-wide text-ink-soft uppercase">
+            <span className="flex-1">{s.edge}</span>
+            <span className="tabular-nums normal-case">{Math.round(edgeValue * 100)}%</span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round(edgeValue * 100)}
+            aria-label={s.edge}
+            className="w-full cursor-pointer accent-[var(--accent)]"
+            onChange={(e) => {
+              const next = Number(e.target.value) / 100;
+              setEdgeValue(next);
+              if (edgeTimer.current) clearTimeout(edgeTimer.current);
+              edgeTimer.current = setTimeout(() => onEdge(next), EDGE_SAVE_DELAY_MS);
+            }}
+          />
+        </label>
+      )}
     </div>
   );
 }

@@ -215,6 +215,9 @@ export const NodeSchema = new mongoose.Schema(
     // See ZONE_PATTERNS / ZONE_PALETTE above — plain owner-only PATCH fields.
     zonePattern: { type: String, enum: ZONE_PATTERNS, default: null },
     zoneColor: { type: String, enum: ZONE_PALETTE, default: null },
+    // How bright the zone's outline is drawn: 0 (no outline) to 1 (full
+    // colour). null keeps the default (0.5). Owner-only PATCH, like the two above.
+    zoneEdge: { type: Number, min: 0, max: 1, default: null },
   },
   {
     timestamps: true,

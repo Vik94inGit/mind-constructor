@@ -241,6 +241,8 @@ export interface NodeDoc {
   zonePattern?: ZonePattern | null;
   /** A circle parent's zone colour from the calm palette (Node.zoneColor) — null / absent: the sentiment colour. */
   zoneColor?: ZonePaletteColor | null;
+  /** How bright the zone's outline is, 0..1 (Node.zoneEdge) — null / absent: the default 0.5. */
+  zoneEdge?: number | null;
   /** Where the node sits while drawn as a puzzle card (Node.cardX/cardY), apart from the icon's x/y. null / absent: never placed as a card, so it sits at x/y. */
   cardX?: number | null;
   cardY?: number | null;
