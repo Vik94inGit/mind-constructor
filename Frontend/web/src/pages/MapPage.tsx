@@ -1224,12 +1224,32 @@ export function MapPage() {
     setMultiSelectIds(new Set());
     setPictureView(null);
     setTimeLapse({ step: 0, playing: true });
-    // The whole map in view, so it grows where it's watched.
-    showPoints(
-      unpackedNodes.map((n) => positions.get(n.nodeId)).filter((pt): pt is { x: number; y: number } => !!pt),
-      { aboveSheet: false },
-    );
+    // Close enough to read: the camera then follows each node as it appears.
+    if (Math.abs(zoom - 1) > 0.005) zoomFromCenter(0, 1);
   }
+  // The camera follows the replay: it glides to each node as it appears, so
+  // nobody has to hunt for what changed. At the last node it pulls back to
+  // show the whole finished map.
+  const timeLapseFollowRef = useRef(-1);
+  useEffect(() => {
+    if (timeLapseStep === null) {
+      timeLapseFollowRef.current = -1;
+      return;
+    }
+    if (timeLapseStep === timeLapseFollowRef.current) return;
+    timeLapseFollowRef.current = timeLapseStep;
+    if (timeLapseStep >= timeLapseNodes.length && timeLapseNodes.length > 0) {
+      showPoints(
+        timeLapseNodes.map((n) => positions.get(n.nodeId)).filter((pt): pt is { x: number; y: number } => !!pt),
+        { aboveSheet: false },
+      );
+      return;
+    }
+    const newest = timeLapseNodes[timeLapseStep - 1];
+    const at = newest ? positions.get(newest.nodeId) : undefined;
+    if (at) centerOnPoint(at.x, at.y, { aboveSheet: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLapseStep]);
 
   // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
   // open node to the one before or after it, or, with none open, from the
