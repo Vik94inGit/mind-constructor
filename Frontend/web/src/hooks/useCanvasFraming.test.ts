@@ -101,6 +101,26 @@ describe("useCanvasFraming", () => {
     });
   });
 
+  describe("fitAll", () => {
+    const nodes = [makeNode({ nodeId: "a" }), makeNode({ nodeId: "b" })];
+
+    it("zooms in on a small map from far out, but not past 100%", () => {
+      const positions = new Map([["a", { x: 100, y: 100 }], ["b", { x: 300, y: 100 }]]);
+      const { api, zoomFromCenter, centerOnPoint } = setup({ visibleNodes: nodes, positions, zoom: 0.4 });
+      api.fitAll();
+      expect(zoomFromCenter).toHaveBeenCalledWith(0, 1);
+      vi.advanceTimersByTime(260);
+      expect(centerOnPoint).toHaveBeenCalledWith(200, 100, { aboveSheet: false });
+    });
+
+    it("zooms out on a map wider than the screen, as far as the zoom goes", () => {
+      const positions = new Map([["a", { x: 0, y: 0 }], ["b", { x: 4000, y: 0 }]]);
+      const { api, zoomFromCenter } = setup({ visibleNodes: nodes, positions, zoom: 1 });
+      api.fitAll();
+      expect(zoomFromCenter.mock.calls[0][1]).toBe(0.5); // MIN_ZOOM
+    });
+  });
+
   describe("showPoints options", () => {
     it("passes its centering options through to centerOnPoint", () => {
       const { api, centerOnPoint } = setup({ zoom: 1 });

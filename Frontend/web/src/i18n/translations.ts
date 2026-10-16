@@ -140,6 +140,7 @@ export interface Translation {
       presentation: string;
       zoomOut: string;
       zoomReset: string;
+      fitMap: string;
       zoomIn: string;
       expandToolbar: string;
       displayMenu: string;
@@ -346,6 +347,7 @@ const en: Translation = {
       presentation: "Present — step through the map as slides",
       zoomOut: "Zoom out",
       zoomReset: "Reset zoom",
+      fitMap: "Fit the whole map on screen",
       zoomIn: "Zoom in",
       expandToolbar: "Show toolbar",
       displayMenu: "Display options",
@@ -537,6 +539,7 @@ const cs: Translation = {
       presentation: "Prezentovat — projít mapu jako snímky",
       zoomOut: "Oddálit",
       zoomReset: "Obnovit přiblížení",
+      fitMap: "Zobrazit celou mapu",
       zoomIn: "Přiblížit",
       expandToolbar: "Zobrazit panel nástrojů",
       displayMenu: "Možnosti zobrazení",
@@ -728,6 +731,7 @@ const uk: Translation = {
       presentation: "Презентація — пройти мапу як слайди",
       zoomOut: "Зменшити",
       zoomReset: "Скинути масштаб",
+      fitMap: "Показати всю мапу",
       zoomIn: "Збільшити",
       expandToolbar: "Показати панель інструментів",
       displayMenu: "Параметри відображення",
@@ -919,6 +923,7 @@ const ru: Translation = {
       presentation: "Презентация — пройти карту как слайды",
       zoomOut: "Уменьшить",
       zoomReset: "Сбросить масштаб",
+      fitMap: "Показать всю карту",
       zoomIn: "Увеличить",
       expandToolbar: "Показать панель инструментов",
       displayMenu: "Параметры отображения",

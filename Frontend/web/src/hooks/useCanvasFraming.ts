@@ -119,6 +119,27 @@ export function useCanvasFraming({
     }
   }
 
+  // "Fit map": every node on screen at once, zooming in or out as needed
+  // (never past 100% — a small map isn't blown up), then centered on them.
+  function fitAll() {
+    const wrap = wrapRef.current;
+    const pts = visibleNodes.map((n) => positions.get(n.nodeId)).filter((p): p is Pt => !!p);
+    if (!wrap || pts.length === 0) return;
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    const PAD = 140;
+    const width = Math.max(...xs) - Math.min(...xs) + PAD * 2;
+    const height = Math.max(...ys) - Math.min(...ys) + PAD * 2;
+    const middle = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 };
+    const target = Math.max(MIN_ZOOM, Math.min(1, MAX_ZOOM, wrap.clientWidth / width, wrap.clientHeight / height));
+    if (Math.abs(target - zoom) > 0.005) {
+      zoomFromCenter(0, target);
+      setTimeout(() => centerOnPoint(middle.x, middle.y, { aboveSheet: false }), 260);
+    } else {
+      centerOnPoint(middle.x, middle.y, { aboveSheet: false });
+    }
+  }
+
   // After an action on chosen nodes finishes, brings them into view: zooms out
   // just enough for all of them to fit on screen (never in), then glides to
   // their middle.
@@ -145,5 +166,5 @@ export function useCanvasFraming({
     fitZoomForDisplay(next, readingMode, middle);
   }
 
-  return { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen };
+  return { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen, fitAll };
 }

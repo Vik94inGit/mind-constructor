@@ -851,7 +851,7 @@ export function MapPage() {
   // Every camera-framing cue (fit-to-zoom for a text reading mode, the
   // floor-at-100%-for-editing after a drag, bringing a set of nodes into
   // view) — see hooks/useCanvasFraming.ts.
-  const { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen } = useCanvasFraming({
+  const { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen, fitAll } = useCanvasFraming({
     visibleNodes,
     positions,
     circleRootSentimentByNode,
@@ -2410,6 +2410,7 @@ export function MapPage() {
                 onZoomOut={() => zoomFromCenter(-ZOOM_STEP)}
                 onZoomIn={() => zoomFromCenter(ZOOM_STEP)}
                 onReset={() => zoomFromCenter(0, 1)}
+                onFit={fitAll}
                 minimapShown={minimapShown}
               />
             </>
