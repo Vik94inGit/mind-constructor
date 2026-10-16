@@ -40,13 +40,15 @@ interface Params {
   sheetOpen: boolean;
   /** Every node's canvas position, by id. */
   positions: Map<string, { x: number; y: number }>;
+  /** Where this viewer left the map last time, if already known: the map opens looking there. */
+  openAt?: { x: number; y: number } | null;
 }
 
 // The scrolling, zooming window onto the canvas: zoom level, the blind-zone
 // margins, scroll<->canvas coordinate conversion, panning to a node, and
 // which part of the canvas is currently on screen. Nothing here knows about
 // nodes beyond their positions.
-export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Params) {
+export function useCanvasViewport({ mapId, loading, sheetOpen, positions, openAt }: Params) {
   // Gates the quick-add ghost ring and the radial neighbor layout (see
   // quickAddActive/radialPositions in MapPage): false from the moment
   // centerOnNode starts a pan until the camera has landed, so the ring fans
@@ -164,7 +166,10 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   // the screen, so its on-screen size stays put while the zoom animates.
   // The viewport size itself is tracked with a ResizeObserver.
   const [viewSize, setViewSize] = useState({ w: 0, h: 0 });
-  useEffect(() => {
+  // A layout effect, so the first frame the canvas is painted in already has
+  // its margins (and, below, its opening position) — measured after paint,
+  // the map showed a frame of the empty corner first.
+  useLayoutEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
     function update() {
@@ -400,10 +405,23 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   // Puts the zoom anchor back under the pointer once the canvas has resized
   // for the new zoom (and margin) — before the browser paints, so there is no
   // frame where the content has scaled but not yet re-centered.
+  // Also keeps the map still when only the margins change (the window or
+  // the space around the canvas resized): the content moves by the change in
+  // margin, so the scroll moves with it instead of the map jumping.
+  const shownMarginsRef = useRef({ h: hScrollMargin, v: vScrollMargin, zoom });
   useLayoutEffect(() => {
     const wrap = wrapRef.current;
     const a = zoomAnchorRef.current;
-    if (!wrap || !a) return;
+    const was = shownMarginsRef.current;
+    shownMarginsRef.current = { h: hScrollMargin, v: vScrollMargin, zoom };
+    if (!wrap) return;
+    if (!a) {
+      if (was.zoom === zoom && was.h && was.v && (was.h !== hScrollMargin || was.v !== vScrollMargin)) {
+        wrap.scrollLeft += (hScrollMargin - was.h) * zoom;
+        wrap.scrollTop += (vScrollMargin - was.v) * zoom;
+      }
+      return;
+    }
     wrap.scrollLeft = (a.canvasX + hScrollMargin) * zoom - a.offX;
     wrap.scrollTop = (a.canvasY + vScrollMargin) * zoom - a.offY;
     if (zoomFrameRef.current == null) zoomAnchorRef.current = null;
@@ -662,8 +680,10 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
   // bigger than any screen and nodes cluster near its middle — so without
   // this a fresh load shows nothing and the map has to be hunted for. Once
   // per map, the first time both the nodes and the scroll margins exist.
+  // A layout effect, before the first paint of the canvas: run after it, the
+  // map flashed — a frame of the empty top-left corner, then the jump.
   const didInitialFitRef = useRef<string | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const wrap = wrapRef.current;
     if (loading || !wrap || !mapId || didInitialFitRef.current === mapId) return;
     if (hScrollMargin === 0 || vScrollMargin === 0) return;
@@ -672,7 +692,12 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
     // node-type ghosts are drawn (see MapPage's empty-map QuickAddGhosts).
     let cx = CANVAS_W / 2;
     let cy = CANVAS_H / 2;
-    if (positions.size > 0) {
+    if (openAt) {
+      // Back where they left it, straight away — not opened on the middle
+      // of the nodes and then glided over.
+      cx = openAt.x;
+      cy = openAt.y;
+    } else if (positions.size > 0) {
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
@@ -687,7 +712,7 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions }: Para
       cy = (minY + maxY) / 2;
     }
     // Always opens at 100%, whatever the last map was left at, with the
-    // middle of its nodes in the middle of the screen.
+    // middle of its nodes (or the saved spot) in the middle of the screen.
     zoomNow(1, { canvasX: cx, canvasY: cy, offX: wrap.clientWidth / 2, offY: wrap.clientHeight / 2 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, mapId, hScrollMargin, vScrollMargin, positions]);

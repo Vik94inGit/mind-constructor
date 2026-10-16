@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import * as mapsApi from "../api/maps";
@@ -8,6 +8,7 @@ import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
 import { useBackGuard } from "../hooks/useBackGuard";
 import { useIntroMigration } from "../hooks/useIntroMigration";
+import { usePositionGlide } from "../hooks/usePositionGlide";
 import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
 import { useZoneFocus } from "../hooks/useZoneFocus";
 import { usePresentation } from "../hooks/usePresentation";
@@ -24,6 +25,7 @@ import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
+import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
@@ -328,6 +330,16 @@ export function MapPage() {
     refreshInsights,
   } = useMapData({ mapId, setSelectedId, setCelebrateIds, loadErrorMessage: t.ui.errors.loadMap });
 
+  // Battle mode needs the server and the other members, so it is off while
+  // offline: the map reads as Creating mode until the connection is back.
+  const online = useSyncExternalStore(subscribeSyncStatus, () => getSyncStatus().online);
+  const discussionOn = map?.discussionMode !== false && online;
+  const offlinePausedBattle = map?.discussionMode !== false && !online && !!map;
+  useEffect(() => {
+    if (offlinePausedBattle) showNotice(t.map.toolbar.discussionOffline);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offlinePausedBattle]);
+
   // Choosing ("stabilizing") a circle and letting it go again — see
   // hooks/useChosenCircle.ts.
   const {
@@ -429,7 +441,12 @@ export function MapPage() {
   }
   // Each node's drift during the map's opening animation — see posFor.
   const introOffset = useIntroMigration(loading ? null : (mapId ?? null), positions);
+  // Nodes glide to a changed resting spot instead of jumping — see posFor.
+  const glide = usePositionGlide(positions);
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
+  // ?node=<id> (a search result on the dashboard): the map opens on that node.
+  const [searchParams] = useSearchParams();
+  const focusNodeId = searchParams.get("node");
   // NodePanel/PackPickerPanel's bottom sheet physically covers the bottom
   // third (half on mobile) of the screen while it's open. Skipped for the
   // group-selection footer (multiSelectIds), which is a slim bar, not a tall
@@ -451,16 +468,20 @@ export function MapPage() {
     centerOnNode,
     centerOnPoint,
     panTo,
-  } = useCanvasViewport({ mapId, loading, sheetOpen, positions });
+  } = useCanvasViewport({
+    mapId,
+    loading,
+    sheetOpen,
+    positions,
+    openAt: focusNodeId ? null : (savedView?.center ?? null),
+  });
 
   // Picking up where you left off (on this device or another): once the map
   // and the saved view are both in, go back to the node that was open — or,
   // with none, to the spot that was in the middle of the screen. From then on
   // that spot (a moment after scrolling stops) and the open node are saved.
   const restoredRef = useRef<string | null>(null);
-  // ?node=<id> (a search result on the dashboard): open on that node instead.
-  const [searchParams] = useSearchParams();
-  const focusNodeId = searchParams.get("node");
+  // With ?node=<id>, open on that node instead.
   useEffect(() => {
     if (loading || !focusNodeId || !mapId || restoredRef.current === mapId) return;
     restoredRef.current = mapId;
@@ -599,11 +620,15 @@ export function MapPage() {
 
   function posFor(node: NodeDoc) {
     const grouped = groupDragState?.get(node.nodeId);
-    if (grouped) return grouped;
-    if (dragState && dragState.nodeId === node.nodeId) return { x: dragState.x, y: dragState.y };
+    if (grouped) return glide.shown(node.nodeId, grouped);
+    if (dragState && dragState.nodeId === node.nodeId) return glide.shown(node.nodeId, { x: dragState.x, y: dragState.y });
     // Always the real position — the sentiment show's travel is drawn on top
     // of this directly on the canvas DOM (see useSentimentShow), never here.
-    const stored = positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    // Gliding there when it changes, not jumping (see usePositionGlide).
+    const stored = glide.shown(
+      node.nodeId,
+      glide.at(node.nodeId, positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 }),
+    );
     // The map's opening animation: drifting out and back (useIntroMigration).
     const drift = introOffset(node.nodeId);
     const own = drift ? { x: stored.x + drift.x, y: stored.y + drift.y } : stored;
@@ -969,7 +994,7 @@ export function MapPage() {
   // never sees it); skip is wired to any pointer-down on the canvas.
   // A Personal map stays calm: no majority notice, nothing travels on open.
   const sentimentShow = useSentimentShow({
-    enabled: map?.discussionMode !== false,
+    enabled: discussionOn,
     nodes,
     visibleNodes,
     positions,
@@ -1173,7 +1198,7 @@ export function MapPage() {
   // attackAbl.ts), not which nodes may be attacked. A Personal map has no
   // attacks at all (the owner can switch it back to Discussion for that).
   function canAttackNode(_node: NodeDoc) {
-    return map?.discussionMode !== false;
+    return discussionOn;
   }
 
   // Single entry point for "start editing this node's text/type inline, on
@@ -1275,7 +1300,7 @@ export function MapPage() {
     setSiegeOpen(false);
     // In a discussion the replay also shows the fight: who was hit, and when.
     setReplayAttacks([]);
-    if (mapId && map?.discussionMode !== false) {
+    if (mapId && discussionOn) {
       mapsApi
         .listMapAttacks(mapId)
         .then(setReplayAttacks)
@@ -1895,10 +1920,10 @@ export function MapPage() {
   // solo organizing). Never coerced with `!!` anywhere this is read — that
   // would collapse the undefined "never touched" default to false/Personal
   // instead of true/Discussion.
-  const isDiscussionMode = map.discussionMode !== false;
+  const isDiscussionMode = discussionOn;
   const canvasBackground = mapBackgroundStyle(map.background);
   async function toggleMapMode() {
-    if (!isOwner || !mapId) return;
+    if (!isOwner || !mapId || !online) return;
     setActionError(null);
     try {
       const updated = await mapsApi.updateMap(mapId, { discussionMode: !isDiscussionMode });
@@ -2030,6 +2055,7 @@ export function MapPage() {
       isDemo={!!user?.isDemo}
       isOwner={isOwner}
       isDiscussionMode={isDiscussionMode}
+      offline={!online}
       expanded={!quickAddActive || forceShowToolbar}
       onExpand={() => setForceShowToolbar(true)}
       moveMode={moveMode}
