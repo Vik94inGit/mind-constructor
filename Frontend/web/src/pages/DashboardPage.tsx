@@ -206,7 +206,10 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1080px] px-6 pt-8 pb-16">
+    // On wide screens the page spreads out instead of sitting in a narrow
+    // column: the writing tools (resume, quick note, think) on the left and
+    // the map library filling the rest.
+    <div className="mx-auto w-full max-w-[1080px] px-6 pt-8 pb-16 lg:max-w-[1600px] lg:px-10">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="m-0 text-2xl font-bold">{t.dashboard.title}</h1>
@@ -225,144 +228,150 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {lastMap && (
-        <button
-          type="button"
-          className="mb-5 flex w-full cursor-pointer items-center gap-3 rounded-card border border-line bg-surface p-3 text-left shadow-card transition-colors duration-[120ms] hover:border-accent"
-          onClick={() => navigate(`/maps/${lastMap.mapId}`)}
-        >
-          <MapIcon color={lastMap.color} />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[0.75rem] font-semibold tracking-[0.03em] text-ink-soft uppercase">
-              {t.dashboard.library.resume.title}
-            </span>
-            <span className="block truncate text-[1rem] font-bold">{lastMap.name}</span>
-          </span>
-          <span className="shrink-0 rounded-lg bg-accent px-3 py-[0.45rem] text-[0.85rem] font-semibold text-white">
-            {t.dashboard.library.resume.open} →
-          </span>
-        </button>
-      )}
+      <div className="lg:grid lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <aside className="lg:sticky lg:top-6">
+          {lastMap && (
+            <button
+              type="button"
+              className="mb-5 flex w-full cursor-pointer items-center gap-3 rounded-card border border-line bg-surface p-3 text-left shadow-card transition-colors duration-[120ms] hover:border-accent"
+              onClick={() => navigate(`/maps/${lastMap.mapId}`)}
+            >
+              <MapIcon color={lastMap.color} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.75rem] font-semibold tracking-[0.03em] text-ink-soft uppercase">
+                  {t.dashboard.library.resume.title}
+                </span>
+                <span className="block truncate text-[1rem] font-bold">{lastMap.name}</span>
+              </span>
+              <span className="shrink-0 rounded-lg bg-accent px-3 py-[0.45rem] text-[0.85rem] font-semibold text-white">
+                {t.dashboard.library.resume.open} →
+              </span>
+            </button>
+          )}
 
-      <QuickNote
-        maps={maps}
-        autoFocus={searchParams.get("note") === "1"}
-        onSaved={(map, created) => {
-          if (created) setMaps((prev) => [map, ...prev]);
-        }}
-      />
+          <QuickNote
+            maps={maps}
+            autoFocus={searchParams.get("note") === "1"}
+            onSaved={(map, created) => {
+              if (created) setMaps((prev) => [map, ...prev]);
+            }}
+          />
 
-      <ThinkEntry />
+          <ThinkEntry />
+        </aside>
 
-      <div className="mb-4 flex flex-wrap items-center gap-[0.4rem]">
-        {(["all", "owned", "shared"] as Filter[]).map((f) => (
-          <button
-            key={f}
-            className={`cursor-pointer rounded-[20px] border border-transparent px-[0.85rem] py-[0.4rem] text-[0.82rem] font-semibold ${
-              filter === f ? "bg-accent-soft text-accent-ink" : "bg-surface-2 text-ink-soft"
-            }`}
-            onClick={() => setFilter(f)}
-          >
-            {filterLabels[f]}
-          </button>
-        ))}
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t.dashboard.library.search}
-          aria-label={t.dashboard.library.search}
-          className="ml-auto min-w-[200px] flex-1 rounded-[20px] border border-line bg-surface px-[0.9rem] py-[0.4rem] text-[0.85rem] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent sm:max-w-[320px]"
-        />
-      </div>
+        <section className="min-w-0">
+          <div className="mb-4 flex flex-wrap items-center gap-[0.4rem]">
+            {(["all", "owned", "shared"] as Filter[]).map((f) => (
+              <button
+                key={f}
+                className={`cursor-pointer rounded-[20px] border border-transparent px-[0.85rem] py-[0.4rem] text-[0.82rem] font-semibold ${
+                  filter === f ? "bg-accent-soft text-accent-ink" : "bg-surface-2 text-ink-soft"
+                }`}
+                onClick={() => setFilter(f)}
+              >
+                {filterLabels[f]}
+              </button>
+            ))}
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t.dashboard.library.search}
+              aria-label={t.dashboard.library.search}
+              className="ml-auto min-w-[200px] flex-1 rounded-[20px] border border-line bg-surface px-[0.9rem] py-[0.4rem] text-[0.85rem] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent sm:max-w-[320px]"
+            />
+          </div>
 
-      {openFolder && !query.trim() && (
-        <nav className="mb-4 flex items-center gap-2 text-[0.9rem]">
-          <button
-            type="button"
-            className="cursor-pointer border-none bg-transparent p-0 font-semibold text-accent-ink hover:underline"
-            onClick={() => setOpenFolderId(null)}
-          >
-            {t.dashboard.library.allMaps}
-          </button>
-          <span className="text-ink-soft">/</span>
-          <span className="font-semibold">{openFolder.name}</span>
-        </nav>
-      )}
+          {openFolder && !query.trim() && (
+            <nav className="mb-4 flex items-center gap-2 text-[0.9rem]">
+              <button
+                type="button"
+                className="cursor-pointer border-none bg-transparent p-0 font-semibold text-accent-ink hover:underline"
+                onClick={() => setOpenFolderId(null)}
+              >
+                {t.dashboard.library.allMaps}
+              </button>
+              <span className="text-ink-soft">/</span>
+              <span className="font-semibold">{openFolder.name}</span>
+            </nav>
+          )}
 
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
-      {notice && (
-        <div className="mb-4 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">{notice}</div>
-      )}
+          {error && (
+            <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
+          )}
+          {notice && (
+            <div className="mb-4 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">{notice}</div>
+          )}
 
-      {query.trim() && <ThoughtResults {...thoughtSearch} />}
+          {query.trim() && <ThoughtResults {...thoughtSearch} />}
 
-      {loading ? (
-        <div className="p-12 text-center text-ink-soft">{t.dashboard.loading}</div>
-      ) : items.length === 0 && query.trim() && thoughtSearch.hits.length > 0 ? null : items.length === 0 ? (
-        <div className="rounded-card border border-dashed border-line px-6 py-12 text-center text-ink-soft">
-          {query.trim()
-            ? t.dashboard.library.noResults(query.trim())
-            : openFolder
-              ? t.dashboard.library.folderEmpty
-              : `${t.dashboard.empty} ${filter !== "owned" ? "" : t.dashboard.emptyOwnedHint}`}
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-x-2 gap-y-3">
-            {paged.items.map((item) =>
-              item.kind === "folder" ? (
-                <LibraryTile
-                  key={`f:${item.folder.folderId}`}
-                  icon={<FolderIcon />}
-                  title={item.folder.name}
-                  subtitle={t.dashboard.card.maps(item.mapCount)}
-                  onOpen={() => {
-                    setQuery("");
-                    setOpenFolderId(item.folder.folderId);
-                  }}
-                  menu={[
-                    {
-                      label: t.dashboard.library.folderMenu.open,
-                      onClick: () => {
+          {loading ? (
+            <div className="p-12 text-center text-ink-soft">{t.dashboard.loading}</div>
+          ) : items.length === 0 && query.trim() && thoughtSearch.hits.length > 0 ? null : items.length === 0 ? (
+            <div className="rounded-card border border-dashed border-line px-6 py-12 text-center text-ink-soft">
+              {query.trim()
+                ? t.dashboard.library.noResults(query.trim())
+                : openFolder
+                  ? t.dashboard.library.folderEmpty
+                  : `${t.dashboard.empty} ${filter !== "owned" ? "" : t.dashboard.emptyOwnedHint}`}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-x-2 gap-y-3">
+                {paged.items.map((item) =>
+                  item.kind === "folder" ? (
+                    <LibraryTile
+                      key={`f:${item.folder.folderId}`}
+                      icon={<FolderIcon />}
+                      title={item.folder.name}
+                      subtitle={t.dashboard.card.maps(item.mapCount)}
+                      onOpen={() => {
                         setQuery("");
                         setOpenFolderId(item.folder.folderId);
-                      },
-                    },
-                    { label: t.dashboard.library.folderMenu.rename, onClick: () => setFolderModal({ folder: item.folder }) },
-                    { label: t.dashboard.library.folderMenu.delete, danger: true, onClick: () => handleDeleteFolder(item.folder) },
-                  ]}
-                />
-              ) : (
-                <LibraryTile
-                  key={`m:${item.map.mapId}`}
-                  icon={<MapIcon color={item.map.color} shared={item.map.ownerId !== user?._id} />}
-                  title={item.map.name}
-                  onOpen={() => navigate(`/maps/${item.map.mapId}`)}
-                  menu={mapMenu(item.map)}
-                />
-              ),
-            )}
-          </div>
-          {paged.pageCount > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-3 text-[0.85rem]">
-              <button className={secondaryBtn} disabled={paged.page <= 1} onClick={() => setPage(paged.page - 1)}>
-                {t.dashboard.library.prev}
-              </button>
-              <span className="text-ink-soft">{t.dashboard.library.page(paged.page, paged.pageCount)}</span>
-              <button
-                className={secondaryBtn}
-                disabled={paged.page >= paged.pageCount}
-                onClick={() => setPage(paged.page + 1)}
-              >
-                {t.dashboard.library.next}
-              </button>
-            </div>
+                      }}
+                      menu={[
+                        {
+                          label: t.dashboard.library.folderMenu.open,
+                          onClick: () => {
+                            setQuery("");
+                            setOpenFolderId(item.folder.folderId);
+                          },
+                        },
+                        { label: t.dashboard.library.folderMenu.rename, onClick: () => setFolderModal({ folder: item.folder }) },
+                        { label: t.dashboard.library.folderMenu.delete, danger: true, onClick: () => handleDeleteFolder(item.folder) },
+                      ]}
+                    />
+                  ) : (
+                    <LibraryTile
+                      key={`m:${item.map.mapId}`}
+                      icon={<MapIcon color={item.map.color} shared={item.map.ownerId !== user?._id} />}
+                      title={item.map.name}
+                      onOpen={() => navigate(`/maps/${item.map.mapId}`)}
+                      menu={mapMenu(item.map)}
+                    />
+                  ),
+                )}
+              </div>
+              {paged.pageCount > 1 && (
+                <div className="mt-6 flex items-center justify-center gap-3 text-[0.85rem]">
+                  <button className={secondaryBtn} disabled={paged.page <= 1} onClick={() => setPage(paged.page - 1)}>
+                    {t.dashboard.library.prev}
+                  </button>
+                  <span className="text-ink-soft">{t.dashboard.library.page(paged.page, paged.pageCount)}</span>
+                  <button
+                    className={secondaryBtn}
+                    disabled={paged.page >= paged.pageCount}
+                    onClick={() => setPage(paged.page + 1)}
+                  >
+                    {t.dashboard.library.next}
+                  </button>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </section>
+      </div>
 
       {showCreate && (
         <CreateMapModal
