@@ -7,6 +7,7 @@ import {
   createNodeMutationDao,
   countNodesByMapInternalIdDao,
   updateNodeDao,
+  zoneColorTakenDao,
   findNodeByPublicIdDao,
   setBranchHiddenMutationDao,
 } from "../dao/nodeDao.js";
@@ -26,6 +27,9 @@ export class CrossMapParentError extends Error {}
 export class ParentNotOwnedError extends Error {}
 export class SelfParentError extends Error {}
 export class NotMapOwnerError extends Error {}
+// One person, one colour: a palette colour another member's zone on the map
+// already wears can't be picked (Node.zoneColor).
+export class ZoneColorTakenError extends Error {}
 
 // Shared by create/update: same cap as Node.title's own maxlength. Empty is
 // valid (it's how "no title" is stored, and how an update clears one).
@@ -301,6 +305,11 @@ export const updateNodeAbl = async (
       if (parent.mapId.toString() !== node.mapId.toString()) throw new CrossMapParentError();
       definedUpdates.parentId = parent._id;
     }
+  }
+
+  if (typeof definedUpdates.zoneColor === "string") {
+    const node = await findNodeByPublicIdDao(publicNodeId);
+    if (node && (await zoneColorTakenDao(node.mapId, definedUpdates.zoneColor, userId))) throw new ZoneColorTakenError();
   }
 
   // In a discussion, a change to what a node says goes into the map's

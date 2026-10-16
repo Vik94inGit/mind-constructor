@@ -62,6 +62,8 @@ interface Props {
     color: ZonePaletteColor | null;
     edge: number | null;
     autoColor: string;
+    /** Palette colours other members' zones already wear, each with who has it — one person, one colour. */
+    taken?: Partial<Record<ZonePaletteColor, string>>;
     onChange: (patch: ZoneStylePatch) => void;
   };
   /** A zone's parent: how this viewer reads the zone — the same views as the zone's own menu. */

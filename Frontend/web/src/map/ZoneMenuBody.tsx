@@ -31,6 +31,8 @@ interface Props {
     color: ZonePaletteColor | null;
     edge: number | null;
     autoColor: string;
+    /** Palette colours other members' zones already wear, each with who has it — one person, one colour. */
+    taken?: Partial<Record<ZonePaletteColor, string>>;
     onChange: (patch: ZoneStylePatch) => void;
   };
   /** A view or layout was picked — the menu around it usually closes. */
@@ -112,6 +114,7 @@ export function ZoneMenuBody({ idPrefix, view, layout, style, onPicked }: Props)
             pattern={style.pattern}
             color={style.color}
             autoColor={style.autoColor}
+            taken={style.taken}
             onPattern={(p) => style.onChange({ zonePattern: p })}
             onColor={(c) => style.onChange({ zoneColor: c })}
             edge={style.edge}

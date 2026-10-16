@@ -437,3 +437,9 @@ export const findLatestNodeOnMapDao = async (mapInternalId: MapInternalId) => {
 export const hasOpponentMovesDao = async (mapInternalId: MapInternalId) => {
   return !!(await Node.exists({ mapId: mapInternalId, byOpponent: true }));
 };
+
+// Whether another member's node on the map already wears this zone colour —
+// each person's zones keep a colour of their own (nodeAbl's ZoneColorTakenError).
+export const zoneColorTakenDao = async (mapInternalId: MapInternalId, zoneColor: string, userId: string) => {
+  return !!(await Node.exists({ mapId: mapInternalId, zoneColor, userId: { $ne: userId } }));
+};

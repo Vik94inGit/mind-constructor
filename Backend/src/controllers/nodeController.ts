@@ -14,6 +14,7 @@ import {
   CrossMapParentError,
   ParentNotOwnedError,
   SelfParentError,
+  ZoneColorTakenError,
 } from "../abl/nodeAbl.js";
 import {
   attackNodeAbl,
@@ -144,6 +145,7 @@ export const updateNode = async (
         [CrossMapParentError, 400, "Parent node must belong to the same map"],
         [ParentNotOwnedError, 403, "You can only branch off nodes you created"],
         [SelfParentError, 400, "A node can't be its own parent"],
+        [ZoneColorTakenError, 409, "Another member's zones already use this colour"],
       ],
       { message: "Failed to update node", logLabel: "updateNode" },
     );

@@ -113,7 +113,7 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeType } from "../types";
+import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeType, ZonePaletteColor } from "../types";
 import { battleTally, finishState, healthAt } from "../utils/finish";
 import { FinishedBanner } from "../map/FinishedBanner";
 import { HistoryPanel } from "../map/HistoryPanel";
@@ -1414,11 +1414,20 @@ export function MapPage() {
     const root = nodes.find((n) => n.nodeId === rootId);
     const group = nodeGroups.find((g) => g.rootId === rootId);
     if (!root || !group || !isOwnNode(root)) return undefined;
+    // One person, one colour: a palette colour another member's zone wears
+    // isn't offered (Backend's ZoneColorTakenError backs this up).
+    const taken: Partial<Record<ZonePaletteColor, string>> = {};
+    for (const n of nodes) {
+      if (n.zoneColor && !isOwnNode(n) && !taken[n.zoneColor]) {
+        taken[n.zoneColor] = typeof n.userId === "string" ? "?" : n.userId.username;
+      }
+    }
     return {
       pattern: root.zonePattern ?? null,
       color: root.zoneColor ?? null,
       edge: root.zoneEdge ?? null,
       autoColor: ZONE_COLORS[group.sentiment],
+      taken,
     };
   }
 

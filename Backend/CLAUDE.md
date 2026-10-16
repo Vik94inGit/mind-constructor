@@ -270,7 +270,9 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   fill; `zoneColor` is one of a small calm palette (`ZONE_PALETTE`: sand, sage, sky, lavender, rose,
   slate) used in place of the majority-sentiment colour. `null` (the default) keeps no pattern / the
   sentiment colour. `zoneEdge` (0..1, `null` = 0.5) is how bright the zone's outline is drawn. Plain
-  `PATCH /api/nodes/:nodeId`, owner-only. Purely visual, shared with every member.
+  `PATCH /api/nodes/:nodeId`, owner-only. Purely visual, shared with every member. One person, one colour:
+  a `zoneColor` another member's node on the same map already wears is refused (`ZoneColorTakenError` → 409,
+  via `zoneColorTakenDao`); a frontend shows such colours as taken.
 - **`src/models/Attack.ts`** (`WEAPONS`) — the weapon catalog (label, damage). Damage is snapshotted
   onto each `Attack` document at attack time, so rebalancing a weapon later doesn't rewrite history.
   No cooldown field — combat has none to track (see `attackAbl.ts` below).

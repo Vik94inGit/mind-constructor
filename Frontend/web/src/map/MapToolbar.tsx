@@ -134,7 +134,9 @@ export function MapToolbar({
       className={
         vertical
           ? "z-[45] flex h-full w-[4.75rem] shrink-0 flex-col items-center gap-1 border-r border-line bg-surface px-1 py-2 shadow-card"
-          : "absolute top-3 left-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
+          : // Wraps onto a second row rather than running off a phone's edge
+            // (discussion mode adds the opponent, history and finish buttons).
+            "absolute top-3 left-3 z-[45] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
       }
       role={vertical ? "navigation" : undefined}
     >

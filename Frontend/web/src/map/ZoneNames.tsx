@@ -16,7 +16,13 @@ export interface NamedZone {
   /** A circle parent that itself hangs from another node: helmet instead of crown. */
   variant: boolean;
   /** The zone's own look, set when this viewer may change it (they own its parent). */
-  style?: { pattern: ZonePattern | null; color: ZonePaletteColor | null; edge: number | null; autoColor: string };
+  style?: {
+    pattern: ZonePattern | null;
+    color: ZonePaletteColor | null;
+    edge: number | null;
+    autoColor: string;
+    taken?: Partial<Record<ZonePaletteColor, string>>;
+  };
 }
 
 interface Props {
