@@ -6,6 +6,7 @@ import {
   updateNodeDao,
   findNodeByPublicIdDao,
   setBranchHiddenMutationDao,
+  zoneColorTakenDao,
 } from "../src/dao/nodeDao.js";
 import {
   createNodeAbl,
@@ -17,6 +18,7 @@ import {
   CrossMapParentError,
   ParentNotOwnedError,
   SelfParentError,
+  ZoneColorTakenError,
 } from "../src/abl/nodeAbl.js";
 import { ValidationError } from "../src/abl/errors.js";
 import { createImageDao, findNodeImageIdsDao, deleteNodeImagesExceptDao } from "../src/dao/imageDao.js";
@@ -29,6 +31,7 @@ vi.mock("../src/dao/nodeDao.js", () => ({
   createNodeMutationDao: vi.fn(),
   countNodesByMapInternalIdDao: vi.fn(),
   updateNodeDao: vi.fn(),
+  zoneColorTakenDao: vi.fn(),
   findNodeByPublicIdDao: vi.fn(),
   setBranchHiddenMutationDao: vi.fn(),
 }));
@@ -411,13 +414,30 @@ describe("nodeAbl", () => {
       expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { order: null });
     });
 
+    it("refuses a zone colour another member's zones already wear", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({ _id: "n1", mapId: "m1", userId: "user1" } as never);
+      vi.mocked(zoneColorTakenDao).mockResolvedValue(true);
+      await expect(updateNodeAbl("node1", "user1", { zoneColor: "sky" })).rejects.toThrow(ZoneColorTakenError);
+      expect(zoneColorTakenDao).toHaveBeenCalledWith("m1", "sky", "user1");
+      expect(updateNodeDao).not.toHaveBeenCalled();
+    });
+
+    it("allows a free zone colour", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({ _id: "n1", mapId: "m1", userId: "user1" } as never);
+      vi.mocked(zoneColorTakenDao).mockResolvedValue(false);
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+      await updateNodeAbl("node1", "user1", { zoneColor: "sky" });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { zoneColor: "sky" });
+    });
+
     it("passes only the provided fields through to the DAO", async () => {
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
 
       await updateNodeAbl("node1", "user1", { text: "Updated text" });
 
       expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { text: "Updated text", ghost: false });
-      expect(findNodeByPublicIdDao).not.toHaveBeenCalled();
+      // Read once, only for the discussion history (historyAbl.ts) — a text edit is recorded there.
+      expect(findNodeByPublicIdDao).toHaveBeenCalledTimes(1);
     });
 
     // parentId used to be passed straight through unresolved here — a real

@@ -42,6 +42,11 @@ vi.mock("../src/models/User.js", () => ({
     find: vi.fn(),
   },
 }));
+vi.mock("../src/models/NodeRevision.js", () => ({
+  NodeRevision: {
+    deleteMany: vi.fn(),
+  },
+}));
 vi.mock("../src/models/Line.js", () => ({
   Line: {
     deleteMany: vi.fn(),

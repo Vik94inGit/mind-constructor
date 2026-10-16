@@ -51,7 +51,7 @@ describe("SiegePanel", () => {
     await userEvent.selectOptions(screen.getByLabelText(s.target), "app");
     await userEvent.click(screen.getByRole("radio", { name: new RegExp(s.strategies.assault.name) }));
     await userEvent.click(screen.getByRole("button", { name: s.go }));
-    expect(nodesApi.attackNode).toHaveBeenCalledWith("a2", "fatalFlaw", { type: "Fail", text: s.moves.assault("Nobody cares") });
+    expect(nodesApi.attackNode).toHaveBeenCalledWith("a2", "fatalFlaw", { type: "Fail", text: s.moves.assault("Nobody cares"), byOpponent: true });
     expect(onAttacked).toHaveBeenCalledWith(res);
     expect(onFocus).toHaveBeenCalledWith("a2");
     expect(screen.getByText(s.done(s.strategies.assault.name, "Nobody cares"))).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe("SiegePanel", () => {
     await userEvent.selectOptions(screen.getByLabelText(s.attacker), "tt");
     await userEvent.click(screen.getByRole("radio", { name: new RegExp(s.strategies.fortify.name) }));
     await userEvent.click(screen.getByRole("button", { name: s.go }));
-    expect(nodesApi.protectNode).toHaveBeenCalledWith("tt", { type: "Solution", text: s.moves.fortify("TikTok") });
+    expect(nodesApi.protectNode).toHaveBeenCalledWith("tt", { type: "Solution", text: s.moves.fortify("TikTok"), byOpponent: true });
     expect(onProtected).toHaveBeenCalled();
   });
 });

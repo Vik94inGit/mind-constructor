@@ -113,6 +113,7 @@ export const createWeaponNodeMutationDao = async (
     type: NodeType;
     text: string;
     userId: string;
+    byOpponent?: boolean;
   },
 ) => {
   const weaponNode = await Node.create({
@@ -125,6 +126,7 @@ export const createWeaponNodeMutationDao = async (
     isWeapon: true,
     weaponIcon: data.weaponIcon,
     targetNodeId: data.targetNodeId,
+    byOpponent: !!data.byOpponent,
     // Parented to its own target on arrival, same as every other new node
     // gets an easy, already-chosen parent for free (branching off an existing
     // one via "create child here"/quick-add) — an objection reads naturally
@@ -147,6 +149,7 @@ export const createProtectionNodeMutationDao = async (
     type: NodeType;
     text: string;
     userId: string;
+    byOpponent?: boolean;
   },
 ) => {
   const protectionNode = await Node.create({
@@ -158,6 +161,7 @@ export const createProtectionNodeMutationDao = async (
     isFirstNode: false,
     isProtection: true,
     protectsNodeId: data.protectsNodeId,
+    byOpponent: !!data.byOpponent,
   });
   return protectionNode.populate(NODE_POPULATE);
 };
@@ -419,4 +423,23 @@ export const countNodesByMapInternalIdDao = async (mapInternalId: MapInternalId)
 // abl/circleAbl.ts can group by it without a second query.
 export const listNodesByMapInternalIdDao = async (mapInternalId: MapInternalId) => {
   return await Node.find({ mapId: mapInternalId }, "nodeId parentId").lean();
+};
+
+// The newest node on a map — whose word was last, for abl/finishAbl.ts.
+export const findLatestNodeOnMapDao = async (mapInternalId: MapInternalId) => {
+  return await Node.findOne({ mapId: mapInternalId })
+    .sort({ createdAt: -1, _id: -1 })
+    .select("userId byOpponent createdAt")
+    .lean<{ userId: { toString(): string }; byOpponent?: boolean; createdAt?: Date } | null>();
+};
+
+// Whether the imitated opponent has made any move on the map.
+export const hasOpponentMovesDao = async (mapInternalId: MapInternalId) => {
+  return !!(await Node.exists({ mapId: mapInternalId, byOpponent: true }));
+};
+
+// Whether another member's node on the map already wears this zone colour —
+// each person's zones keep a colour of their own (nodeAbl's ZoneColorTakenError).
+export const zoneColorTakenDao = async (mapInternalId: MapInternalId, zoneColor: string, userId: string) => {
+  return !!(await Node.exists({ mapId: mapInternalId, zoneColor, userId: { $ne: userId } }));
 };

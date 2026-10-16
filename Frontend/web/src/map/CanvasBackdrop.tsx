@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { CANVAS_W, CANVAS_H } from "../utils/canvasLayout";
+import { CANVAS_W, CANVAS_H, realmMembers, realmOutline } from "../utils/canvasLayout";
 import { roundedPath } from "../utils/drawLine";
 import { useI18n } from "../i18n/I18nContext";
 import type { NodeGroup } from "../utils/canvasLayout";
@@ -38,6 +38,8 @@ interface Props {
   solvedZones?: Set<string>;
   /** Discussion mode: every zone's outline drawn as a battlemented wall — the kingdom's (a parentless keep) thicker and doubled. */
   walls?: boolean;
+  /** The kingdom's outer border round each whole tree that has castles inside it (utils/canvasLayout.ts realmOutline). */
+  realmBorders?: boolean;
   /** The simplified view: no ring drawn around a circle's parent. */
   compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
@@ -72,6 +74,7 @@ export function CanvasBackdrop({
   compact = false,
   solvedZones,
   walls = false,
+  realmBorders = false,
   onZoneMenu,
 }: Props) {
   const { t } = useI18n();
@@ -101,6 +104,20 @@ export function CanvasBackdrop({
   function moveHold(e: ReactPointerEvent) {
     if (hold.current && Math.hypot(e.clientX - hold.current.x, e.clientY - hold.current.y) > 8) cancelHold();
   }
+  // A zone's corners where its nodes are drawn right now — so a node being
+  // dragged pulls its own corner along live, and nothing else moves.
+  const byId = new Map(visibleNodes.map((n) => [n.nodeId, n]));
+  const cornersOf = (g: NodeGroup) =>
+    g.outlineIds?.length === g.outline.length
+      ? g.outlineIds.map((id, i) => {
+          const n = byId.get(id);
+          return n ? posFor(n) : g.outline[i];
+        })
+      : g.outline;
+  const pointsOf = (g: NodeGroup) =>
+    cornersOf(g)
+      .map((p) => `${p.x},${p.y}`)
+      .join(" ");
   return (
     <svg
       className="pointer-events-none absolute inset-0 h-full w-full"
@@ -120,6 +137,36 @@ export function CanvasBackdrop({
         current positions (including mid-drag) on every render, nothing here is a
         snapshot. Same "click to stabilize" control the old plain-circle backdrop had.
       */}
+      {/*
+        The kingdom's border: round a whole tree — its parentless zone parent
+        and every castle below — once the tree reaches past the kingdom's own
+        zone, so nobody has to draw the realm's wall by hand. Deepest layer,
+        follows the nodes live like the zones do. In discussion mode it is a
+        stone wall; otherwise a quiet line.
+      */}
+      {realmBorders &&
+        nodeGroups.map((g) => {
+          const root = visibleNodes.find((n) => n.nodeId === g.rootId);
+          if (!root || nodeRefId(root.parentId)) return null;
+          const members = realmMembers(g.rootId, visibleNodes);
+          if (members.length <= g.members.length) return null;
+          const outline = realmOutline(members.map(posFor));
+          if (outline.length < 3) return null;
+          const d = `M${outline.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(" L")} Z`;
+          return (
+            <g key={`realm-${g.rootId}`} data-testid="realm-border" opacity={walls ? 0.7 : 0.45}>
+              {walls && <path d={d} fill="none" stroke="var(--color-ink-soft)" strokeWidth={12} strokeOpacity={0.3} strokeLinejoin="round" />}
+              <path
+                d={d}
+                fill="none"
+                stroke="var(--color-ink-soft)"
+                strokeWidth={walls ? 6 : 3}
+                strokeDasharray={walls ? "14 8" : undefined}
+                strokeLinejoin="round"
+              />
+            </g>
+          );
+        })}
       {nodeGroups.map((g) => {
         // A zone's own look lives on its parent (Node.zoneColor/zonePattern).
         const root = visibleNodes.find((n) => n.nodeId === g.rootId);
@@ -130,7 +177,7 @@ export function CanvasBackdrop({
         // group, if any, is currently stabilized.
         const isStabilized = selectedCircle?.rootId === g.rootId;
         const dimmed = selectedCircle ? !isStabilized : !!focusedZones && !focusedZones.has(g.rootId);
-        const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+        const zonePoints = pointsOf(g);
         const patternId = root?.zonePattern ? `zone-pattern-${g.rootId}` : null;
         return (
           <g key={`zone-${g.rootId}`}>
@@ -211,7 +258,7 @@ export function CanvasBackdrop({
       {nodeGroups
         .filter((g) => solvedZones?.has(g.rootId))
         .map((g) => {
-          const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+          const zonePoints = pointsOf(g);
           return (
             <polygon
               key={`solved-${g.rootId}`}
@@ -238,7 +285,7 @@ export function CanvasBackdrop({
           const kingdom = !nodeRefId(root?.parentId);
           const color = zoneColorFor(root, g.sentiment);
           const dimmed = selectedCircle ? selectedCircle.rootId !== g.rootId : !!focusedZones && !focusedZones.has(g.rootId);
-          const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+          const zonePoints = pointsOf(g);
           return (
             <g key={`wall-${g.rootId}`} data-testid={kingdom ? "kingdom-wall" : "castle-wall"} opacity={dimmed ? 0.35 : 0.8}>
               {kingdom && (

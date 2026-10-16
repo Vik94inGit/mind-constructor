@@ -77,7 +77,7 @@ import { ZoneMenu } from "../map/ZoneMenu";
 import type { ZoneStylePatch } from "../map/ZoneMenuBody";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
-import { idOf, nodeRefId, ZONE_COLORS } from "../utils/nodeType";
+import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
 import { useRadialBlend } from "../hooks/useRadialBlend";
 import { useSentimentShow } from "../hooks/useSentimentShow";
 import { useCanvasFraming } from "../hooks/useCanvasFraming";
@@ -113,7 +113,11 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, MapBackground, NodeDoc, NodeType } from "../types";
+import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeType, ZonePaletteColor } from "../types";
+import { battleTally, finishState, healthAt } from "../utils/finish";
+import { FinishedBanner } from "../map/FinishedBanner";
+import { HistoryPanel } from "../map/HistoryPanel";
+import { BURST_MS, NodeBurst } from "../map/NodeBurst";
 import { mapBackgroundStyle } from "../utils/mapBackground";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
@@ -160,6 +164,13 @@ export function MapPage() {
   const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
   // The opponent's turn (SiegePanel) is open — discussion mode only.
   const [siegeOpen, setSiegeOpen] = useState(false);
+  // The discussion's history of changes (HistoryPanel) is open.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  // Every attack on the map, fetched when a replay starts, so the replay can
+  // show health as it was at each step (utils/finish.ts healthAt).
+  const [replayAttacks, setReplayAttacks] = useState<MapAttack[]>([]);
+  // A finish / agree / reopen request is on its way.
+  const [finishBusy, setFinishBusy] = useState(false);
   const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
@@ -386,12 +397,17 @@ export function MapPage() {
   const visibleNodes = useMemo(() => {
     if (timeLapseStep !== null) {
       const shown = new Set(timeLapseNodes.slice(0, timeLapseStep).map((n) => n.nodeId));
-      return unpackedNodes.filter((n) => shown.has(n.nodeId));
+      // The fight as it was at the newest node on screen, not as it ended.
+      return healthAt(
+        unpackedNodes.filter((n) => shown.has(n.nodeId)),
+        replayAttacks,
+        timeLapseNodes[timeLapseStep - 1]?.createdAt,
+      );
     }
     return activeLevel === null
       ? unpackedNodes
       : unpackedNodes.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel));
-  }, [unpackedNodes, depthByNode, activeLevel, selectedId, timeLapseNodes, timeLapseStep]);
+  }, [unpackedNodes, depthByNode, activeLevel, selectedId, timeLapseNodes, timeLapseStep, replayAttacks]);
   // A node drawn as a puzzle card sits at its own card spot, apart from the
   // icon's — see utils/cardSpace.ts. Worked out from the same display choices
   // modeOf reads below, with zones taken by membership alone (their outline
@@ -675,8 +691,40 @@ export function MapPage() {
   // too, even though the function resolves each root against `nodes` —
   // matching this hook's original dependency list exactly rather than
   // changing behavior as part of a pure relocation.
+  // A node that leaves the map (deleted here, by someone else, or in a batch)
+  // pops where it stood — a boom for a negative one (map/NodeBurst.tsx).
+  // Found by comparing the node list with the last one, so every way of
+  // deleting gets it; a wholesale swap (another map, a reload) doesn't.
+  const [bursts, setBursts] = useState<{ id: string; x: number; y: number; boom: boolean }[]>([]);
+  const lastNodesRef = useRef<{ mapId: string | undefined; nodes: NodeDoc[]; positions: Map<string, { x: number; y: number }> }>({
+    mapId,
+    nodes: [],
+    positions: new Map(),
+  });
+  useEffect(() => {
+    const last = lastNodesRef.current;
+    lastNodesRef.current = { mapId, nodes, positions };
+    if (last.mapId !== mapId || last.nodes.length === 0) return;
+    const now = new Set(nodes.map((n) => n.nodeId));
+    const gone = last.nodes.filter((n) => !now.has(n.nodeId) && !nodeRefId(n.packedIntoNodeId));
+    if (gone.length === 0 || gone.length > 25 || gone.length === last.nodes.length) return;
+    const fresh = gone.flatMap((n) => {
+      const at = last.positions.get(n.nodeId);
+      return at ? [{ id: `${n.nodeId}-${Date.now()}`, x: at.x, y: at.y, boom: sentimentOf(n.type) === "negative" }] : [];
+    });
+    if (fresh.length === 0) return;
+    setBursts((prev) => [...prev, ...fresh]);
+    const ids = new Set(fresh.map((b) => b.id));
+    setTimeout(() => setBursts((prev) => prev.filter((b) => !ids.has(b.id))), BURST_MS);
+    // positions is read as of the same render; only a change of nodes matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, mapId]);
+
+  // Each zone's corner order from last time — moving one node then moves only
+  // its own corner (see computeNodeGroups).
+  const zoneCornerOrder = useRef(new Map<string, string[]>());
   const nodeGroups = useMemo(
-    () => computeNodeGroups(visibleNodes, nodes, positions, undefined, zoneLayouts),
+    () => computeNodeGroups(visibleNodes, nodes, positions, undefined, zoneLayouts, zoneCornerOrder.current),
     [visibleNodes, positions, zoneLayouts],
   );
   // Discussion mode reads the zones as a realm: the kingdom and its castles
@@ -852,7 +900,7 @@ export function MapPage() {
   // Every camera-framing cue (fit-to-zoom for a text reading mode, the
   // floor-at-100%-for-editing after a drag, bringing a set of nodes into
   // view) — see hooks/useCanvasFraming.ts.
-  const { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen, fitAll } = useCanvasFraming({
+  const { fitZoomForDisplay, showPoints, showNodes, setDisplayForChosen, fitAll } = useCanvasFraming({
     visibleNodes,
     positions,
     circleRootSentimentByNode,
@@ -1058,7 +1106,6 @@ export function MapPage() {
     viewportBounds,
     obstaclePoints,
     placeNode,
-    zoomToEditAt,
     upsertNode,
     setActionError,
     setNodes,
@@ -1225,6 +1272,15 @@ export function MapPage() {
     setMultiSelectIds(new Set());
     setPictureView(null);
     setTimeLapse({ step: 0, playing: true });
+    setSiegeOpen(false);
+    // In a discussion the replay also shows the fight: who was hit, and when.
+    setReplayAttacks([]);
+    if (mapId && map?.discussionMode !== false) {
+      mapsApi
+        .listMapAttacks(mapId)
+        .then(setReplayAttacks)
+        .catch(() => setReplayAttacks([]));
+    }
     // Close enough to read: the camera then follows each node as it appears.
     if (Math.abs(zoom - 1) > 0.005) zoomFromCenter(0, 1);
   }
@@ -1358,11 +1414,20 @@ export function MapPage() {
     const root = nodes.find((n) => n.nodeId === rootId);
     const group = nodeGroups.find((g) => g.rootId === rootId);
     if (!root || !group || !isOwnNode(root)) return undefined;
+    // One person, one colour: a palette colour another member's zone wears
+    // isn't offered (Backend's ZoneColorTakenError backs this up).
+    const taken: Partial<Record<ZonePaletteColor, string>> = {};
+    for (const n of nodes) {
+      if (n.zoneColor && !isOwnNode(n) && !taken[n.zoneColor]) {
+        taken[n.zoneColor] = typeof n.userId === "string" ? "?" : n.userId.username;
+      }
+    }
     return {
       pattern: root.zonePattern ?? null,
       color: root.zoneColor ?? null,
       edge: root.zoneEdge ?? null,
       autoColor: ZONE_COLORS[group.sentiment],
+      taken,
     };
   }
 
@@ -1843,6 +1908,54 @@ export function MapPage() {
     }
   }
 
+  // Ending the discussion (utils/finish.ts): the owner finishes, but only
+  // once the opponent had the last word or everyone else agreed; the other
+  // members agree (or take it back). A finished map takes no new points until
+  // the owner reopens it.
+  const isFinished = !!map.finishedAt;
+  const finishNow = finishState(map, nodes);
+  const memberName = (id: string) =>
+    (map.members ?? []).find((m): m is { _id: string; username: string } => typeof m !== "string" && m._id === id)?.username ?? "?";
+  const iAgreed = !!user && (map.finishAgreedBy ?? []).includes(user._id);
+  const fs = t.ui.siege.finish;
+  const finishTitle = isOwner
+    ? finishNow.allowed
+      ? fs.button
+      : [fs.button, fs.notYet, finishNow.others.length ? fs.waiting(finishNow.waitingFor.map(memberName).join(", ")) : ""]
+          .filter(Boolean)
+          .join("\n")
+    : `${iAgreed ? fs.agreed : fs.agree}\n${fs.agreedCount((map.finishAgreedBy ?? []).length, finishNow.others.length)}`;
+  async function runFinish(request: () => Promise<typeof map>) {
+    if (!mapId) return;
+    setActionError(null);
+    setFinishBusy(true);
+    try {
+      setMap(await request());
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
+    } finally {
+      setFinishBusy(false);
+    }
+  }
+  function pressFinish() {
+    if (!mapId || finishBusy) return;
+    if (!isOwner) {
+      void runFinish(() => mapsApi.agreeToFinish(mapId, !iAgreed));
+      return;
+    }
+    if (!finishNow.allowed) {
+      setActionError(
+        [fs.notYet, finishNow.others.length ? fs.waiting(finishNow.waitingFor.map(memberName).join(", ")) : ""]
+          .filter(Boolean)
+          .join(" "),
+      );
+      return;
+    }
+    if (!confirm(fs.confirm)) return;
+    setSiegeOpen(false);
+    void runFinish(() => mapsApi.finishMap(mapId));
+  }
+
   // The map's canvas (Map.background), owner-only like the mode above. Shown
   // straight away, put back if the save fails; map:updated brings it to
   // everyone else on the map.
@@ -1941,8 +2054,19 @@ export function MapPage() {
         centerOnNode(id);
       }}
       onToggleMapMode={toggleMapMode}
-      onOpponentTurn={() => {
+      finish={
+        isFinished || (!isOwner && finishNow.others.length === 0)
+          ? undefined
+          : { title: finishTitle, pressed: !isOwner && iAgreed, muted: isOwner && !finishNow.allowed, onClick: pressFinish }
+      }
+      onHistory={() => {
         setSelectedId(null);
+        setSiegeOpen(false);
+        setHistoryOpen(true);
+      }}
+      onOpponentTurn={isFinished ? undefined : () => {
+        setSelectedId(null);
+        setHistoryOpen(false);
         setSiegeOpen(true);
       }}
       onExitDemo={exitDemo}
@@ -1964,6 +2088,14 @@ export function MapPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       {notice && <MapBanner tone="success" message={notice} onDismiss={dismissNotice} />}
       {actionError && <MapBanner tone="danger" message={actionError} onDismiss={() => setActionError(null)} />}
+      {isFinished && !timeLapse && (
+        <FinishedBanner
+          {...battleTally(nodes)}
+          onReplay={startTimeLapse}
+          onReopen={isOwner && mapId ? () => void runFinish(() => mapsApi.reopenMap(mapId)) : undefined}
+          busy={finishBusy}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1">
         {desktopLayout && !presenting && renderToolbar(true)}
@@ -2143,6 +2275,7 @@ export function MapPage() {
               compact={compactView || dotZoom}
               solvedZones={solvedZones}
               walls={isDiscussionMode}
+              realmBorders
               drawing={
                 drawMode
                   ? {
@@ -2162,6 +2295,10 @@ export function MapPage() {
                   <PuzzleConnectLine from={posFor(fromNode)} connect={puzzleConnect} zoom={zoom} />
                 ) : null;
               })()}
+
+            {bursts.map((b) => (
+              <NodeBurst key={b.id} x={b.x} y={b.y} boom={b.boom} />
+            ))}
 
             {visibleNodes.map((node) => {
               const pos = posFor(node);
@@ -2476,7 +2613,14 @@ export function MapPage() {
             }
             onExit={() => setTimeLapse(null)}
           />
-        ) : siegeOpen && isDiscussionMode ? (
+        ) : historyOpen && isDiscussionMode && mapId ? (
+          <HistoryPanel
+            mapId={mapId}
+            liveIds={new Set(nodes.map((n) => n.nodeId))}
+            onShow={centerOnNode}
+            onExit={() => setHistoryOpen(false)}
+          />
+        ) : siegeOpen && isDiscussionMode && !isFinished ? (
           <SiegePanel
             holds={holds}
             nodes={nodes}

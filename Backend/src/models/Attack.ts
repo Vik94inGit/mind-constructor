@@ -17,6 +17,11 @@ const AttackSchema = new mongoose.Schema(
     attackerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     weapon: { type: String, enum: Object.keys(WEAPONS), required: true },
     damage: { type: Number, required: true },
+    // A shield stopped it (damage is then 0) — so a replay can flash the shield.
+    blocked: { type: Boolean, default: false },
+    // Played by the imitated opponent (the map owner's "Opponent's turn"),
+    // not by the person whose account sent it — see Node.byOpponent.
+    byOpponent: { type: Boolean, default: false },
   },
   {
     timestamps: true,

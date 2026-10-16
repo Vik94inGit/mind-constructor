@@ -72,6 +72,14 @@ export const MapSchema = new mongoose.Schema(
     kind: { type: String, enum: MAP_KINDS, default: null },
     // See MAP_BACKGROUNDS.
     background: { type: String, enum: MAP_BACKGROUNDS, default: null },
+    // When the discussion on this map was finished (see abl/finishAbl.ts) —
+    // null while it's still going. A finished map takes no new nodes,
+    // attacks or shields until its owner reopens it.
+    finishedAt: { type: Date, default: null },
+    // Members (not the owner) who agreed to end the discussion. Ending it
+    // needs either the opponent's last word or every other member's
+    // agreement, so the owner can't cut anyone off; cleared on reopen.
+    finishAgreedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields

@@ -2,14 +2,16 @@ import { z } from "zod";
 import type mongoose from "mongoose";
 import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS, NODE_SHAPES, ZONE_PATTERNS, ZONE_PALETTE } from "../models/Node.js";
 import { getMapByIdDao, getMapByInternalIdDao } from "../dao/mapsDao.js";
+import { recordEditAbl } from "./historyAbl.js";
 import {
   createNodeMutationDao,
   countNodesByMapInternalIdDao,
   updateNodeDao,
+  zoneColorTakenDao,
   findNodeByPublicIdDao,
   setBranchHiddenMutationDao,
 } from "../dao/nodeDao.js";
-import { parseOrThrow, ValidationError } from "./errors.js";
+import { MapFinishedError, parseOrThrow, ValidationError } from "./errors.js";
 import { IMAGE_URL_PREFIX } from "../models/Image.js";
 import { createImageDao, findNodeImageIdsDao, deleteNodeImagesExceptDao } from "../dao/imageDao.js";
 
@@ -25,6 +27,9 @@ export class CrossMapParentError extends Error {}
 export class ParentNotOwnedError extends Error {}
 export class SelfParentError extends Error {}
 export class NotMapOwnerError extends Error {}
+// One person, one colour: a palette colour another member's zone on the map
+// already wears can't be picked (Node.zoneColor).
+export class ZoneColorTakenError extends Error {}
 
 // Shared by create/update: same cap as Node.title's own maxlength. Empty is
 // valid (it's how "no title" is stored, and how an update clears one).
@@ -182,6 +187,7 @@ export const createNodeAbl = async (
 
   const map = await getMapByIdDao(publicMapId, userId);
   if (!map) throw new MapNotFoundError();
+  if (map.finishedAt) throw new MapFinishedError();
 
   // parentId arrives as a public nodeId (nanoid) — the schema stores an
   // internal ObjectId ref, so it has to be resolved the same way edgeAbl
@@ -261,6 +267,8 @@ const updateNodeSchema = z
     error: "No fields to update",
   });
 
+const HISTORY_FIELDS = ["text", "title", "type"] as const;
+
 export const updateNodeAbl = async (
   publicNodeId: string,
   userId: string,
@@ -299,8 +307,19 @@ export const updateNodeAbl = async (
     }
   }
 
+  if (typeof definedUpdates.zoneColor === "string") {
+    const node = await findNodeByPublicIdDao(publicNodeId);
+    if (node && (await zoneColorTakenDao(node.mapId, definedUpdates.zoneColor, userId))) throw new ZoneColorTakenError();
+  }
+
+  // In a discussion, a change to what a node says goes into the map's
+  // history (see historyAbl.ts) — so read it as it was first.
+  const before = HISTORY_FIELDS.some((f) => f in definedUpdates) ? await findNodeByPublicIdDao(publicNodeId) : null;
+
   if (!IMAGE_FIELDS.some((f) => f in definedUpdates)) {
-    return await updateNodeDao(publicNodeId, userId, definedUpdates);
+    const updated = await updateNodeDao(publicNodeId, userId, definedUpdates);
+    if (before && updated) await recordEditAbl(before.toObject?.() ?? before, updated, userId);
+    return updated;
   }
 
   // Pictures go to the image store, and the node keeps their addresses.
@@ -310,6 +329,7 @@ export const updateNodeAbl = async (
   if (!node || node.userId.toString() !== userId.toString()) return null;
   await storeImageFields(definedUpdates, node, userId);
   const updated = await updateNodeDao(publicNodeId, userId, definedUpdates);
+  if (before && updated) await recordEditAbl(before.toObject?.() ?? before, updated, userId);
   // Whatever the node no longer points at (a removed picture, a replaced
   // icon) is deleted from the store.
   await deleteNodeImagesExceptDao(node._id, referencedImageIds(updated ?? node));

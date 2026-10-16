@@ -1,3 +1,4 @@
+import { NodeRevision } from "../models/NodeRevision.js";
 import type mongoose from "mongoose";
 import { Map } from "../models/Map.js";
 import { Node, NODE_TYPES, type NodeType } from "../models/Node.js";
@@ -295,6 +296,7 @@ export const deleteMapDao = async (publicMapId: string, userId: string) => {
   await Edge.deleteMany({ mapId: map._id });
   await Line.deleteMany({ mapId: map._id });
   await Node.deleteMany({ mapId: map._id });
+  await NodeRevision.deleteMany({ mapId: map._id });
   await deleteImagesByMapDao(map._id);
   await removeMapFromAllFoldersDao(publicMapId);
   await removeMapViewStatesDao(publicMapId);
@@ -419,4 +421,16 @@ export const searchNodesDao = async (userId: string, pattern: RegExp, limit: num
       updatedAt: r.updatedAt,
     };
   });
+};
+
+// ========== FINISHING A DISCUSSION (see abl/finishAbl.ts) ==========
+// null reopens it, and forgets who agreed to end it.
+export const setMapFinishedDao = async (mapInternalId: unknown, finishedAt: Date | null) => {
+  const update = finishedAt ? { $set: { finishedAt } } : { $set: { finishedAt: null, finishAgreedBy: [] } };
+  return await Map.findByIdAndUpdate(mapInternalId, update, { new: true });
+};
+
+export const setFinishAgreementDao = async (mapInternalId: unknown, userId: string, agree: boolean) => {
+  const update = agree ? { $addToSet: { finishAgreedBy: userId } } : { $pull: { finishAgreedBy: userId } };
+  return await Map.findByIdAndUpdate(mapInternalId, update, { new: true });
 };

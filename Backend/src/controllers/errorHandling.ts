@@ -4,7 +4,7 @@
 // back to console.error(...) + 500. Every controller still imports its own
 // error classes from its own ABL module and passes them in via `mappings`.
 import type { Response } from "express";
-import { ValidationError } from "../abl/errors.js";
+import { MapFinishedError, ValidationError } from "../abl/errors.js";
 
 // The JSON body an error mapping produces — always includes `success: false`
 // (added by handleAblError itself), so a mapping only ever supplies the rest.
@@ -35,6 +35,9 @@ export function handleAblError(
 ): Response {
   if (error instanceof ValidationError) {
     return res.status(400).json({ success: false, error: error.message });
+  }
+  if (error instanceof MapFinishedError) {
+    return res.status(409).json({ success: false, error: error.message, finished: true });
   }
 
   for (const [ErrorClass, status, body] of mappings) {

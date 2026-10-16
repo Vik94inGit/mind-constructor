@@ -17,6 +17,8 @@ interface Props {
   /** How bright the zone's outline is (Node.zoneEdge, 0..1) — null: the default. Left out: no slider. */
   edge?: number | null;
   onEdge?: (edge: number) => void;
+  /** Colours other members' zones already wear (with who has each) — offered, but not pickable. */
+  taken?: Partial<Record<ZonePaletteColor, string>>;
 }
 
 /** A drag of the edge slider saves once it rests this long, not on every step. */
@@ -29,7 +31,7 @@ const swatch =
 // pattern swatches and a row of calm-palette colours, each with a "none" /
 // "auto" swatch that goes back to the default. Used in the zone's ⋯ menu and
 // the parent node's right-click Zones submenu.
-export function ZoneStylePicker({ idPrefix, pattern, color, autoColor, onPattern, onColor, edge, onEdge }: Props) {
+export function ZoneStylePicker({ idPrefix, pattern, color, autoColor, onPattern, onColor, edge, onEdge, taken = {} }: Props) {
   const { t } = useI18n();
   const s = t.ui.zoneStyle;
   // The slider moves at once; the save waits for the drag to settle.
@@ -86,19 +88,27 @@ export function ZoneStylePicker({ idPrefix, pattern, color, autoColor, onPattern
           >
             {s.auto}
           </button>
-          {ZONE_PALETTE.map((c) => (
-            <button
-              key={c}
-              type="button"
-              role="radio"
-              aria-checked={color === c}
-              title={s.colors[c]}
-              aria-label={s.colors[c]}
-              className={`${swatch} ${ring(color === c)}`}
-              style={{ background: ZONE_PALETTE_HEX[c] }}
-              onClick={() => onColor(c)}
-            />
-          ))}
+          {ZONE_PALETTE.map((c) => {
+            // Another member's colour: each person's zones keep a colour of their own.
+            const owner = color === c ? undefined : taken[c];
+            const label = owner ? `${s.colors[c]} — ${s.takenBy(owner)}` : s.colors[c];
+            return (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={color === c}
+                disabled={!!owner}
+                title={label}
+                aria-label={label}
+                className={`${swatch} ${ring(color === c)} disabled:cursor-not-allowed disabled:opacity-35`}
+                style={{ background: ZONE_PALETTE_HEX[c] }}
+                onClick={() => onColor(c)}
+              >
+                {owner ? "✕" : null}
+              </button>
+            );
+          })}
         </div>
       </div>
       {onEdge && (

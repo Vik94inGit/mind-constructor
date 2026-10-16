@@ -40,6 +40,10 @@ interface Props {
   onToggleMapMode: () => void;
   /** Discussion mode: opens the opponent's turn (see SiegePanel). */
   onOpponentTurn?: () => void;
+  /** Ending the discussion (see utils/finish.ts): the owner's Finish, or another member's agree toggle. Absent: no button. */
+  finish?: { title: string; pressed: boolean; muted: boolean; onClick: () => void };
+  /** Opens the discussion's history of changes (map/HistoryPanel.tsx). */
+  onHistory?: () => void;
   /** Demo sessions only: leave the demo (log out) to log in or register. */
   onExitDemo: () => void;
   onInvite: () => void;
@@ -74,6 +78,8 @@ export function MapToolbar({
   isOwner,
   isDiscussionMode,
   onOpponentTurn,
+  finish,
+  onHistory,
   expanded,
   onExpand,
   moveMode,
@@ -128,7 +134,9 @@ export function MapToolbar({
       className={
         vertical
           ? "z-[45] flex h-full w-[4.75rem] shrink-0 flex-col items-center gap-1 border-r border-line bg-surface px-1 py-2 shadow-card"
-          : "absolute top-3 left-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
+          : // Wraps onto a second row rather than running off a phone's edge
+            // (discussion mode adds the opponent, history and finish buttons).
+            "absolute top-3 left-3 z-[45] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
       }
       role={vertical ? "navigation" : undefined}
     >
@@ -325,6 +333,24 @@ export function MapToolbar({
       {isOwner && isDiscussionMode && onOpponentTurn && (
         <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.open} onClick={onOpponentTurn}>
           ♜
+        </button>
+      )}
+      {/* Finish the discussion (owner) or agree to finish (everyone else) —
+          muted while the owner may not finish yet; the press then says why. */}
+      {isDiscussionMode && onHistory && (
+        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.history.open} onClick={onHistory}>
+          ◷
+        </button>
+      )}
+      {isDiscussionMode && finish && (
+        <button
+          type="button"
+          className={`${iconBtn} ${finish.pressed ? pressed : idle} ${finish.muted ? "opacity-50" : ""}`}
+          title={finish.title}
+          aria-pressed={finish.pressed}
+          onClick={finish.onClick}
+        >
+          ⚐
         </button>
       )}
       {/* A demo session has no dashboard to go back to (see ProtectedRoute) and

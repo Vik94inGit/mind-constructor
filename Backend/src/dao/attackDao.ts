@@ -23,6 +23,8 @@ export const logAttackDao = async (attackData: {
   attackerId: string;
   weapon: WeaponKey;
   damage: number;
+  blocked?: boolean;
+  byOpponent?: boolean;
 }) => {
   return await Attack.create(attackData);
 };
@@ -51,4 +53,24 @@ export const getAttackHistoryByNodeDao = async (nodeInternalId: InternalId) => {
   return await Attack.find({ targetNodeId: nodeInternalId })
     .sort({ createdAt: -1 })
     .populate("attackerId", "username");
+};
+
+// Every attack on a map, oldest first, each with its target's public id —
+// what a replay needs to show the fight as it happened (abl/finishAbl.ts's
+// listMapAttacksAbl). Attacks on a node that no longer exists are left out.
+export const listAttacksByMapDao = async (mapInternalId: InternalId) => {
+  const rows = await Attack.find({ mapId: mapInternalId })
+    .sort({ createdAt: 1, _id: 1 })
+    .populate("targetNodeId", "nodeId")
+    .lean<
+      {
+        targetNodeId: { _id: { toString(): string }; nodeId: string } | null;
+        weapon: WeaponKey;
+        damage: number;
+        blocked?: boolean;
+        byOpponent?: boolean;
+        createdAt: Date;
+      }[]
+    >();
+  return rows.filter((r) => r.targetNodeId);
 };

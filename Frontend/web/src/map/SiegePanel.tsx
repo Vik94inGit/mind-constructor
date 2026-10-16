@@ -60,8 +60,11 @@ export function SiegePanel({ holds, nodes, onAttacked, onProtected, onFocus, onE
     setBusy(true);
     setMessage(null);
     try {
-      if (move.action === "attack") onAttacked(await nodesApi.attackNode(move.targetId, move.weapon, { type: move.type, text }));
-      else onProtected(await nodesApi.protectNode(move.targetId, { type: move.type, text }));
+      // byOpponent: the move is the opponent's, not yours — it shows with the
+      // opponent's flag, and counts as their word when you want to finish.
+      if (move.action === "attack")
+        onAttacked(await nodesApi.attackNode(move.targetId, move.weapon, { type: move.type, text, byOpponent: true }));
+      else onProtected(await nodesApi.protectNode(move.targetId, { type: move.type, text, byOpponent: true }));
       onFocus(move.targetId);
       setMessage({ tone: "ok", text: s.done(s.strategies[active].name, labelOf(move.targetId)) });
     } catch (err) {

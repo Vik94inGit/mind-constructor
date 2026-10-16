@@ -42,4 +42,11 @@ describe("ZoneStylePicker", () => {
     await userEvent.click(screen.getByRole("radio", { name: s.autoHint }));
     expect(props.onColor).toHaveBeenCalledWith(null);
   });
+  it("shows another member's colour as taken and doesn't let you pick it", async () => {
+    const props = renderPicker({ taken: { rose: "petra" } });
+    const rose = screen.getByRole("radio", { name: `${s.colors.rose} — ${s.takenBy("petra")}` });
+    expect(rose).toBeDisabled();
+    await userEvent.click(rose);
+    expect(props.onColor).not.toHaveBeenCalled();
+  });
 });

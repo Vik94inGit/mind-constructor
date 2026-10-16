@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 
 import { findNodeDao, deleteNodeDao, deleteManyNodesDao } from "../dao/nodeDao.js";
+import { recordDeletionsAbl } from "../abl/historyAbl.js";
 import { findPublicMapIdsDao } from "../dao/mapsDao.js";
 import { broadcastToMap } from "../realtime/io.js";
 import {
@@ -13,6 +14,7 @@ import {
   CrossMapParentError,
   ParentNotOwnedError,
   SelfParentError,
+  ZoneColorTakenError,
 } from "../abl/nodeAbl.js";
 import {
   attackNodeAbl,
@@ -143,6 +145,7 @@ export const updateNode = async (
         [CrossMapParentError, 400, "Parent node must belong to the same map"],
         [ParentNotOwnedError, 403, "You can only branch off nodes you created"],
         [SelfParentError, 400, "A node can't be its own parent"],
+        [ZoneColorTakenError, 409, "Another member's zones already use this colour"],
       ],
       { message: "Failed to update node", logLabel: "updateNode" },
     );
@@ -374,6 +377,7 @@ export const deleteNode = async (
         .json({ success: false, error: "Node not found" });
     }
     const { node, damagedProtectedNode } = result;
+    await recordDeletionsAbl([node], userId);
 
     // Deleting a node also cascades to edges touching it, children's
     // parentId, and weapon nodes aimed at it (see deleteNodeDao) — those
@@ -417,6 +421,7 @@ export const deleteManyNodes = async (req: Request, res: Response) => {
     }
 
     const results = await deleteManyNodesDao(nodeIds, userId);
+    await recordDeletionsAbl(results.map(({ node }) => node), userId);
 
     // deleteManyNodesDao's node docs aren't populated (they're about to be
     // broadcast one at a time, not returned as a batch response), but each

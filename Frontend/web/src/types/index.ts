@@ -151,6 +151,10 @@ export interface MapDoc {
   kind?: MapKind | null;
   /** The canvas behind the nodes (Map.background) — null / absent: the dot grid. Owner-only to change. */
   background?: MapBackground | null;
+  /** When the owner finished the discussion (Map.finishedAt) — null / absent: still open. A finished map takes no new nodes, attacks or shields until reopened. */
+  finishedAt?: string | null;
+  /** Members other than the owner who agreed to finish (user ids) — see utils/finish.ts. */
+  finishAgreedBy?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -198,6 +202,8 @@ export interface NodeDoc {
   health: number;
   defeated: boolean;
   isWeapon?: boolean;
+  /** A move the map's owner made for the imitated opponent (the opponent's turn, map/SiegePanel.tsx). */
+  byOpponent?: boolean;
   weaponIcon?: WeaponIcon;
   targetNodeId?: string | EdgeNodeRef | null;
   // Protection node: true for a real, typed content node created via
@@ -286,6 +292,27 @@ export interface Attack {
   weapon: Weapon;
   damage: number;
   attackerId: { _id: string; username: string } | string;
+  createdAt: string;
+}
+
+/** One kept change in a discussion (GET /api/:mapId/history, Backend's NodeRevision): an edit of what a node says, or its deletion. */
+export interface NodeRevisionDoc {
+  revisionId: string;
+  nodeId: string;
+  userId: { _id: string; username: string } | string;
+  action: "edit" | "delete";
+  before: { text: string; title: string; type: string };
+  after: { text: string; title: string; type: string } | null;
+  createdAt: string;
+}
+
+/** One attack on a map, oldest first (GET /api/:mapId/attacks) — what the replay rebuilds health from. */
+export interface MapAttack {
+  targetNodeId: string;
+  weapon: Weapon;
+  damage: number;
+  blocked: boolean;
+  byOpponent: boolean;
   createdAt: string;
 }
 

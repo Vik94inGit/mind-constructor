@@ -623,12 +623,35 @@ export function zoneShape(zone: ZoneMembership, pts: Pt[], reach: number = getZo
   return zone.nested ? branchCorners(pts, zone.parentIdx, reach) : zoneCorners(pts, reach);
 }
 
+// Whether a closed polygon crosses itself (any two non-adjacent edges cross).
+export function selfIntersects(pts: Pt[]): boolean {
+  const n = pts.length;
+  const cross = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const hits = (p1: Pt, p2: Pt, q1: Pt, q2: Pt) =>
+    cross(p1, p2, q1) * cross(p1, p2, q2) < 0 && cross(q1, q2, p1) * cross(q1, q2, p2) < 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue;
+      if (hits(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * `cornerOrder` (optional, kept by the caller between calls) makes a zone's
+ * outline sticky: while the same nodes are its corners, they stay connected
+ * in the same order as last time, so moving one node moves only its own
+ * corner instead of rewiring the whole zone. A fresh order is worked out only
+ * when the corners change or the kept order would cross itself.
+ */
 export function computeNodeGroups(
   visibleNodes: NodeDoc[],
   allNodes: NodeDoc[],
   positions: Map<string, { x: number; y: number }>,
   reach: number = getZoneReach(),
   layouts: ZoneLayouts = {},
+  cornerOrder?: Map<string, string[]>,
 ): NodeGroup[] {
   const childrenByParent = new Map<string, string[]>();
   const byId = new Map(allNodes.map((n) => [n.nodeId, n]));
@@ -648,7 +671,19 @@ export function computeNodeGroups(
     const members = zone.ids.map((id) => byId.get(id)!);
     const sentiment = circleSentiment(members);
     const all = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-    const order = zoneShape(zone, all, reach);
+    let order = zoneShape(zone, all, reach);
+    if (cornerOrder) {
+      const ids = order.map((i) => zone.ids[i]);
+      const kept = cornerOrder.get(zone.rootId);
+      if (kept && kept.length === ids.length && kept.every((id) => ids.includes(id))) {
+        const keptOrder = kept.map((id) => zone.ids.indexOf(id));
+        if (!selfIntersects(keptOrder.map((i) => all[i]))) order = keptOrder;
+      }
+      cornerOrder.set(
+        zone.rootId,
+        order.map((i) => zone.ids[i]),
+      );
+    }
     // Centre and radius follow the drawn zone; with no outline, just the root.
     const pts = order.length ? order.map((i) => all[i]) : [all[0]];
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -718,4 +753,55 @@ export function computeLinkCycles(edges: EdgeDoc[]): string[][] {
     dfs(start, start, [start], new Set([start]));
   }
   return found;
+}
+
+// The kingdom's outer border: a rounded line all the way round a whole tree
+// (a parentless zone parent and everything below it, castles included), `pad`
+// clear of every node, so the realm reads as one place even where its castles
+// stick out of the kingdom's own zone. Each node is widened to a small circle
+// and the border is the convex hull of those circles, which rounds the
+// corners. Fewer than 3 corners when there is nothing to wrap.
+export function realmOutline(pts: Pt[], pad = 70): Pt[] {
+  const STEPS = 12;
+  const ring: Pt[] = [];
+  for (const p of pts) {
+    for (let k = 0; k < STEPS; k++) {
+      const a = (k / STEPS) * Math.PI * 2;
+      ring.push({ x: p.x + Math.cos(a) * pad, y: p.y + Math.sin(a) * pad });
+    }
+  }
+  if (pts.length === 0) return [];
+  return hullOrder(
+    ring,
+    ring.map((_, i) => i),
+  ).map((i) => ring[i]);
+}
+
+/** A tree's nodes: `rootId` and everything below it by parentId, plus shields guarding any of them. */
+export function realmMembers(rootId: string, nodes: NodeDoc[]): NodeDoc[] {
+  const children = new Map<string, NodeDoc[]>();
+  for (const n of nodes) {
+    const p = nodeRefId(n.parentId);
+    if (p) children.set(p, [...(children.get(p) ?? []), n]);
+  }
+  const root = nodes.find((n) => n.nodeId === rootId);
+  if (!root) return [];
+  const out = [root];
+  const seen = new Set([rootId]);
+  for (let i = 0; i < out.length; i++) {
+    for (const c of children.get(out[i].nodeId) ?? []) {
+      if (!seen.has(c.nodeId)) {
+        seen.add(c.nodeId);
+        out.push(c);
+      }
+    }
+  }
+  for (const n of nodes) {
+    const guards = nodeRefId(n.protectsNodeId);
+    if (n.isProtection && guards && seen.has(guards) && !seen.has(n.nodeId)) {
+      seen.add(n.nodeId);
+      out.push(n);
+    }
+  }
+  return out;
 }

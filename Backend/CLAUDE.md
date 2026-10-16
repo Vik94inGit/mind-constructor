@@ -82,7 +82,7 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `GET /api/search?q=` 
   calls. Each module defines its own domain-specific error classes (e.g. `MapNotFoundError`,
   `ParentNotOwnedError`) that the matching controller knows how to map to a status code. Modules:
   `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `lineAbl`,
-  `attackAbl`, `attackIndicatorAbl`, `circleAbl`, `packAbl`, `imageAbl`.
+  `attackAbl`, `attackIndicatorAbl`, `finishAbl`, `historyAbl`, `circleAbl`, `packAbl`, `imageAbl`.
 - **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`, `imageDao`) — the only layer
   that touches Mongoose models directly.
 - **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Line`, `Attack`, `Image`) — schemas. Each one strips
@@ -226,6 +226,28 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
 - **`Map.background`** — the canvas behind the nodes: `dots | plain | lined | dark` (`MAP_BACKGROUNDS`),
   `null` = the default dot grid. Owner-only, through the same `PATCH /api/:mapId` (`map:updated` reaches
   every member).
+- **Finishing a discussion** (`abl/finishAbl.ts`, `finishController.ts`; `Map.finishedAt`, `Map.finishAgreedBy`) —
+  only the map's owner may finish (`POST /api/:mapId/finish`), and only fairly (`finishRule`): the newest
+  node on the map is another member's or an imitated-opponent move (`Node.byOpponent`), or every other
+  member agreed (`POST /api/:mapId/finish/agree`, body `{ agree }`, non-owners only), or nobody else is on
+  the map and the owner never played the opponent, or the map is empty. Otherwise
+  `FinishNotAllowedError` → 409. `GET /api/:mapId/finish` reports `{ finishedAt, agreedBy, allowed, reason,
+  waitingFor }`; `POST /api/:mapId/reopen` (owner) clears both fields. Finish/agree/reopen broadcast
+  `map:updated`. A finished map refuses new nodes, attacks and shields (`MapFinishedError` from
+  `abl/errors.ts` → 409 `{ finished: true }`); edits and deletes are not frozen.
+- **The imitated opponent** (`Node.byOpponent`, `Attack.byOpponent`) — the map's owner may play the other
+  side alone: `attackNodeAbl` / `protectNodeAbl` take `byOpponent: true` in their content, honoured for the
+  owner only, and stamp it on the weapon/protection node and the `Attack` record. `Attack.blocked` records
+  whether a shield stopped the hit. `GET /api/:mapId/attacks` (`listMapAttacksAbl`) lists every attack on
+  the map oldest first (target's public `nodeId`, weapon, damage, blocked, byOpponent, createdAt), with the
+  hidden-branch rule for non-owners — what a frontend's replay uses to show health as it was.
+- **Discussion history** (`models/NodeRevision.ts`, `dao/historyDao.ts`, `abl/historyAbl.ts`) — in a discussion
+  (`Map.discussionMode !== false`) every change to a node's `text`, `title` or `type` (`updateNodeAbl` →
+  `recordEditAbl`) and every deletion (`deleteNode`/`deleteManyNodes` → `recordDeletionsAbl`) is appended as a
+  `NodeRevision` (`before`/`after` snapshots; `after: null` for a deletion). Append-only: no endpoint edits or
+  removes one, and a failure to record is logged, never thrown. `GET /api/:mapId/history` lists a map's changes
+  newest first (500 max, `userId` populated to `{ username }`) for any member, hidden branches left out for
+  non-owners. Deleting the map takes its history along (`deleteMapDao`).
 - **`Node.order`** — an optional step number (whole number 1..9999, `null` = none) for describing a
   process by labeling nodes in sequence; a frontend draws it as a small numbered badge on the node.
   Set via `POST`/`PATCH /api/nodes` (`orderSchema` in `nodeAbl.ts`; explicit `null` on PATCH clears
@@ -248,7 +270,9 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   fill; `zoneColor` is one of a small calm palette (`ZONE_PALETTE`: sand, sage, sky, lavender, rose,
   slate) used in place of the majority-sentiment colour. `null` (the default) keeps no pattern / the
   sentiment colour. `zoneEdge` (0..1, `null` = 0.5) is how bright the zone's outline is drawn. Plain
-  `PATCH /api/nodes/:nodeId`, owner-only. Purely visual, shared with every member.
+  `PATCH /api/nodes/:nodeId`, owner-only. Purely visual, shared with every member. One person, one colour:
+  a `zoneColor` another member's node on the same map already wears is refused (`ZoneColorTakenError` → 409,
+  via `zoneColorTakenDao`); a frontend shows such colours as taken.
 - **`src/models/Attack.ts`** (`WEAPONS`) — the weapon catalog (label, damage). Damage is snapshotted
   onto each `Attack` document at attack time, so rebalancing a weapon later doesn't rewrite history.
   No cooldown field — combat has none to track (see `attackAbl.ts` below).
