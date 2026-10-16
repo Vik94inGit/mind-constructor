@@ -33,6 +33,17 @@ describe("useMoveUndo", () => {
     expect(upsertNode).toHaveBeenCalled();
   });
 
+  it("runs a recorded change's own way back, and reports its own error when that fails", async () => {
+    const setActionError = vi.fn();
+    const hook = renderHook(() => useMoveUndo({ nodes: [], upsertNode: vi.fn(), setActionError, errorMessage: "move", keysEnabled: true }));
+    const back = vi.fn().mockRejectedValue(new Error("offline"));
+    act(() => hook.result.current.recordUndo(back, "restore failed"));
+    await act(() => hook.result.current.undo());
+    expect(back).toHaveBeenCalled();
+    expect(setActionError).toHaveBeenLastCalledWith("restore failed");
+    expect(hook.result.current.canUndo).toBe(false);
+  });
+
   it("undoes on Ctrl+Z, but not while typing in a field", async () => {
     vi.mocked(nodesApi.updateNode).mockClear();
     const { hook } = setup();

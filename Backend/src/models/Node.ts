@@ -77,6 +77,17 @@ export const NodeSchema = new mongoose.Schema(
     // it's capped small enough that a whole map's titles are a rounding
     // error next to what stripping `text` saved.
     title: { type: String, default: "", trim: true, maxlength: 80 },
+    // A ghost node's prompt: the question a template (or a person) leaves
+    // for whoever fills the node in — shown as the node's placeholder while
+    // its text is empty. Small, so it rides along on the node list like
+    // `title`. Empty (the default) means no prompt.
+    prompt: { type: String, default: "", trim: true, maxlength: 200 },
+    // True for a node made without text (a ghost waiting to be filled in —
+    // from a template, or sketched on the canvas). Stored rather than derived
+    // because the node list strips `text`, so a client can't otherwise tell
+    // an empty node from one whose text simply hasn't loaded. createNodeAbl
+    // sets it from the text; the first non-empty text on update clears it.
+    ghost: { type: Boolean, default: false },
     // An optional name for the zone (circle) this node is the parent of —
     // shown under the parent on the canvas and on the minimap. Only
     // meaningful on a circle parent; empty (the default) means unnamed.

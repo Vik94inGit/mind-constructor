@@ -1,3 +1,4 @@
+import type mongoose from "mongoose";
 import { Map } from "../models/Map.js";
 import { Node, NODE_TYPES, type NodeType } from "../models/Node.js";
 import { Edge } from "../models/Edge.js";
@@ -363,4 +364,59 @@ export const getMapSummaryDao = async (publicMapId: string, userId: string) => {
     nodeCount,
     nodesByType,
   };
+};
+
+// Search across every thought the caller can see: the text, title, prompt or
+// zone name of any node on any map they're a member of, newest first. Same
+// hidden-branch rule as getNodesByMapDao — on a map someone else owns, a
+// branch the owner hid never matches. `pattern` is matched as-is (searchNodesAbl
+// escapes the person's words into it).
+export const searchNodesDao = async (userId: string, pattern: RegExp, limit: number) => {
+  const maps = await Map.find({ members: userId })
+    .select("_id mapId name ownerId")
+    .lean<{ _id: mongoose.Types.ObjectId; mapId: string; name: string; ownerId: { toString(): string } }[]>();
+  if (maps.length === 0) return [];
+
+  const hiddenIds: string[] = [];
+  for (const m of maps) {
+    if (m.ownerId.toString() === userId.toString()) continue;
+    hiddenIds.push(...(await getHiddenNodesDao(m._id)).ids);
+  }
+
+  const rows = await Node.find({
+    mapId: { $in: maps.map((m) => m._id) },
+    _id: { $nin: hiddenIds },
+    $or: [{ text: pattern }, { title: pattern }, { prompt: pattern }, { zoneName: pattern }],
+  })
+    .select("-_id nodeId mapId text title prompt zoneName type updatedAt")
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .lean<
+      {
+        nodeId: string;
+        mapId: { toString(): string };
+        text?: string;
+        title?: string;
+        prompt?: string;
+        zoneName?: string;
+        type: NodeType;
+        updatedAt?: Date;
+      }[]
+    >();
+
+  const mapsById = new globalThis.Map(maps.map((m) => [m._id.toString(), m]));
+  return rows.map((r) => {
+    const m = mapsById.get(r.mapId.toString());
+    return {
+      nodeId: r.nodeId,
+      mapId: m?.mapId ?? "",
+      mapName: m?.name ?? "",
+      type: r.type,
+      title: r.title ?? "",
+      text: r.text ?? "",
+      prompt: r.prompt ?? "",
+      zoneName: r.zoneName ?? "",
+      updatedAt: r.updatedAt,
+    };
+  });
 };

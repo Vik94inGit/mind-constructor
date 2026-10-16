@@ -44,6 +44,13 @@ export function ThinkPage() {
     return saved ?? emptyDraft();
   });
   const [name, setName] = useState("");
+  // A draft resumed on the last step (here, or synced from another device)
+  // never went through goTo(3), so it gets its suggested name here too — or
+  // Build stays disabled on an empty name.
+  useEffect(() => {
+    if (draft.step === 3 && !name.trim()) setName(suggestMapName(draft.center));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.step]);
   const [personal, setPersonal] = useState(true);
   const [building, setBuilding] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);

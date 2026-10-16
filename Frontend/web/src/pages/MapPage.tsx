@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
@@ -54,8 +54,11 @@ import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, sho
 import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { readingOrder, stepNode } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
+import { deletedNodeOf, restoreDeletedNode } from "../utils/restoreNode";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
+import { SiegePanel } from "../map/SiegePanel";
+import { holdsOf } from "../utils/siege";
 import { MapBanner } from "../map/MapBanner";
 import { MarqueeRect, PuzzleConnectLine, ZoneLoadingSpinner } from "../map/CanvasOverlays";
 import { computePuzzleJoins } from "../utils/puzzleLinks";
@@ -154,6 +157,8 @@ export function MapPage() {
   // The time-lapse (TimeLapseBar): how many nodes, oldest first, are shown,
   // and whether it's playing. `null` when it's off.
   const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
+  // The opponent's turn (SiegePanel) is open — discussion mode only.
+  const [siegeOpen, setSiegeOpen] = useState(false);
   const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
@@ -436,6 +441,19 @@ export function MapPage() {
   // with none, to the spot that was in the middle of the screen. From then on
   // that spot (a moment after scrolling stops) and the open node are saved.
   const restoredRef = useRef<string | null>(null);
+  // ?node=<id> (a search result on the dashboard): open on that node instead.
+  const [searchParams] = useSearchParams();
+  const focusNodeId = searchParams.get("node");
+  useEffect(() => {
+    if (loading || !focusNodeId || !mapId || restoredRef.current === mapId) return;
+    restoredRef.current = mapId;
+    window.setTimeout(() => {
+      if (!visibleNodes.some((n) => n.nodeId === focusNodeId)) return;
+      setSelectedId(focusNodeId);
+      centerOnNode(focusNodeId);
+    }, 80);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, focusNodeId, mapId]);
   useEffect(() => {
     if (loading || !savedView || !mapId || restoredRef.current === mapId) return;
     restoredRef.current = mapId;
@@ -660,6 +678,16 @@ export function MapPage() {
     () => computeNodeGroups(visibleNodes, nodes, positions, undefined, zoneLayouts),
     [visibleNodes, positions, zoneLayouts],
   );
+  // Discussion mode reads the zones as a realm: the kingdom and its castles
+  // (utils/siege.ts), named like the zone list names them.
+  const holds = useMemo(
+    () =>
+      holdsOf(
+        nodeGroups.map((g) => g.rootId),
+        nodes,
+      ).map((h) => ({ ...h, name: zoneLabel(nodes.find((n) => n.nodeId === h.rootId)) ?? "" })),
+    [nodeGroups, nodes],
+  );
 
   // Zoomed out to 50%: no icons anywhere on the canvas — nodes are plain
   // dots, and the decorations drawn around them (circle-parent rings,
@@ -823,7 +851,7 @@ export function MapPage() {
   // Every camera-framing cue (fit-to-zoom for a text reading mode, the
   // floor-at-100%-for-editing after a drag, bringing a set of nodes into
   // view) — see hooks/useCanvasFraming.ts.
-  const { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen } = useCanvasFraming({
+  const { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen, fitAll } = useCanvasFraming({
     visibleNodes,
     positions,
     circleRootSentimentByNode,
@@ -1006,7 +1034,7 @@ export function MapPage() {
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
   // Undo for moves: each drag records where its nodes were; Ctrl+Z (or the
   // toolbar's undo button) puts the last one back.
-  const { recordMove, undo: undoMove, canUndo } = useMoveUndo({
+  const { recordMove, recordUndo, undo: undoMove, canUndo } = useMoveUndo({
     nodes,
     upsertNode,
     setActionError,
@@ -1196,12 +1224,32 @@ export function MapPage() {
     setMultiSelectIds(new Set());
     setPictureView(null);
     setTimeLapse({ step: 0, playing: true });
-    // The whole map in view, so it grows where it's watched.
-    showPoints(
-      unpackedNodes.map((n) => positions.get(n.nodeId)).filter((pt): pt is { x: number; y: number } => !!pt),
-      { aboveSheet: false },
-    );
+    // Close enough to read: the camera then follows each node as it appears.
+    if (Math.abs(zoom - 1) > 0.005) zoomFromCenter(0, 1);
   }
+  // The camera follows the replay: it glides to each node as it appears, so
+  // nobody has to hunt for what changed. At the last node it pulls back to
+  // show the whole finished map.
+  const timeLapseFollowRef = useRef(-1);
+  useEffect(() => {
+    if (timeLapseStep === null) {
+      timeLapseFollowRef.current = -1;
+      return;
+    }
+    if (timeLapseStep === timeLapseFollowRef.current) return;
+    timeLapseFollowRef.current = timeLapseStep;
+    if (timeLapseStep >= timeLapseNodes.length && timeLapseNodes.length > 0) {
+      showPoints(
+        timeLapseNodes.map((n) => positions.get(n.nodeId)).filter((pt): pt is { x: number; y: number } => !!pt),
+        { aboveSheet: false },
+      );
+      return;
+    }
+    const newest = timeLapseNodes[timeLapseStep - 1];
+    const at = newest ? positions.get(newest.nodeId) : undefined;
+    if (at) centerOnPoint(at.x, at.y, { aboveSheet: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLapseStep]);
 
   // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
   // open node to the one before or after it, or, with none open, from the
@@ -1412,16 +1460,41 @@ export function MapPage() {
   }
 
   async function handleDeleteNode(node: NodeDoc) {
-    if (!confirm(t.ui.node.deleteConfirm)) return;
     try {
-      const res = await nodesApi.deleteNode(node.nodeId);
-      applyNodeDeleted(node.nodeId);
-      // Deleting a protection node with banked damage releases the whole
-      // total onto whatever it was defending — see Backend's deleteNodeDao.
-      if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
+      await deleteNodeWithUndo(node);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.delete);
     }
+  }
+
+  // Deleting a node, from its panel or its right-click menu. An ordinary node
+  // can be brought back with undo (see utils/restoreNode.ts), so it goes
+  // without a confirm; a weapon or protection node can't (its damage and
+  // shields don't replay), so that one still asks first. Resolves false when
+  // the person changed their mind. Throws when the delete fails.
+  async function deleteNodeWithUndo(node: NodeDoc): Promise<boolean> {
+    const undoable = !node.isWeapon && !node.isProtection;
+    if (!undoable && !confirm(t.ui.node.deleteConfirm)) return false;
+    // The node list arrives without text and pictures — fetch them so undo has them.
+    const full = undoable ? await nodesApi.getNode(node.nodeId).catch(() => node) : node;
+    const deleted = deletedNodeOf({ ...node, ...full }, nodes, edges, isOwnNode);
+    const res = await nodesApi.deleteNode(node.nodeId);
+    applyNodeDeleted(node.nodeId);
+    // Deleting a protection node with banked damage releases the whole
+    // total onto whatever it was defending — see Backend's deleteNodeDao.
+    if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
+    if (undoable && mapId) {
+      recordUndo(async () => {
+        const back = await restoreDeletedNode(mapId, deleted);
+        upsertNode(back.node);
+        back.children.forEach(upsertNode);
+        setEdges((prev) => [...prev, ...back.edges]);
+        setCelebrateIds((prev) => new Set(prev).add(back.node.nodeId));
+        refreshInsights(mapId);
+      }, t.ui.errors.restoreNode);
+      showNotice(t.ui.node.deletedUndo);
+    }
+    return true;
   }
 
   // Taking links apart from a node's right-click menu ("Remove links ›"): its
@@ -1503,7 +1576,7 @@ export function MapPage() {
     setInlineEditId(null);
     // Emoji first: the feeling was already picked (or skipped, "") on the
     // ring before the types. Otherwise it's offered around the new node.
-    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, text, emoji: emojiFirst ? (emoji ?? "") : undefined });
+    setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, prompt: text, emoji: emojiFirst ? (emoji ?? "") : undefined });
   }
 
   // Draw first, write later: a type ghost dragged out of the selected node's
@@ -1851,6 +1924,10 @@ export function MapPage() {
         centerOnNode(id);
       }}
       onToggleMapMode={toggleMapMode}
+      onOpponentTurn={() => {
+        setSelectedId(null);
+        setSiegeOpen(true);
+      }}
       onExitDemo={exitDemo}
       onInvite={() => setShowInvite(true)}
       onCreateNode={startCreateNodeInView}
@@ -2053,6 +2130,7 @@ export function MapPage() {
               interactive={!drawMode}
               compact={compactView || dotZoom}
               solvedZones={solvedZones}
+              walls={isDiscussionMode}
               drawing={
                 drawMode
                   ? {
@@ -2224,7 +2302,7 @@ export function MapPage() {
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => {
                   setActionError(null);
-                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, text, emoji: emojiFirst ? (emoji ?? "") : undefined });
+                  setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null, prompt: text, emoji: emojiFirst ? (emoji ?? "") : undefined });
                 }}
               />
             )}
@@ -2250,7 +2328,6 @@ export function MapPage() {
                 x={pendingCreate.x}
                 y={pendingCreate.y}
                 type={pendingCreate.type}
-                initialText={pendingCreate.text}
                 emoji={pendingCreate.emoji || undefined}
                 zoom={zoom}
                 onConfirm={confirmPendingCreate}
@@ -2353,6 +2430,7 @@ export function MapPage() {
                 onZoomOut={() => zoomFromCenter(-ZOOM_STEP)}
                 onZoomIn={() => zoomFromCenter(ZOOM_STEP)}
                 onReset={() => zoomFromCenter(0, 1)}
+                onFit={fitAll}
                 minimapShown={minimapShown}
               />
             </>
@@ -2388,6 +2466,25 @@ export function MapPage() {
               })
             }
             onExit={() => setTimeLapse(null)}
+          />
+        ) : siegeOpen && isDiscussionMode ? (
+          <SiegePanel
+            holds={holds}
+            nodes={nodes}
+            onAttacked={(res) => {
+              upsertNode(res.node);
+              upsertNode(res.weaponNode);
+              if (res.healedParent) upsertNode(res.healedParent);
+              if (res.protector) upsertNode(res.protector);
+              setCelebrateIds((prev) => new Set(prev).add(res.weaponNode.nodeId));
+              if (mapId) refreshInsights(mapId);
+            }}
+            onProtected={(res) => {
+              upsertNode(res.protectionNode);
+              upsertNode(res.healedNode);
+            }}
+            onFocus={centerOnNode}
+            onExit={() => setSiegeOpen(false)}
           />
         ) : drawMode ? (
           <DrawLineBar
@@ -2427,10 +2524,10 @@ export function MapPage() {
             key={`${pendingCreate.x}:${pendingCreate.y}`}
             type={pendingCreate.type}
             emoji={pendingCreate.emoji || undefined}
-            initialText={pendingCreate.text}
+            prompt={pendingCreate.prompt}
             onTypeChange={(type) => setPendingCreate((prev) => (prev ? { ...prev, type } : prev))}
             onClearEmoji={() => setPendingCreate((prev) => (prev ? { ...prev, emoji: "" } : prev))}
-            onCreate={(text, type, images) => confirmPendingCreate(text, type, images)}
+            onCreate={(text, type, images, prompt) => confirmPendingCreate(text, type, images, prompt)}
             onCancel={() => setPendingCreate(null)}
           />
         ) : (
@@ -2489,7 +2586,7 @@ export function MapPage() {
                   // canvas gets, just reached from here instead.
                   if (selectedNode?.isWeapon) triggerWeaponShot(selectedNode.nodeId);
                 }}
-                onDeleted={applyNodeDeleted}
+                onDelete={deleteNodeWithUndo}
                 onUpdated={upsertNode}
                 onAttacked={(updatedNode, weaponNode, _weapon, healedParent, _blocked, protector) => {
                   upsertNode(updatedNode);

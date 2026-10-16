@@ -66,9 +66,12 @@ describe("nodeAbl", () => {
       vi.mocked(countNodesByMapInternalIdDao).mockResolvedValue(1 as never);
       vi.mocked(createNodeMutationDao).mockResolvedValue({ nodeId: "n1" } as never);
 
-      await createNodeAbl({ text: "", type: "Option" }, "pub123", "user1");
+      await createNodeAbl({ text: "", type: "Option", prompt: "  What could go wrong?  " }, "pub123", "user1");
 
-      expect(vi.mocked(createNodeMutationDao).mock.calls[0][1].text).toBe("");
+      const created = vi.mocked(createNodeMutationDao).mock.calls[0][1];
+      expect(created.text).toBe("");
+      expect(created.ghost).toBe(true);
+      expect(created.prompt).toBe("What could go wrong?");
     });
 
     it("rejects an invalid order at creation too", async () => {
@@ -110,6 +113,7 @@ describe("nodeAbl", () => {
         type: "Problem",
         userId: "user1",
         isFirstNode: true,
+        ghost: false,
         parentId: null,
       });
       expect(findNodeByPublicIdDao).not.toHaveBeenCalled();
@@ -151,6 +155,7 @@ describe("nodeAbl", () => {
         type: "Option",
         userId: "user1",
         isFirstNode: false,
+        ghost: false,
         parentId: "parentInternal1",
       });
     });
@@ -211,6 +216,16 @@ describe("nodeAbl", () => {
         updateNodeAbl("node1", "user1", { symbolOverride: "star" }),
       ).rejects.toThrow(ValidationError);
       expect(updateNodeDao).not.toHaveBeenCalled();
+    });
+
+    it("fills a ghost in when text is written, and leaves it alone otherwise", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      await updateNodeAbl("node1", "user1", { text: "Users churn" });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { text: "Users churn", ghost: false });
+
+      await updateNodeAbl("node1", "user1", { prompt: "Why?" });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { prompt: "Why?" });
     });
 
     it("passes a zone name through, trimmed, and rejects one over 40 characters", async () => {
@@ -389,7 +404,7 @@ describe("nodeAbl", () => {
 
       await updateNodeAbl("node1", "user1", { text: "Updated text" });
 
-      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { text: "Updated text" });
+      expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { text: "Updated text", ghost: false });
       expect(findNodeByPublicIdDao).not.toHaveBeenCalled();
     });
 

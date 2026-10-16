@@ -309,7 +309,11 @@ export const NodeCard = memo(function NodeCard({
   // What the caption says: the node's own title if it has one, otherwise the
   // start of its text (the line-clamp on the chip is what cuts it off, so
   // "first words" needs no separate truncation here).
-  const captionLabel = node.title?.trim() || node.text;
+  // A ghost (a node no one has written in yet — see NodeDoc.ghost) shows
+  // its prompt instead, in a quieter style, until it's filled in.
+  const ghost = !!node.ghost && !node.text?.trim();
+  const ghostPrompt = ghost && !node.title?.trim() ? (node.prompt?.trim() ?? "") : "";
+  const captionLabel = node.title?.trim() || node.text || ghostPrompt;
   // An icon drawn with no caption shows its text in a small label on hover
   // instead (the same label a zoomed-out dot shows) — so a quiet map can still
   // be read node by node. Not while selected or editing: the panel and the
@@ -335,6 +339,8 @@ export const NodeCard = memo(function NodeCard({
   // — the chosen node and its quick-add ghosts are meant to be the one
   // clear center of attention on screen while they're up; everything else
   // needs to properly recede, not just slightly fade.
+  // A ghost sits between muted and quiet: faded until someone writes in it,
+  // then it eases up to full (the slower opacity transition below).
   // quiet (a child no one is looking at) ranks last: any stronger fade wins.
   const opacityClass = node.defeated
     ? "opacity-55"
@@ -342,9 +348,11 @@ export const NodeCard = memo(function NodeCard({
       ? "opacity-85"
       : muted
         ? "opacity-16"
-        : quiet
-          ? "opacity-50 hover:opacity-100"
-          : "";
+        : ghost
+          ? "opacity-45 hover:opacity-75"
+          : quiet
+            ? "opacity-50 hover:opacity-100"
+            : "";
   const filterClass = muted ? "grayscale-[65%]" : "";
   const cursorClass = readonly ? "cursor-default" : dragging ? "cursor-grabbing" : "cursor-grab";
   // Position updates (left/top, applied via inline style) need to be
@@ -366,7 +374,7 @@ export const NodeCard = memo(function NodeCard({
   // before this fix.
   const transitionClass = dragging
     ? "[transition:opacity_0.15s_ease,filter_0.15s_ease]"
-    : "[transition:opacity_0.15s_ease,filter_0.15s_ease,transform_1.8s_cubic-bezier(0.4,0,0.2,1)]";
+    : "[transition:opacity_0.5s_ease,filter_0.15s_ease,transform_1.8s_cubic-bezier(0.4,0,0.2,1)]";
   // Single resolution point for this node's own stacking, same reasoning as
   // opacityClass/cursorClass above — exactly one z-index utility ever
   // applies, never two stacked in the same class list (whichever Tailwind
@@ -953,6 +961,7 @@ export const NodeCard = memo(function NodeCard({
           className="pointer-events-auto absolute top-full left-0 mt-[0.6rem] block max-h-[200px] w-full resize-none overflow-y-auto rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
           autoFocus
           value={draftText}
+          placeholder={node.prompt || undefined}
           onChange={(e) => setDraftText(e.target.value)}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
@@ -997,7 +1006,7 @@ export const NodeCard = memo(function NodeCard({
           // than the spacing getNodeMinDist() budgets for (CAPTION_WIDTH),
           // and wide enough to run into its own children. The chip stays
           // CAPTION_WIDTH on screen at every size.
-          className={`absolute top-full left-1/2 ${isNamedZone && !puzzle && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] font-medium text-ink ${iconText ? "line-clamp-4 break-words" : mixed ? "truncate whitespace-nowrap" : "line-clamp-2 break-words"}`}
+          className={`absolute top-full left-1/2 ${isNamedZone && !puzzle && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] ${ghostPrompt ? "font-normal text-ink-soft italic" : "font-medium text-ink"} ${iconText ? "line-clamp-4 break-words" : mixed ? "truncate whitespace-nowrap" : "line-clamp-2 break-words"}`}
           style={{
             width: iconText ? ICON_TEXT_CAPTION_WIDTH : CAPTION_WIDTH,
             // translateX(-50%) centers it under the icon (left-1/2 puts its

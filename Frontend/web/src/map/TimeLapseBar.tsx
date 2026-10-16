@@ -10,9 +10,13 @@ export function timeLapseOrder(nodes: NodeDoc[]): NodeDoc[] {
     .map(({ n }) => n);
 }
 
-/** How long one step of the replay shows: the whole map takes about ten seconds, but never faster than 8 nodes a second or slower than 2. */
+/**
+ * How long one step of the replay shows: the whole map takes about fifteen
+ * seconds, but never faster than 3 nodes a second (the camera glides to each
+ * new node, and needs a moment to settle) or slower than one every 0.8 s.
+ */
 export function timeLapseStepMs(total: number): number {
-  return Math.min(500, Math.max(125, 10000 / Math.max(1, total)));
+  return Math.min(800, Math.max(350, 15000 / Math.max(1, total)));
 }
 
 interface Props {

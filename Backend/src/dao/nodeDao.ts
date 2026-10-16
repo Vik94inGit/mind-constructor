@@ -67,6 +67,8 @@ export const createNodeMutationDao = async (
   nodeData: {
     text: string;
     title?: string;
+    prompt?: string;
+    ghost?: boolean;
     emoji?: string;
     order?: number | null;
     type: NodeType;
@@ -84,6 +86,8 @@ export const createNodeMutationDao = async (
     userId: nodeData.userId,
     text: nodeData.text,
     title: nodeData.title,
+    prompt: nodeData.prompt,
+    ghost: nodeData.ghost,
     emoji: nodeData.emoji,
     order: nodeData.order,
     type: nodeData.type,

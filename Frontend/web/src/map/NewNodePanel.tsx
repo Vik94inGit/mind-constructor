@@ -11,12 +11,13 @@ import { ImagesSection } from "./nodePanel/ImagesSection";
 interface Props {
   type: NodeType;
   emoji?: string;
-  /** A ghost template's starter phrase to open with. */
-  initialText?: string;
+  /** A starter phrase picked on the quick-add ring: the field's placeholder, and the node's prompt. */
+  prompt?: string;
   onTypeChange: (type: NodeType) => void;
   onClearEmoji: () => void;
   /** Resolves once the node is made (or making it failed — the caller shows that). */
-  onCreate: (text: string, type: NodeType, images: string[]) => Promise<void>;
+  /** Empty `text` with a `prompt` makes a ghost (see NodeDoc.ghost). */
+  onCreate: (text: string, type: NodeType, images: string[], prompt?: string) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -24,9 +25,15 @@ interface Props {
 // uses, opened with its text field focused. Type, emoji and pictures can be
 // set here too; nothing is sent until Create (or Enter). The emoji is
 // optional — writing straight away makes the node without one.
-export function NewNodePanel({ type, emoji, initialText = "", onTypeChange, onClearEmoji, onCreate, onCancel }: Props) {
+//
+// "Ghost" turns what's written into the node's prompt instead of its text:
+// the node lands faded with that question as its placeholder, to be filled in
+// later. A picked starter phrase is a prompt from the start, so Create with
+// nothing written makes a ghost of it too.
+export function NewNodePanel({ type, emoji, prompt = "", onTypeChange, onClearEmoji, onCreate, onCancel }: Props) {
   const { t } = useI18n();
-  const [text, setText] = useState(initialText);
+  const [text, setText] = useState("");
+  const [asGhost, setAsGhost] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +64,11 @@ export function NewNodePanel({ type, emoji, initialText = "", onTypeChange, onCl
 
   async function create() {
     const trimmed = text.trim();
-    if (!trimmed || busy) return;
+    if (busy || (!trimmed && !prompt)) return;
     setBusy(true);
     try {
-      await onCreate(trimmed, type, images);
+      if (asGhost) await onCreate("", type, images, trimmed || prompt);
+      else await onCreate(trimmed, type, images, prompt || undefined);
     } finally {
       setBusy(false);
     }
@@ -122,7 +130,7 @@ export function NewNodePanel({ type, emoji, initialText = "", onTypeChange, onCl
           rows={5}
           maxLength={MAX_NODE_TEXT}
           value={text}
-          placeholder={t.ui.newNode.placeholder}
+          placeholder={asGhost ? t.ui.newNode.ghostPlaceholder : prompt || t.ui.newNode.placeholder}
           disabled={busy}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -155,11 +163,15 @@ export function NewNodePanel({ type, emoji, initialText = "", onTypeChange, onCl
         <button
           type="button"
           className="cursor-pointer rounded-lg border border-accent bg-accent px-[0.9rem] py-[0.4rem] text-[0.82rem] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={busy || !text.trim()}
+          disabled={busy || (!text.trim() && !prompt)}
           onClick={() => void create()}
         >
-          {t.ui.newNode.create}
+          {asGhost || (!text.trim() && prompt) ? t.ui.newNode.createGhost : t.ui.newNode.create}
         </button>
+        <label className="flex cursor-pointer items-center gap-[0.35rem] text-[0.78rem] text-ink-soft" title={t.ui.newNode.ghostHint}>
+          <input type="checkbox" checked={asGhost} disabled={busy} onChange={(e) => setAsGhost(e.target.checked)} />
+          {t.ui.newNode.ghost}
+        </label>
         <button
           type="button"
           className="cursor-pointer rounded-lg border border-line bg-surface px-[0.9rem] py-[0.4rem] text-[0.82rem] font-semibold text-ink hover:bg-surface-2"

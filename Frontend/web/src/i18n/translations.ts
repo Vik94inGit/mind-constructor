@@ -65,10 +65,16 @@ export interface Translation {
       owner: string;
     };
     menu: { summary: string; edit: string; invite: string; delete: string; moveToFolder: string };
+    /** The dashboard's quick note box (dashboard/QuickNote.tsx). */
+    quickNote: { title: string; placeholder: string; save: string; saved: string; open: (mapName: string) => string; error: string; inboxName: string };
     library: {
       newFolder: string;
       search: string;
       noResults: (query: string) => string;
+      /** Search across every map's nodes (dashboard/ThoughtResults.tsx). */
+      thoughts: string;
+      thoughtIn: (mapName: string) => string;
+      thoughtsError: string;
       allMaps: string;
       folderEmpty: string;
       prev: string;
@@ -134,6 +140,7 @@ export interface Translation {
       presentation: string;
       zoomOut: string;
       zoomReset: string;
+      fitMap: string;
       zoomIn: string;
       expandToolbar: string;
       displayMenu: string;
@@ -265,9 +272,13 @@ const en: Translation = {
       owner: "Owner",
     },
     menu: { summary: "Summary", edit: "Edit", invite: "Invite", delete: "Delete", moveToFolder: "Move to folder…" },
+    quickNote: { title: "Quick note", placeholder: "Jot a thought — it goes to your Inbox map…", save: "Save", saved: "Saved.", open: (name) => `Open ${name} →`, error: "Couldn't save the note", inboxName: "Inbox" },
     library: {
       newFolder: "+ New folder",
-      search: "Search maps and folders…",
+      search: "Search maps, folders and thoughts…",
+      thoughts: "Thoughts",
+      thoughtIn: (mapName) => `in “${mapName}”`,
+      thoughtsError: "Searching your thoughts failed",
       noResults: (query) => `Nothing matches "${query}".`,
       allMaps: "All maps",
       folderEmpty: "This folder is empty. Move maps here from their ⋯ menu.",
@@ -336,6 +347,7 @@ const en: Translation = {
       presentation: "Present — step through the map as slides",
       zoomOut: "Zoom out",
       zoomReset: "Reset zoom",
+      fitMap: "Fit the whole map on screen",
       zoomIn: "Zoom in",
       expandToolbar: "Show toolbar",
       displayMenu: "Display options",
@@ -452,9 +464,13 @@ const cs: Translation = {
       owner: "Vlastník",
     },
     menu: { summary: "Přehled", edit: "Upravit", invite: "Pozvat", delete: "Smazat", moveToFolder: "Přesunout do složky…" },
+    quickNote: { title: "Rychlá poznámka", placeholder: "Zapište myšlenku — uloží se do mapy Doručené…", save: "Uložit", saved: "Uloženo.", open: (name) => `Otevřít ${name} →`, error: "Poznámku se nepodařilo uložit", inboxName: "Doručené" },
     library: {
       newFolder: "+ Nová složka",
-      search: "Hledat mapy a složky…",
+      search: "Hledat mapy, složky a myšlenky…",
+      thoughts: "Myšlenky",
+      thoughtIn: (mapName) => `v mapě „${mapName}“`,
+      thoughtsError: "Hledání v myšlenkách se nepodařilo",
       noResults: (query) => `Nic neodpovídá „${query}“.`,
       allMaps: "Všechny mapy",
       folderEmpty: "Složka je prázdná. Mapy sem přesunete z jejich nabídky ⋯.",
@@ -523,6 +539,7 @@ const cs: Translation = {
       presentation: "Prezentovat — projít mapu jako snímky",
       zoomOut: "Oddálit",
       zoomReset: "Obnovit přiblížení",
+      fitMap: "Zobrazit celou mapu",
       zoomIn: "Přiblížit",
       expandToolbar: "Zobrazit panel nástrojů",
       displayMenu: "Možnosti zobrazení",
@@ -639,9 +656,13 @@ const uk: Translation = {
       owner: "Власник",
     },
     menu: { summary: "Підсумок", edit: "Редагувати", invite: "Запросити", delete: "Видалити", moveToFolder: "Перемістити в папку…" },
+    quickNote: { title: "Швидка нотатка", placeholder: "Запишіть думку — вона піде у мапу «Вхідні»…", save: "Зберегти", saved: "Збережено.", open: (name) => `Відкрити ${name} →`, error: "Не вдалося зберегти нотатку", inboxName: "Вхідні" },
     library: {
       newFolder: "+ Нова папка",
-      search: "Пошук карт і папок…",
+      search: "Пошук карт, папок і думок…",
+      thoughts: "Думки",
+      thoughtIn: (mapName) => `у мапі «${mapName}»`,
+      thoughtsError: "Не вдалося знайти думки",
       noResults: (query) => `Нічого не знайдено за «${query}».`,
       allMaps: "Усі карти",
       folderEmpty: "Папка порожня. Переміщуйте сюди карти через їхнє меню ⋯.",
@@ -710,6 +731,7 @@ const uk: Translation = {
       presentation: "Презентація — пройти мапу як слайди",
       zoomOut: "Зменшити",
       zoomReset: "Скинути масштаб",
+      fitMap: "Показати всю мапу",
       zoomIn: "Збільшити",
       expandToolbar: "Показати панель інструментів",
       displayMenu: "Параметри відображення",
@@ -826,9 +848,13 @@ const ru: Translation = {
       owner: "Владелец",
     },
     menu: { summary: "Сводка", edit: "Изменить", invite: "Пригласить", delete: "Удалить", moveToFolder: "Переместить в папку…" },
+    quickNote: { title: "Быстрая заметка", placeholder: "Запишите мысль — она попадёт в карту «Входящие»…", save: "Сохранить", saved: "Сохранено.", open: (name) => `Открыть ${name} →`, error: "Не удалось сохранить заметку", inboxName: "Входящие" },
     library: {
       newFolder: "+ Новая папка",
-      search: "Поиск карт и папок…",
+      search: "Поиск карт, папок и мыслей…",
+      thoughts: "Мысли",
+      thoughtIn: (mapName) => `в карте «${mapName}»`,
+      thoughtsError: "Не удалось найти мысли",
       noResults: (query) => `Ничего не найдено по «${query}».`,
       allMaps: "Все карты",
       folderEmpty: "Папка пуста. Перемещайте сюда карты через их меню ⋯.",
@@ -897,6 +923,7 @@ const ru: Translation = {
       presentation: "Презентация — пройти карту как слайды",
       zoomOut: "Уменьшить",
       zoomReset: "Сбросить масштаб",
+      fitMap: "Показать всю карту",
       zoomIn: "Увеличить",
       expandToolbar: "Показать панель инструментов",
       displayMenu: "Параметры отображения",

@@ -18,10 +18,10 @@ describe("timeLapseOrder", () => {
 });
 
 describe("timeLapseStepMs", () => {
-  it("spreads the replay over about ten seconds, within limits", () => {
-    expect(timeLapseStepMs(40)).toBe(250);
-    expect(timeLapseStepMs(2)).toBe(500);
-    expect(timeLapseStepMs(1000)).toBe(125);
+  it("spreads the replay over about fifteen seconds, within limits", () => {
+    expect(timeLapseStepMs(30)).toBe(500);
+    expect(timeLapseStepMs(2)).toBe(800);
+    expect(timeLapseStepMs(1000)).toBe(350);
   });
 });
 

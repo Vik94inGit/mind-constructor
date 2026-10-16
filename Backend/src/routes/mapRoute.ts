@@ -4,6 +4,7 @@ import {
   createMap,
   inviteUserToMap,
   getAllMaps,
+  searchNodes,
   getMapSummary,
   getNodesByMap,
   getNodesText,
@@ -24,6 +25,8 @@ const router = Router();
 // Protected routes
 router.post("/", protect, createMap);
 router.get("/", protect, getAllMaps);
+// Before "/:mapId", so "search" isn't read as a map id.
+router.get("/search", protect, searchNodes);
 
 router.patch("/:mapId", protect, updateMap);
 router.get("/:mapId", protect, getMapById);

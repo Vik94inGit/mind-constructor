@@ -10,6 +10,7 @@ import {
   socketToken,
 } from "../controllers/authController.js";
 import { protect, requireAdmin } from "../middleware/auth.js";
+import { authLimiter } from "../middleware/rateLimit.js";
 import {
   getAllUsers,
   searchUsers,
@@ -20,10 +21,11 @@ import {
 } from "../controllers/userController.js";
 const router = Router();
 
-router.post("/register", register);
-router.post("/login", login);
-router.post("/google", googleAuth);
-router.post("/demo", demoAuth);
+// Rate-limited per address — see middleware/rateLimit.ts.
+router.post("/register", authLimiter, register);
+router.post("/login", authLimiter, login);
+router.post("/google", authLimiter, googleAuth);
+router.post("/demo", authLimiter, demoAuth);
 router.post("/logout", logout);
 // Who the current session cookie belongs to — see authController.ts's own
 // doc comment on `me`.

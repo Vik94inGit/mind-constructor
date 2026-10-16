@@ -63,7 +63,7 @@ Strict layering, one direction only: **routes → controllers → abl → dao �
   `src/middleware/auth.ts`. No logic here. Mounted in [server.ts](server.ts) as `/api/auth`,
   `/api/nodes`, `/api/edges`, `/api/lines`, `/api/images` (`GET /:imageId`, a stored node picture — see the image store below), `/api/state` (the signed-in user's own state, so they pick up where they left off on any device — `GET /` preferences + last map, `PATCH /preferences`, `GET`/`PATCH /maps/:mapId` their view of a map, `GET`/`PATCH`/`DELETE /drafts/:kind`; see `models/UserState.ts`), `/api/folders` (a user's own dashboard folders — `GET`/`POST /`, `PATCH`/`DELETE /:folderId`, and `PATCH /maps/:mapId` with `{ folderId | null }` to file a map; mounted before the map routes so `folders` isn't read as a mapId), and `/api` (map routes — note the mount point itself has no `/maps`
   segment, so these resolve as `/api/{mapId}/{nodes,edges,lines,circles/select,circles/deselect,
-attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `DELETE /api/nodes` (body: `{ nodeIds }`)
+attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `GET /api/search?q=` (same router, declared before `/:mapId`; `searchNodesAbl` + `searchNodesDao`) searches every node the caller can see across all their maps — text, title, prompt or zone name, case-insensitive substring, newest first, at most 50 — and returns a snippet around the match rather than the full text, with the hidden-branch rule of `getNodesByMapDao`. `DELETE /api/nodes` (body: `{ nodeIds }`)
   is the bulk counterpart of `DELETE /api/nodes/:nodeId` — one request for a multi-select delete
   instead of N parallel single-node ones; same per-node ownership check, silently skipping any id
   the caller doesn't own rather than failing the whole batch. `GET /:mapId/nodes` omits each node's
@@ -108,6 +108,10 @@ Cross-cutting pieces:
 payload)` is the one function controllers call after a mutation commits; it's a no-op if `io`
   was never initialized (true under the test app), so it's safe to call unconditionally.
 - **`src/abl/errors.ts`** — shared `ValidationError` + `parseOrThrow`.
+- **`src/middleware/rateLimit.ts`** + `helmet` in `server.ts` — the sign-in routes (`/register`, `/login`,
+  `/google`, `/demo`) allow `AUTH_MAX_ATTEMPTS` (20) per address per 15 minutes (in-memory store, `429`
+  after); every response carries helmet's security headers, with `Cross-Origin-Resource-Policy:
+  cross-origin` so the frontend's own origin can still load `/api/images`.
 - **`src/abl/authAbl.ts`** `googleAuthAbl` — "Sign in with Google" is one endpoint
   (`POST /api/auth/google`) for both registering and logging in: the frontend hands it a Google ID
   token (never a password), the backend verifies it against `GOOGLE_CLIENT_ID` via
@@ -193,6 +197,11 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `nodeAbl.ts`; an empty string on PATCH clears it). Unlike `text`, it is *not* stripped from
   `GET /:mapId/nodes` — it's small enough to ride along, and it's what lets a frontend caption a node
   without the lazy `text` backfill. The `"demo"` map template seeds a couple of titles.
+- **`Node.prompt` / `Node.ghost`** — a ghost is a node made with empty text (`createNodeAbl` sets
+  `ghost` from the text); the first non-empty `text` on `PATCH` clears it. `prompt` (max 200 chars,
+  `""` = none) is the question a frontend shows as the ghost's placeholder — map templates create
+  ghosts with a prompt and no text or title. Both ride along on `GET /:mapId/nodes` like `title`:
+  the stored flag is what lets a frontend fade a ghost without the lazy `text` backfill.
 - **`Node.zoneName`** — an optional name (max 40 chars, `""` = none) for the zone a circle parent
   radiates. Set via `PATCH /api/nodes/:nodeId` (`zoneNameSchema` in `nodeAbl.ts`; an empty string
   clears it), owner-only like every node edit. A frontend shows it under the parent on the canvas and

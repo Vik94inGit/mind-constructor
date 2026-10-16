@@ -6,6 +6,8 @@ interface Props {
   onZoomOut: () => void;
   onZoomIn: () => void;
   onReset: () => void;
+  /** Brings every node on screen (useCanvasFraming's fitAll). */
+  onFit: () => void;
   /** Whether the minimap sits between this and the view corner's eye button. */
   minimapShown: boolean;
 }
@@ -18,7 +20,7 @@ const stepBtn =
 // (bottom-[56px], ~122px tall with its border): bottom-[194px] clears the
 // minimap, bottom-[56px] just the eye button. Same z-[45] reasoning as the
 // minimap: above the canvas/panel, below a real modal.
-export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset, minimapShown }: Props) {
+export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset, onFit, minimapShown }: Props) {
   const { t } = useI18n();
   return (
     <div className={`absolute ${minimapShown ? "bottom-[194px]" : "bottom-[56px]"} right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card`}>
@@ -36,6 +38,11 @@ export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset, minimapShown 
       </button>
       <button type="button" className={stepBtn} disabled={zoom >= MAX_ZOOM} title={t.map.toolbar.zoomIn} onClick={onZoomIn}>
         +
+      </button>
+      <button type="button" className={stepBtn} title={t.map.toolbar.fitMap} aria-label={t.map.toolbar.fitMap} onClick={onFit}>
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+          <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" />
+        </svg>
       </button>
     </div>
   );

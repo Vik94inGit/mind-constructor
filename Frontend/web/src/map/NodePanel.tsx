@@ -105,7 +105,8 @@ interface Props {
   /** Grows a template branch from this node (see utils/templates.ts). Resolves once every node is created. */
   onApplyTemplate: (kind: TemplateKind) => Promise<void>;
   onClose: () => void;
-  onDeleted: (nodeId: string) => void;
+  /** Deletes the node (MapPage's deleteNodeWithUndo) — false when the person cancelled; throws on failure. */
+  onDelete: (node: NodeDoc) => Promise<boolean>;
   /** Fired after a direct panel-side PATCH (currently just the symbol-override toggle below) with the server's response, so the canvas/other panels stay in sync — same upsert-by-id MapPage already does for every other node update. */
   onUpdated: (node: NodeDoc) => void;
   /** healedParent: set only when this landed as a retaliation — see attackAbl.ts's own healedParent doc comment. null on an ordinary attack. blocked: true when a linked, undefeated protection node stopped this attack outright. protector: that protection node's own updated document (its blockedDamage bumped) when blocked, else null. */
@@ -156,7 +157,7 @@ export function NodePanel({
   isMapOwner,
   onApplyTemplate,
   onClose,
-  onDeleted,
+  onDelete,
   onUpdated,
   onAttacked,
   onDeleteEdge,
@@ -683,16 +684,9 @@ export function NodePanel({
   }
 
   async function handleDelete() {
-    if (!confirm(t.ui.node.deleteConfirm)) return;
     setBusy(true);
     try {
-      const res = await nodesApi.deleteNode(node.nodeId);
-      onDeleted(node.nodeId);
-      // Deleting a protection node with banked damage releases the whole
-      // total onto whatever it was defending in the same breath — see
-      // Backend's deleteNodeDao. Surface that update the same way any
-      // other panel-triggered change does.
-      if (res.damagedProtectedNode) onUpdated(res.damagedProtectedNode);
+      await onDelete(node);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.errors.delete);
     } finally {

@@ -25,8 +25,8 @@ export interface PendingCreate {
   y: number;
   type: NodeType;
   parentId: string | null;
-  /** A ghost template's starter phrase the input opens with. */
-  text?: string;
+  /** A starter phrase picked from the quick-add ring — the new node's prompt (its placeholder), never its text. */
+  prompt?: string;
   /** Picked from the emoji ghost ring (QuickAddGhosts) — optional: writing the text straight away makes the node without one. */
   emoji?: string;
 }
@@ -98,7 +98,8 @@ export function useNodeCreation({
   t,
 }: Params) {
   // Grows a template branch (see utils/templates.ts) from `root`: every node
-  // is a real node with its prompt as title + text, created parents-first so
+  // is a ghost: empty text and no title, only its prompt (shown as the
+  // node's placeholder until someone writes in it), created parents-first so
   // each one can hang from the previous, geometrized in a ring around `root`
   // (layoutTemplate's own "around the king" placement) rather than appearing
   // all at once — each one gets its own celebrate burst (same creation
@@ -121,10 +122,9 @@ export function useNodeCreation({
     const ids = new Map<TemplateNodeKey, string>();
     for (let i = 0; i < placed.length; i++) {
       const p = placed[i];
-      const copy = t.ui.templates.nodes[p.key];
       const node = await nodesApi.createNode(mapId, {
-        text: copy.text,
-        title: copy.title,
+        text: "",
+        prompt: t.ui.templates.nodes[p.key],
         type: p.type,
         order: p.order,
         x: p.x,
@@ -145,12 +145,13 @@ export function useNodeCreation({
   // Fires once the inline pending-node input (see PendingNodeCard) actually
   // confirms with non-empty text — the one place any node-creation path
   // (toolbar, double-click, "Create branch", quick-add) ends up.
-  async function confirmPendingCreate(text: string, type: NodeType, images: string[] = []) {
+  // Empty text with a prompt makes a ghost (see NodeDoc.ghost).
+  async function confirmPendingCreate(text: string, type: NodeType, images: string[] = [], prompt?: string) {
     if (!pendingCreate || !mapId) return;
     const { x, y, parentId, emoji } = pendingCreate;
     setActionError(null);
     try {
-      let node = await nodesApi.createNode(mapId, { text, type, x, y, parentId, ...(emoji ? { emoji } : {}) });
+      let node = await nodesApi.createNode(mapId, { text, type, x, y, parentId, ...(emoji ? { emoji } : {}), ...(prompt ? { prompt } : {}) });
       // Pictures added while writing it (NewNodePanel) go on once it exists.
       if (images.length) node = await nodesApi.updateNode(node.nodeId, { images });
       upsertNode(node);
@@ -249,10 +250,9 @@ export function useNodeCreation({
     const root = MAP_KIND_ROOTS[kind];
     const pos = placeNode(desired, [{ nodeId: NEW_NODE_ID, parentId: null }]);
     try {
-      const copy = t.ui.templates.nodes[root.key];
       const rootNode = await nodesApi.createNode(mapId, {
-        text: copy.text,
-        title: copy.title,
+        text: "",
+        prompt: t.ui.templates.nodes[root.key],
         type: root.type,
         x: pos.x,
         y: pos.y,

@@ -38,6 +38,8 @@ interface Props {
   onSearchMatches: (ids: Set<string> | null) => void;
   onPickSearchResult: (nodeId: string) => void;
   onToggleMapMode: () => void;
+  /** Discussion mode: opens the opponent's turn (see SiegePanel). */
+  onOpponentTurn?: () => void;
   /** Demo sessions only: leave the demo (log out) to log in or register. */
   onExitDemo: () => void;
   onInvite: () => void;
@@ -71,6 +73,7 @@ export function MapToolbar({
   isDemo,
   isOwner,
   isDiscussionMode,
+  onOpponentTurn,
   expanded,
   onExpand,
   moveMode,
@@ -313,6 +316,15 @@ export function MapToolbar({
               a colorful emoji — matches the rest of this cluster's
               monochrome icons. */}
           {isDiscussionMode ? "⚔" : "✎"}
+        </button>
+      )}
+      {/* The opponent's turn: an imitated opponent attacks one of your
+          castles (see SiegePanel). Owner-only for the same reason as the
+          toggle — it attacks with whatever type the strategy calls for,
+          which only the owner may do in battle mode. */}
+      {isOwner && isDiscussionMode && onOpponentTurn && (
+        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.open} onClick={onOpponentTurn}>
+          ♜
         </button>
       )}
       {/* A demo session has no dashboard to go back to (see ProtectedRoute) and

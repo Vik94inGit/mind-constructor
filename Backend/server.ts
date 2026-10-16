@@ -6,6 +6,7 @@ import http from "http";
 import type { Express } from "express";
 import mongoose from "mongoose";
 import cors from "cors";
+import helmet from "helmet";
 import session from "express-session";
 import { RedisStore } from "connect-redis";
 
@@ -57,6 +58,12 @@ app.use((req, res, next) => {
 // (src/realtime/io.ts) stay wide open — fine for local dev.
 const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((o) => o.trim());
 app.use(cors({ origin: allowedOrigins ?? true, credentials: true }));
+
+// Standard security headers (no sniffing, no framing, HSTS, a locked-down
+// CSP — this server only answers JSON and pictures). Cross-origin resource
+// policy is relaxed because the frontend lives on another origin (Vercel)
+// and loads node pictures from /api/images.
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
 // "Are we actually running on a real deploy" — NODE_ENV alone isn't reliable
 // for this: Render (unlike some other platforms) does NOT set NODE_ENV to

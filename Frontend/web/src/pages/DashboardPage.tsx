@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ThoughtResults, useThoughtSearch } from "../dashboard/ThoughtResults";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUserState } from "../context/UserStateContext";
 import * as mapsApi from "../api/maps";
@@ -15,6 +16,7 @@ import { ApiRequestError } from "../api/client";
 import type { FolderDoc, MapDoc } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { ThinkEntry } from "../dashboard/ThinkEntry";
+import { QuickNote } from "../dashboard/QuickNote";
 import { CreateMapModal } from "../dashboard/CreateMapModal";
 import { EditMapModal } from "../dashboard/EditMapModal";
 import { FolderModal, primaryBtn, secondaryBtn } from "../dashboard/FolderModal";
@@ -110,6 +112,7 @@ export function DashboardPage() {
   const openFolder = folders.find((f) => f.folderId === openFolderId) ?? null;
   const items = useMemo(() => libraryItems(maps, folders, openFolderId, query), [maps, folders, openFolderId, query]);
   const paged = paginate(items, page);
+  const thoughtSearch = useThoughtSearch(query);
 
   // "Copy map content": puts every node of the map (with the connections among
   // them) on the app's clipboard — open another map and paste it there.
@@ -241,6 +244,14 @@ export function DashboardPage() {
         </button>
       )}
 
+      <QuickNote
+        maps={maps}
+        autoFocus={searchParams.get("note") === "1"}
+        onSaved={(map, created) => {
+          if (created) setMaps((prev) => [map, ...prev]);
+        }}
+      />
+
       <ThinkEntry />
 
       <div className="mb-4 flex flex-wrap items-center gap-[0.4rem]">
@@ -286,9 +297,11 @@ export function DashboardPage() {
         <div className="mb-4 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">{notice}</div>
       )}
 
+      {query.trim() && <ThoughtResults {...thoughtSearch} />}
+
       {loading ? (
         <div className="p-12 text-center text-ink-soft">{t.dashboard.loading}</div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && query.trim() && thoughtSearch.hits.length > 0 ? null : items.length === 0 ? (
         <div className="rounded-card border border-dashed border-line px-6 py-12 text-center text-ink-soft">
           {query.trim()
             ? t.dashboard.library.noResults(query.trim())
