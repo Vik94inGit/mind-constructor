@@ -42,6 +42,8 @@ interface Props {
   onOpponentTurn?: () => void;
   /** Ending the discussion (see utils/finish.ts): the owner's Finish, or another member's agree toggle. Absent: no button. */
   finish?: { title: string; pressed: boolean; muted: boolean; onClick: () => void };
+  /** Opens the discussion's history of changes (map/HistoryPanel.tsx). */
+  onHistory?: () => void;
   /** Demo sessions only: leave the demo (log out) to log in or register. */
   onExitDemo: () => void;
   onInvite: () => void;
@@ -77,6 +79,7 @@ export function MapToolbar({
   isDiscussionMode,
   onOpponentTurn,
   finish,
+  onHistory,
   expanded,
   onExpand,
   moveMode,
@@ -332,6 +335,11 @@ export function MapToolbar({
       )}
       {/* Finish the discussion (owner) or agree to finish (everyone else) —
           muted while the owner may not finish yet; the press then says why. */}
+      {isDiscussionMode && onHistory && (
+        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.history.open} onClick={onHistory}>
+          ◷
+        </button>
+      )}
       {isDiscussionMode && finish && (
         <button
           type="button"

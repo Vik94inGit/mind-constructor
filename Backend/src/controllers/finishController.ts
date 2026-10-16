@@ -10,12 +10,14 @@ import {
   OwnerCannotAgreeError,
   reopenMapAbl,
 } from "../abl/finishAbl.js";
+import { listMapHistoryAbl, MapNotFoundError as HistoryMapNotFoundError } from "../abl/historyAbl.js";
 import { broadcastToMap } from "../realtime/io.js";
 import { handleAblError, type ErrorMapping } from "./errorHandling.js";
 
 // Finishing a discussion — see abl/finishAbl.ts.
 const MAPPINGS: ErrorMapping[] = [
   [MapNotFoundError, 404, "Map not found"],
+  [HistoryMapNotFoundError, 404, "Map not found"],
   [NotMapOwnerError, 403, "Only the map's owner can finish or reopen the discussion"],
   [OwnerCannotAgreeError, 400, "The owner finishes the discussion; agreeing is for the other members"],
   [FinishNotAllowedError, 409, (e) => ({ error: e.message, reason: "lastWordIsYours" })],
@@ -51,5 +53,12 @@ export const agreeToFinish = handler("agreeToFinish", (mapId, userId, req) => ag
 export const getMapAttacks = handler(
   "getMapAttacks",
   async (mapId, userId) => ({ attacks: await listMapAttacksAbl(mapId, userId) }),
+  false,
+);
+
+// The discussion's change history — see abl/historyAbl.ts.
+export const getMapHistory = handler(
+  "getMapHistory",
+  async (mapId, userId) => ({ revisions: await listMapHistoryAbl(mapId, userId) }),
   false,
 );

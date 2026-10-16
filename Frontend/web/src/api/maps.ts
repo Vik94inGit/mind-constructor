@@ -1,6 +1,6 @@
 import { apiRequest, ApiRequestError } from "./client";
 import * as offline from "../offline/sync";
-import type { MapAttack, MapDoc, MapKind, MapTemplate, NodeType, SelectedCircle } from "../types";
+import type { MapAttack, MapDoc, NodeRevisionDoc, MapKind, MapTemplate, NodeType, SelectedCircle } from "../types";
 
 export type MapFilter = "all" | "owned" | "shared";
 
@@ -237,4 +237,9 @@ export async function agreeToFinish(mapId: string, agree: boolean) {
 /** Every attack on the map, oldest first — the replay's health history. */
 export async function listMapAttacks(mapId: string): Promise<MapAttack[]> {
   return (await apiRequest<{ success: boolean; attacks: MapAttack[] }>(`/api/${mapId}/attacks`)).attacks;
+}
+
+/** The discussion's kept changes, newest first — see map/HistoryPanel.tsx. */
+export async function getMapHistory(mapId: string): Promise<NodeRevisionDoc[]> {
+  return (await apiRequest<{ success: boolean; revisions: NodeRevisionDoc[] }>(`/api/${mapId}/history`)).revisions;
 }

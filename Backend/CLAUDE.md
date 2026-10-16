@@ -82,7 +82,7 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `GET /api/search?q=` 
   calls. Each module defines its own domain-specific error classes (e.g. `MapNotFoundError`,
   `ParentNotOwnedError`) that the matching controller knows how to map to a status code. Modules:
   `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `lineAbl`,
-  `attackAbl`, `attackIndicatorAbl`, `finishAbl`, `circleAbl`, `packAbl`, `imageAbl`.
+  `attackAbl`, `attackIndicatorAbl`, `finishAbl`, `historyAbl`, `circleAbl`, `packAbl`, `imageAbl`.
 - **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`, `imageDao`) — the only layer
   that touches Mongoose models directly.
 - **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Line`, `Attack`, `Image`) — schemas. Each one strips
@@ -241,6 +241,13 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   whether a shield stopped the hit. `GET /api/:mapId/attacks` (`listMapAttacksAbl`) lists every attack on
   the map oldest first (target's public `nodeId`, weapon, damage, blocked, byOpponent, createdAt), with the
   hidden-branch rule for non-owners — what a frontend's replay uses to show health as it was.
+- **Discussion history** (`models/NodeRevision.ts`, `dao/historyDao.ts`, `abl/historyAbl.ts`) — in a discussion
+  (`Map.discussionMode !== false`) every change to a node's `text`, `title` or `type` (`updateNodeAbl` →
+  `recordEditAbl`) and every deletion (`deleteNode`/`deleteManyNodes` → `recordDeletionsAbl`) is appended as a
+  `NodeRevision` (`before`/`after` snapshots; `after: null` for a deletion). Append-only: no endpoint edits or
+  removes one, and a failure to record is logged, never thrown. `GET /api/:mapId/history` lists a map's changes
+  newest first (500 max, `userId` populated to `{ username }`) for any member, hidden branches left out for
+  non-owners. Deleting the map takes its history along (`deleteMapDao`).
 - **`Node.order`** — an optional step number (whole number 1..9999, `null` = none) for describing a
   process by labeling nodes in sequence; a frontend draws it as a small numbered badge on the node.
   Set via `POST`/`PATCH /api/nodes` (`orderSchema` in `nodeAbl.ts`; explicit `null` on PATCH clears

@@ -116,6 +116,7 @@ import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeType } from "../types";
 import { battleTally, finishState, healthAt } from "../utils/finish";
 import { FinishedBanner } from "../map/FinishedBanner";
+import { HistoryPanel } from "../map/HistoryPanel";
 import { mapBackgroundStyle } from "../utils/mapBackground";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
@@ -162,6 +163,8 @@ export function MapPage() {
   const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
   // The opponent's turn (SiegePanel) is open — discussion mode only.
   const [siegeOpen, setSiegeOpen] = useState(false);
+  // The discussion's history of changes (HistoryPanel) is open.
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Every attack on the map, fetched when a replay starts, so the replay can
   // show health as it was at each step (utils/finish.ts healthAt).
   const [replayAttacks, setReplayAttacks] = useState<MapAttack[]>([]);
@@ -2015,8 +2018,14 @@ export function MapPage() {
           ? undefined
           : { title: finishTitle, pressed: !isOwner && iAgreed, muted: isOwner && !finishNow.allowed, onClick: pressFinish }
       }
+      onHistory={() => {
+        setSelectedId(null);
+        setSiegeOpen(false);
+        setHistoryOpen(true);
+      }}
       onOpponentTurn={isFinished ? undefined : () => {
         setSelectedId(null);
+        setHistoryOpen(false);
         setSiegeOpen(true);
       }}
       onExitDemo={exitDemo}
@@ -2558,6 +2567,13 @@ export function MapPage() {
               })
             }
             onExit={() => setTimeLapse(null)}
+          />
+        ) : historyOpen && isDiscussionMode && mapId ? (
+          <HistoryPanel
+            mapId={mapId}
+            liveIds={new Set(nodes.map((n) => n.nodeId))}
+            onShow={centerOnNode}
+            onExit={() => setHistoryOpen(false)}
           />
         ) : siegeOpen && isDiscussionMode && !isFinished ? (
           <SiegePanel

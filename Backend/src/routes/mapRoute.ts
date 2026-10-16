@@ -18,7 +18,7 @@ import {
   deselectMapCircle,
 } from "../controllers/mapController.js";
 import { getLinesByMap } from "../controllers/lineController.js";
-import { agreeToFinish, finishMap, getFinishStatus, getMapAttacks, reopenMap } from "../controllers/finishController.js";
+import { agreeToFinish, finishMap, getFinishStatus, getMapAttacks, getMapHistory, reopenMap } from "../controllers/finishController.js";
 import { protect } from "../middleware/auth.js";
 
 const router = Router();
@@ -49,5 +49,6 @@ router.post("/:mapId/finish", protect, finishMap);
 router.post("/:mapId/finish/agree", protect, agreeToFinish);
 router.post("/:mapId/reopen", protect, reopenMap);
 router.get("/:mapId/attacks", protect, getMapAttacks);
+router.get("/:mapId/history", protect, getMapHistory);
 
 export default router;

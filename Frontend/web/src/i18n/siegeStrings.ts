@@ -37,6 +37,20 @@ export interface SiegeStrings {
     reopen: string;
     opponentMove: string;
   };
+  /** The discussion's kept changes (map/HistoryPanel.tsx). */
+  history: {
+    open: string;
+    title: string;
+    intro: string;
+    empty: string;
+    loading: string;
+    failed: string;
+    edited: string;
+    deleted: string;
+    typeChanged: (from: string, to: string) => string;
+    titleChanged: string;
+    show: string;
+  };
 }
 
 const en: SiegeStrings = {
@@ -81,6 +95,19 @@ const en: SiegeStrings = {
     replay: "Watch the replay",
     reopen: "Reopen",
     opponentMove: "The opponent's move",
+  },
+  history: {
+    open: "History — every change in this discussion",
+    title: "History",
+    intro: "Every edit and deletion in this discussion is kept here for everyone. Nothing can be removed from it.",
+    empty: "No changes yet.",
+    loading: "Loading…",
+    failed: "Couldn't load the history.",
+    edited: "edited",
+    deleted: "deleted",
+    typeChanged: (from, to) => `type: ${from} → ${to}`,
+    titleChanged: "title",
+    show: "Show on the map",
   },
 };
 
@@ -127,6 +154,19 @@ const cs: SiegeStrings = {
     reopen: "Znovu otevřít",
     opponentMove: "Tah protivníka",
   },
+  history: {
+    open: "Historie — každá změna v této diskusi",
+    title: "Historie",
+    intro: "Každá úprava a smazání v této diskusi tu zůstává pro všechny. Nic z ní nejde odstranit.",
+    empty: "Zatím žádné změny.",
+    loading: "Načítání…",
+    failed: "Historii se nepodařilo načíst.",
+    edited: "upravil(a)",
+    deleted: "smazal(a)",
+    typeChanged: (from, to) => `typ: ${from} → ${to}`,
+    titleChanged: "název",
+    show: "Ukázat na mapě",
+  },
 };
 
 const uk: SiegeStrings = {
@@ -172,6 +212,19 @@ const uk: SiegeStrings = {
     reopen: "Відкрити знову",
     opponentMove: "Хід опонента",
   },
+  history: {
+    open: "Історія — кожна зміна в цій дискусії",
+    title: "Історія",
+    intro: "Кожна правка й видалення в цій дискусії лишаються тут для всіх. Звідси нічого не можна прибрати.",
+    empty: "Змін ще немає.",
+    loading: "Завантаження…",
+    failed: "Не вдалося завантажити історію.",
+    edited: "змінив(-ла)",
+    deleted: "видалив(-ла)",
+    typeChanged: (from, to) => `тип: ${from} → ${to}`,
+    titleChanged: "назва",
+    show: "Показати на мапі",
+  },
 };
 
 const ru: SiegeStrings = {
@@ -216,6 +269,19 @@ const ru: SiegeStrings = {
     replay: "Посмотреть запись",
     reopen: "Открыть снова",
     opponentMove: "Ход оппонента",
+  },
+  history: {
+    open: "История — каждое изменение в этой дискуссии",
+    title: "История",
+    intro: "Каждая правка и удаление в этой дискуссии остаются здесь для всех. Отсюда ничего нельзя убрать.",
+    empty: "Изменений пока нет.",
+    loading: "Загрузка…",
+    failed: "Не удалось загрузить историю.",
+    edited: "изменил(а)",
+    deleted: "удалил(а)",
+    typeChanged: (from, to) => `тип: ${from} → ${to}`,
+    titleChanged: "название",
+    show: "Показать на карте",
   },
 };
 

@@ -417,7 +417,8 @@ describe("nodeAbl", () => {
       await updateNodeAbl("node1", "user1", { text: "Updated text" });
 
       expect(updateNodeDao).toHaveBeenCalledWith("node1", "user1", { text: "Updated text", ghost: false });
-      expect(findNodeByPublicIdDao).not.toHaveBeenCalled();
+      // Read once, only for the discussion history (historyAbl.ts) — a text edit is recorded there.
+      expect(findNodeByPublicIdDao).toHaveBeenCalledTimes(1);
     });
 
     // parentId used to be passed straight through unresolved here — a real

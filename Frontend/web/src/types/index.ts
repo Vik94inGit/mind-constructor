@@ -295,6 +295,17 @@ export interface Attack {
   createdAt: string;
 }
 
+/** One kept change in a discussion (GET /api/:mapId/history, Backend's NodeRevision): an edit of what a node says, or its deletion. */
+export interface NodeRevisionDoc {
+  revisionId: string;
+  nodeId: string;
+  userId: { _id: string; username: string } | string;
+  action: "edit" | "delete";
+  before: { text: string; title: string; type: string };
+  after: { text: string; title: string; type: string } | null;
+  createdAt: string;
+}
+
 /** One attack on a map, oldest first (GET /api/:mapId/attacks) — what the replay rebuilds health from. */
 export interface MapAttack {
   targetNodeId: string;

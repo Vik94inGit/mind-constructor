@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 
 import { findNodeDao, deleteNodeDao, deleteManyNodesDao } from "../dao/nodeDao.js";
+import { recordDeletionsAbl } from "../abl/historyAbl.js";
 import { findPublicMapIdsDao } from "../dao/mapsDao.js";
 import { broadcastToMap } from "../realtime/io.js";
 import {
@@ -374,6 +375,7 @@ export const deleteNode = async (
         .json({ success: false, error: "Node not found" });
     }
     const { node, damagedProtectedNode } = result;
+    await recordDeletionsAbl([node], userId);
 
     // Deleting a node also cascades to edges touching it, children's
     // parentId, and weapon nodes aimed at it (see deleteNodeDao) — those
@@ -417,6 +419,7 @@ export const deleteManyNodes = async (req: Request, res: Response) => {
     }
 
     const results = await deleteManyNodesDao(nodeIds, userId);
+    await recordDeletionsAbl(results.map(({ node }) => node), userId);
 
     // deleteManyNodesDao's node docs aren't populated (they're about to be
     // broadcast one at a time, not returned as a batch response), but each

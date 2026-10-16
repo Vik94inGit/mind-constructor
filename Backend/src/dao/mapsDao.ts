@@ -1,3 +1,4 @@
+import { NodeRevision } from "../models/NodeRevision.js";
 import type mongoose from "mongoose";
 import { Map } from "../models/Map.js";
 import { Node, NODE_TYPES, type NodeType } from "../models/Node.js";
@@ -295,6 +296,7 @@ export const deleteMapDao = async (publicMapId: string, userId: string) => {
   await Edge.deleteMany({ mapId: map._id });
   await Line.deleteMany({ mapId: map._id });
   await Node.deleteMany({ mapId: map._id });
+  await NodeRevision.deleteMany({ mapId: map._id });
   await deleteImagesByMapDao(map._id);
   await removeMapFromAllFoldersDao(publicMapId);
   await removeMapViewStatesDao(publicMapId);
