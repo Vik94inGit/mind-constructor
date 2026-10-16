@@ -14,6 +14,8 @@ interface Props {
   isDemo: boolean;
   isOwner: boolean;
   isDiscussionMode: boolean;
+  /** Offline: battle mode is paused and can't be switched (see MapPage). */
+  offline?: boolean;
   /** Show the full cluster; false collapses it to a single "⋮" while a node's quick-add ring is up. */
   expanded: boolean;
   onExpand: () => void;
@@ -77,6 +79,7 @@ export function MapToolbar({
   isDemo,
   isOwner,
   isDiscussionMode,
+  offline,
   onOpponentTurn,
   finish,
   onHistory,
@@ -317,7 +320,14 @@ export function MapToolbar({
         <button
           type="button"
           className={`${iconBtn} ${isDiscussionMode ? idle : pressed}`}
-          title={isDiscussionMode ? t.map.toolbar.discussionTooltip : t.map.toolbar.personalTooltip}
+          title={
+            offline
+              ? t.map.toolbar.discussionOffline
+              : isDiscussionMode
+                ? t.map.toolbar.discussionTooltip
+                : t.map.toolbar.personalTooltip
+          }
+          disabled={offline}
           onClick={onToggleMapMode}
         >
           {/* Plain text-presentation glyphs (no emoji variation selector), not

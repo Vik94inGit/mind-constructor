@@ -137,6 +137,8 @@ export interface Translation {
       moveOff: string;
       discussionTooltip: string;
       personalTooltip: string;
+      /** Battle mode while offline: paused, the toggle can't be used. */
+      discussionOffline: string;
       presentation: string;
       zoomOut: string;
       zoomReset: string;
@@ -344,6 +346,8 @@ const en: Translation = {
         "Battle mode: on — attacks do damage, and members other than the owner are limited in what they can attack with. Click to switch to Creating mode.",
       personalTooltip:
         "Creating mode: on — attacks are decoration only and do no damage; no shields. Click to switch back to Battle mode.",
+      discussionOffline:
+        "Battle mode is off while you're offline: it needs the server and the other members. It comes back once you're online.",
       presentation: "Present — step through the map as slides",
       zoomOut: "Zoom out",
       zoomReset: "Reset zoom",
@@ -536,6 +540,8 @@ const cs: Translation = {
         "Bojový režim: zapnuto — útoky způsobují poškození a členové kromě vlastníka jsou omezeni v tom, čím mohou útočit. Klepnutím přepnete do tvůrčího režimu.",
       personalTooltip:
         "Tvůrčí režim: zapnuto — útoky jsou jen dekorace a nezpůsobují poškození; bez štítů. Klepnutím přepnete zpět do bojového režimu.",
+      discussionOffline:
+        "Bojový režim je bez připojení vypnutý: potřebuje server a ostatní členy. Vrátí se, jakmile budete online.",
       presentation: "Prezentovat — projít mapu jako snímky",
       zoomOut: "Oddálit",
       zoomReset: "Obnovit přiblížení",
@@ -728,6 +734,8 @@ const uk: Translation = {
         "Бойовий режим: увімкнено — атаки завдають шкоди, а учасники, крім власника, обмежені в тому, чим можуть атакувати. Натисніть, щоб перейти в творчий режим.",
       personalTooltip:
         "Творчий режим: увімкнено — атаки лише декорація й не завдають шкоди; без щитів. Натисніть, щоб повернутися в бойовий режим.",
+      discussionOffline:
+        "Бойовий режим вимкнено, поки ви офлайн: йому потрібні сервер та інші учасники. Він повернеться, щойно ви будете онлайн.",
       presentation: "Презентація — пройти мапу як слайди",
       zoomOut: "Зменшити",
       zoomReset: "Скинути масштаб",
@@ -920,6 +928,8 @@ const ru: Translation = {
         "Боевой режим: включён — атаки наносят урон, а участники, кроме владельца, ограничены в том, чем могут атаковать. Нажмите, чтобы переключиться в творческий режим.",
       personalTooltip:
         "Творческий режим: включён — атаки лишь декорация и не наносят урона; без щитов. Нажмите, чтобы вернуться в боевой режим.",
+      discussionOffline:
+        "Боевой режим выключен, пока вы офлайн: ему нужны сервер и другие участники. Он вернётся, как только вы будете онлайн.",
       presentation: "Презентация — пройти карту как слайды",
       zoomOut: "Уменьшить",
       zoomReset: "Сбросить масштаб",
