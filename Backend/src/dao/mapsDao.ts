@@ -420,3 +420,15 @@ export const searchNodesDao = async (userId: string, pattern: RegExp, limit: num
     };
   });
 };
+
+// ========== FINISHING A DISCUSSION (see abl/finishAbl.ts) ==========
+// null reopens it, and forgets who agreed to end it.
+export const setMapFinishedDao = async (mapInternalId: unknown, finishedAt: Date | null) => {
+  const update = finishedAt ? { $set: { finishedAt } } : { $set: { finishedAt: null, finishAgreedBy: [] } };
+  return await Map.findByIdAndUpdate(mapInternalId, update, { new: true });
+};
+
+export const setFinishAgreementDao = async (mapInternalId: unknown, userId: string, agree: boolean) => {
+  const update = agree ? { $addToSet: { finishAgreedBy: userId } } : { $pull: { finishAgreedBy: userId } };
+  return await Map.findByIdAndUpdate(mapInternalId, update, { new: true });
+};

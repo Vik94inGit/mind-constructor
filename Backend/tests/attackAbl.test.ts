@@ -17,7 +17,7 @@ import {
   AttackTypeNotAllowedError,
   allowedAttackTypes,
 } from "../src/abl/attackAbl.js";
-import { ValidationError } from "../src/abl/errors.js";
+import { MapFinishedError, ValidationError } from "../src/abl/errors.js";
 import { getHiddenNodesDao } from "../src/dao/visibilityDao.js";
 
 // An attack always carries the attacker's real objection now — every
@@ -212,7 +212,7 @@ describe("attackAbl", () => {
 
       expect(applyDamageDao).toHaveBeenCalledWith("n1", 90, false);
       expect(logAttackDao).toHaveBeenCalledWith({
-        mapId: "m1", targetNodeId: "n1", attackerId: "attacker1", weapon: "nitpick", damage: 10,
+        mapId: "m1", targetNodeId: "n1", attackerId: "attacker1", weapon: "nitpick", damage: 10, blocked: false, byOpponent: false,
       });
       expect(createWeaponNodeMutationDao).toHaveBeenCalledWith("m1", {
         targetNodeId: "n1",
@@ -220,6 +220,7 @@ describe("attackAbl", () => {
         type: "Problem",
         text: "This has a real issue",
         userId: "attacker1",
+        byOpponent: false,
       });
       expect(result).toEqual({
         node: { _id: "n1", health: 90, defeated: false },
@@ -409,11 +410,55 @@ describe("attackAbl", () => {
         type: "Problem",
         text: "This has a real issue",
         userId: "owner1",
+        byOpponent: false,
       });
       // The immediate, one-time heal-on-create — on top of, not instead of,
       // the ongoing block-and-bank-damage behavior tested above.
       expect(healNodeDao).toHaveBeenCalledWith("n1", 15);
       expect(result).toEqual({ protectionNode: { nodeId: "p1" }, healedNode: { _id: "n1", health: 100 } });
+    });
+  });
+
+  describe("the imitated opponent and finished discussions", () => {
+    it("marks an owner's move as the opponent's, and logs it", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "victim1", defeated: false, health: 100,
+      } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
+      vi.mocked(findActiveProtectorDao).mockResolvedValue(null as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "n1", health: 90 } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
+
+      await attackNodeAbl("node1", "attacker1", "nitpick", { ...validContent, byOpponent: true });
+
+      expect(logAttackDao).toHaveBeenCalledWith(expect.objectContaining({ byOpponent: true }));
+      expect(createWeaponNodeMutationDao).toHaveBeenCalledWith("m1", expect.objectContaining({ byOpponent: true }));
+    });
+
+    it("ignores the opponent flag from anyone but the owner", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 100,
+      } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue(normalMap as never);
+      vi.mocked(findActiveProtectorDao).mockResolvedValue(null as never);
+      vi.mocked(applyDamageDao).mockResolvedValue({ _id: "n1", health: 90 } as never);
+      vi.mocked(createWeaponNodeMutationDao).mockResolvedValue({ nodeId: "w1" } as never);
+
+      await attackNodeAbl("node1", "victim1", "nitpick", { ...validContent, byOpponent: true });
+
+      expect(createWeaponNodeMutationDao).toHaveBeenCalledWith("m1", expect.objectContaining({ byOpponent: false }));
+    });
+
+    it("refuses attacks and shields on a finished discussion", async () => {
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValue({
+        _id: "n1", mapId: "m1", userId: "attacker1", defeated: false, health: 100,
+      } as never);
+      vi.mocked(getMapByInternalIdDao).mockResolvedValue({ ...normalMap, finishedAt: new Date() } as never);
+
+      await expect(attackNodeAbl("node1", "attacker1", "nitpick", validContent)).rejects.toThrow(MapFinishedError);
+      await expect(protectNodeAbl("node1", "attacker1", validContent)).rejects.toThrow(MapFinishedError);
+      expect(createWeaponNodeMutationDao).not.toHaveBeenCalled();
+      expect(createProtectionNodeMutationDao).not.toHaveBeenCalled();
     });
   });
 

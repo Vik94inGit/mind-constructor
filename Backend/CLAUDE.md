@@ -82,7 +82,7 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `GET /api/search?q=` 
   calls. Each module defines its own domain-specific error classes (e.g. `MapNotFoundError`,
   `ParentNotOwnedError`) that the matching controller knows how to map to a status code. Modules:
   `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `lineAbl`,
-  `attackAbl`, `attackIndicatorAbl`, `circleAbl`, `packAbl`, `imageAbl`.
+  `attackAbl`, `attackIndicatorAbl`, `finishAbl`, `circleAbl`, `packAbl`, `imageAbl`.
 - **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`, `imageDao`) — the only layer
   that touches Mongoose models directly.
 - **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Line`, `Attack`, `Image`) — schemas. Each one strips
@@ -226,6 +226,21 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
 - **`Map.background`** — the canvas behind the nodes: `dots | plain | lined | dark` (`MAP_BACKGROUNDS`),
   `null` = the default dot grid. Owner-only, through the same `PATCH /api/:mapId` (`map:updated` reaches
   every member).
+- **Finishing a discussion** (`abl/finishAbl.ts`, `finishController.ts`; `Map.finishedAt`, `Map.finishAgreedBy`) —
+  only the map's owner may finish (`POST /api/:mapId/finish`), and only fairly (`finishRule`): the newest
+  node on the map is another member's or an imitated-opponent move (`Node.byOpponent`), or every other
+  member agreed (`POST /api/:mapId/finish/agree`, body `{ agree }`, non-owners only), or nobody else is on
+  the map and the owner never played the opponent, or the map is empty. Otherwise
+  `FinishNotAllowedError` → 409. `GET /api/:mapId/finish` reports `{ finishedAt, agreedBy, allowed, reason,
+  waitingFor }`; `POST /api/:mapId/reopen` (owner) clears both fields. Finish/agree/reopen broadcast
+  `map:updated`. A finished map refuses new nodes, attacks and shields (`MapFinishedError` from
+  `abl/errors.ts` → 409 `{ finished: true }`); edits and deletes are not frozen.
+- **The imitated opponent** (`Node.byOpponent`, `Attack.byOpponent`) — the map's owner may play the other
+  side alone: `attackNodeAbl` / `protectNodeAbl` take `byOpponent: true` in their content, honoured for the
+  owner only, and stamp it on the weapon/protection node and the `Attack` record. `Attack.blocked` records
+  whether a shield stopped the hit. `GET /api/:mapId/attacks` (`listMapAttacksAbl`) lists every attack on
+  the map oldest first (target's public `nodeId`, weapon, damage, blocked, byOpponent, createdAt), with the
+  hidden-branch rule for non-owners — what a frontend's replay uses to show health as it was.
 - **`Node.order`** — an optional step number (whole number 1..9999, `null` = none) for describing a
   process by labeling nodes in sequence; a frontend draws it as a small numbered badge on the node.
   Set via `POST`/`PATCH /api/nodes` (`orderSchema` in `nodeAbl.ts`; explicit `null` on PATCH clears

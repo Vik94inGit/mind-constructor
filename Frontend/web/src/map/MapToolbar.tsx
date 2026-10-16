@@ -40,6 +40,8 @@ interface Props {
   onToggleMapMode: () => void;
   /** Discussion mode: opens the opponent's turn (see SiegePanel). */
   onOpponentTurn?: () => void;
+  /** Ending the discussion (see utils/finish.ts): the owner's Finish, or another member's agree toggle. Absent: no button. */
+  finish?: { title: string; pressed: boolean; muted: boolean; onClick: () => void };
   /** Demo sessions only: leave the demo (log out) to log in or register. */
   onExitDemo: () => void;
   onInvite: () => void;
@@ -74,6 +76,7 @@ export function MapToolbar({
   isOwner,
   isDiscussionMode,
   onOpponentTurn,
+  finish,
   expanded,
   onExpand,
   moveMode,
@@ -325,6 +328,19 @@ export function MapToolbar({
       {isOwner && isDiscussionMode && onOpponentTurn && (
         <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.open} onClick={onOpponentTurn}>
           ♜
+        </button>
+      )}
+      {/* Finish the discussion (owner) or agree to finish (everyone else) —
+          muted while the owner may not finish yet; the press then says why. */}
+      {isDiscussionMode && finish && (
+        <button
+          type="button"
+          className={`${iconBtn} ${finish.pressed ? pressed : idle} ${finish.muted ? "opacity-50" : ""}`}
+          title={finish.title}
+          aria-pressed={finish.pressed}
+          onClick={finish.onClick}
+        >
+          ⚐
         </button>
       )}
       {/* A demo session has no dashboard to go back to (see ProtectedRoute) and

@@ -17,7 +17,7 @@ import {
 import { getMapByInternalIdDao, isMapMemberDao } from "../dao/mapsDao.js";
 import { applyDamageDao, logAttackDao, healNodeDao, getAttackHistoryByNodeDao } from "../dao/attackDao.js";
 import { getHiddenNodesDao } from "../dao/visibilityDao.js";
-import { parseOrThrow } from "./errors.js";
+import { MapFinishedError, parseOrThrow } from "./errors.js";
 
 // Combat has two modes, set per map (Map.discussionMode):
 //
@@ -86,6 +86,9 @@ const attackContentSchema = z.object({
     error: () => `type is required and must be one of: ${ATTACK_TYPES_WITH_QUESTION.join(", ")}`,
   }),
   text: z.string().min(1, "text is required"),
+  // The imitated opponent's move (Node.byOpponent) — honoured for the map's
+  // owner only, who is the one playing the opponent.
+  byOpponent: z.boolean().optional(),
 });
 
 const protectContentSchema = z.object({
@@ -93,6 +96,7 @@ const protectContentSchema = z.object({
     error: () => `type is required and must be one of: ${ATTACK_NODE_TYPES.join(", ")}`,
   }),
   text: z.string().min(1, "text is required"),
+  byOpponent: z.boolean().optional(),
 });
 
 // Which visual icon each combat weapon spawns as a weapon-node. Defined
@@ -113,7 +117,7 @@ export const attackNodeAbl = async (
 ) => {
   // Validated before anything touches the database, same as every other
   // ABL — a malformed attack shouldn't cost a lookup, let alone damage.
-  const { type, text } = parseOrThrow(attackContentSchema, content);
+  const { type, text, byOpponent: askedByOpponent } = parseOrThrow(attackContentSchema, content);
 
   const node = await findNodeByPublicIdDao(publicNodeId);
   if (!node) return null;
@@ -124,8 +128,10 @@ export const attackNodeAbl = async (
   if (!map) return null;
   const isMember = map.members.some((m) => m.toString() === attackerId.toString());
   if (!isMember) return null;
+  if (map.finishedAt) throw new MapFinishedError();
 
   const isMapOwner = map.ownerId.toString() === attackerId.toString();
+  const byOpponent = !!askedByOpponent && isMapOwner;
   // A branch the owner has hidden from invited members can't be attacked by them.
   if (!isMapOwner && (await getHiddenNodesDao(node.mapId)).ids.has(node._id.toString())) return null;
 
@@ -178,6 +184,8 @@ export const attackNodeAbl = async (
     attackerId,
     weapon,
     damage: noDamage ? 0 : weaponDef.damage,
+    blocked,
+    byOpponent,
   });
 
   // Every landed attack spawns its own weapon node pointing at the target
@@ -192,6 +200,7 @@ export const attackNodeAbl = async (
     type,
     text,
     userId: attackerId,
+    byOpponent,
   });
 
   // Only set on a landed retaliation (see healParentId above) — a node
@@ -222,18 +231,22 @@ export const protectNodeAbl = async (
   protectorId: string,
   content: unknown,
 ) => {
-  const { type, text } = parseOrThrow(protectContentSchema, content);
+  const { type, text, byOpponent: askedByOpponent } = parseOrThrow(protectContentSchema, content);
 
   const node = await findNodeByPublicIdDao(publicNodeId);
   if (!node) return null;
 
   if (node.userId.toString() !== protectorId.toString()) throw new NotNodeOwnerError();
+  const map = await getMapByInternalIdDao(node.mapId);
+  if (map?.finishedAt) throw new MapFinishedError();
+  const byOpponent = !!askedByOpponent && !!map && map.ownerId.toString() === protectorId.toString();
 
   const protectionNode = await createProtectionNodeMutationDao(node.mapId, {
     protectsNodeId: node._id,
     type,
     text,
     userId: protectorId,
+    byOpponent,
   });
 
   // Immediate, one-time reward for adding a shield — capped at 100, same

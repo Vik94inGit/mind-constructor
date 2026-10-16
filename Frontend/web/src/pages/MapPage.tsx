@@ -113,7 +113,9 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, MapBackground, NodeDoc, NodeType } from "../types";
+import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeType } from "../types";
+import { battleTally, finishState, healthAt } from "../utils/finish";
+import { FinishedBanner } from "../map/FinishedBanner";
 import { mapBackgroundStyle } from "../utils/mapBackground";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
@@ -160,6 +162,11 @@ export function MapPage() {
   const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
   // The opponent's turn (SiegePanel) is open — discussion mode only.
   const [siegeOpen, setSiegeOpen] = useState(false);
+  // Every attack on the map, fetched when a replay starts, so the replay can
+  // show health as it was at each step (utils/finish.ts healthAt).
+  const [replayAttacks, setReplayAttacks] = useState<MapAttack[]>([]);
+  // A finish / agree / reopen request is on its way.
+  const [finishBusy, setFinishBusy] = useState(false);
   const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
   // Off by default: a bare tap/click on a node only ever selects it while
   // this is false — onNodePointerDown's own single-node drag setup is
@@ -386,12 +393,17 @@ export function MapPage() {
   const visibleNodes = useMemo(() => {
     if (timeLapseStep !== null) {
       const shown = new Set(timeLapseNodes.slice(0, timeLapseStep).map((n) => n.nodeId));
-      return unpackedNodes.filter((n) => shown.has(n.nodeId));
+      // The fight as it was at the newest node on screen, not as it ended.
+      return healthAt(
+        unpackedNodes.filter((n) => shown.has(n.nodeId)),
+        replayAttacks,
+        timeLapseNodes[timeLapseStep - 1]?.createdAt,
+      );
     }
     return activeLevel === null
       ? unpackedNodes
       : unpackedNodes.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel));
-  }, [unpackedNodes, depthByNode, activeLevel, selectedId, timeLapseNodes, timeLapseStep]);
+  }, [unpackedNodes, depthByNode, activeLevel, selectedId, timeLapseNodes, timeLapseStep, replayAttacks]);
   // A node drawn as a puzzle card sits at its own card spot, apart from the
   // icon's — see utils/cardSpace.ts. Worked out from the same display choices
   // modeOf reads below, with zones taken by membership alone (their outline
@@ -1225,6 +1237,15 @@ export function MapPage() {
     setMultiSelectIds(new Set());
     setPictureView(null);
     setTimeLapse({ step: 0, playing: true });
+    setSiegeOpen(false);
+    // In a discussion the replay also shows the fight: who was hit, and when.
+    setReplayAttacks([]);
+    if (mapId && map?.discussionMode !== false) {
+      mapsApi
+        .listMapAttacks(mapId)
+        .then(setReplayAttacks)
+        .catch(() => setReplayAttacks([]));
+    }
     // Close enough to read: the camera then follows each node as it appears.
     if (Math.abs(zoom - 1) > 0.005) zoomFromCenter(0, 1);
   }
@@ -1843,6 +1864,54 @@ export function MapPage() {
     }
   }
 
+  // Ending the discussion (utils/finish.ts): the owner finishes, but only
+  // once the opponent had the last word or everyone else agreed; the other
+  // members agree (or take it back). A finished map takes no new points until
+  // the owner reopens it.
+  const isFinished = !!map.finishedAt;
+  const finishNow = finishState(map, nodes);
+  const memberName = (id: string) =>
+    (map.members ?? []).find((m): m is { _id: string; username: string } => typeof m !== "string" && m._id === id)?.username ?? "?";
+  const iAgreed = !!user && (map.finishAgreedBy ?? []).includes(user._id);
+  const fs = t.ui.siege.finish;
+  const finishTitle = isOwner
+    ? finishNow.allowed
+      ? fs.button
+      : [fs.button, fs.notYet, finishNow.others.length ? fs.waiting(finishNow.waitingFor.map(memberName).join(", ")) : ""]
+          .filter(Boolean)
+          .join("\n")
+    : `${iAgreed ? fs.agreed : fs.agree}\n${fs.agreedCount((map.finishAgreedBy ?? []).length, finishNow.others.length)}`;
+  async function runFinish(request: () => Promise<typeof map>) {
+    if (!mapId) return;
+    setActionError(null);
+    setFinishBusy(true);
+    try {
+      setMap(await request());
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
+    } finally {
+      setFinishBusy(false);
+    }
+  }
+  function pressFinish() {
+    if (!mapId || finishBusy) return;
+    if (!isOwner) {
+      void runFinish(() => mapsApi.agreeToFinish(mapId, !iAgreed));
+      return;
+    }
+    if (!finishNow.allowed) {
+      setActionError(
+        [fs.notYet, finishNow.others.length ? fs.waiting(finishNow.waitingFor.map(memberName).join(", ")) : ""]
+          .filter(Boolean)
+          .join(" "),
+      );
+      return;
+    }
+    if (!confirm(fs.confirm)) return;
+    setSiegeOpen(false);
+    void runFinish(() => mapsApi.finishMap(mapId));
+  }
+
   // The map's canvas (Map.background), owner-only like the mode above. Shown
   // straight away, put back if the save fails; map:updated brings it to
   // everyone else on the map.
@@ -1941,7 +2010,12 @@ export function MapPage() {
         centerOnNode(id);
       }}
       onToggleMapMode={toggleMapMode}
-      onOpponentTurn={() => {
+      finish={
+        isFinished || (!isOwner && finishNow.others.length === 0)
+          ? undefined
+          : { title: finishTitle, pressed: !isOwner && iAgreed, muted: isOwner && !finishNow.allowed, onClick: pressFinish }
+      }
+      onOpponentTurn={isFinished ? undefined : () => {
         setSelectedId(null);
         setSiegeOpen(true);
       }}
@@ -1964,6 +2038,14 @@ export function MapPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       {notice && <MapBanner tone="success" message={notice} onDismiss={dismissNotice} />}
       {actionError && <MapBanner tone="danger" message={actionError} onDismiss={() => setActionError(null)} />}
+      {isFinished && !timeLapse && (
+        <FinishedBanner
+          {...battleTally(nodes)}
+          onReplay={startTimeLapse}
+          onReopen={isOwner && mapId ? () => void runFinish(() => mapsApi.reopenMap(mapId)) : undefined}
+          busy={finishBusy}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1">
         {desktopLayout && !presenting && renderToolbar(true)}
@@ -2476,7 +2558,7 @@ export function MapPage() {
             }
             onExit={() => setTimeLapse(null)}
           />
-        ) : siegeOpen && isDiscussionMode ? (
+        ) : siegeOpen && isDiscussionMode && !isFinished ? (
           <SiegePanel
             holds={holds}
             nodes={nodes}

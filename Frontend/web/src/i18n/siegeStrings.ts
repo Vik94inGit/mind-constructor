@@ -22,6 +22,21 @@ export interface SiegeStrings {
   done: (strategy: string, target: string) => string;
   noHolds: string;
   moves: Record<Strategy, (name: string) => string>;
+  /** Ending the discussion (map/FinishControls.tsx, utils/finish.ts). */
+  finish: {
+    button: string;
+    confirm: string;
+    notYet: string;
+    waiting: (names: string) => string;
+    agree: string;
+    agreed: string;
+    agreedCount: (agreed: number, total: number) => string;
+    finished: (standing: number, fallen: number) => string;
+    closed: string;
+    replay: string;
+    reopen: string;
+    opponentMove: string;
+  };
 }
 
 const en: SiegeStrings = {
@@ -52,6 +67,20 @@ const en: SiegeStrings = {
     assault: (name) => `"${name}" is where the whole plan breaks.`,
     sally: (name) => `This objection doesn't hold: "${name}"`,
     fortify: (name) => `We hold "${name}".`,
+  },
+  finish: {
+    button: "Finish the discussion",
+    confirm: "Finish this discussion? New points close until you reopen it.",
+    notYet: "Your point was the last one. Let the opponent answer first, or finish once everyone agrees.",
+    waiting: (names) => `Still waiting for: ${names}`,
+    agree: "Agree to finish the discussion",
+    agreed: "You agreed to finish. Press again to take it back.",
+    agreedCount: (agreed, total) => `${agreed} of ${total} agreed to finish`,
+    finished: (standing, fallen) => `The discussion is finished: ${standing} standing, ${fallen} fallen.`,
+    closed: "New points are closed until the owner reopens it.",
+    replay: "Watch the replay",
+    reopen: "Reopen",
+    opponentMove: "The opponent's move",
   },
 };
 
@@ -84,6 +113,20 @@ const cs: SiegeStrings = {
     sally: (name) => `Tato námitka neobstojí: „${name}“`,
     fortify: (name) => `Držíme „${name}“.`,
   },
+  finish: {
+    button: "Ukončit diskusi",
+    confirm: "Ukončit tuto diskusi? Nové body se uzavřou, dokud ji znovu neotevřete.",
+    notYet: "Poslední slovo bylo vaše. Nechte nejdřív odpovědět protivníka, nebo ukončete, až budou všichni souhlasit.",
+    waiting: (names) => `Ještě se čeká na: ${names}`,
+    agree: "Souhlasit s ukončením diskuse",
+    agreed: "Souhlasili jste s ukončením. Dalším stiskem souhlas vezmete zpět.",
+    agreedCount: (agreed, total) => `S ukončením souhlasí ${agreed} z ${total}`,
+    finished: (standing, fallen) => `Diskuse je ukončena: ${standing} obstálo, ${fallen} padlo.`,
+    closed: "Nové body jsou uzavřené, dokud ji vlastník znovu neotevře.",
+    replay: "Přehrát záznam",
+    reopen: "Znovu otevřít",
+    opponentMove: "Tah protivníka",
+  },
 };
 
 const uk: SiegeStrings = {
@@ -115,6 +158,20 @@ const uk: SiegeStrings = {
     sally: (name) => `Це заперечення не тримається: «${name}»`,
     fortify: (name) => `Ми тримаємо «${name}».`,
   },
+  finish: {
+    button: "Завершити дискусію",
+    confirm: "Завершити цю дискусію? Нові пункти буде закрито, доки ви її не відкриєте знову.",
+    notYet: "Останнє слово було вашим. Дайте опоненту відповісти, або завершіть, коли всі погодяться.",
+    waiting: (names) => `Ще чекаємо на: ${names}`,
+    agree: "Погодитися завершити дискусію",
+    agreed: "Ви погодилися завершити. Натисніть ще раз, щоб відкликати згоду.",
+    agreedCount: (agreed, total) => `${agreed} з ${total} погодилися завершити`,
+    finished: (standing, fallen) => `Дискусію завершено: вистояло ${standing}, впало ${fallen}.`,
+    closed: "Нові пункти закрито, доки власник не відкриє дискусію знову.",
+    replay: "Переглянути запис",
+    reopen: "Відкрити знову",
+    opponentMove: "Хід опонента",
+  },
 };
 
 const ru: SiegeStrings = {
@@ -145,6 +202,20 @@ const ru: SiegeStrings = {
     assault: (name) => `«${name}» — именно здесь весь план ломается.`,
     sally: (name) => `Это возражение не держится: «${name}»`,
     fortify: (name) => `Мы держим «${name}».`,
+  },
+  finish: {
+    button: "Завершить дискуссию",
+    confirm: "Завершить эту дискуссию? Новые пункты будут закрыты, пока вы её не откроете снова.",
+    notYet: "Последнее слово было вашим. Дайте оппоненту ответить или завершите, когда все согласятся.",
+    waiting: (names) => `Ещё ждём: ${names}`,
+    agree: "Согласиться завершить дискуссию",
+    agreed: "Вы согласились завершить. Нажмите ещё раз, чтобы отозвать согласие.",
+    agreedCount: (agreed, total) => `${agreed} из ${total} согласились завершить`,
+    finished: (standing, fallen) => `Дискуссия завершена: устояло ${standing}, пало ${fallen}.`,
+    closed: "Новые пункты закрыты, пока владелец не откроет дискуссию снова.",
+    replay: "Посмотреть запись",
+    reopen: "Открыть снова",
+    opponentMove: "Ход оппонента",
   },
 };
 

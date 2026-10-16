@@ -1,6 +1,6 @@
 import { apiRequest, ApiRequestError } from "./client";
 import * as offline from "../offline/sync";
-import type { MapDoc, MapKind, MapTemplate, NodeType, SelectedCircle } from "../types";
+import type { MapAttack, MapDoc, MapKind, MapTemplate, NodeType, SelectedCircle } from "../types";
 
 export type MapFilter = "all" | "owned" | "shared";
 
@@ -215,4 +215,26 @@ export async function getNodesText(mapId: string, nodeIds: string[]): Promise<Re
     if (err instanceof ApiRequestError && err.status === 0) return keptText();
     throw err;
   }
+}
+
+// Ending a discussion (see utils/finish.ts and Backend's finishAbl.ts). Only
+// the owner finishes or reopens; the other members agree. Each answers with
+// the updated map, which map:updated also brings to everyone else.
+export async function finishMap(mapId: string) {
+  return (await apiRequest<{ success: boolean; map: MapDoc }>(`/api/${mapId}/finish`, { method: "POST" })).map;
+}
+
+export async function reopenMap(mapId: string) {
+  return (await apiRequest<{ success: boolean; map: MapDoc }>(`/api/${mapId}/reopen`, { method: "POST" })).map;
+}
+
+export async function agreeToFinish(mapId: string, agree: boolean) {
+  return (
+    await apiRequest<{ success: boolean; map: MapDoc }>(`/api/${mapId}/finish/agree`, { method: "POST", body: { agree } })
+  ).map;
+}
+
+/** Every attack on the map, oldest first — the replay's health history. */
+export async function listMapAttacks(mapId: string): Promise<MapAttack[]> {
+  return (await apiRequest<{ success: boolean; attacks: MapAttack[] }>(`/api/${mapId}/attacks`)).attacks;
 }

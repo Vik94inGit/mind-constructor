@@ -140,7 +140,7 @@ export async function deleteManyNodes(nodeIds: string[]) {
 export async function attackNode(
   nodeId: string,
   weapon: Weapon,
-  content: { type: NodeType; text: string },
+  content: { type: NodeType; text: string; byOpponent?: boolean },
 ) {
   // healedParent: set only when this landed as a retaliation (attacking
   // the weapon node that hit your own node) — see Backend's attackAbl.ts.
@@ -158,7 +158,7 @@ export async function attackNode(
     protector: NodeDoc | null;
   }>(`/api/nodes/${nodeId}/attack`, {
     method: "POST",
-    body: { weapon, type: content.type, text: content.text },
+    body: { weapon, type: content.type, text: content.text, byOpponent: content.byOpponent },
   });
 }
 
@@ -173,13 +173,13 @@ export async function getAttackHistory(nodeId: string): Promise<Attack[]> {
 // of (not instead of) its ongoing block-and-bank-damage behavior.
 export async function protectNode(
   nodeId: string,
-  content: { type: AttackNodeType; text: string },
+  content: { type: AttackNodeType; text: string; byOpponent?: boolean },
 ) {
   return apiRequest<{ success: boolean; protectionNode: NodeDoc; healedNode: NodeDoc }>(
     `/api/nodes/${nodeId}/protect`,
     {
       method: "POST",
-      body: { type: content.type, text: content.text },
+      body: { type: content.type, text: content.text, byOpponent: content.byOpponent },
     },
   );
 }

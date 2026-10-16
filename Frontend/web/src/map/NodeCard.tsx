@@ -756,6 +756,17 @@ export const NodeCard = memo(function NodeCard({
             protection node would be redundant clutter, since the node
             itself already sits right on the attack's own arrow path (see
             MapPage's positions memo). */}
+        {/* The imitated opponent's move (the opponent's turn, SiegePanel) —
+            a small flag on the top edge (every corner is taken) so the two
+            sides read apart. */}
+        {node.byOpponent && (
+          <div
+            className="absolute -top-2.5 left-1/2 z-[6] flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] text-white"
+            title={t.ui.siege.finish.opponentMove}
+          >
+            ⚑
+          </div>
+        )}
         {node.isProtection && (
           <div className="absolute -bottom-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-surface text-[0.7rem]">
             🛡️

@@ -157,6 +157,11 @@ export const NodeSchema = new mongoose.Schema(
     // counts like any other node; isWeapon is just how a frontend (or you)
     // tells them apart from user-authored ones.
     isWeapon: { type: Boolean, default: false },
+    // A weapon or protection node placed by the imitated opponent (the map
+    // owner's "Opponent's turn") rather than by its account's own person —
+    // so the map and its replay can tell the two sides apart, and so the
+    // opponent's move counts as the opponent's last word (abl/finishAbl.ts).
+    byOpponent: { type: Boolean, default: false },
     weaponIcon: { type: String, enum: WEAPON_ICONS }, // only set when isWeapon is true
     targetNodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", default: null }, // which node this weapon points at
 

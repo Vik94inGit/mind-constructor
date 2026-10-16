@@ -9,7 +9,7 @@ import {
   findNodeByPublicIdDao,
   setBranchHiddenMutationDao,
 } from "../dao/nodeDao.js";
-import { parseOrThrow, ValidationError } from "./errors.js";
+import { MapFinishedError, parseOrThrow, ValidationError } from "./errors.js";
 import { IMAGE_URL_PREFIX } from "../models/Image.js";
 import { createImageDao, findNodeImageIdsDao, deleteNodeImagesExceptDao } from "../dao/imageDao.js";
 
@@ -182,6 +182,7 @@ export const createNodeAbl = async (
 
   const map = await getMapByIdDao(publicMapId, userId);
   if (!map) throw new MapNotFoundError();
+  if (map.finishedAt) throw new MapFinishedError();
 
   // parentId arrives as a public nodeId (nanoid) — the schema stores an
   // internal ObjectId ref, so it has to be resolved the same way edgeAbl
