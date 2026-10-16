@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   avoidOverlap,
   realmMembers,
+  selfIntersects,
   realmOutline,
   CAPTION_WIDTH,
   computeDominantSentiment,
@@ -305,5 +306,25 @@ describe("realmOutline / realmMembers", () => {
       const nearest = Math.min(...outline.map((o) => Math.hypot(o.x - p.x, o.y - p.y)));
       expect(nearest).toBeGreaterThanOrEqual(49);
     }
+  });
+});
+
+describe("computeNodeGroups — sticky corners", () => {
+  const n = (nodeId: string, parentId: string | null) =>
+    ({ nodeId, parentId, text: "", type: "Option", x: 0, y: 0, health: 100, defeated: false, userId: "u" }) as NodeDoc;
+  const nodes = [n("r", null), n("a", "r"), n("b", "r"), n("c", "r")];
+
+  it("keeps the corner order when one node moves, so only its corner moves", () => {
+    const cache = new Map<string, string[]>();
+    const at = (pos: Record<string, [number, number]>) => new Map(Object.entries(pos).map(([k, [x, y]]) => [k, { x, y }]));
+    const first = computeNodeGroups(nodes, nodes, at({ r: [0, 0], a: [100, 0], b: [100, 100], c: [0, 100] }), 1000, {}, cache);
+    // Move "a" a little — still a simple shape in the old order.
+    const second = computeNodeGroups(nodes, nodes, at({ r: [0, 0], a: [60, -40], b: [100, 100], c: [0, 100] }), 1000, {}, cache);
+    expect(second[0].outlineIds).toEqual(first[0].outlineIds);
+  });
+
+  it("re-orders when keeping the old order would cross itself", () => {
+    expect(selfIntersects([{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 0 }, { x: 0, y: 100 }])).toBe(true);
+    expect(selfIntersects([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }])).toBe(false);
   });
 });

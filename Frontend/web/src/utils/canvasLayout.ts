@@ -623,12 +623,35 @@ export function zoneShape(zone: ZoneMembership, pts: Pt[], reach: number = getZo
   return zone.nested ? branchCorners(pts, zone.parentIdx, reach) : zoneCorners(pts, reach);
 }
 
+// Whether a closed polygon crosses itself (any two non-adjacent edges cross).
+export function selfIntersects(pts: Pt[]): boolean {
+  const n = pts.length;
+  const cross = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const hits = (p1: Pt, p2: Pt, q1: Pt, q2: Pt) =>
+    cross(p1, p2, q1) * cross(p1, p2, q2) < 0 && cross(q1, q2, p1) * cross(q1, q2, p2) < 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue;
+      if (hits(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * `cornerOrder` (optional, kept by the caller between calls) makes a zone's
+ * outline sticky: while the same nodes are its corners, they stay connected
+ * in the same order as last time, so moving one node moves only its own
+ * corner instead of rewiring the whole zone. A fresh order is worked out only
+ * when the corners change or the kept order would cross itself.
+ */
 export function computeNodeGroups(
   visibleNodes: NodeDoc[],
   allNodes: NodeDoc[],
   positions: Map<string, { x: number; y: number }>,
   reach: number = getZoneReach(),
   layouts: ZoneLayouts = {},
+  cornerOrder?: Map<string, string[]>,
 ): NodeGroup[] {
   const childrenByParent = new Map<string, string[]>();
   const byId = new Map(allNodes.map((n) => [n.nodeId, n]));
@@ -648,7 +671,19 @@ export function computeNodeGroups(
     const members = zone.ids.map((id) => byId.get(id)!);
     const sentiment = circleSentiment(members);
     const all = members.map((n) => positions.get(n.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-    const order = zoneShape(zone, all, reach);
+    let order = zoneShape(zone, all, reach);
+    if (cornerOrder) {
+      const ids = order.map((i) => zone.ids[i]);
+      const kept = cornerOrder.get(zone.rootId);
+      if (kept && kept.length === ids.length && kept.every((id) => ids.includes(id))) {
+        const keptOrder = kept.map((id) => zone.ids.indexOf(id));
+        if (!selfIntersects(keptOrder.map((i) => all[i]))) order = keptOrder;
+      }
+      cornerOrder.set(
+        zone.rootId,
+        order.map((i) => zone.ids[i]),
+      );
+    }
     // Centre and radius follow the drawn zone; with no outline, just the root.
     const pts = order.length ? order.map((i) => all[i]) : [all[0]];
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;

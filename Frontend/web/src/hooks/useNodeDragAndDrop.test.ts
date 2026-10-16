@@ -78,7 +78,6 @@ function setup(overrides: Partial<Parameters<typeof useNodeDragAndDrop>[0]> = {}
       viewportBounds: () => ({ minX: 0, minY: 0, maxX: 2400, maxY: 1600 }),
       obstaclePoints: () => [],
       placeNode: (p: Pt) => p,
-      zoomToEditAt,
       upsertNode,
       setActionError,
       setNodes,
@@ -167,7 +166,8 @@ describe("useNodeDragAndDrop", () => {
         await vi.runAllTimersAsync();
       });
 
-      expect(zoomToEditAt).toHaveBeenCalledWith(400, 300);
+      // A drop no longer moves the camera — that jump read as a glitch.
+      expect(zoomToEditAt).not.toHaveBeenCalled();
       expect(setNodes).toHaveBeenCalled(); // optimistic local update
       expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 400, y: 300 });
       expect(upsertNode).toHaveBeenCalledWith(updated);
@@ -448,7 +448,7 @@ describe("useNodeDragAndDrop", () => {
         await vi.runAllTimersAsync();
       });
 
-      expect(zoomToEditAt).toHaveBeenCalledWith(400, 200);
+      expect(zoomToEditAt).not.toHaveBeenCalled();
       expect(nodesApi.updateNode).toHaveBeenCalledWith("leader", { x: 400, y: 200 });
       expect(nodesApi.updateNode).toHaveBeenCalledWith("follower", { x: 500, y: 600 });
       expect(result.current.groupDragState).toBeNull();

@@ -690,8 +690,11 @@ export function MapPage() {
   // too, even though the function resolves each root against `nodes` —
   // matching this hook's original dependency list exactly rather than
   // changing behavior as part of a pure relocation.
+  // Each zone's corner order from last time — moving one node then moves only
+  // its own corner (see computeNodeGroups).
+  const zoneCornerOrder = useRef(new Map<string, string[]>());
   const nodeGroups = useMemo(
-    () => computeNodeGroups(visibleNodes, nodes, positions, undefined, zoneLayouts),
+    () => computeNodeGroups(visibleNodes, nodes, positions, undefined, zoneLayouts, zoneCornerOrder.current),
     [visibleNodes, positions, zoneLayouts],
   );
   // Discussion mode reads the zones as a realm: the kingdom and its castles
@@ -867,7 +870,7 @@ export function MapPage() {
   // Every camera-framing cue (fit-to-zoom for a text reading mode, the
   // floor-at-100%-for-editing after a drag, bringing a set of nodes into
   // view) — see hooks/useCanvasFraming.ts.
-  const { fitZoomForDisplay, zoomToEditAt, showPoints, showNodes, setDisplayForChosen, fitAll } = useCanvasFraming({
+  const { fitZoomForDisplay, showPoints, showNodes, setDisplayForChosen, fitAll } = useCanvasFraming({
     visibleNodes,
     positions,
     circleRootSentimentByNode,
@@ -1073,7 +1076,6 @@ export function MapPage() {
     viewportBounds,
     obstaclePoints,
     placeNode,
-    zoomToEditAt,
     upsertNode,
     setActionError,
     setNodes,

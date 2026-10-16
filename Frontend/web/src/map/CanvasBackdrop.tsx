@@ -104,6 +104,20 @@ export function CanvasBackdrop({
   function moveHold(e: ReactPointerEvent) {
     if (hold.current && Math.hypot(e.clientX - hold.current.x, e.clientY - hold.current.y) > 8) cancelHold();
   }
+  // A zone's corners where its nodes are drawn right now — so a node being
+  // dragged pulls its own corner along live, and nothing else moves.
+  const byId = new Map(visibleNodes.map((n) => [n.nodeId, n]));
+  const cornersOf = (g: NodeGroup) =>
+    g.outlineIds?.length === g.outline.length
+      ? g.outlineIds.map((id, i) => {
+          const n = byId.get(id);
+          return n ? posFor(n) : g.outline[i];
+        })
+      : g.outline;
+  const pointsOf = (g: NodeGroup) =>
+    cornersOf(g)
+      .map((p) => `${p.x},${p.y}`)
+      .join(" ");
   return (
     <svg
       className="pointer-events-none absolute inset-0 h-full w-full"
@@ -163,7 +177,7 @@ export function CanvasBackdrop({
         // group, if any, is currently stabilized.
         const isStabilized = selectedCircle?.rootId === g.rootId;
         const dimmed = selectedCircle ? !isStabilized : !!focusedZones && !focusedZones.has(g.rootId);
-        const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+        const zonePoints = pointsOf(g);
         const patternId = root?.zonePattern ? `zone-pattern-${g.rootId}` : null;
         return (
           <g key={`zone-${g.rootId}`}>
@@ -244,7 +258,7 @@ export function CanvasBackdrop({
       {nodeGroups
         .filter((g) => solvedZones?.has(g.rootId))
         .map((g) => {
-          const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+          const zonePoints = pointsOf(g);
           return (
             <polygon
               key={`solved-${g.rootId}`}
@@ -271,7 +285,7 @@ export function CanvasBackdrop({
           const kingdom = !nodeRefId(root?.parentId);
           const color = zoneColorFor(root, g.sentiment);
           const dimmed = selectedCircle ? selectedCircle.rootId !== g.rootId : !!focusedZones && !focusedZones.has(g.rootId);
-          const zonePoints = g.outline.map((p) => `${p.x},${p.y}`).join(" ");
+          const zonePoints = pointsOf(g);
           return (
             <g key={`wall-${g.rootId}`} data-testid={kingdom ? "kingdom-wall" : "castle-wall"} opacity={dimmed ? 0.35 : 0.8}>
               {kingdom && (

@@ -50,7 +50,6 @@ interface Params {
   obstaclePoints: (exclude?: Set<string>) => Pt[];
   /** Where `moving` lands when dropped at `desired`, under the zone rules (utils/zoneRules.ts). */
   placeNode: (desired: Pt, moving: MovingNode[]) => Pt;
-  zoomToEditAt: (x: number, y: number) => void;
   upsertNode: (node: NodeDoc) => void;
   setActionError: (message: string | null) => void;
   setNodes: Dispatch<SetStateAction<NodeDoc[]>>;
@@ -103,7 +102,6 @@ export function useNodeDragAndDrop({
   viewportBounds,
   obstaclePoints,
   placeNode,
-  zoomToEditAt,
   upsertNode,
   setActionError,
   setNodes,
@@ -288,7 +286,6 @@ export function useNodeDragAndDrop({
         }
 
         dispatch({ type: "groupSetMember", id: node.nodeId, pos: leaderTarget, fallback: startPositions });
-        zoomToEditAt(leaderTarget.x, leaderTarget.y);
 
         const leaderDone = nodesApi
           .updateNode(node.nodeId, spotFor(node, leaderTarget))
@@ -595,14 +592,13 @@ export function useNodeDragAndDrop({
           const target = found.target;
           const placed = placeNode({ x, y }, [{ nodeId: node.nodeId, parentId: target.nodeId }]);
           setActionError(null);
-          zoomToEditAt(placed.x, placed.y);
           // Moved over right away, same as a plain drop below — waiting for
           // the server left the node flashing back at its old spot (dragState
           // is already cleared above) until the response landed.
           const before = { x: node.x, y: node.y, parentId: node.parentId };
           setNodes((prev) =>
             prev.map((n) =>
-              n.nodeId === node.nodeId ? { ...n, x: placed.x, y: placed.y, parentId: target.nodeId } : n,
+              n.nodeId === node.nodeId ? { ...n, ...spotFor(node, placed), parentId: target.nodeId } : n,
             ),
           );
           try {
@@ -644,7 +640,6 @@ export function useNodeDragAndDrop({
         const staysMember = !!ownCircle && (dropDist <= getZoneReach() || dropDist <= startDist);
         const leftCircle = !!ownCircle && !staysMember;
         const dropped = placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }]);
-        zoomToEditAt(dropped.x, dropped.y);
 
         // Remembered so a failed persist below can put the node back exactly
         // where it actually still is on the server, instead of leaving the
