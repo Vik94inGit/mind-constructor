@@ -36,7 +36,7 @@ function renderPanel(overrides: Partial<Parameters<typeof NodePanel>[0]> = {}) {
     isMapOwner: true,
     onApplyTemplate: vi.fn(async () => {}),
     onClose: vi.fn(),
-    onDeleted: vi.fn(),
+    onDelete: vi.fn().mockResolvedValue(true),
     onUpdated: vi.fn(),
     onAttacked: vi.fn(),
     onDeleteEdge: vi.fn(),

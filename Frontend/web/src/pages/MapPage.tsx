@@ -54,6 +54,7 @@ import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, sho
 import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { readingOrder, stepNode } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
+import { deletedNodeOf, restoreDeletedNode } from "../utils/restoreNode";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { SiegePanel } from "../map/SiegePanel";
@@ -1020,7 +1021,7 @@ export function MapPage() {
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
   // Undo for moves: each drag records where its nodes were; Ctrl+Z (or the
   // toolbar's undo button) puts the last one back.
-  const { recordMove, undo: undoMove, canUndo } = useMoveUndo({
+  const { recordMove, recordUndo, undo: undoMove, canUndo } = useMoveUndo({
     nodes,
     upsertNode,
     setActionError,
@@ -1426,16 +1427,41 @@ export function MapPage() {
   }
 
   async function handleDeleteNode(node: NodeDoc) {
-    if (!confirm(t.ui.node.deleteConfirm)) return;
     try {
-      const res = await nodesApi.deleteNode(node.nodeId);
-      applyNodeDeleted(node.nodeId);
-      // Deleting a protection node with banked damage releases the whole
-      // total onto whatever it was defending — see Backend's deleteNodeDao.
-      if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
+      await deleteNodeWithUndo(node);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.delete);
     }
+  }
+
+  // Deleting a node, from its panel or its right-click menu. An ordinary node
+  // can be brought back with undo (see utils/restoreNode.ts), so it goes
+  // without a confirm; a weapon or protection node can't (its damage and
+  // shields don't replay), so that one still asks first. Resolves false when
+  // the person changed their mind. Throws when the delete fails.
+  async function deleteNodeWithUndo(node: NodeDoc): Promise<boolean> {
+    const undoable = !node.isWeapon && !node.isProtection;
+    if (!undoable && !confirm(t.ui.node.deleteConfirm)) return false;
+    // The node list arrives without text and pictures — fetch them so undo has them.
+    const full = undoable ? await nodesApi.getNode(node.nodeId).catch(() => node) : node;
+    const deleted = deletedNodeOf({ ...node, ...full }, nodes, edges, isOwnNode);
+    const res = await nodesApi.deleteNode(node.nodeId);
+    applyNodeDeleted(node.nodeId);
+    // Deleting a protection node with banked damage releases the whole
+    // total onto whatever it was defending — see Backend's deleteNodeDao.
+    if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
+    if (undoable && mapId) {
+      recordUndo(async () => {
+        const back = await restoreDeletedNode(mapId, deleted);
+        upsertNode(back.node);
+        back.children.forEach(upsertNode);
+        setEdges((prev) => [...prev, ...back.edges]);
+        setCelebrateIds((prev) => new Set(prev).add(back.node.nodeId));
+        refreshInsights(mapId);
+      }, t.ui.errors.restoreNode);
+      showNotice(t.ui.node.deletedUndo);
+    }
+    return true;
   }
 
   // Taking links apart from a node's right-click menu ("Remove links ›"): its
@@ -2526,7 +2552,7 @@ export function MapPage() {
                   // canvas gets, just reached from here instead.
                   if (selectedNode?.isWeapon) triggerWeaponShot(selectedNode.nodeId);
                 }}
-                onDeleted={applyNodeDeleted}
+                onDelete={deleteNodeWithUndo}
                 onUpdated={upsertNode}
                 onAttacked={(updatedNode, weaponNode, _weapon, healedParent, _blocked, protector) => {
                   upsertNode(updatedNode);

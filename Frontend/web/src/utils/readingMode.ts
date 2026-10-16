@@ -8,8 +8,11 @@
 //  - mixed:    the quiet one — a circle's parent as a puzzle card, every
 //              other node an icon with a one-line cut of its text.
 //  - iconText: the usual icon, with its text always shown beside it.
-//  - actual:   the app's own default — icons, with captions only where the
-//              zone/selection rules say to show them.
+//  - actual:   icons, with captions only where the zone/selection rules say
+//              to show them.
+//
+// Until a viewer picks one, maps open in `mixed`: read as notes, a map has to
+// show its words, and mixed does that without crowding the canvas.
 export type ReadingMode = "puzzle" | "mixed" | "iconText" | "actual";
 
 // Menu order: the most text-heavy first.
@@ -35,7 +38,7 @@ export function loadReadingMode(): ReadingMode {
   } catch {
     // storage blocked or unavailable — fall through to the default
   }
-  return "actual";
+  return "mixed";
 }
 
 export function saveReadingMode(mode: ReadingMode): void {

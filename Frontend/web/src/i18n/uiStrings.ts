@@ -170,6 +170,8 @@ export interface UiStrings {
     expandTitle: string;
     collapseTitle: string;
     deleteConfirm: string;
+    /** Shown after deleting a node — undo brings it back. */
+    deletedUndo: string;
     selectToSeeHealth: string;
     circleParent: (sentiment: string) => string;
     variantParent: (sentiment: string) => string;
@@ -228,6 +230,7 @@ export interface UiStrings {
     loadMap: string;
     mapNotFound: string;
     moveNodes: string;
+    restoreNode: string;
     joinCircle: string;
     leaveCircle: string;
     dropOnOwnBranch: string;
@@ -680,6 +683,7 @@ const en: UiStrings = {
     expandTitle: "Expand to show the whole text, no inner scrollbar",
     collapseTitle: "Collapse back to a scrollable box",
     deleteConfirm: "Delete this node?",
+    deletedUndo: "Deleted. Press Ctrl+Z or Undo to bring it back.",
     selectToSeeHealth: "Select to see health",
     circleParent: (s) => `Circle parent (${s})`,
     variantParent: (s) => `Variant parent (${s})`,
@@ -744,6 +748,7 @@ const en: UiStrings = {
     loadMap: "Failed to load map",
     mapNotFound: "Map not found",
     moveNodes: "Failed to move the selected nodes",
+    restoreNode: "Failed to bring the deleted node back",
     joinCircle: "Failed to join circle",
     leaveCircle: "Failed to leave circle",
     dropOnOwnBranch: "Can't drop a node onto its own branch.",
@@ -1177,6 +1182,7 @@ const cs: UiStrings = {
     expandTitle: "Rozbalit a zobrazit celý text bez vnitřního posuvníku",
     collapseTitle: "Sbalit zpět do posuvného pole",
     deleteConfirm: "Smazat tento uzel?",
+    deletedUndo: "Smazáno. Ctrl+Z nebo Zpět ho vrátí.",
     selectToSeeHealth: "Vyberte pro zobrazení zdraví",
     circleParent: (s) => `Rodič kruhu (${s})`,
     variantParent: (s) => `Rodič varianty (${s})`,
@@ -1241,6 +1247,7 @@ const cs: UiStrings = {
     loadMap: "Mapu se nepodařilo načíst",
     mapNotFound: "Mapa nenalezena",
     moveNodes: "Vybrané uzly se nepodařilo přesunout",
+    restoreNode: "Smazaný uzel se nepodařilo vrátit",
     joinCircle: "Do kruhu se nepodařilo vstoupit",
     leaveCircle: "Kruh se nepodařilo opustit",
     dropOnOwnBranch: "Uzel nelze pustit na jeho vlastní větev.",
@@ -1673,6 +1680,7 @@ const uk: UiStrings = {
     expandTitle: "Розгорнути, щоб побачити весь текст без внутрішньої прокрутки",
     collapseTitle: "Згорнути назад у поле з прокруткою",
     deleteConfirm: "Видалити цей вузол?",
+    deletedUndo: "Видалено. Ctrl+Z або «Скасувати крок» поверне його.",
     selectToSeeHealth: "Виберіть, щоб побачити здоров’я",
     circleParent: (s) => `Батько кола (${s})`,
     variantParent: (s) => `Батько варіанту (${s})`,
@@ -1737,6 +1745,7 @@ const uk: UiStrings = {
     loadMap: "Не вдалося завантажити мапу",
     mapNotFound: "Мапу не знайдено",
     moveNodes: "Не вдалося перемістити вибрані вузли",
+    restoreNode: "Не вдалося повернути видалений вузол",
     joinCircle: "Не вдалося приєднатися до кола",
     leaveCircle: "Не вдалося вийти з кола",
     dropOnOwnBranch: "Не можна кинути вузол на його власну гілку.",
@@ -2172,6 +2181,7 @@ const ru: UiStrings = {
     expandTitle: "Развернуть, чтобы увидеть весь текст без внутренней прокрутки",
     collapseTitle: "Свернуть обратно в поле с прокруткой",
     deleteConfirm: "Удалить этот узел?",
+    deletedUndo: "Удалено. Ctrl+Z или «Отменить шаг» вернёт его.",
     selectToSeeHealth: "Выберите, чтобы увидеть здоровье",
     circleParent: (s) => `Родитель круга (${s})`,
     variantParent: (s) => `Родитель варианта (${s})`,
@@ -2236,6 +2246,7 @@ const ru: UiStrings = {
     loadMap: "Не удалось загрузить карту",
     mapNotFound: "Карта не найдена",
     moveNodes: "Не удалось переместить выбранные узлы",
+    restoreNode: "Не удалось вернуть удалённый узел",
     joinCircle: "Не удалось присоединиться к кругу",
     leaveCircle: "Не удалось выйти из круга",
     dropOnOwnBranch: "Нельзя бросить узел на его собственную ветку.",
