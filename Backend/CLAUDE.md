@@ -7,7 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working in **th
 
 ## What this is
 
-The backend for Mind Constructor, a collaborative argument/decision-mapping tool. Users build a
+The backend for Mind Constructor: notes you can see. The product's main path is personal — jot a
+thought (a quick note lands in an Inbox map), lay thoughts out on a canvas, find any of them again
+through search — with sharing and a discussion ("battle") layer on top. Users build a
 **map** of **nodes** (Problem / Problematic option / Solution / Option / Success / Fail / unknown)
 connected by **edges** with a sentiment (positive/negative/neutral). Multiple invited members work
 the same map live over Socket.IO. Layered on top of the mapping itself is a "combat" system:
@@ -42,6 +44,8 @@ npx vitest run tests/nodeAbl.test.ts        # single test file
 npx vitest run -t "test name substring"     # single test by name
 npm run admin:promote -- someone@example.com  # promote a user to admin (no in-app endpoint for this, by design)
 npm run images:move       # move inline pictures into the image store, and MongoDB-kept ones into the bucket
+npm run db:stats          # print collection counts/sizes of the connected database
+npx tsc --noEmit          # typecheck (CI runs this before the tests)
 ```
 
 Requires a `.env` with `PORT`, `MONGO_URI`, `SESSION_SECRET`, `REDIS_URL`, `GOOGLE_CLIENT_ID` (the
@@ -54,11 +58,14 @@ pictures — see the image store below.
 Tests mock the DAO layer with `vi.mock(...)` (see any file in `tests/`) rather than hitting a real
 MongoDB, so `npm run test:run` doesn't need `MONGO_URI` to pass.
 
+CI (`.github/workflows/ci.yml`, on every PR and push to `main`) runs `npm ci`, `npx tsc --noEmit` and
+`npm run test:run` here, and lint/test/build in `Frontend/web`; run the same before pushing.
+
 ## Architecture
 
 Strict layering, one direction only: **routes → controllers → abl → dao → models**.
 
-- **`src/routes/*.ts`** (`authRoutes.ts`, `mapRoute.ts`, `nodeRoute.ts`, `edgeRoute.ts`, `lineRoute.ts`) — wires
+- **`src/routes/*.ts`** (`authRoutes.ts`, `mapRoute.ts`, `nodeRoute.ts`, `edgeRoute.ts`, `lineRoute.ts`, `imageRoute.ts`, `userStateRoute.ts`, `folderRoute.ts`) — wires
   URLs to controller functions, applies `protect` (and `requireAdmin` where needed) from
   `src/middleware/auth.ts`. No logic here. Mounted in [server.ts](server.ts) as `/api/auth`,
   `/api/nodes`, `/api/edges`, `/api/lines`, `/api/images` (`GET /:imageId`, a stored node picture — see the image store below), `/api/state` (the signed-in user's own state, so they pick up where they left off on any device — `GET /` preferences + last map, `PATCH /preferences`, `GET`/`PATCH /maps/:mapId` their view of a map, `GET`/`PATCH`/`DELETE /drafts/:kind`; see `models/UserState.ts`), `/api/folders` (a user's own dashboard folders — `GET`/`POST /`, `PATCH`/`DELETE /:folderId`, and `PATCH /maps/:mapId` with `{ folderId | null }` to file a map; mounted before the map routes so `folders` isn't read as a mapId), and `/api` (map routes — note the mount point itself has no `/maps`
@@ -82,10 +89,12 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `GET /api/search?q=` 
   calls. Each module defines its own domain-specific error classes (e.g. `MapNotFoundError`,
   `ParentNotOwnedError`) that the matching controller knows how to map to a status code. Modules:
   `authAbl`, `userAbl`, `mapAbl`, `nodeAbl`, `edgeAbl`, `lineAbl`,
-  `attackAbl`, `attackIndicatorAbl`, `finishAbl`, `historyAbl`, `circleAbl`, `packAbl`, `imageAbl`.
-- **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`, `imageDao`) — the only layer
+  `attackAbl`, `attackIndicatorAbl`, `finishAbl`, `historyAbl`, `circleAbl`, `packAbl`, `imageAbl`,
+  `userStateAbl`, `folderAbl`.
+- **`src/dao/*.ts`** (`userDao`, `mapsDao`, `nodeDao`, `edgeDao`, `lineDao`, `attackDao`, `imageDao`, `historyDao`,
+  `visibilityDao`, `userStateDao`, `folderDao`) — the only layer
   that touches Mongoose models directly.
-- **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Line`, `Attack`, `Image`) — schemas. Each one strips
+- **`src/models/*.ts`** (`User`, `Map`, `Node`, `Edge`, `Line`, `Attack`, `Image`, `NodeRevision`, `UserState`, `Folder`) — schemas. Each one strips
   `_id`/`__v` in its `toJSON` transform and exposes only a public id instead (`nodeId`, `mapId`,
   `edgeId` — nanoids, not Mongo ObjectIds). **This public/internal id split is load-bearing
   everywhere**: DAOs take a public id in, resolve it to an internal `ObjectId` to query with;
@@ -107,6 +116,11 @@ Cross-cutting pieces:
   `notifyUser(userId, event, payload)` addresses (an invite sends `map:invited` to the invitee). `broadcastToMap(publicMapId, event,
 payload)` is the one function controllers call after a mutation commits; it's a no-op if `io`
   was never initialized (true under the test app), so it's safe to call unconditionally.
+- **`src/realtime/socketToken.ts`** — Safari never sends the `mc_sid` cookie on the cross-site socket
+  handshake, so the frontend also fetches a short-lived HMAC token (`GET /api/auth/socket-token`, over
+  the same-origin REST API where the cookie *is* sent; `SOCKET_TOKEN_TTL_MS` = 2 min, keyed by
+  `SESSION_SECRET`) on every connect/reconnect and hands it to the handshake. `io.ts` accepts either; the
+  user is still looked up, and a blocked one refused, at handshake time.
 - **`src/abl/errors.ts`** — shared `ValidationError` + `parseOrThrow`.
 - **`src/middleware/rateLimit.ts`** + `helmet` in `server.ts` — the sign-in routes (`/register`, `/login`,
   `/google`, `/demo`) allow `AUTH_MAX_ATTEMPTS` (20) per address per 15 minutes (in-memory store, `429`
