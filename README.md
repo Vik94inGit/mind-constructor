@@ -76,7 +76,7 @@ npm run admin:promote -- someone@example.com
 ## Deploying
 
 - **Backend**: [`render.yaml`](render.yaml) is a Render Blueprint — point Render at this repo and
-  it picks it up, prompting for `MONGO_URI`/`JWT_SECRET`/`CORS_ORIGIN`/`GOOGLE_CLIENT_ID` in its
+  it picks it up, prompting for `MONGO_URI`/`SESSION_SECRET`/`REDIS_URL`/`CORS_ORIGIN`/`GOOGLE_CLIENT_ID` in its
   dashboard rather than expecting them in the file.
 - **Frontend**: [`Frontend/web/vercel.json`](Frontend/web/vercel.json) is a plain SPA rewrite
   config for Vercel (or any static host that needs one) — set `VITE_API_URL` to the deployed
