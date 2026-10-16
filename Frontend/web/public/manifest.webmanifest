@@ -1,7 +1,7 @@
 {
   "name": "Mind Constructor",
   "short_name": "Mind Constructor",
-  "description": "Map out a problem, a decision or a goal — on your own or together.",
+  "description": "Notes you can see: jot thoughts down, then lay them out on a map to think them through — on your own or together.",
   "id": "/",
   "start_url": "/?resume=1",
   "scope": "/",
@@ -16,6 +16,7 @@
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ],
   "shortcuts": [
+    { "name": "Quick note", "url": "/?note=1", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Text → map", "url": "/split", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Think it through", "url": "/think", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]

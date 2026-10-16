@@ -65,6 +65,8 @@ export interface Translation {
       owner: string;
     };
     menu: { summary: string; edit: string; invite: string; delete: string; moveToFolder: string };
+    /** The dashboard's quick note box (dashboard/QuickNote.tsx). */
+    quickNote: { title: string; placeholder: string; save: string; saved: string; open: (mapName: string) => string; error: string; inboxName: string };
     library: {
       newFolder: string;
       search: string;
@@ -269,6 +271,7 @@ const en: Translation = {
       owner: "Owner",
     },
     menu: { summary: "Summary", edit: "Edit", invite: "Invite", delete: "Delete", moveToFolder: "Move to folder…" },
+    quickNote: { title: "Quick note", placeholder: "Jot a thought — it goes to your Inbox map…", save: "Save", saved: "Saved.", open: (name) => `Open ${name} →`, error: "Couldn't save the note", inboxName: "Inbox" },
     library: {
       newFolder: "+ New folder",
       search: "Search maps, folders and thoughts…",
@@ -459,6 +462,7 @@ const cs: Translation = {
       owner: "Vlastník",
     },
     menu: { summary: "Přehled", edit: "Upravit", invite: "Pozvat", delete: "Smazat", moveToFolder: "Přesunout do složky…" },
+    quickNote: { title: "Rychlá poznámka", placeholder: "Zapište myšlenku — uloží se do mapy Doručené…", save: "Uložit", saved: "Uloženo.", open: (name) => `Otevřít ${name} →`, error: "Poznámku se nepodařilo uložit", inboxName: "Doručené" },
     library: {
       newFolder: "+ Nová složka",
       search: "Hledat mapy, složky a myšlenky…",
@@ -649,6 +653,7 @@ const uk: Translation = {
       owner: "Власник",
     },
     menu: { summary: "Підсумок", edit: "Редагувати", invite: "Запросити", delete: "Видалити", moveToFolder: "Перемістити в папку…" },
+    quickNote: { title: "Швидка нотатка", placeholder: "Запишіть думку — вона піде у мапу «Вхідні»…", save: "Зберегти", saved: "Збережено.", open: (name) => `Відкрити ${name} →`, error: "Не вдалося зберегти нотатку", inboxName: "Вхідні" },
     library: {
       newFolder: "+ Нова папка",
       search: "Пошук карт, папок і думок…",
@@ -839,6 +844,7 @@ const ru: Translation = {
       owner: "Владелец",
     },
     menu: { summary: "Сводка", edit: "Изменить", invite: "Пригласить", delete: "Удалить", moveToFolder: "Переместить в папку…" },
+    quickNote: { title: "Быстрая заметка", placeholder: "Запишите мысль — она попадёт в карту «Входящие»…", save: "Сохранить", saved: "Сохранено.", open: (name) => `Открыть ${name} →`, error: "Не удалось сохранить заметку", inboxName: "Входящие" },
     library: {
       newFolder: "+ Новая папка",
       search: "Поиск карт, папок и мыслей…",

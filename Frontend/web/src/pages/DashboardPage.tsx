@@ -16,6 +16,7 @@ import { ApiRequestError } from "../api/client";
 import type { FolderDoc, MapDoc } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { ThinkEntry } from "../dashboard/ThinkEntry";
+import { QuickNote } from "../dashboard/QuickNote";
 import { CreateMapModal } from "../dashboard/CreateMapModal";
 import { EditMapModal } from "../dashboard/EditMapModal";
 import { FolderModal, primaryBtn, secondaryBtn } from "../dashboard/FolderModal";
@@ -242,6 +243,14 @@ export function DashboardPage() {
           </span>
         </button>
       )}
+
+      <QuickNote
+        maps={maps}
+        autoFocus={searchParams.get("note") === "1"}
+        onSaved={(map, created) => {
+          if (created) setMaps((prev) => [map, ...prev]);
+        }}
+      />
 
       <ThinkEntry />
 
