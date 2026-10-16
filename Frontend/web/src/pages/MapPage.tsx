@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
@@ -441,6 +441,19 @@ export function MapPage() {
   // with none, to the spot that was in the middle of the screen. From then on
   // that spot (a moment after scrolling stops) and the open node are saved.
   const restoredRef = useRef<string | null>(null);
+  // ?node=<id> (a search result on the dashboard): open on that node instead.
+  const [searchParams] = useSearchParams();
+  const focusNodeId = searchParams.get("node");
+  useEffect(() => {
+    if (loading || !focusNodeId || !mapId || restoredRef.current === mapId) return;
+    restoredRef.current = mapId;
+    window.setTimeout(() => {
+      if (!visibleNodes.some((n) => n.nodeId === focusNodeId)) return;
+      setSelectedId(focusNodeId);
+      centerOnNode(focusNodeId);
+    }, 80);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, focusNodeId, mapId]);
   useEffect(() => {
     if (loading || !savedView || !mapId || restoredRef.current === mapId) return;
     restoredRef.current = mapId;

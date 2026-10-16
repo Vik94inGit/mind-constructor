@@ -21,6 +21,23 @@ export async function listMaps(filter: MapFilter = "all"): Promise<MapDoc[]> {
   return res.maps;
 }
 
+/** One node found by searchThoughts — a snippet of its text, never the whole of it. */
+export interface ThoughtHit {
+  nodeId: string;
+  mapId: string;
+  mapName: string;
+  type: NodeType;
+  title: string;
+  zoneName: string;
+  snippet: string;
+}
+
+/** Searches every node the user can see, across all their maps (Backend's GET /api/search). */
+export async function searchThoughts(q: string): Promise<ThoughtHit[]> {
+  const res = await apiRequest<{ success: boolean; results: ThoughtHit[] }>(`/api/search?q=${encodeURIComponent(q)}`);
+  return res.results;
+}
+
 export async function getMap(mapId: string): Promise<MapDoc> {
   const res = await apiRequest<{ success: boolean; map: MapDoc }>(`/api/${mapId}`);
   return res.map;

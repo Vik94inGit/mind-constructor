@@ -69,6 +69,10 @@ export interface Translation {
       newFolder: string;
       search: string;
       noResults: (query: string) => string;
+      /** Search across every map's nodes (dashboard/ThoughtResults.tsx). */
+      thoughts: string;
+      thoughtIn: (mapName: string) => string;
+      thoughtsError: string;
       allMaps: string;
       folderEmpty: string;
       prev: string;
@@ -267,7 +271,10 @@ const en: Translation = {
     menu: { summary: "Summary", edit: "Edit", invite: "Invite", delete: "Delete", moveToFolder: "Move to folder…" },
     library: {
       newFolder: "+ New folder",
-      search: "Search maps and folders…",
+      search: "Search maps, folders and thoughts…",
+      thoughts: "Thoughts",
+      thoughtIn: (mapName) => `in “${mapName}”`,
+      thoughtsError: "Searching your thoughts failed",
       noResults: (query) => `Nothing matches "${query}".`,
       allMaps: "All maps",
       folderEmpty: "This folder is empty. Move maps here from their ⋯ menu.",
@@ -454,7 +461,10 @@ const cs: Translation = {
     menu: { summary: "Přehled", edit: "Upravit", invite: "Pozvat", delete: "Smazat", moveToFolder: "Přesunout do složky…" },
     library: {
       newFolder: "+ Nová složka",
-      search: "Hledat mapy a složky…",
+      search: "Hledat mapy, složky a myšlenky…",
+      thoughts: "Myšlenky",
+      thoughtIn: (mapName) => `v mapě „${mapName}“`,
+      thoughtsError: "Hledání v myšlenkách se nepodařilo",
       noResults: (query) => `Nic neodpovídá „${query}“.`,
       allMaps: "Všechny mapy",
       folderEmpty: "Složka je prázdná. Mapy sem přesunete z jejich nabídky ⋯.",
@@ -641,7 +651,10 @@ const uk: Translation = {
     menu: { summary: "Підсумок", edit: "Редагувати", invite: "Запросити", delete: "Видалити", moveToFolder: "Перемістити в папку…" },
     library: {
       newFolder: "+ Нова папка",
-      search: "Пошук карт і папок…",
+      search: "Пошук карт, папок і думок…",
+      thoughts: "Думки",
+      thoughtIn: (mapName) => `у мапі «${mapName}»`,
+      thoughtsError: "Не вдалося знайти думки",
       noResults: (query) => `Нічого не знайдено за «${query}».`,
       allMaps: "Усі карти",
       folderEmpty: "Папка порожня. Переміщуйте сюди карти через їхнє меню ⋯.",
@@ -828,7 +841,10 @@ const ru: Translation = {
     menu: { summary: "Сводка", edit: "Изменить", invite: "Пригласить", delete: "Удалить", moveToFolder: "Переместить в папку…" },
     library: {
       newFolder: "+ Новая папка",
-      search: "Поиск карт и папок…",
+      search: "Поиск карт, папок и мыслей…",
+      thoughts: "Мысли",
+      thoughtIn: (mapName) => `в карте «${mapName}»`,
+      thoughtsError: "Не удалось найти мысли",
       noResults: (query) => `Ничего не найдено по «${query}».`,
       allMaps: "Все карты",
       folderEmpty: "Папка пуста. Перемещайте сюда карты через их меню ⋯.",

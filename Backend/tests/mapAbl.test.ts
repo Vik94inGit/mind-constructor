@@ -6,6 +6,7 @@ import {
   getMapsDao,
   updateMapDao,
   inviteUserToMapDao,
+  searchNodesDao,
 } from "../src/dao/mapsDao.js";
 import {
   createMapAbl,
@@ -13,6 +14,8 @@ import {
   inviteUserToMapAbl,
   setMapColorAbl,
   getMapsAbl,
+  searchNodesAbl,
+  snippetAround,
   ColorTakenError,
   NotInviterError,
   InviteeNotFoundError,
@@ -29,6 +32,7 @@ vi.mock("../src/dao/mapsDao.js", () => ({
   getMapsDao: vi.fn(),
   updateMapDao: vi.fn(),
   inviteUserToMapDao: vi.fn(),
+  searchNodesDao: vi.fn(),
 }));
 
 // createMapAbl seeds a template's nodes through the real createNodeAbl (see
@@ -344,5 +348,34 @@ describe("mapAbl", () => {
 
       expect(getMapsDao).toHaveBeenCalledWith("user1", "owned");
     });
+  });
+});
+
+describe("searchNodesAbl", () => {
+  it("refuses a query shorter than two characters", async () => {
+    await expect(searchNodesAbl("user1", { q: " a " })).rejects.toThrow(ValidationError);
+    expect(searchNodesDao).not.toHaveBeenCalled();
+  });
+
+  it("matches the words literally, case-insensitively, and sends back a snippet instead of the text", async () => {
+    vi.mocked(searchNodesDao).mockResolvedValue([
+      { nodeId: "n1", mapId: "m1", mapName: "Work", type: "Option", title: "", text: "Call the (new) client", prompt: "", zoneName: "", updatedAt: undefined },
+      { nodeId: "n2", mapId: "m1", mapName: "Work", type: "Option", title: "", text: "", prompt: "Who is the (new) owner?", zoneName: "", updatedAt: undefined },
+    ] as never);
+    const results = await searchNodesAbl("user1", { q: "(NEW)" });
+    const pattern = vi.mocked(searchNodesDao).mock.calls[0][1];
+    expect(pattern.test("a (new) one")).toBe(true);
+    expect(pattern.test("a new one")).toBe(false);
+    expect(results[0]).toMatchObject({ nodeId: "n1", mapName: "Work", snippet: "Call the (new) client" });
+    expect(results[0]).not.toHaveProperty("text");
+    expect(results[1].snippet).toBe("Who is the (new) owner?");
+  });
+
+  it("cuts a long text around the match", () => {
+    const text = `${"a".repeat(100)} needle ${"b".repeat(100)}`;
+    const snippet = snippetAround(text, "needle");
+    expect(snippet.startsWith("…")).toBe(true);
+    expect(snippet.endsWith("…")).toBe(true);
+    expect(snippet).toContain("needle");
   });
 });

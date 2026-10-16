@@ -6,6 +6,7 @@ import {
   getMapsDao,
   updateMapDao,
   inviteUserToMapDao,
+  searchNodesDao,
 } from "../dao/mapsDao.js";
 import { findUserByIdDao } from "../dao/userDao.js";
 import { parseOrThrow } from "./errors.js";
@@ -250,4 +251,36 @@ const isMapFilter = (value: unknown): value is MapFilter =>
 export const getMapsAbl = async (userId: string, rawFilter: unknown) => {
   const filter = isMapFilter(rawFilter) ? rawFilter : "all";
   return await getMapsDao(userId, filter);
+};
+
+// ========== SEARCH ACROSS ALL THOUGHTS ==========
+const SEARCH_LIMIT = 50;
+const SNIPPET_AROUND = 60;
+const searchSchema = z.object({
+  q: z.string().trim().min(2, "q must be at least 2 characters").max(100, "q must be at most 100 characters"),
+});
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The part of `text` around the first match, so a long note shows where the words are. */
+export const snippetAround = (text: string, query: string): string => {
+  const flat = text.replace(/\s+/g, " ").trim();
+  const at = flat.toLowerCase().indexOf(query.toLowerCase());
+  if (at < 0) return flat.length > SNIPPET_AROUND * 2 ? `${flat.slice(0, SNIPPET_AROUND * 2)}…` : flat;
+  const start = Math.max(0, at - SNIPPET_AROUND);
+  const end = Math.min(flat.length, at + query.length + SNIPPET_AROUND);
+  return `${start > 0 ? "…" : ""}${flat.slice(start, end)}${end < flat.length ? "…" : ""}`;
+};
+
+// Every node the caller can see whose text, title, prompt or zone name holds
+// the words, across all their maps — a notes app has to find a thought
+// without knowing which map it went into. Plain substring match, case-
+// insensitive; the full text never leaves the server, only a snippet.
+export const searchNodesAbl = async (userId: string, input: unknown) => {
+  const { q } = parseOrThrow(searchSchema, input);
+  const rows = await searchNodesDao(userId, new RegExp(escapeRegex(q), "i"), SEARCH_LIMIT);
+  return rows.map(({ text, prompt, ...rest }) => ({
+    ...rest,
+    snippet: snippetAround(text || prompt, q),
+  }));
 };

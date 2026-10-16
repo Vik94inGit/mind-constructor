@@ -16,6 +16,7 @@ import {
   AlreadyMemberError,
   setMapColorAbl,
   getMapsAbl,
+  searchNodesAbl,
   ColorTakenError,
 } from "../abl/mapAbl.js";
 import {
@@ -176,6 +177,21 @@ export const getAllMaps = async (req: Request, res: Response) => {
     return res.status(200).json({ success: true, maps });
   } catch (error) {
     return handleAblError(res, error, [], { message: "Server error", logLabel: "getAllMaps" });
+  }
+};
+
+// ========== SEARCH ACROSS ALL THOUGHTS ==========
+// GET /api/search?q=… — see searchNodesAbl.
+export const searchNodes = async (req: Request, res: Response) => {
+  try {
+    const currentUserId = req.user?._id;
+    if (!currentUserId) {
+      return res.status(401).json({ success: false, error: "Not authenticated" });
+    }
+    const results = await searchNodesAbl(currentUserId, { q: req.query.q });
+    return res.status(200).json({ success: true, results });
+  } catch (error) {
+    return handleAblError(res, error, [], { message: "Server error", logLabel: "searchNodes" });
   }
 };
 
