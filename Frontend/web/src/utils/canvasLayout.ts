@@ -719,3 +719,54 @@ export function computeLinkCycles(edges: EdgeDoc[]): string[][] {
   }
   return found;
 }
+
+// The kingdom's outer border: a rounded line all the way round a whole tree
+// (a parentless zone parent and everything below it, castles included), `pad`
+// clear of every node, so the realm reads as one place even where its castles
+// stick out of the kingdom's own zone. Each node is widened to a small circle
+// and the border is the convex hull of those circles, which rounds the
+// corners. Fewer than 3 corners when there is nothing to wrap.
+export function realmOutline(pts: Pt[], pad = 70): Pt[] {
+  const STEPS = 12;
+  const ring: Pt[] = [];
+  for (const p of pts) {
+    for (let k = 0; k < STEPS; k++) {
+      const a = (k / STEPS) * Math.PI * 2;
+      ring.push({ x: p.x + Math.cos(a) * pad, y: p.y + Math.sin(a) * pad });
+    }
+  }
+  if (pts.length === 0) return [];
+  return hullOrder(
+    ring,
+    ring.map((_, i) => i),
+  ).map((i) => ring[i]);
+}
+
+/** A tree's nodes: `rootId` and everything below it by parentId, plus shields guarding any of them. */
+export function realmMembers(rootId: string, nodes: NodeDoc[]): NodeDoc[] {
+  const children = new Map<string, NodeDoc[]>();
+  for (const n of nodes) {
+    const p = nodeRefId(n.parentId);
+    if (p) children.set(p, [...(children.get(p) ?? []), n]);
+  }
+  const root = nodes.find((n) => n.nodeId === rootId);
+  if (!root) return [];
+  const out = [root];
+  const seen = new Set([rootId]);
+  for (let i = 0; i < out.length; i++) {
+    for (const c of children.get(out[i].nodeId) ?? []) {
+      if (!seen.has(c.nodeId)) {
+        seen.add(c.nodeId);
+        out.push(c);
+      }
+    }
+  }
+  for (const n of nodes) {
+    const guards = nodeRefId(n.protectsNodeId);
+    if (n.isProtection && guards && seen.has(guards) && !seen.has(n.nodeId)) {
+      seen.add(n.nodeId);
+      out.push(n);
+    }
+  }
+  return out;
+}

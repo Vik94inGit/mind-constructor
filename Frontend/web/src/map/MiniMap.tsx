@@ -191,11 +191,10 @@ export const MiniMap = memo(function MiniMap({
 
   return (
     <div
-      // bottom-[56px] right-3: anchored to the bottom-right corner, just
-      // above the view corner's eye button (see ViewCorner), rather than
-      // top-right — out of the way of the toolbar's own top-left "back"
-      // link and the map name up there, and clear of the top-of-screen
-      // controls generally.
+      // bottom-3 right-3: down in the bottom-right corner itself, with the
+      // view corner's eye button beside it (see ViewCorner) and the zoom
+      // controls above — out of the way of the toolbar up top and of the
+      // map's middle, where the work is.
       // z-[45]: below NodePanel/PackPickerPanel/the multi-select pill
       // (z-[46] — see NodePanel's own PANEL_CLASS comment) on purpose now —
       // those are full-width bottom sheets, so once one is open it should
@@ -210,7 +209,7 @@ export const MiniMap = memo(function MiniMap({
       // it's open. (An earlier z-[70] here overshot past z-50 too, leaving
       // the minimap floating on top of an open modal instead of properly
       // covered by it.)
-      className="absolute bottom-[56px] right-3 z-45 overflow-hidden rounded-card border border-line bg-surface shadow-card"
+      className="absolute bottom-3 right-3 z-45 overflow-hidden rounded-card border border-line bg-surface shadow-card"
       title={t.ui.minimapTitle}
     >
       <svg

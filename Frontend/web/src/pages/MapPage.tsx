@@ -2225,6 +2225,7 @@ export function MapPage() {
               compact={compactView || dotZoom}
               solvedZones={solvedZones}
               walls={isDiscussionMode}
+              realmBorders
               drawing={
                 drawMode
                   ? {

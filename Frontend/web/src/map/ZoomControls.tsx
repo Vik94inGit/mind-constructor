@@ -16,14 +16,14 @@ const stepBtn =
   "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40";
 
 // Stacked in the bottom-right corner over the view corner's eye button
-// (bottom-3, 36px tall) and, when it's shown, the minimap above that
-// (bottom-[56px], ~122px tall with its border): bottom-[194px] clears the
-// minimap, bottom-[56px] just the eye button. Same z-[45] reasoning as the
+// (bottom-3, 36px tall) or, when it's shown, over the minimap that takes the
+// corner (bottom-3, ~122px tall with its border): then the eye moves on top
+// of the minimap and the zoom controls sit in the same row, left of it. Same z-[45] reasoning as the
 // minimap: above the canvas/panel, below a real modal.
 export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset, onFit, minimapShown }: Props) {
   const { t } = useI18n();
   return (
-    <div className={`absolute ${minimapShown ? "bottom-[194px]" : "bottom-[56px]"} right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card`}>
+    <div className={`absolute ${minimapShown ? "bottom-[142px] right-[60px]" : "bottom-[56px] right-3"} z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card`}>
       <button type="button" className={stepBtn} disabled={zoom <= MIN_ZOOM} title={t.map.toolbar.zoomOut} onClick={onZoomOut}>
         −
       </button>

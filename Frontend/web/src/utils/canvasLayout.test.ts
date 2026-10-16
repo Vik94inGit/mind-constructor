@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   avoidOverlap,
+  realmMembers,
+  realmOutline,
   CAPTION_WIDTH,
   computeDominantSentiment,
   computeLinkCycles,
@@ -272,5 +274,36 @@ describe("computeNodeGroups with zone layouts", () => {
   it("drops a parent's branch zones when it says none", () => {
     expect(ids({ root: "none" })).toEqual([]);
     expect(ids({ a: "none" })).toEqual([["root", ["a", "b", "root"]]]);
+  });
+});
+
+describe("realmOutline / realmMembers", () => {
+  const n = (nodeId: string, parentId: string | null, extra: Partial<NodeDoc> = {}) =>
+    ({ nodeId, parentId, text: "", type: "Problem", x: 0, y: 0, health: 100, defeated: false, userId: "u", ...extra }) as NodeDoc;
+
+  it("takes the whole tree and the shields guarding it, nothing else", () => {
+    const nodes = [
+      n("k", null),
+      n("c", "k"),
+      n("deep", "c"),
+      n("shield", null, { isProtection: true, protectsNodeId: "deep" }),
+      n("other", null),
+    ];
+    expect(realmMembers("k", nodes).map((x) => x.nodeId)).toEqual(["k", "c", "deep", "shield"]);
+  });
+
+  it("keeps every node at least `pad` inside the border", () => {
+    const pts = [
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      { x: 150, y: 200 },
+      { x: 150, y: 60 },
+    ];
+    const outline = realmOutline(pts, 50);
+    expect(outline.length).toBeGreaterThan(8);
+    for (const p of pts) {
+      const nearest = Math.min(...outline.map((o) => Math.hypot(o.x - p.x, o.y - p.y)));
+      expect(nearest).toBeGreaterThanOrEqual(49);
+    }
   });
 });
