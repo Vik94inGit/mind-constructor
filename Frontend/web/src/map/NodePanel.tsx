@@ -599,7 +599,8 @@ export function NodePanel({
   }
 
   // A picture as the node's icon: a small square cut from it (makeIconImage),
-  // or null to go back to the type's symbol.
+  // or null to go back to the type's symbol. A picture is the icon or the
+  // card, never both, so choosing the icon takes the card off.
   async function handleSetIcon(index: number | null) {
     const src = index == null ? "" : images?.[index];
     if (src == null) return;
@@ -607,7 +608,7 @@ export function NodePanel({
     setError(null);
     try {
       const iconImage = src ? await makeIconImage(src) : "";
-      onUpdated(await nodesApi.updateNode(node.nodeId, { iconImage }));
+      onUpdated(await nodesApi.updateNode(node.nodeId, iconImage ? { iconImage, cardImage: "" } : { iconImage }));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.images.iconFailed);
     } finally {
@@ -616,6 +617,7 @@ export function NodePanel({
   }
 
   // A picture as a card on the map (makeCardImage), or null to take it off.
+  // Choosing the card takes the picture icon off (see handleSetIcon).
   async function handleSetCard(index: number | null) {
     const src = index == null ? "" : images?.[index];
     if (src == null) return;
@@ -623,7 +625,7 @@ export function NodePanel({
     setError(null);
     try {
       const cardImage = src ? await makeCardImage(src) : "";
-      onUpdated(await nodesApi.updateNode(node.nodeId, { cardImage }));
+      onUpdated(await nodesApi.updateNode(node.nodeId, cardImage ? { cardImage, iconImage: "" } : { cardImage }));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.images.iconFailed);
     } finally {

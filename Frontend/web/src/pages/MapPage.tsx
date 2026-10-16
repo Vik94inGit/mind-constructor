@@ -2164,6 +2164,19 @@ export function MapPage() {
               smaller (or larger) safety net once zoomed. transformOrigin
               "0 0" keeps that scaling anchored at this wrapper's own
               top-left. */}
+          {/* The scroll area is exactly as big as the zoomed map and its margin.
+              The wrapper inside is scaled with a transform, which doesn't
+              change the room it takes up — on its own, zooming out left a
+              huge empty stretch past the right and bottom edges to scroll
+              into (twice the map's size at 50%). */}
+          <div
+            style={{
+              position: "relative",
+              width: (CANVAS_W + hScrollMargin * 2) * zoom,
+              height: (CANVAS_H + vScrollMargin + vScrollMarginBottom) * zoom,
+              overflow: "clip",
+            }}
+          >
           <div
             // A tap on the blind zone around the canvas is outside the node
             // panel too — closes it, same as empty canvas.
@@ -2171,7 +2184,9 @@ export function MapPage() {
               if (e.target === e.currentTarget && !drawMode && !chooseMode && !packMode) setSelectedId(null);
             }}
             style={{
-              position: "relative",
+              position: "absolute",
+              left: 0,
+              top: 0,
               width: CANVAS_W + hScrollMargin * 2,
               height: CANVAS_H + vScrollMargin + vScrollMarginBottom,
               transform: `scale(${zoom})`,
@@ -2519,6 +2534,7 @@ export function MapPage() {
 
             {/* Rubber-band select rectangle — see useMarqueeSelect. */}
             {marquee && <MarqueeRect marquee={marquee} />}
+          </div>
           </div>
           </div>
           </div>

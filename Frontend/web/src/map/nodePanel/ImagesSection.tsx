@@ -56,15 +56,19 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
                   title={s.open}
                   onClick={() => setOpen(i)}
                 >
+                  {/* The whole picture, scaled to the panel's width (and
+                      held under a share of the screen's height), never
+                      cropped. */}
                   <img
                     src={imageSrc(src)}
                     alt=""
-                    className={`block w-full object-cover ${list.length === 1 ? "max-h-[220px]" : "h-[110px]"}`}
+                    className={`mx-auto block max-w-full object-contain ${list.length === 1 ? "h-auto max-h-[30vh] w-full" : "h-[110px] w-full"}`}
                   />
                 </button>
                 {(onSetIcon || onSetCard) && (
                   // Shows this picture on the map: as the node's round icon
-                  // (instead of its type's symbol), as a card, or both.
+                  // (instead of its type's symbol) or as a card — one or the
+                  // other, choosing one takes the other off.
                   <div className="absolute bottom-[0.3rem] left-[0.3rem] flex flex-wrap gap-[0.25rem]">
                     {onSetIcon && (
                       <button
