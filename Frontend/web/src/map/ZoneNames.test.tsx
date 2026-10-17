@@ -70,7 +70,7 @@ describe("ZoneNames", () => {
     // The zone with a view shows it on its button; picking one reports it.
     expect(screen.getByRole("button", { name: /Near zone.$/ }).textContent).toBe("•••");
     await user.click(screen.getByRole("button", { name: /Also near.$/ }));
-    await user.click(screen.getByRole("menuitemradio", { name: /Puzzle cards/ }));
+    await user.click(screen.getByRole("menuitemradio", { name: /^Cards/ }));
     expect(onSetMode).toHaveBeenCalledWith("also", "puzzle");
   });
 

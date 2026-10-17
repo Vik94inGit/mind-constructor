@@ -13,6 +13,8 @@ interface Props {
   flipToken?: number;
   /** Emoji glyph size, px. */
   size?: number;
+  /** A still emoji (NodeDoc.emojiStill): the card never turns over. */
+  still?: boolean;
 }
 
 /** How long the back face stays up before the card turns home again, ms. */
@@ -22,10 +24,11 @@ export const FLIP_HOLD_MS = 900;
 // symbol on the other. Choosing the node turns it over once — a quick peek at
 // the back — and it settles home again on its own, so the face that's up is
 // always the viewer's choice (utils/emojiFace.ts), never stuck halfway.
-export function NodeFlipIcon({ typeFace, emoji, emojiFirst, selected, flipToken = 0, size = 22 }: Props) {
+export function NodeFlipIcon({ typeFace, emoji, emojiFirst, selected, flipToken = 0, size = 22, still = false }: Props) {
   const [showBack, setShowBack] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function peek() {
+    if (still) return;
     if (timer.current) clearTimeout(timer.current);
     setShowBack(true);
     timer.current = setTimeout(() => setShowBack(false), FLIP_HOLD_MS);

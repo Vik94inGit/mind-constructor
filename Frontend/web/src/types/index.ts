@@ -11,6 +11,14 @@ export const NODE_TYPES = [
 ] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
 
+// Mirrors Backend's CARD_SHAPES and the card size/text bounds (models/Node.ts).
+export const CARD_SHAPES = ["rounded", "square", "round"] as const;
+export type CardShape = (typeof CARD_SHAPES)[number];
+export const CARD_SIZE_MIN = 40;
+export const CARD_SIZE_MAX = 800;
+export const CARD_FONT_MIN = 9;
+export const CARD_FONT_MAX = 32;
+
 export const WEAPON_ICONS = ["sword", "axe", "spear"] as const;
 export type WeaponIcon = (typeof WEAPON_ICONS)[number];
 
@@ -250,11 +258,20 @@ export interface NodeDoc {
   zonePattern?: ZonePattern | null;
   /** A circle parent's zone colour from the calm palette (Node.zoneColor) — null / absent: the sentiment colour. */
   zoneColor?: ZonePaletteColor | null;
-  /** How bright the zone's outline is, 0..1 (Node.zoneEdge) — null / absent: the default 0.5. */
+  /** How bright the zone's outline is, 0..1 (Node.zoneEdge) — null / absent: the default, a soft 0.25. */
   zoneEdge?: number | null;
   /** Where the node sits while drawn as a puzzle card (Node.cardX/cardY), apart from the icon's x/y. null / absent: never placed as a card, so it sits at x/y. */
   cardX?: number | null;
   cardY?: number | null;
+  /** A card's own size in canvas units (Node.cardW/cardH) — null / absent: sized to its text. */
+  cardW?: number | null;
+  cardH?: number | null;
+  /** A card's text size, px (Node.cardFont) — null / absent: the default. */
+  cardFont?: number | null;
+  /** A card's outline (Node.cardShape) — null / absent: rounded. */
+  cardShape?: CardShape | null;
+  /** The node's own emoji stays face up and never turns over (Node.emojiStill). */
+  emojiStill?: boolean;
   /** Set by the map owner on the root of a branch hidden from invited members — see Node.hiddenFromMembers on the backend. */
   hiddenFromMembers?: boolean;
   /** Optional emoji — the node's icon flips between it and the type's symbol. See Backend's Node.emoji. "" / absent = none. */

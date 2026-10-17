@@ -38,7 +38,7 @@ describe("ZoneMenuBody", () => {
     const onChange = vi.fn();
     renderBody({ style: { pattern: null, color: null, edge: null, autoColor: "red", onChange } });
     const slider = screen.getByRole("slider", { name: t.ui.zoneStyle.edge });
-    expect(slider).toHaveValue("50");
+    expect(slider).toHaveValue("25");
     fireEvent.change(slider, { target: { value: "70" } });
     fireEvent.change(slider, { target: { value: "85" } });
     expect(onChange).not.toHaveBeenCalled();

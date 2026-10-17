@@ -39,3 +39,23 @@ describe("DisplayMenu background", () => {
     expect(screen.queryByText(bg.title)).not.toBeInTheDocument();
   });
 });
+
+describe("DisplayMenu emoji for each type", () => {
+  const types = TRANSLATIONS.en.ui.types;
+
+  it("lets the viewer give a type its own emoji, and go back to the default", async () => {
+    const onTypeEmoji = vi.fn();
+    renderMenu({ emojiFirst: true, typeEmoji: { Solution: "🌟" }, onTypeEmoji });
+    await userEvent.click(screen.getByRole("button", { name: `${types.Problem}: ❗` }));
+    await userEvent.click(screen.getByRole("button", { name: "🔥" }));
+    expect(onTypeEmoji).toHaveBeenCalledWith("Problem", "🔥");
+    await userEvent.click(screen.getByRole("button", { name: `${types.Solution}: 🌟` }));
+    await userEvent.click(screen.getByRole("button", { name: TRANSLATIONS.en.ui.emoji.typeEmojiReset }));
+    expect(onTypeEmoji).toHaveBeenLastCalledWith("Solution", null);
+  });
+
+  it("offers type emoji only while emoji first is on", () => {
+    renderMenu({ emojiFirst: false, typeEmoji: {}, onTypeEmoji: vi.fn() });
+    expect(screen.queryByTestId("type-emoji-picker")).not.toBeInTheDocument();
+  });
+});

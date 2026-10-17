@@ -12,6 +12,7 @@ import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeSha
 import { useI18n } from "../i18n/I18nContext";
 import { usePanelSheet } from "./nodePanel/usePanelSheet";
 import { InfoTab } from "./nodePanel/InfoTab";
+import type { CardLook } from "./nodePanel/InfoTab";
 import { ModifyTab } from "./nodePanel/ModifyTab";
 import { AttackTab } from "./nodePanel/AttackTab";
 import { ProtectTab } from "./nodePanel/ProtectTab";
@@ -135,6 +136,8 @@ interface Props {
   onExtractText: () => void;
   /** Set while this node is drawn as a puzzle card: its fill (the viewer's own, see utils/cardFill.ts) and how to change it. */
   cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
+  /** Set while this node is drawn as a card and is the viewer's own: its text size and shape, whether it has its own size, and how to change them (Node.cardFont/cardShape/cardW/cardH). */
+  cardLook?: CardLook;
   /** Its owner locked this text block (utils/blockLock.ts): the text reads as for anyone else's node until unlocked. */
   textLocked?: boolean;
   /** Locks/unlocks this node — owner only. */
@@ -170,6 +173,7 @@ export function NodePanel({
   isClusterParent,
   onExtractText,
   cardFill,
+  cardLook,
   textLocked = false,
   onToggleLock,
   autoFocusText = false,
@@ -638,11 +642,12 @@ export function NodePanel({
     }
   }
 
-  async function handleSetEmoji(emoji: string) {
+  // `still`: keep the emoji face up, never turning over (NodeDoc.emojiStill).
+  async function handleSetEmoji(emoji: string, still?: boolean) {
     setBusy(true);
     setError(null);
     try {
-      onUpdated(await nodesApi.updateNode(node.nodeId, { emoji }));
+      onUpdated(await nodesApi.updateNode(node.nodeId, still === undefined ? { emoji } : { emojiStill: still }));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.emoji.failed);
     } finally {
@@ -959,6 +964,7 @@ export function NodePanel({
           isCreator={isCreator}
           busy={busy}
           cardFill={cardFill}
+          cardLook={cardLook}
           textLocked={textLocked}
           onToggleLock={onToggleLock}
           textareaRef={textareaRef}
@@ -1023,6 +1029,7 @@ export function NodePanel({
           setOrderDraft={setOrderDraft}
           onTitleSave={handleTitleSave}
           onSetEmoji={(emoji) => void handleSetEmoji(emoji)}
+          onToggleEmojiStill={() => void handleSetEmoji(node.emoji ?? "", !node.emojiStill)}
           onZoneNameSave={handleZoneNameSave}
           onOrderSave={handleOrderSave}
           onToggleHidden={handleToggleHidden}

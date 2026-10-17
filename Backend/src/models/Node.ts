@@ -53,6 +53,14 @@ export type ManualZoneColor = (typeof MANUAL_ZONE_COLORS)[number];
 // The node's outline on the canvas — a light per-node styling choice, purely
 // visual. null (the default) means the usual circle.
 export const NODE_SHAPES = ["circle", "square", "triangle"] as const;
+// The outline of a node drawn as a card (Node.cardShape); null is "rounded".
+export const CARD_SHAPES = ["rounded", "square", "round"] as const;
+export type CardShape = (typeof CARD_SHAPES)[number];
+// Bounds for a card's own size and text size (Node.cardW/cardH/cardFont), canvas units / px.
+export const CARD_SIZE_MIN = 40;
+export const CARD_SIZE_MAX = 800;
+export const CARD_FONT_MIN = 9;
+export const CARD_FONT_MAX = 32;
 export type NodeShape = (typeof NODE_SHAPES)[number];
 
 // A zone's own look, set on the parent it radiates from: a faint pattern over
@@ -136,6 +144,16 @@ export const NodeSchema = new mongoose.Schema(
     // frontend falls back to x/y until the card is first moved.
     cardX: { type: Number, default: null },
     cardY: { type: Number, default: null },
+    // A card's own size (canvas units) and text size (px) — null: the
+    // default, sized to its text. Shared like cardX/cardY, so every member
+    // sees the same cards touch or keep apart.
+    cardW: { type: Number, default: null },
+    cardH: { type: Number, default: null },
+    cardFont: { type: Number, default: null },
+    cardShape: { type: String, enum: CARD_SHAPES, default: null },
+    // The node's own emoji stays face up and never turns over (no flip to
+    // the type's symbol) — a fixed icon of the owner's choosing.
+    emojiStill: { type: Boolean, default: false },
     color: String,
     parentId: {
       type: mongoose.Schema.Types.ObjectId,

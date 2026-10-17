@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { TypeEmoji } from "../utils/emojiFace";
 import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -6,7 +7,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { AddMenu } from "./AddMenu";
 import { DisplayMenu } from "./DisplayMenu";
 import { NodeSearch } from "./NodeSearch";
-import type { MapBackground, NodeDoc } from "../types";
+import type { MapBackground, NodeDoc, NodeType } from "../types";
 import type { ZoneLayout } from "../utils/zoneLayout";
 
 interface Props {
@@ -28,6 +29,9 @@ interface Props {
   onToggleCompact: () => void;
   emojiFirst: boolean;
   onToggleEmojiFirst: () => void;
+  /** The viewer's own emoji per type — see DisplayMenu. */
+  typeEmoji?: TypeEmoji;
+  onTypeEmoji?: (type: NodeType, emoji: string | null) => void;
   /** How the whole map draws its zones — see DisplayMenu. */
   zoneLayout?: ZoneLayout;
   onPickZoneLayout?: (layout: ZoneLayout) => void;
@@ -93,6 +97,8 @@ export function MapToolbar({
   onToggleCompact,
   emojiFirst,
   onToggleEmojiFirst,
+  typeEmoji,
+  onTypeEmoji,
   zoneLayout,
   onPickZoneLayout,
   background,
@@ -239,6 +245,8 @@ export function MapToolbar({
                 onToggleCompact={onToggleCompact}
                 emojiFirst={emojiFirst}
                 onToggleEmojiFirst={onToggleEmojiFirst}
+                typeEmoji={typeEmoji}
+                onTypeEmoji={onTypeEmoji}
                 zoneLayout={zoneLayout}
                 onPickZoneLayout={onPickZoneLayout}
                 background={background}

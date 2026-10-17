@@ -19,7 +19,7 @@ import { storedSpots } from "../utils/cardSpace";
 import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
-import type { Snap } from "../utils/puzzleSnap";
+import type { Snap } from "../utils/cardGlue";
 
 type Pt = { x: number; y: number };
 
@@ -59,11 +59,13 @@ interface Params {
   t: Translation;
   /** The fields that save a move of `node` to `pt` — its puzzle-card spot or its icon spot (utils/cardSpace.ts). Plain x/y when absent. */
   spotFor?: (node: NodeDoc, pt: Pt) => Partial<NodeDoc>;
-  /** Puzzle cards click together (utils/puzzleSnap.ts): where `node` dragged to (x,y) snaps to, if a fitting piece is close. */
+  /** Cards glue together (utils/cardGlue.ts): where `node` dragged to (x,y) glues on, if a card is close. */
   snapFor?: (node: NodeDoc, x: number, y: number) => Snap | null;
-  /** A piece was dropped clicked into another (`snap.partnerId`). */
+  /** A card was dropped glued to another (`snap.partnerId`). */
   onSnapped?: (node: NodeDoc, snap: Snap) => void;
-  /** Every node that moves along with `node` as one unit (an assembled puzzle), `node` first. */
+  /** Cards never pile up: where a card let go at (x,y) can sit clear of the others, or null for a node that isn't a card on the board. */
+  clearSpotFor?: (node: NodeDoc, x: number, y: number) => Pt | null;
+  /** Every node that moves along with `node` as one unit (a glued block), `node` first. */
   clusterFor?: (node: NodeDoc) => string[];
   /**
    * Touch: holding a node still. Return true when that was handled (a puzzle
@@ -107,6 +109,7 @@ export function useNodeDragAndDrop({
   spotFor = (_node, pt) => ({ x: pt.x, y: pt.y }),
   snapFor,
   onSnapped,
+  clearSpotFor,
   clusterFor,
   onHold,
   isBlockLocked,
@@ -603,9 +606,13 @@ export function useNodeDragAndDrop({
         const startDist = rootPos ? Math.hypot(start.x - rootPos.x, start.y - rootPos.y) : 0;
         const staysMember = !!ownCircle && (dropDist <= getZoneReach() || dropDist <= startDist);
         const leftCircle = !!ownCircle && !staysMember;
-        const dropped = placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }], [], {
-          free: !node.isWeapon,
-        });
+        // A card on the board keeps clear of the other cards instead — in
+        // the board's own units, where the icon spacing means nothing.
+        const dropped =
+          clearSpotFor?.(node, x, y) ??
+          placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }], [], {
+            free: !node.isWeapon,
+          });
 
         // Remembered so a failed persist below can put the node back exactly
         // where it actually still is on the server, instead of leaving the

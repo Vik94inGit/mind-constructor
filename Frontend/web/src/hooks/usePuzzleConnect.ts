@@ -2,16 +2,14 @@ import { useState } from "react";
 import type { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction } from "react";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { connectedPieces, findSnap } from "../utils/puzzleSnap";
-import type { Snap, SnapPiece } from "../utils/puzzleSnap";
-import type { PuzzleJoins } from "../utils/puzzleLinks";
-import { pieceEdges } from "../map/PuzzleCard";
+import { clearOfCards, connectedPieces, findSnap } from "../utils/cardGlue";
+import type { CardBox, Snap } from "../utils/cardGlue";
 import { nodeRefId } from "../utils/nodeType";
 import type { Pt } from "./useCanvasMode";
 import type { EdgeDoc, NodeDoc } from "../types";
 
-// How close (in screen pixels) a dragged puzzle piece has to come to a fitting
-// one before it clicks in.
+// How close (in screen pixels) a dragged card has to come to another before
+// it glues on.
 const SNAP_REACH_PX = 36;
 
 interface Params {
@@ -20,10 +18,8 @@ interface Params {
   edges: EdgeDoc[];
   visibleNodes: NodeDoc[];
   zoom: number;
-  /** The interlocking sides each piece shows — see utils/puzzleLinks.ts. */
-  puzzleJoins: Map<string, PuzzleJoins>;
   isOwnNode: (node: NodeDoc) => boolean;
-  /** Whether a node is drawn as a puzzle card right now — only those snap. */
+  /** Whether a node is a card on the board right now — only those glue and keep apart. */
   drawnAsCard: (node: NodeDoc) => boolean;
   posFor: (node: NodeDoc) => Pt;
   screenToCanvas: (clientX: number, clientY: number) => Pt;
@@ -31,10 +27,10 @@ interface Params {
   refreshInsights: (mapId: string) => void;
   setActionError: (message: string | null) => void;
   setContextMenu: (value: null) => void;
-  /** Opens the link dialog for the two pieces a connect drag joined. */
+  /** Opens the link dialog for the two cards a connect drag joined. */
   setPendingLink: Dispatch<SetStateAction<NodeDoc[] | null>>;
   linkFailedMessage: string;
-  /** Pieces taken out of their puzzle on demand (see MapPage's detachedPieces): they stand alone until clicked back in. */
+  /** Cards unglued on demand (see MapPage's detachedPieces): they stand alone until glued back. */
   isDetached?: (nodeId: string) => boolean;
 }
 
@@ -44,7 +40,6 @@ export function usePuzzleConnect({
   edges,
   visibleNodes,
   zoom,
-  puzzleJoins,
   isOwnNode,
   drawnAsCard,
   posFor,
@@ -57,9 +52,9 @@ export function usePuzzleConnect({
   linkFailedMessage,
   isDetached = () => false,
 }: Params) {
-  // Connecting puzzle pieces: dragging out of a piece's tab (see PuzzleCard's
-  // handles) draws a line to the pointer; letting go over another of your
-  // own pieces opens the link dialog for the two, like the group bar's Link.
+  // Linking cards: dragging out of a card's link handle (see StickerCard)
+  // draws a line to the pointer; letting go over another of your own cards
+  // opens the link dialog for the two, like the group bar's Link.
   // A link needs both ends to be yours (Backend's createEdgeAbl), and a pair
   // that's already linked can't be linked again.
   const [puzzleConnect, setPuzzleConnect] = useState<{
@@ -80,53 +75,61 @@ export function usePuzzleConnect({
       return (a === from.nodeId && b === to.nodeId) || (a === to.nodeId && b === from.nodeId);
     });
   }
-  // Clicking pieces together (utils/puzzleSnap.ts): a puzzle card dragged
-  // close to another one whose facing side has the opposite cut (a tab to a
-  // blank) jumps flush into it. Measured off the cards as drawn, so the fit
-  // matches what's on screen at any zoom. Only between pieces actually
-  // drawn as cards (drawnAsCard) — not dots, not icons.
-  function snapPiece(n: NodeDoc, at: { x: number; y: number }): SnapPiece | null {
+  // Gluing cards (utils/cardGlue.ts): a card dragged close to another jumps
+  // flush against its nearest side. Measured off the cards as drawn, so the
+  // fit matches what's on screen at any zoom. Only between cards on the
+  // board (drawnAsCard) — not dots, not icons.
+  function cardBox(n: NodeDoc, at: { x: number; y: number }): CardBox | null {
     const el = document.querySelector(`[data-reveal-node="${CSS.escape(n.nodeId)}"] [data-puzzle-card]`);
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    return {
-      id: n.nodeId,
-      x: at.x,
-      y: at.y,
-      w: r.width / zoom,
-      h: r.height / zoom,
-      edges: pieceEdges(n.nodeId, puzzleJoins.get(n.nodeId)),
-    };
+    return { id: n.nodeId, x: at.x, y: at.y, w: r.width / zoom, h: r.height / zoom };
+  }
+  // The board's other cards near (x, y), measured where they're drawn.
+  function cardsNear(node: NodeDoc, x: number, y: number, skip: (n: NodeDoc) => boolean): CardBox[] {
+    const near = (SNAP_REACH_PX + 900) / zoom;
+    return visibleNodes.flatMap((n) => {
+      if (n.nodeId === node.nodeId || !drawnAsCard(n) || skip(n)) return [];
+      const p = posFor(n);
+      if (Math.abs(p.x - x) > near || Math.abs(p.y - y) > near) return [];
+      const box = cardBox(n, p);
+      return box ? [box] : [];
+    });
   }
   function puzzleSnapFor(node: NodeDoc, x: number, y: number): Snap | null {
     if (!drawnAsCard(node)) return null;
-    const me = snapPiece(node, { x, y });
+    const me = cardBox(node, { x, y });
     if (!me) return null;
-    // Only pieces near enough to possibly fit are measured.
-    const near = (SNAP_REACH_PX + 600) / zoom;
-    const others = visibleNodes.flatMap((n) => {
-      // A detached piece is no place to click into; the dragged piece may be
-      // one, though — clicking it into a piece is how it rejoins.
-      if (n.nodeId === node.nodeId || !drawnAsCard(n) || isDetached(n.nodeId)) return [];
-      const p = posFor(n);
-      if (Math.abs(p.x - x) > near || Math.abs(p.y - y) > near) return [];
-      const piece = snapPiece(n, p);
-      return piece ? [piece] : [];
-    });
-    return findSnap(me, others, SNAP_REACH_PX / zoom);
+    // An unglued card is no place to glue onto; the dragged card may be one,
+    // though — gluing it to a card is how it rejoins.
+    const others = cardsNear(node, x, y, (n) => isDetached(n.nodeId));
+    const snap = findSnap(me, others, SNAP_REACH_PX / zoom);
+    // A glue that would land on a third card isn't one.
+    if (!snap) return null;
+    const clear = clearOfCards({ ...me, x: snap.x, y: snap.y }, cardsNear(node, snap.x, snap.y, () => false));
+    return clear.x === snap.x && clear.y === snap.y ? snap : null;
   }
-  // An assembled puzzle moves as one: every piece clicked together with
+  // Where a card let go at (x, y) can sit without covering another card:
+  // the spot itself, or the nearest one clear of them (utils/cardGlue.ts).
+  // null when `node` isn't a card on the board, so the usual placement applies.
+  function cardClearSpot(node: NodeDoc, x: number, y: number): { x: number; y: number } | null {
+    if (!drawnAsCard(node)) return null;
+    const me = cardBox(node, { x, y });
+    if (!me) return null;
+    return clearOfCards(me, cardsNear(node, x, y, () => false));
+  }
+  // A glued block moves as one: every card glued to
   // `node` (linked to it, as a branch or a link, and sitting flush against it
   // — see connectedPieces), directly or through others: what drags as one,
-  // and what locks and unlocks as one. A puzzle with any piece held in place
+  // and what locks and unlocks as one. A block with any card held in place
   // doesn't drag at all (see useNodeDragAndDrop).
   function puzzleClusterFor(node: NodeDoc): string[] {
-    // A detached piece moves on its own, and the puzzle it left moves without it.
+    // An unglued card moves on its own, and the block it left moves without it.
     if (!drawnAsCard(node) || isDetached(node.nodeId)) return [node.nodeId];
     const pieces = visibleNodes.flatMap((n) => {
       if (!drawnAsCard(n) || !isOwnNode(n) || isDetached(n.nodeId)) return [];
-      const piece = snapPiece(n, posFor(n));
-      return piece ? [piece] : [];
+      const box = cardBox(n, posFor(n));
+      return box ? [box] : [];
     });
     const byId = new Map(nodes.map((n) => [n.nodeId, n]));
     const linked = (a: string, b: string) =>
@@ -139,10 +142,9 @@ export function usePuzzleConnect({
       });
     return connectedPieces(node.nodeId, pieces, linked, 6);
   }
-  // Pieces dropped clicked together are linked — from the piece whose tab
-  // went in to the one whose blank took it, so the fit stays the way it's
-  // drawn — when both are yours (a link needs both ends to be) and they
-  // aren't linked yet.
+  // Cards dropped glued together are linked — from the card glued onto to the
+  // one brought to it — when both are yours (a link needs both ends to be)
+  // and they aren't linked yet.
   async function linkSnappedPieces(_node: NodeDoc, snap: Snap) {
     const from = nodes.find((n) => n.nodeId === snap.from);
     const to = nodes.find((n) => n.nodeId === snap.to);
@@ -192,5 +194,5 @@ export function usePuzzleConnect({
     track(e.clientX, e.clientY);
   }
 
-  return { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect };
+  return { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect, cardClearSpot };
 }

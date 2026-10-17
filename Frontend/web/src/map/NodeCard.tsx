@@ -9,10 +9,11 @@ import { NodeWings } from "./NodeWings";
 import { KnightHelmet } from "./KnightHelmet";
 import { NodeTypeIcon } from "./NodeTypeIcon";
 import { NodeFlipIcon } from "./NodeFlipIcon";
+import { nodeEmojiFace } from "../utils/emojiFace";
+import type { TypeEmoji } from "../utils/emojiFace";
 import { ShapeContent, shapeBodyClass, shapeRoundClass } from "./nodeShape";
-import { PuzzleCard } from "./PuzzleCard";
+import { StickerCard } from "./StickerCard";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
-import type { PuzzleJoins } from "../utils/puzzleLinks";
 import { CAPTION_WIDTH } from "../utils/canvasLayout";
 import { useI18n } from "../i18n/I18nContext";
 import {
@@ -43,6 +44,12 @@ const OUTCOME_BADGE_SIZE = 26;
 // point of the mode is reading whole nodes — and only a selected node
 // (whose ghost ring and panel already surround it) is held to the compact one.
 const PUZZLE_MAX_WIDTH = 240;
+const NO_TYPE_EMOJI: TypeEmoji = {};
+// A node's outline in its type's color, toned down so a map full of nodes
+// doesn't read as a field of bright rims.
+export function softEdge(color: string): string {
+  return `color-mix(in srgb, ${color} 55%, transparent)`;
+}
 const PUZZLE_SELECTED_MAX_WIDTH = 180;
 // A puzzle card shows about this many characters of its text on the canvas
 // (a node holds up to 1000); the rest scrolls inside the card. At the card's
@@ -60,8 +67,10 @@ const CARD_IMAGE_SELECTED_SIZE = 72;
 
 interface Props {
   node: NodeDoc;
-  /** The viewer's "emoji first" mode: a node with an emoji shows it face up, its type on the back (see NodeFlipIcon). */
+  /** The viewer's "emoji first" mode: every node shows an emoji face up (its own, or its type's), its type on the back (see utils/emojiFace.ts). */
   emojiFirst?: boolean;
+  /** The viewer's own emoji per type, over the defaults (utils/emojiFace.ts). */
+  typeEmoji?: TypeEmoji;
   /** Each new non-zero value turns the emoji card over once and back — MapPage's chosen-zone sequence (see useFlipSequence). */
   flipToken?: number;
   x: number;
@@ -121,9 +130,9 @@ interface Props {
   /** Double-click/double-tap — starts inline text/type editing (see MapPage's startInlineEdit); the only thing double-clicking a node does. */
   onDoubleClick?: () => void;
   onContextMenu?: (e: ReactMouseEvent) => void;
-  /** Puzzle cards only: the sides interlocked with linked nodes (utils/puzzleLinks.ts). */
-  puzzleJoins?: PuzzleJoins;
-  /** Puzzle cards only: the viewer's own fill for this piece (utils/cardFill.ts). */
+  /** Cards only: set when the viewer may resize this card — the new size, in canvas units (Node.cardW/cardH). */
+  onCardResize?: (size: { w: number; h: number }) => void;
+  /** Cards only: the viewer's own fill for this card (utils/cardFill.ts). */
   cardFill?: string;
   /** Zoomed far out (MapPage's DOT_ZOOM): drawn as a small dot in its type's color, nothing else. */
   dotted?: boolean;
@@ -140,6 +149,7 @@ interface Props {
 export const NodeCard = memo(function NodeCard({
   node,
   emojiFirst = false,
+  typeEmoji = NO_TYPE_EMOJI,
   flipToken,
   x,
   y,
@@ -174,7 +184,7 @@ export const NodeCard = memo(function NodeCard({
   onClick,
   onDoubleClick,
   onContextMenu,
-  puzzleJoins,
+  onCardResize,
   cardFill,
   dotted = false,
   onConnectStart,
@@ -614,7 +624,13 @@ export const NodeCard = memo(function NodeCard({
   // ring/OutcomeBadge all already scale through together, so composing the
   // size tier's multiplier into the same scale() keeps everything
   // proportional automatically instead of needing separately-tuned numbers.
-  const inverseScaleStyle: CSSProperties = { transform: `scale(${sizeMultiplier / zoom})` };
+  // The cards view is the exception: there every card is a sticker on the
+  // board, in the canvas's own units, so it grows and shrinks with the zoom —
+  // that's what lets cards glue edge to edge and keep from overlapping at
+  // any zoom (utils/cardGlue.ts). A zone parent drawn as a card in the mixed
+  // view stays one size on screen, like the icons around it.
+  const canvasCard = puzzle && readingMode === "puzzle";
+  const inverseScaleStyle: CSSProperties = { transform: canvasCard ? "none" : `scale(${sizeMultiplier / zoom})` };
 
   // A picture card (NodeDoc.cardImage) takes the round icon's place, so the
   // node shows one picture rather than a card stacked over an icon, selected
@@ -802,11 +818,16 @@ export const NodeCard = memo(function NodeCard({
           // glows, which as box-shadows wouldn't follow the piece's cut. A
           // thin health bar shows for the selected node in place of the
           // round health ring.
-          <PuzzleCard
-            seed={node.nodeId}
+          <StickerCard
             color={circleBorderColor}
-            joins={puzzleJoins}
             fill={cardFill}
+            shape={node.cardShape}
+            width={node.cardW}
+            height={node.cardH}
+            fontSize={node.cardFont}
+            screenScale={canvasCard ? zoom : sizeMultiplier}
+            onResize={onCardResize}
+            resizeHint={t.ui.display.resizeCard}
             onConnectStart={onConnectStart}
             connectHint={t.ui.link.dragToConnect}
             locked={blockLocked}
@@ -839,16 +860,17 @@ export const NodeCard = memo(function NodeCard({
               <img src={imageSrc(node.cardImage)} alt="" className="mb-[0.3rem] block max-h-[110px] w-full rounded-[4px] object-cover" draggable={false} />
             )}
             {trimmedTitle && (
-              <div className={`text-[0.78rem] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}>{trimmedTitle}</div>
+              <div className={`text-[1.08em] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}>{trimmedTitle}</div>
             )}
             <div
               data-testid="puzzle-card-text"
-              className={`text-[0.72rem] leading-[1.35] break-words whitespace-pre-wrap ${cardFill ? "" : "text-ink"} ${
-                selected ? "line-clamp-3" : "overflow-y-auto overscroll-contain pr-[2px]"
+              className={`min-h-0 leading-[1.35] break-words whitespace-pre-wrap ${cardFill ? "" : "text-ink"} ${
+                selected && !node.cardH ? "line-clamp-3" : "flex-1 overflow-y-auto overscroll-contain pr-[2px]"
               }`}
-              // Longer text scrolls inside the card; overscroll-contain keeps
-              // the wheel from scrolling the canvas once it reaches the end.
-              style={selected ? undefined : { maxHeight: `${(PUZZLE_TEXT_MAX_LINES * 1.35).toFixed(2)}em` }}
+              // Longer text scrolls inside the card (a card sized by its
+              // owner scrolls within that size); overscroll-contain keeps the
+              // wheel from scrolling the canvas once it reaches the end.
+              style={selected || node.cardH ? undefined : { maxHeight: `${(PUZZLE_TEXT_MAX_LINES * 1.35).toFixed(2)}em` }}
             >
               {node.text || (trimmedTitle ? "" : "…")}
             </div>
@@ -860,7 +882,7 @@ export const NodeCard = memo(function NodeCard({
                 />
               </div>
             )}
-          </PuzzleCard>
+          </StickerCard>
         ) : showPictureCard ? (
           // The picture card, in the icon's place: framed in the type's color,
           // with the selection outline and glows the round icon would carry.
@@ -893,7 +915,7 @@ export const NodeCard = memo(function NodeCard({
             <button
               type="button"
               className={`flex h-full w-full cursor-pointer items-center justify-center p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${shapeBodyClass(node.shape)}`}
-              style={{ borderColor: circleBorderColor }}
+              style={{ borderColor: softEdge(circleBorderColor) }}
               title={t.ui.node.clickToChangeType}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -927,7 +949,7 @@ export const NodeCard = memo(function NodeCard({
               // fill uses, so a ghost previews a real node's actual look
               // instead of a differently-colored stand-in.
               className={`flex h-full w-full items-center justify-center ${shapeBodyClass(node.shape)}`}
-              style={{ borderColor: circleBorderColor }}
+              style={{ borderColor: softEdge(circleBorderColor) }}
             >
               {(() => {
                 // A picture icon (NodeDoc.iconImage) stands in for the type's
@@ -946,15 +968,19 @@ export const NodeCard = memo(function NodeCard({
                 );
                 // With an emoji the icon is a two-sided card that turns over
                 // once when the node is chosen (see NodeFlipIcon).
+                // In emoji first a node without its own emoji wears its
+                // type's, and a still one never turns (utils/emojiFace.ts).
+                const face = nodeEmojiFace(node, emojiFirst, typeEmoji);
                 return (
                   <ShapeContent shape={node.shape} color={circleBorderColor}>
-                    {node.emoji ? (
+                    {face.emoji ? (
                       <NodeFlipIcon
                         typeFace={typeFace}
-                        emoji={node.emoji}
-                        emojiFirst={emojiFirst}
+                        emoji={face.emoji}
+                        emojiFirst={face.emojiUp}
                         selected={selected}
                         flipToken={flipToken}
+                        still={!face.flips}
                       />
                     ) : (
                       typeFace

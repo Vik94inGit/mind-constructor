@@ -10,6 +10,7 @@ import {
   updatePreferencesDao,
 } from "../dao/userStateDao.js";
 import { DRAFT_KINDS, LANGUAGES, READING_MODES, THEMES, ZONE_LAYOUTS, ZONE_MODES } from "../models/UserState.js";
+import { NODE_TYPES } from "../models/Node.js";
 import type { DraftKind } from "../models/UserState.js";
 import { ValidationError, parseOrThrow } from "./errors.js";
 
@@ -32,6 +33,12 @@ const preferencesSchema = z
     language: z.enum(LANGUAGES),
     readingMode: z.enum(READING_MODES),
     compactView: z.boolean(),
+    emojiFirst: z.boolean(),
+    // Same rule as a node's emoji: no letters or digits, short.
+    typeEmoji: z.partialRecord(
+      z.enum(NODE_TYPES),
+      z.string().max(32).refine((v) => !/[\p{L}\p{N}]/u.test(v), "an emoji has no letters or digits"),
+    ),
   })
   .partial()
   .strict();

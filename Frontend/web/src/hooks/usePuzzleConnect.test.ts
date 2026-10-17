@@ -3,7 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { usePuzzleConnect } from "./usePuzzleConnect";
 import { makeEdge, makeNode } from "../test/fixtures";
 import type { EdgeDoc, NodeDoc } from "../types";
-import type { Snap } from "../utils/puzzleSnap";
+import type { Snap } from "../utils/cardGlue";
 
 vi.mock("../api/edges", () => ({ createEdge: vi.fn() }));
 import * as edgesApi from "../api/edges";
@@ -15,7 +15,6 @@ function setup(nodes: NodeDoc[], edges: EdgeDoc[] = []) {
     edges,
     visibleNodes: nodes,
     zoom: 1,
-    puzzleJoins: new Map(),
     isOwnNode: (n: NodeDoc) => n.userId === "u1",
     drawnAsCard: () => true,
     posFor: (n: NodeDoc) => ({ x: n.x ?? 0, y: n.y ?? 0 }),
@@ -38,7 +37,7 @@ describe("usePuzzleConnect.linkSnappedPieces", () => {
     vi.clearAllMocks();
   });
 
-  it("links two of your own unlinked pieces, tab to blank", async () => {
+  it("links two of your own unlinked pieces, from the card glued onto", async () => {
     const a = makeNode({ nodeId: "a" });
     const b = makeNode({ nodeId: "b" });
     const created = makeEdge("a", "b");

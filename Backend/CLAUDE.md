@@ -68,7 +68,7 @@ Strict layering, one direction only: **routes → controllers → abl → dao �
 - **`src/routes/*.ts`** (`authRoutes.ts`, `mapRoute.ts`, `nodeRoute.ts`, `edgeRoute.ts`, `lineRoute.ts`, `imageRoute.ts`, `userStateRoute.ts`, `folderRoute.ts`) — wires
   URLs to controller functions, applies `protect` (and `requireAdmin` where needed) from
   `src/middleware/auth.ts`. No logic here. Mounted in [server.ts](server.ts) as `/api/auth`,
-  `/api/nodes`, `/api/edges`, `/api/lines`, `/api/images` (`GET /:imageId`, a stored node picture — see the image store below), `/api/state` (the signed-in user's own state, so they pick up where they left off on any device — `GET /` preferences + last map, `PATCH /preferences`, `GET`/`PATCH /maps/:mapId` their view of a map, `GET`/`PATCH`/`DELETE /drafts/:kind`; see `models/UserState.ts`), `/api/folders` (a user's own dashboard folders — `GET`/`POST /`, `PATCH`/`DELETE /:folderId`, and `PATCH /maps/:mapId` with `{ folderId | null }` to file a map; mounted before the map routes so `folders` isn't read as a mapId), and `/api` (map routes — note the mount point itself has no `/maps`
+  `/api/nodes`, `/api/edges`, `/api/lines`, `/api/images` (`GET /:imageId`, a stored node picture — see the image store below), `/api/state` (the signed-in user's own state, so they pick up where they left off on any device — `GET /` preferences + last map, `PATCH /preferences` (theme, language, reading mode, compact view, `emojiFirst`, and `typeEmoji`: the user's own emoji per node type), `GET`/`PATCH /maps/:mapId` their view of a map, `GET`/`PATCH`/`DELETE /drafts/:kind`; see `models/UserState.ts`), `/api/folders` (a user's own dashboard folders — `GET`/`POST /`, `PATCH`/`DELETE /:folderId`, and `PATCH /maps/:mapId` with `{ folderId | null }` to file a map; mounted before the map routes so `folders` isn't read as a mapId), and `/api` (map routes — note the mount point itself has no `/maps`
   segment, so these resolve as `/api/{mapId}/{nodes,edges,lines,circles/select,circles/deselect,
 attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `GET /api/search?q=` (same router, declared before `/:mapId`; `searchNodesAbl` + `searchNodesDao`) searches every node the caller can see across all their maps — text, title, prompt or zone name, case-insensitive substring, newest first, at most 50 — and returns a snippet around the match rather than the full text, with the hidden-branch rule of `getNodesByMapDao`. `DELETE /api/nodes` (body: `{ nodeIds }`)
   is the bulk counterpart of `DELETE /api/nodes/:nodeId` — one request for a multi-select delete
@@ -277,13 +277,20 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   kept apart from `x`/`y` (the icon's spot) because a card is far bigger than an icon. `null` (the
   default) means never placed as a card, and a frontend falls back to `x`/`y`. Plain
   `PATCH /api/nodes/:nodeId`, owner-only like `x`/`y`; `null` forgets it.
+- **`Node.cardW` / `cardH` / `cardFont` / `cardShape`** — a card's own size in canvas units
+  (`CARD_SIZE_MIN`..`CARD_SIZE_MAX`, 40..800), its text size in px (9..32) and its outline
+  (`rounded | square | round`, `CARD_SHAPES`); `null` is the default (sized to its text, rounded).
+  Shared like `cardX`/`cardY`, so every member sees the same cards touch or keep apart. Plain
+  `PATCH /api/nodes/:nodeId`, owner-only.
+- **`Node.emojiStill`** — the node's own emoji stays face up and never turns over to the type's
+  symbol. Plain `PATCH`, owner-only; default `false`.
 - **`Node.shape`** — `circle | square | triangle` (`NODE_SHAPES`), the node's outline on the canvas;
   `null` (the default) is the usual circle. Plain `PATCH /api/nodes/:nodeId`, owner-only. Purely visual.
 - **`Node.zonePattern` / `Node.zoneColor`** — the look of the zone a circle parent radiates:
   `zonePattern` is `dots | stripes | grid | chess` (`ZONE_PATTERNS`), drawn faintly over the zone's
   fill; `zoneColor` is one of a small calm palette (`ZONE_PALETTE`: sand, sage, sky, lavender, rose,
   slate) used in place of the majority-sentiment colour. `null` (the default) keeps no pattern / the
-  sentiment colour. `zoneEdge` (0..1, `null` = 0.5) is how bright the zone's outline is drawn. Plain
+  sentiment colour. `zoneEdge` (0..1, `null` = a soft 0.25) is how bright the zone's outline is drawn. Plain
   `PATCH /api/nodes/:nodeId`, owner-only. Purely visual, shared with every member. One person, one colour:
   a `zoneColor` another member's node on the same map already wears is refused (`ZoneColorTakenError` → 409,
   via `zoneColorTakenDao`); a frontend shows such colours as taken.

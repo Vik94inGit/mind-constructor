@@ -5,13 +5,19 @@ import type { ZoneLayout } from "../utils/zoneLayout";
 import { MAP_BACKGROUNDS } from "../types";
 import type { MapBackground } from "../types";
 import { mapBackgroundStyle } from "../utils/mapBackground";
+import type { NodeType } from "../types";
+import type { TypeEmoji } from "../utils/emojiFace";
+import { TypeEmojiPicker } from "./TypeEmojiPicker";
 
 interface Props {
   compact: boolean;
   onToggleCompact: () => void;
-  /** "Emoji first": a node with an emoji shows it face up, its type on the back. */
+  /** "Emoji first": every node shows an emoji face up (its own, or its type's), its type on the back. Off: symbols first. */
   emojiFirst: boolean;
   onToggleEmojiFirst: () => void;
+  /** The viewer's own emoji per type (utils/emojiFace.ts), offered while emoji first is on. */
+  typeEmoji?: TypeEmoji;
+  onTypeEmoji?: (type: NodeType, emoji: string | null) => void;
   /** How the whole map draws its zones (utils/zoneLayout.ts); a parent's own choice still wins for its branch. */
   zoneLayout?: ZoneLayout;
   onPickZoneLayout?: (layout: ZoneLayout) => void;
@@ -40,6 +46,8 @@ export function DisplayMenu({
   onToggleCompact,
   emojiFirst,
   onToggleEmojiFirst,
+  typeEmoji,
+  onTypeEmoji,
   zoneLayout,
   onPickZoneLayout,
   background,
@@ -98,6 +106,14 @@ export function DisplayMenu({
         <span className="flex-1">{t.ui.emoji.first}</span>
         {emojiFirst && <span aria-hidden>✓</span>}
       </button>
+      {emojiFirst && typeEmoji && onTypeEmoji && (
+        <>
+          <div className="px-[0.7rem] pt-[0.2rem] text-[0.72rem] font-semibold tracking-wide text-ink-soft uppercase">
+            {t.ui.emoji.typeEmoji}
+          </div>
+          <TypeEmojiPicker typeEmoji={typeEmoji} onChange={onTypeEmoji} />
+        </>
+      )}
       {zoneLayout && onPickZoneLayout && (
         <>
           <div className="my-[0.15rem] border-t border-line" />
