@@ -142,6 +142,8 @@ export function makeZoneRule(
   extra: ExtraNode[] = [],
   reach: number = getZoneReach(),
   layouts: ZoneLayouts = {},
+  /** Only keep the moving nodes off other nodes: no zone rules, no rule 3. */
+  free = false,
 ): ZoneRule {
   const offsetOf = new Map(moving.map((m) => [m.nodeId, m.offset ?? { x: 0, y: 0 }]));
   const parentOf = new Map<string, string | null>();
@@ -215,9 +217,11 @@ export function makeZoneRule(
       // A follower in a group can't land on a node outside it either (the
       // first moving node is held to that by the caller's own obstacles).
       for (const f of fixedPoints) if (footprintsOverlap(m.p, f.p)) return false;
+      if (free) continue;
       // Rule 1: not in a zone it isn't part of.
       for (const z of fixedZones) if (!z.memberIds.has(m.id) && intrudes(m.p, z)) return false;
     }
+    if (free) return true;
     for (const mz of movingZones) {
       const outline = outlineOf(mz.zone, posOf);
       if (!outline) continue;
@@ -232,7 +236,7 @@ export function makeZoneRule(
   }
 
   function compact(p: Pt): boolean {
-    if (fixedPoints.length === 0 && fixedLines.length === 0) return true;
+    if (free || (fixedPoints.length === 0 && fixedLines.length === 0)) return true;
     for (const m of movingAt(p)) {
       for (const f of fixedPoints) if (footprintGap(m.p, f.p) <= MAX_ZONE_GAP) return true;
       for (const line of fixedLines) if (distToOutline(m.p, line) - NODE_FOOTPRINT.h / 2 <= MAX_ZONE_GAP) return true;

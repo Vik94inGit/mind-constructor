@@ -667,13 +667,25 @@ export function MapPage() {
   // `desired`: the nearest spot that covers no other node and follows the
   // zone rules — out of zones it isn't in, zones not crossing, and no more
   // than ~2 cm from the nearest node or zone line. See utils/zoneRules.ts.
+  // `free` (a node the person dragged there themselves) keeps only the first
+  // part: nothing on top of another node or its text.
   // Only the moving nodes move; nothing else on the map is pushed around.
-  function placeNode(desired: { x: number; y: number }, moving: MovingNode[], extra: ExtraNode[] = []) {
+  function placeNode(
+    desired: { x: number; y: number },
+    moving: MovingNode[],
+    extra: ExtraNode[] = [],
+    opts: { free?: boolean } = {},
+  ) {
     const obstacles = footprintObstacles(
       [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
       MIN_NODE_GAP,
     );
-    return placeByZoneRules(desired, obstacles, viewportBounds(), makeZoneRule(visibleNodes, positions, moving, extra, undefined, zoneLayouts));
+    return placeByZoneRules(
+      desired,
+      obstacles,
+      viewportBounds(),
+      makeZoneRule(visibleNodes, positions, moving, extra, undefined, zoneLayouts, opts.free),
+    );
   }
 
 

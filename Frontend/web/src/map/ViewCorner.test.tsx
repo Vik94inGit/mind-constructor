@@ -47,32 +47,12 @@ describe("ViewCorner", () => {
     expect(props.onReadingModeChange).toHaveBeenLastCalledWith("mixed");
   });
 
-  it("keeps the separate level and view steppers under Fine-tune", async () => {
+  it("has one detail equalizer, no separate level or view steppers", async () => {
     renderCorner();
     await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    expect(screen.getAllByRole("button", { name: s.richer })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: s.fineTune })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: s.moreDetail })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: s.fineTune }));
-    expect(screen.getByRole("button", { name: s.moreDetail })).toBeInTheDocument();
-  });
-
-  it("steps the detail level, with the top step meaning every level", async () => {
-    const props = renderCorner({ level: 2 });
-    await userEvent.click(screen.getByRole("button", { name: s.menu }));
-    await userEvent.click(screen.getByRole("button", { name: s.fineTune }));
-    await userEvent.click(screen.getByRole("button", { name: s.moreDetail }));
-    expect(props.onLevelChange).toHaveBeenLastCalledWith(null);
-    await userEvent.click(screen.getByRole("button", { name: s.lessDetail }));
-    expect(props.onLevelChange).toHaveBeenLastCalledWith(1);
-  });
-
-  it("steps the view from minimal to text-heavy", async () => {
-    const props = renderCorner({ readingMode: "actual" });
-    await userEvent.click(screen.getByRole("button", { name: s.menu }));
-    await userEvent.click(screen.getByRole("button", { name: s.fineTune }));
-    await userEvent.click(screen.getByRole("button", { name: s.moreText }));
-    expect(props.onReadingModeChange).toHaveBeenLastCalledWith("iconText");
-    await userEvent.click(screen.getByRole("button", { name: s.lessText }));
-    expect(props.onReadingModeChange).toHaveBeenLastCalledWith("mixed");
   });
 
   it("toggles the minimap", async () => {

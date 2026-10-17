@@ -466,6 +466,10 @@ export const NodeCard = memo(function NodeCard({
     // right-clicking a node should open its menu, not dismiss it.
     e.preventDefault();
     e.stopPropagation();
+    // A finger held on a node is already the long press (multi-select, or a
+    // puzzle card's menu, see useNodeDragAndDrop); the phone's own
+    // contextmenu for the same hold would select the node over it.
+    if (lastPointerType.current === "touch") return;
     onContextMenu?.(e);
   };
 
