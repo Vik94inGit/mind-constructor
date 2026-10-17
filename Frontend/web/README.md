@@ -140,3 +140,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node with a question or a Problem / Problematic option (enforced by the backend's `attackAbl.ts`).
   In Creating mode attacks only add their node and do no damage. The one way to stop a battle-mode
   attack is a protection node, created by the target's own owner.
+- An attack belongs to no zone. Another member's attack, or the imitated opponent's move, is placed
+  outside the walls of the castle it hits and can't be dragged into any castle. Opening an attack on
+  one of your nodes lands on its Attack tab, ready to strike back (each hit on it heals your node by
+  10); the opponent's-turn panel offers the same right after its move.
