@@ -76,6 +76,7 @@ import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
 import { MapLegend } from "../map/MapLegend";
 import { ZoneMenu } from "../map/ZoneMenu";
+import { GestureHint } from "../map/GestureHint";
 import type { ZoneStylePatch } from "../map/ZoneMenuBody";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
@@ -2601,6 +2602,7 @@ export function MapPage() {
               uses for NodePanel. */}
           {!presenting && (
             <>
+              {!loading && <GestureHint />}
               <ViewCorner
                 level={abstractionLevel}
                 levels={levelCount(depthByNode)}
