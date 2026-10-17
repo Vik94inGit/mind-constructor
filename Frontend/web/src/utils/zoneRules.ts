@@ -148,8 +148,8 @@ export function makeZoneRule(
   const offsetOf = new Map(moving.map((m) => [m.nodeId, m.offset ?? { x: 0, y: 0 }]));
   const parentOf = new Map<string, string | null>();
   const fixedPos = new Map<string, Pt>();
-  // Weapon marks are drawn off to the side of their target (see WeaponLayer),
-  // not as nodes on the map, so they neither block nor get blocked.
+  // Attacks don't block other nodes, and belong to no zone, so rule 1 keeps
+  // a dragged attack out of every castle, its target's included.
   const weapons = new Set<string>();
   for (const n of nodes) {
     parentOf.set(n.nodeId, nodeRefId(n.parentId) ?? null);
@@ -168,7 +168,8 @@ export function makeZoneRule(
 
   const childrenOf = new Map<string, string[]>();
   for (const [id, parentId] of parentOf) {
-    if (!parentId) continue;
+    // An attack is in no zone: it stays outside the castle it hits.
+    if (!parentId || weapons.has(id)) continue;
     if (!childrenOf.has(parentId)) childrenOf.set(parentId, []);
     childrenOf.get(parentId)!.push(id);
   }

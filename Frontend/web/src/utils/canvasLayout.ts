@@ -657,7 +657,9 @@ export function computeNodeGroups(
   const byId = new Map(allNodes.map((n) => [n.nodeId, n]));
   for (const n of visibleNodes) {
     byId.set(n.nodeId, byId.get(n.nodeId) ?? n);
-    const parentId = nodeRefId(n.parentId);
+    // An attack hangs from its target by parentId, but it isn't part of the
+    // target's castle: it stays outside, so it never joins or stretches a zone.
+    const parentId = n.isWeapon ? null : nodeRefId(n.parentId);
     if (!parentId) continue;
     if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
     childrenByParent.get(parentId)!.push(n.nodeId);
@@ -777,11 +779,12 @@ export function realmOutline(pts: Pt[], pad = 70): Pt[] {
   ).map((i) => ring[i]);
 }
 
-/** A tree's nodes: `rootId` and everything below it by parentId, plus shields guarding any of them. */
+/** A tree's nodes: `rootId` and everything below it by parentId, plus shields guarding any of them. Attacks are left out. */
 export function realmMembers(rootId: string, nodes: NodeDoc[]): NodeDoc[] {
   const children = new Map<string, NodeDoc[]>();
   for (const n of nodes) {
-    const p = nodeRefId(n.parentId);
+    // Attacks stay outside the realm they hit (see computeNodeGroups).
+    const p = n.isWeapon ? null : nodeRefId(n.parentId);
     if (p) children.set(p, [...(children.get(p) ?? []), n]);
   }
   const root = nodes.find((n) => n.nodeId === rootId);

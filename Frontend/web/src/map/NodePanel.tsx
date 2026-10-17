@@ -262,6 +262,9 @@ export function NodePanel({
   // canAttack right below to decide whether this is a retaliation.
   const targetId = node.isWeapon ? nodeRefId(node.targetNodeId) : undefined;
   const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
+  // An attack from the other side (another member's, or the imitated
+  // opponent's) on one of your own nodes: its panel opens ready to strike back.
+  const strikeBack = discussionMode && !!target && idOf(target.userId) === currentUserId && (!!node.byOpponent || !isCreator);
 
   // Same idea, for a protection node's own protectsNodeId — surfaced as a
   // "Protects" line in the Info tab, exact mirror of "Points at" above.
@@ -365,7 +368,9 @@ export function NodePanel({
   useEffect(() => {
     setError(null);
     setAttackText("");
-    setAttackType("Problem");
+    // A strike back answers a negative attack with a positive node, and
+    // anything else with a problem.
+    setAttackType(strikeBack && sentimentOf(node.type) === "negative" ? "Solution" : "Problem");
     setProtectText("");
     setProtectType("Solution");
     setTextDraft(node.text);
@@ -375,7 +380,7 @@ export function NodePanel({
     setExpanded(false);
     setDragOffset({ x: 0, y: 0 });
     setPanelHeight(null);
-    setTab("info");
+    setTab(strikeBack ? "attack" : "info");
     nodesApi
       .getAttackHistory(node.nodeId)
       .then(setHistory)
@@ -1046,6 +1051,7 @@ export function NodePanel({
           effectiveAttackType={effectiveAttackType}
           setAttackType={setAttackType}
           attackHint={attackHint}
+          strikeBackAt={strikeBack && target ? target.title || target.text || t.ui.types[target.type] : null}
           onAttack={handleAttack}
         />
       )}

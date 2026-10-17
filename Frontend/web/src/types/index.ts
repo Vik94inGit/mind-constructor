@@ -31,6 +31,9 @@ export const WEAPON_INFO: Record<Weapon, { label: string; damage: number }> = {
   fatalFlaw: { label: "Fatal flaw", damage: 50 },
 };
 
+/** What a hit on an attack heals the node it hit by (attackAbl.ts's RETALIATION_HEAL_AMOUNT). */
+export const RETALIATION_HEAL = 10;
+
 // An attack always creates a real content node alongside the damage now —
 // every outcome type except "unknown" (mirrors attackAbl.ts's
 // ATTACK_NODE_TYPES on the backend, which is the one that actually gets

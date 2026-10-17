@@ -13,6 +13,8 @@ interface Props {
   onProtected: (res: Awaited<ReturnType<typeof nodesApi.protectNode>>) => void;
   /** The node the move landed on — MapPage centers the view on it. */
   onFocus: (nodeId: string) => void;
+  /** Answer the opponent's last attack: MapPage opens it, ready to hit back. */
+  onStrikeBack: (weaponNodeId: string) => void;
   onExit: () => void;
 }
 
@@ -28,7 +30,7 @@ const LABEL_MAX = 60;
 // attacks (an invader, or one of your own castles in a civil war), which
 // castle, and a strategy; one press places one move on the map and hands the
 // turn back. Takes over the bottom-sheet slot like DrawLineBar.
-export function SiegePanel({ holds, nodes, onAttacked, onProtected, onFocus, onExit }: Props) {
+export function SiegePanel({ holds, nodes, onAttacked, onProtected, onFocus, onStrikeBack, onExit }: Props) {
   const { t } = useI18n();
   const s = t.ui.siege;
   const [attacker, setAttacker] = useState<string>("");
@@ -36,6 +38,8 @@ export function SiegePanel({ holds, nodes, onAttacked, onProtected, onFocus, onE
   const [strategy, setStrategy] = useState<Strategy>("siege");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  // The opponent's last attack, until you strike back or it makes another move.
+  const [lastAttack, setLastAttack] = useState<string | null>(null);
 
   // Sally and fortify need an attacking castle; with an invader picked they
   // fall back to a siege rather than leaving nothing chosen.
@@ -62,9 +66,14 @@ export function SiegePanel({ holds, nodes, onAttacked, onProtected, onFocus, onE
     try {
       // byOpponent: the move is the opponent's, not yours — it shows with the
       // opponent's flag, and counts as their word when you want to finish.
-      if (move.action === "attack")
-        onAttacked(await nodesApi.attackNode(move.targetId, move.weapon, { type: move.type, text, byOpponent: true }));
-      else onProtected(await nodesApi.protectNode(move.targetId, { type: move.type, text, byOpponent: true }));
+      if (move.action === "attack") {
+        const res = await nodesApi.attackNode(move.targetId, move.weapon, { type: move.type, text, byOpponent: true });
+        onAttacked(res);
+        setLastAttack(res.weaponNode.nodeId);
+      } else {
+        onProtected(await nodesApi.protectNode(move.targetId, { type: move.type, text, byOpponent: true }));
+        setLastAttack(null);
+      }
       onFocus(move.targetId);
       setMessage({ tone: "ok", text: s.done(s.strategies[active].name, labelOf(move.targetId)) });
     } catch (err) {
@@ -141,6 +150,11 @@ export function SiegePanel({ holds, nodes, onAttacked, onProtected, onFocus, onE
             >
               {message?.text ?? s.strategies[active].hint}
             </span>
+            {lastAttack && !busy && (
+              <button className={`${btn} ${idle} shrink-0`} onClick={() => onStrikeBack(lastAttack)}>
+                {s.strikeBack}
+              </button>
+            )}
             <button
               className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-accent bg-accent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-white transition-opacity duration-[120ms] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={busy || !targetId}

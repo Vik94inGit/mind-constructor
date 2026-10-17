@@ -144,6 +144,8 @@ export function useNodeDragAndDrop({
     x: number,
     y: number,
   ): { target: NodeDoc; valid: boolean; reason?: string } | null {
+    // An attack stays tied to what it hit; dropping it is only ever a move.
+    if (dragged.isWeapon) return null;
     let closest: NodeDoc | null = null;
     let closestDist = CIRCLE_DROP_RADIUS;
     for (const n of nodes) {
@@ -584,7 +586,11 @@ export function useNodeDragAndDrop({
         // just moves the root. A circle with only one member left after this
         // simply stops being one — nodeGroups requires 2+ children, so its
         // backdrop disappears on its own, no separate cleanup needed here.
-        const parentId = nodeRefId(node.parentId);
+        // An attack hangs from its target but is no member of its zone: it
+        // never leaves a circle (that would cut it off its target), and the
+        // zone rules keep it outside every castle, so it can't be dropped
+        // inside one.
+        const parentId = node.isWeapon ? undefined : nodeRefId(node.parentId);
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
         // Still a member at the raw drop point? Within the zone's reach of
         // its root (see getZoneReach) it is. Past it, it leaves the circle —
@@ -598,7 +604,7 @@ export function useNodeDragAndDrop({
         const staysMember = !!ownCircle && (dropDist <= getZoneReach() || dropDist <= startDist);
         const leftCircle = !!ownCircle && !staysMember;
         const dropped = placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }], [], {
-          free: true,
+          free: !node.isWeapon,
         });
 
         // Remembered so a failed persist below can put the node back exactly
