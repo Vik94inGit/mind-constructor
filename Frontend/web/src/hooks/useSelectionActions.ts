@@ -24,8 +24,6 @@ interface Params {
   showNodes: (ids: string[]) => void;
   setActionError: (message: string | null) => void;
   refreshInsights: (mapId: string) => void;
-  /** A short shiver on the nodes just deleted, before they leave the map. */
-  shakeNodes?: (ids: string[]) => Promise<void>;
   t: Translation;
 }
 
@@ -45,7 +43,6 @@ export function useSelectionActions({
   showNodes,
   setActionError,
   refreshInsights,
-  shakeNodes,
   t,
 }: Params) {
   const confirm = useConfirm();
@@ -67,7 +64,6 @@ export function useSelectionActions({
     try {
       const { deleted } = await nodesApi.deleteManyNodes(ids);
       const deletedIds = new Set(deleted.map((d) => d.deletedId));
-      await shakeNodes?.(Array.from(deletedIds));
       // Any protection node in the batch releases its own banked damage
       // onto whatever it was defending — see Backend's deleteNodeDao.
       deleted.forEach(({ damagedProtectedNode }) => {

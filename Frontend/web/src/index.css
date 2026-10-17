@@ -163,7 +163,6 @@
      utility only supplies the animation-name/timing-function/iteration
      that's shared across every instance. See NodeCard.tsx/QuickAddGhosts.tsx. */
   --animate-node-chaos-drift: node-chaos-drift 3s ease-in-out infinite;
-  --animate-node-delete-shake: node-delete-shake 0.32s ease-in-out both;
   --animate-drop-target-pulse: drop-target-pulse 0.9s ease-in-out infinite;
   --animate-weapon-fly-in: weapon-fly-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-weapon-arrow-fly: weapon-arrow-fly 0.55s ease-in forwards;
@@ -207,37 +206,6 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-thought-pop,
   .animate-thought-in {
-    animation: none;
-  }
-}
-
-/* A node about to be deleted gives a short shiver and fades. Through the
-   individual rotate property, so it leaves the centering transform (and the
-   reveal show's translate) alone. See MapPage's shakeNodes. */
-@keyframes node-delete-shake {
-  0% {
-    rotate: 0deg;
-  }
-  20% {
-    rotate: -7deg;
-  }
-  40% {
-    rotate: 6deg;
-  }
-  60% {
-    rotate: -4deg;
-  }
-  80% {
-    rotate: 3deg;
-    opacity: 0.8;
-  }
-  100% {
-    rotate: 0deg;
-    opacity: 0.35;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .animate-node-delete-shake {
     animation: none;
   }
 }
