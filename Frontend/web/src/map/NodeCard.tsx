@@ -935,8 +935,9 @@ export const NodeCard = memo(function NodeCard({
             >
               {(() => {
                 // A picture icon (NodeDoc.iconImage) stands in for the type's
-                // symbol; the ring's color still says the type.
-                const typeFace = node.iconImage ? (
+                // symbol; the ring's color still says the type. A node with a
+                // picture card shows that picture only, never an icon too.
+                const typeFace = node.iconImage && !node.cardImage ? (
                   <img src={imageSrc(node.iconImage)} alt="" className={`h-full w-full ${shapeRoundClass(node.shape)} object-cover`} draggable={false} />
                 ) : isOutcome ? (
                   <OutcomeBadge
