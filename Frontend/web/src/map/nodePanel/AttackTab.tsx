@@ -1,4 +1,4 @@
-import { WEAPONS, WEAPON_INFO } from "../../types";
+import { RETALIATION_HEAL, WEAPONS, WEAPON_INFO } from "../../types";
 import type { NodeDoc, NodeType, Weapon } from "../../types";
 import { useI18n } from "../../i18n/I18nContext";
 
@@ -13,15 +13,22 @@ interface Props {
   effectiveAttackType: NodeType;
   setAttackType: (type: NodeType) => void;
   attackHint: string | null;
+  /** Set when this is an attack on one of your nodes: that node's name, for the strike-back intro. */
+  strikeBackAt?: string | null;
   onAttack: (weapon: Weapon) => void;
 }
 
 // NodePanel's Attack tab: write the objection, pick which node type it lands
 // as, then fire one of the weapons.
-export function AttackTab({ node, busy, protectors, attackText, setAttackText, attackTypes, effectiveAttackType, setAttackType, attackHint, onAttack }: Props) {
+export function AttackTab({ node, busy, protectors, attackText, setAttackText, attackTypes, effectiveAttackType, setAttackType, attackHint, strikeBackAt, onAttack }: Props) {
   const { t } = useI18n();
   return (
     <div className="mt-4">
+      {strikeBackAt && (
+        <p className="mb-2 rounded-lg border border-accent bg-accent-soft px-3 py-2 text-[0.8rem] text-accent-ink">
+          <strong>{t.ui.siege.strikeBack}</strong> {t.ui.siege.strikeBackIntro(strikeBackAt.length > 60 ? `${strikeBackAt.slice(0, 60)}…` : strikeBackAt, RETALIATION_HEAL)}
+        </p>
+      )}
       <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
         {t.ui.attack.intro}
         {node.isWeapon && t.ui.attack.introWeapon}

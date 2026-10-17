@@ -1,6 +1,7 @@
 import { CANVAS_W, CANVAS_H, avoidOverlap, getNodeMinDist, hashOffset, isMobileViewport, nodeObstacles, spiralPoint } from "./canvasLayout";
 import type { ViewportBounds } from "./canvasLayout";
 import { idOf, nodeRefId } from "./nodeType";
+import { holdMembers } from "./siege";
 import type { NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
@@ -41,6 +42,32 @@ export function computeBasePositions(nodes: NodeDoc[]): Map<string, Pt> {
     const radius = getNodeMinDist();
     const desired = { x: base.x + radius * Math.cos(angle), y: base.y + radius * Math.sin(angle) };
     return avoidOverlap(desired, nodeObstacles(Array.from(map.values())));
+  }
+
+  // An attack from the other side (another member's, or the imitated
+  // opponent's move) is never placed inside the castle it hits: it waits
+  // outside the walls of the zone its target stands in, on the side facing
+  // the target. Your own attacks keep the companion placement above.
+  function isOpponentMove(n: NodeDoc, target: NodeDoc | undefined): boolean {
+    return !!target && (!!n.byOpponent || idOf(n.userId) !== idOf(target.userId));
+  }
+  function placeOutsideCastle(n: NodeDoc, target: NodeDoc, targetPos: Pt): Pt {
+    const keepId = nodeRefId(target.parentId) ?? target.nodeId;
+    const walls = holdMembers(keepId, nodes)
+      .map((m) => map.get(m.nodeId))
+      .filter((p): p is Pt => !!p);
+    if (walls.length === 0) return placeCompanionNode(n, targetPos);
+    const cx = walls.reduce((sum, p) => sum + p.x, 0) / walls.length;
+    const cy = walls.reduce((sum, p) => sum + p.y, 0) / walls.length;
+    const clearance = getNodeMinDist();
+    const r = Math.max(...walls.map((p) => Math.hypot(p.x - cx, p.y - cy))) + clearance;
+    const toTarget = Math.atan2(targetPos.y - cy, targetPos.x - cx);
+    const base = Math.hypot(targetPos.x - cx, targetPos.y - cy) > 1 ? toTarget : 0;
+    // Fanned a little by hash, so several attacks on one node don't stack.
+    const angle = base + hashOffset(n.nodeId, 30) * (Math.PI / 180);
+    const desired = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+    const outside = (p: Pt) => walls.every((w) => Math.hypot(p.x - w.x, p.y - w.y) >= clearance) && Math.hypot(p.x - cx, p.y - cy) >= r - clearance / 2;
+    return avoidOverlap(desired, nodeObstacles(Array.from(map.values())), undefined, outside);
   }
 
   regular.forEach((n, i) => {
@@ -99,7 +126,7 @@ export function computeBasePositions(nodes: NodeDoc[]): Map<string, Pt> {
     // nodes fan out from an explicit anchor and land far enough out
     // (getNodeMinDist() radius) that this is a rare miss in practice, not
     // a gap worth breaking the memo for.
-    map.set(n.nodeId, placeCompanionNode(n, targetPos));
+    map.set(n.nodeId, isOpponentMove(n, target) ? placeOutsideCastle(n, target!, targetPos) : placeCompanionNode(n, targetPos));
   });
   protections.forEach((n) => {
     if (typeof n.x === "number" && typeof n.y === "number") {

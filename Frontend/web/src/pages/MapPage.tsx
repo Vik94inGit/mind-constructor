@@ -2735,6 +2735,11 @@ export function MapPage() {
               upsertNode(res.healedNode);
             }}
             onFocus={centerOnNode}
+            onStrikeBack={(id) => {
+              setSiegeOpen(false);
+              setSelectedId(id);
+              centerOnNode(id);
+            }}
             onExit={() => setSiegeOpen(false)}
           />
         ) : drawMode ? (
