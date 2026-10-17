@@ -5,20 +5,29 @@
 // changes waiting to be sent (src/offline/sync.ts).
 //
 // Bump VERSION to drop every old cached file on the next visit.
-const VERSION = "v2";
+const VERSION = "v3";
 const CACHE = `mc-${VERSION}`;
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 
-// The built JS/CSS the current page links to. The very first visit loads
-// them before this worker is running, so without fetching them here too the
-// app's page would be cached but its code wouldn't, and it couldn't start offline.
+// Every built JS/CSS file: what the current page links to, plus the parts
+// that load on demand (the map editor and other pages), listed by the build in
+// asset-list.json. The very first visit loads the page's own files before this
+// worker is running, so without fetching them here too the app's page would be
+// cached but its code wouldn't, and it couldn't start offline.
 async function builtAssets() {
+  const found = new Set();
   try {
     const html = await (await fetch("/", { cache: "no-cache" })).text();
-    return [...new Set(html.match(/\/assets\/[^"'\s)]+/g) ?? [])];
+    for (const url of html.match(/\/assets\/[^"'\s)]+/g) ?? []) found.add(url);
   } catch {
-    return [];
+    // offline while installing: nothing more to add
   }
+  try {
+    for (const url of await (await fetch("/asset-list.json", { cache: "no-cache" })).json()) found.add(url);
+  } catch {
+    // an older build without the list
+  }
+  return [...found];
 }
 
 self.addEventListener("install", (event) => {

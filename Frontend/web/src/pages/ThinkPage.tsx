@@ -11,6 +11,7 @@ import { StartStep } from "../think/StartStep";
 import { WriteStep } from "../think/WriteStep";
 import { ShapeStep } from "../think/ShapeStep";
 import { BuildStep } from "../think/BuildStep";
+import { useConfirm } from "../context/ConfirmContext";
 
 // "Think it through": a guided path from a thought in someone's head to a map
 // on the canvas, built to get people writing rather than configuring.
@@ -24,6 +25,7 @@ import { BuildStep } from "../think/BuildStep";
 const STEP_COUNT = 4;
 
 export function ThinkPage() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const { t } = useI18n();
   const tt = t.ui.think;
@@ -80,8 +82,8 @@ export function ThinkPage() {
   const filled = draft.thoughts.filter((x) => x.text.trim());
   const canReach = (step: number) => step === 0 || (draft.center.trim() !== "" && (step <= 2 || filled.length > 0));
 
-  function startOver() {
-    if (!confirm(tt.startOverConfirm)) return;
+  async function startOver() {
+    if (!(await confirm(tt.startOverConfirm))) return;
     clearDraft(userId);
     discardServerDraft();
     setDraft(emptyDraft(draft.kind));

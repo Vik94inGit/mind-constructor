@@ -27,7 +27,7 @@ function setup(pendingCreate: PendingCreate | null = null) {
     viewportBounds: () => FULL_CANVAS_BOUNDS,
     showNodes: vi.fn(),
     showNotice: vi.fn(),
-    openNewNode: vi.fn(),
+    onCreated: vi.fn(),
     t: TRANSLATIONS.en,
   };
   const { result } = renderHook(() => useNodeCreation(params));
@@ -45,12 +45,12 @@ describe("useNodeCreation", () => {
     });
   });
 
-  it("creates the pending node where it was typed, closes the input and opens the new node's panel", async () => {
+  it("creates the pending node where it was typed, closes the input and leaves no panel open", async () => {
     const { result, params } = setup({ x: 10, y: 20, type: "Problem", parentId: "p" });
     await act(() => result.current.confirmPendingCreate("Hello", "Option"));
     expect(nodesApi.createNode).toHaveBeenCalledWith("m1", { text: "Hello", type: "Option", x: 10, y: 20, parentId: "p" });
     expect(params.upsertNode).toHaveBeenCalled();
-    expect(params.openNewNode).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "n1" }), { x: 10, y: 20 });
+    expect(params.onCreated).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "n1" }), { x: 10, y: 20 });
     expect(params.setPendingCreate).toHaveBeenCalledWith(null);
   });
 

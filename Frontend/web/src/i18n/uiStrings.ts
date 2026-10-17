@@ -18,6 +18,8 @@ import type { SiegeStrings } from "./siegeStrings";
 export interface UiStrings {
   common: {
     cancel: string;
+    /** A confirm dialog's yes button. */
+    ok: string;
     close: string;
     delete: string;
     copy: string;
@@ -489,6 +491,7 @@ const slavicPlural = (n: number, one: string, few: string, many: string) => {
 const en: UiStrings = {
   common: {
     cancel: "Cancel",
+    ok: "OK",
     close: "Close",
     delete: "Delete",
     copy: "Copy",
@@ -988,6 +991,7 @@ const csNodes = (n: number) => `${n} ${csPlural(n, "uzel", "uzly", "uzlů")}`;
 const cs: UiStrings = {
   common: {
     cancel: "Zrušit",
+    ok: "OK",
     close: "Zavřít",
     delete: "Smazat",
     copy: "Kopírovat",
@@ -1486,6 +1490,7 @@ const ukNodes = (n: number) => `${n} ${slavicPlural(n, "вузол", "вузли
 const uk: UiStrings = {
   common: {
     cancel: "Скасувати",
+    ok: "Гаразд",
     close: "Закрити",
     delete: "Видалити",
     copy: "Копіювати",
@@ -1987,6 +1992,7 @@ const ruNodes = (n: number) => `${n} ${slavicPlural(n, "узел", "узла", "
 const ru: UiStrings = {
   common: {
     cancel: "Отмена",
+    ok: "ОК",
     close: "Закрыть",
     delete: "Удалить",
     copy: "Копировать",

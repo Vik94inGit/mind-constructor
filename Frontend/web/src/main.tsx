@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { UserStateProvider } from "./context/UserStateContext";
 import { ThemeProvider } from "./theme/ThemeContext";
 import { I18nProvider } from "./i18n/I18nContext";
+import { ConfirmProvider } from "./context/ConfirmContext";
 import App from "./App";
 import "./index.css";
 
@@ -22,13 +23,15 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
       <I18nProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <UserStateProvider>
-              <App />
-            </UserStateProvider>
-          </AuthProvider>
-        </BrowserRouter>
+        <ConfirmProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <UserStateProvider>
+                <App />
+              </UserStateProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </ConfirmProvider>
       </I18nProvider>
     </ThemeProvider>
   </StrictMode>,

@@ -72,6 +72,8 @@ interface Props {
   /** In the current group (multi-)selection — a lighter-weight, dashed version of `selected`'s ring; several nodes can carry this at once, unlike `selected`. See MapPage's multiSelectIds. */
   multiSelected?: boolean;
   dragging: boolean;
+  /** About to be deleted: a short shiver first (MapPage's shakeNodes). */
+  shaking?: boolean;
   canDrag: boolean;
   groupSentiment?: Sentiment;
   /** Set only for a circle's own root/parent node (MapPage's circleRootSentimentByNode) — draws the small crown badge below, colored by the circle's majority pos/neg/neutral vote. Undefined for every other node, root or not part of any circle. Also the one thing (besides `inChosenCircle`) that keeps this node's own caption showing by default — see `showCaption` below. */
@@ -147,6 +149,7 @@ export const NodeCard = memo(function NodeCard({
   selected,
   multiSelected,
   dragging,
+  shaking = false,
   canDrag,
   groupSentiment,
   parentCrownSentiment,
@@ -423,7 +426,8 @@ export const NodeCard = memo(function NodeCard({
     cursorClass,
     opacityClass,
     filterClass,
-    chaotic && "animate-node-chaos-drift",
+    chaotic && !shaking && "animate-node-chaos-drift",
+    shaking && "animate-node-delete-shake",
     // A hovered dot's title (see the dotted branch below) sits above its neighbours.
     "has-[[data-dot]:hover]:z-[55]",
   ]
