@@ -34,4 +34,10 @@ const AttackSchema = new mongoose.Schema(
   },
 );
 
+// A node's attack history (attackDao.ts getAttackHistoryByNodeDao, newest
+// first) and a map's replay (listAttacksByMapDao, oldest first) — without
+// these both read the whole attacks collection.
+AttackSchema.index({ targetNodeId: 1, createdAt: -1 });
+AttackSchema.index({ mapId: 1, createdAt: 1 });
+
 export const Attack = mongoose.model("Attack", AttackSchema);

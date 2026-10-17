@@ -17,7 +17,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 ## What's here
 
 - **Auth** (`/login`, `/register`) — email/password or "Sign in with Google" (one endpoint for
-  both registering and logging in), JWT stored in `localStorage`. "Try it without an account"
+  both registering and logging in); the session is an httpOnly cookie kept in Redis on the backend. "Try it without an account"
   spins up a throwaway demo account with its own seeded map — nothing to configure to try it.
 - **Think it through** (`/think`) — a guided, writing-first way to start a map, opened from the
   dashboard's "What's on your mind?" box. Four steps: pick what kind of thinking it is and write the

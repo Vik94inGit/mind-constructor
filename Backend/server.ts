@@ -44,10 +44,15 @@ app.set("trust proxy", 1);
 
 console.log("DEBUG: Script is starting...");
 
-app.use((req, res, next) => {
-  console.log(`[EXPRESS] ${req.method} ${req.originalUrl}`);
-  next();
-});
+// Every request, for local debugging only: on a real deploy this is a log
+// line per API call, which costs log volume and CPU without saying anything
+// the host's own request log doesn't.
+if (process.env.NODE_ENV !== "production" && process.env.RENDER !== "true") {
+  app.use((req, res, next) => {
+    console.log(`[EXPRESS] ${req.method} ${req.originalUrl}`);
+    next();
+  });
+}
 
 // CORS_ORIGIN restricts the API to specific frontend origin(s) — comma-
 // separated, e.g. "https://my-app.vercel.app". Required in production (see
