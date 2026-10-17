@@ -20,6 +20,9 @@ export interface SiegeStrings {
   nothing: string;
   failed: string;
   done: (strategy: string, target: string) => string;
+  /** Answering an attack with one of your own (SiegePanel, NodePanel's Attack tab). */
+  strikeBack: string;
+  strikeBackIntro: (name: string, heal: number) => string;
   noHolds: string;
   moves: Record<Strategy, (name: string) => string>;
   /** Ending the discussion (map/FinishControls.tsx, utils/finish.ts). */
@@ -74,6 +77,9 @@ const en: SiegeStrings = {
   nothing: "Nothing to do with that strategy here — try another one.",
   failed: "The opponent's move didn't go through",
   done: (strategy, target) => `${strategy}: "${target}". Your turn.`,
+  strikeBack: "⚔ Strike back",
+  strikeBackIntro: (name, heal) =>
+    `This attack hit your "${name}". Answer it with your own: every hit on it heals "${name}" by ${heal}.`,
   noHolds: "No castles yet: a node with two or more nodes under it makes a zone, and every zone is a castle.",
   moves: {
     siege: (name) => `How do you know that "${name}" is true?`,
@@ -132,6 +138,9 @@ const cs: SiegeStrings = {
   nothing: "S touto strategií tu není co dělat — zkuste jinou.",
   failed: "Tah soupeře se nepovedl",
   done: (strategy, target) => `${strategy}: „${target}“. Jste na tahu.`,
+  strikeBack: "⚔ Oplatit útok",
+  strikeBackIntro: (name, heal) =>
+    `Tento útok zasáhl váš uzel „${name}“. Odpovězte vlastním: každý zásah do něj vyléčí „${name}“ o ${heal}.`,
   noHolds: "Zatím žádné hrady: uzel se dvěma a více uzly pod sebou tvoří zónu a každá zóna je hrad.",
   moves: {
     siege: (name) => `Jak víte, že „${name}“ platí?`,
@@ -190,6 +199,9 @@ const uk: SiegeStrings = {
   nothing: "Із цією стратегією тут нічого робити — спробуйте іншу.",
   failed: "Хід суперника не вдався",
   done: (strategy, target) => `${strategy}: «${target}». Ваш хід.`,
+  strikeBack: "⚔ Відповісти ударом",
+  strikeBackIntro: (name, heal) =>
+    `Ця атака влучила у ваш вузол «${name}». Відповідайте власною: кожен удар по ній лікує «${name}» на ${heal}.`,
   noHolds: "Замків ще немає: вузол із двома й більше вузлами під ним утворює зону, і кожна зона — замок.",
   moves: {
     siege: (name) => `Звідки ви знаєте, що «${name}» — правда?`,
@@ -248,6 +260,9 @@ const ru: SiegeStrings = {
   nothing: "С этой стратегией здесь нечего делать — попробуйте другую.",
   failed: "Ход соперника не удался",
   done: (strategy, target) => `${strategy}: «${target}». Ваш ход.`,
+  strikeBack: "⚔ Ответить ударом",
+  strikeBackIntro: (name, heal) =>
+    `Эта атака попала в ваш узел «${name}». Ответьте своей: каждый удар по ней лечит «${name}» на ${heal}.`,
   noHolds: "Замков пока нет: узел с двумя и более узлами под ним образует зону, и каждая зона — замок.",
   moves: {
     siege: (name) => `Откуда вы знаете, что «${name}» — правда?`,

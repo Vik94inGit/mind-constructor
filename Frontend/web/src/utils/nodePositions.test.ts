@@ -50,4 +50,26 @@ describe("computeBasePositions", () => {
       }
     }
   });
+
+  it("places the other side's attack outside the castle it hits", () => {
+    const nodes = [
+      makeNode({ nodeId: "k", x: 1000, y: 800 }),
+      makeNode({ nodeId: "a", parentId: "k", x: 1200, y: 800 }),
+      makeNode({ nodeId: "b", parentId: "k", x: 800, y: 800 }),
+      makeNode({ nodeId: "c", parentId: "a", x: 1300, y: 900 }),
+      // The imitated opponent's move: made by the owner, aimed at the owner's node.
+      makeNode({ nodeId: "w", parentId: "a", isWeapon: true, targetNodeId: "a", byOpponent: true, x: undefined, y: undefined }),
+      // Another member's attack.
+      makeNode({ nodeId: "v", parentId: "b", isWeapon: true, targetNodeId: "b", userId: "u2", x: undefined, y: undefined }),
+    ];
+    const positions = computeBasePositions(nodes);
+    const castle = ["k", "a", "b", "c"].map((id) => positions.get(id)!);
+    const cx = castle.reduce((s, p) => s + p.x, 0) / castle.length;
+    const cy = castle.reduce((s, p) => s + p.y, 0) / castle.length;
+    const radius = Math.max(...castle.map((p) => Math.hypot(p.x - cx, p.y - cy)));
+    for (const id of ["w", "v"]) {
+      const p = positions.get(id)!;
+      expect(Math.hypot(p.x - cx, p.y - cy)).toBeGreaterThan(radius);
+    }
+  });
 });

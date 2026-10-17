@@ -27,7 +27,7 @@ const holds = [
 ];
 
 function renderPanel() {
-  const handlers = { onAttacked: vi.fn(), onProtected: vi.fn(), onFocus: vi.fn(), onExit: vi.fn() };
+  const handlers = { onAttacked: vi.fn(), onProtected: vi.fn(), onFocus: vi.fn(), onStrikeBack: vi.fn(), onExit: vi.fn() };
   render(
     <I18nProvider>
       <SiegePanel holds={holds} nodes={nodes} {...handlers} />
@@ -55,6 +55,16 @@ describe("SiegePanel", () => {
     expect(onAttacked).toHaveBeenCalledWith(res);
     expect(onFocus).toHaveBeenCalledWith("a2");
     expect(screen.getByText(s.done(s.strategies.assault.name, "Nobody cares"))).toBeInTheDocument();
+  });
+
+  it("lets you strike back at the opponent's last attack", async () => {
+    const res = { node: nodes[2], weaponNode: makeNode({ nodeId: "w" }), healedParent: null, blocked: false, protector: null };
+    vi.mocked(nodesApi.attackNode).mockResolvedValue(res as never);
+    const { onStrikeBack } = renderPanel();
+    expect(screen.queryByRole("button", { name: s.strikeBack })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: s.go }));
+    await userEvent.click(screen.getByRole("button", { name: s.strikeBack }));
+    expect(onStrikeBack).toHaveBeenCalledWith("w");
   });
 
   it("fortifies the attacking castle's own keep", async () => {

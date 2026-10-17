@@ -146,6 +146,24 @@ describe("computeNodeGroups", () => {
     expect(groups[0].sentiment).toBe("positive");
   });
 
+  it("leaves an attack on a member out of the zone", () => {
+    const nodes: NodeDoc[] = [
+      makeNode({ nodeId: "root", type: "unknown" }),
+      makeNode({ nodeId: "c1", type: "Success", parentId: "root" }),
+      makeNode({ nodeId: "c2", type: "Option", parentId: "root" }),
+      makeNode({ nodeId: "w", type: "Problem", parentId: "root", isWeapon: true, targetNodeId: "root" }),
+    ];
+    const positions = new Map([
+      ["root", { x: 0, y: 0 }],
+      ["c1", { x: 100, y: 0 }],
+      ["c2", { x: -100, y: 0 }],
+      ["w", { x: 0, y: 900 }],
+    ]);
+    const groups = computeNodeGroups(nodes, nodes, positions);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].members.map((m) => m.nodeId).sort()).toEqual(["c1", "c2", "root"]);
+  });
+
   it("does not form a group for a root with only one child", () => {
     const nodes: NodeDoc[] = [
       makeNode({ nodeId: "root" }),
