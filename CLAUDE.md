@@ -71,7 +71,7 @@ npm run build        # tsc -b && vite build
   `useMapSocket`), viewport/framing, drag and drop, marquee select, node creation, pack mode, line
   drawing, presentation, undo of moves, position glide, `useWeaponReplay` (weapon marks in the
   time-lapse replay; `MapPage` loads `GET /api/:mapId/attacks` so the replay shows health as it was).
-- **`map/`** — canvas components: `NodeCard`, `PuzzleCard`, `CanvasBackdrop` (zones, walls, realm
+- **`map/`** — canvas components: `NodeCard`, `StickerCard` (a node in the cards view), `CanvasBackdrop` (zones, walls, realm
   border), `MiniMap`, `ViewCorner` (eye menu, zoom, minimap in the bottom-right corner),
   `QuickAddGhosts` (type and emoji rings), `NodePanel` + `nodePanel/` tabs (Info, Modify, Attack,
   Protect, Packed, History), `SiegePanel` (the imitated opponent's turn), `HistoryPanel` (the map's
@@ -82,15 +82,15 @@ npm run build        # tsc -b && vite build
   `canvasLayout.ts`, `siege.ts` (opponent strategies and moves), `finish.ts` (mirrors the backend's
   `finishRule` so the Finish button can say why it waits; the server still decides), `nodeType.ts`
   (mirrors `allowedAttackTypes`), `seedMap.ts`/`templates.ts` (starter structures as ghosts, in the
-  user's language), `textSplit.ts`, puzzle-card helpers (`puzzleAssembly`, `puzzleSnap`,
-  `puzzleLinks`).
+  user's language), `textSplit.ts`, `cardGlue.ts` (cards glue side to side and never
+  overlap), `emojiFace.ts` (emoji first, each type's emoji, a still emoji).
 - **`offline/`** — read cache of every GET plus an outbox of changes made offline, replayed in order
   once the server is back (temporary `local_…` ids swapped for real ones); `public/sw.js` caches the
   app shell.
 - **`i18n/`** — English, Czech, Ukrainian, Russian. Every user-visible string goes through
   `translations.ts` / `uiStrings.ts` / `siegeStrings.ts` / `thinkStrings.ts` in all four languages;
   stored values (node types etc.) stay English.
-- Per-browser view preferences (puzzle card fills, locked blocks, emoji-first, minimap) live in
+- Per-browser view preferences (card fills, locked blocks, minimap) live in
   `localStorage`; anything that should follow the user across devices goes through `/api/state`
   (`context/UserStateContext.tsx`).
 

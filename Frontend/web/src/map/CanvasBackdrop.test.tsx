@@ -60,8 +60,8 @@ if (!("PointerEvent" in window)) {
 }
 
 describe("CanvasBackdrop zone edge", () => {
-  it("draws the outline at the parent's edge brightness, 0.5 by default", () => {
-    expect(renderBackdrop().zone.getAttribute("stroke-opacity")).toBe("0.5");
+  it("draws the outline at the parent's edge brightness, a soft 0.25 by default", () => {
+    expect(renderBackdrop().zone.getAttribute("stroke-opacity")).toBe("0.25");
   });
 
   it("follows Node.zoneEdge", () => {

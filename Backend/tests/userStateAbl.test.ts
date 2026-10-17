@@ -56,6 +56,17 @@ describe("userStateAbl", () => {
       expect(updatePreferencesDao).toHaveBeenCalledWith("u1", { language: "ru" });
     });
 
+    it("saves emoji first and the user's own emoji per node type", async () => {
+      vi.mocked(updatePreferencesDao).mockResolvedValue({ preferences: {} } as never);
+      await updatePreferencesAbl({ emojiFirst: false, typeEmoji: { Problem: "🔥", Solution: "🌟" } }, "u1");
+      expect(updatePreferencesDao).toHaveBeenCalledWith("u1", { emojiFirst: false, typeEmoji: { Problem: "🔥", Solution: "🌟" } });
+    });
+
+    it("rejects a type emoji with letters, or for a type that doesn't exist", async () => {
+      await expect(updatePreferencesAbl({ typeEmoji: { Problem: "abc" } }, "u1")).rejects.toThrow(ValidationError);
+      await expect(updatePreferencesAbl({ typeEmoji: { Idea: "💡" } }, "u1")).rejects.toThrow(ValidationError);
+    });
+
     it("rejects unknown values and unknown fields", async () => {
       await expect(updatePreferencesAbl({ theme: "pink" }, "u1")).rejects.toThrow(ValidationError);
       await expect(updatePreferencesAbl({ fontSize: 3 }, "u1")).rejects.toThrow(ValidationError);

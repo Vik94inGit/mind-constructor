@@ -33,18 +33,21 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   other members' nodes with the three combat weapons, shield your own, pack nodes into a
   container, group nodes into a chosen circle, choose a node (and optionally its whole branch) to
   link/copy/number/delete together, and switch how nodes read (icons only, icons + text, or
-  puzzle cards — each node a jigsaw-piece card with its whole text — or a mixed mode: zone parents as
-  cards, everything else a bare icon) for the whole map or just the chosen nodes. Puzzle pieces
-  interlock along links (a tab toward a child or an edge's far end, a matching blank on the other
-  piece; a piece joined on all four sides gets a ✓; drag out of one of your piece's tabs onto another of your
-  pieces to link them; with Move on, a piece dragged close to another whose facing side fits — a
-  tab to a slot — clicks in flush against it, and two of your pieces clicked together get linked), and each piece's fill color can be changed in
-  its panel's Info tab (per browser). Each zone can also take its own view (puzzle cards, mixed, icons + text, the default look, or
+  cards — each node a sticker card with its whole text — or a mixed mode: zone parents as
+  cards, everything else a bare icon) for the whole map or just the chosen nodes. Cards sit on the
+  board in its own units (their own spot, `Node.cardX/cardY`), so they grow and shrink with the zoom;
+  their owner resizes one from its corner grip and picks its text size and shape (rounded, square,
+  round) in the panel's Info tab (`Node.cardW/cardH/cardFont/cardShape`, `map/StickerCard.tsx`). A
+  card let go on top of others is moved just clear of them, and one dragged close to another (with
+  Move on) glues flush against its side — two of your cards glued together get linked and then drag
+  as one (`utils/cardGlue.ts`); drag from a card's side handle onto another of your cards to link
+  them. No quick-add ghosts ring a card. Each card's fill color can be changed in
+  its panel's Info tab (per browser). Each zone can also take its own view (cards, mixed, icons + text, the default look, or
   dots) from the ⋯ button beside its name, so one canvas can show different
   sides of the same map at once (per browser). The ⋯ buttons sit on a compact list, just left of the minimap, of the zones currently in view.
   Your own nodes can be locked from the node panel's Info tab, the right-click menu, or the
-  padlock on a puzzle block's corner (per browser): a locked
-  block can't be dragged, clicked into another piece or have its text edited until unlocked. Zoomed
+  padlock on a card's corner (per browser): a locked
+  block can't be dragged, glued to another card or have its text edited until unlocked. Zoomed
   out to 50%, nodes show as plain dots, the canvas drops its other icons (zone-parent rings,
   weapon marks, quick-add ghosts) and the view glides to the middle of the map; zones near the
   middle of the view stay at full strength while the rest are muted; selecting a node centers it on
@@ -63,12 +66,17 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
-- **Emoji cards** — a node can carry an emoji (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the
-  emoji ghost ring below); its icon is then a two-sided card that turns over once, to the emoji and
-  back, when the node is chosen (`map/NodeFlipIcon.tsx`). Choosing a zone (its parent, or holding it
-  still) turns its cards over one after another, parent first, then the children by their order
-  (`hooks/useFlipSequence.ts`). *Emoji first* in the eye menu turns the emoji face up instead
-  (`utils/emojiFace.ts`, kept in this browser).
+- **Emoji first** — every node's icon is a two-sided card, an emoji face up and its type's symbol on
+  the back, turning over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the
+  node's own (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or else its
+  type's: ❗ Problem, ⚠️ Problematic option, 💡 Solution, 🔀 Option, ✅ Success, ❌ Fail, ❓ unknown,
+  each changeable under *Emoji for each type* in the display menu. Turning *Emoji first* off goes
+  back to symbols first: the type's symbol up, and an emoji only on nodes that have their own. A
+  node's owner can tick *Keep this emoji still* so its own emoji stays up and never turns
+  (`Node.emojiStill`). A picture icon stays the face of its node. Choosing a zone (its parent, or
+  holding it still) turns its cards over one after another, parent first, then the children by
+  their order (`hooks/useFlipSequence.ts`). Both choices follow the user to every device
+  (`utils/emojiFace.ts`, `/api/state`).
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
@@ -79,8 +87,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   as a ring around the new node, optional — and editing opens the node's panel on its text.
 - **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
-  picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the piece in
-  the puzzle view).
+  picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
+  the cards view).
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
   in the panel; the inline inputs grow taller with the text, never wider.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the

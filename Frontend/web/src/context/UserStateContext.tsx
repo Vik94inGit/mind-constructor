@@ -6,6 +6,7 @@ import { useAuth } from "./AuthContext";
 import { useTheme } from "../theme/ThemeContext";
 import { useI18n } from "../i18n/I18nContext";
 import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
+import { loadEmojiFirst, loadTypeEmoji, saveEmojiFirst, saveTypeEmoji } from "../utils/emojiFace";
 
 // The signed-in user's preferences and the map they were last on, kept on the
 // server so every device they sign in on picks up where they left off. This
@@ -69,12 +70,16 @@ export function UserStateProvider({ children }: { children: ReactNode }) {
         if (saved.language) setLanguage(saved.language);
         if (saved.readingMode) saveReadingMode(saved.readingMode);
         if (saved.compactView !== undefined) saveCompactView(saved.compactView);
+        if (saved.emojiFirst !== undefined) saveEmojiFirst(saved.emojiFirst);
+        if (saved.typeEmoji) saveTypeEmoji(saved.typeEmoji);
         // …and whatever it doesn't have yet comes from this device.
         const local: Preferences = {
           theme: saved.theme ?? (document.documentElement.dataset.theme === "dark" ? "dark" : "light"),
           language: saved.language ?? language,
           readingMode: saved.readingMode ?? loadReadingMode(),
           compactView: saved.compactView ?? loadCompactView(),
+          emojiFirst: saved.emojiFirst ?? loadEmojiFirst(),
+          typeEmoji: saved.typeEmoji ?? loadTypeEmoji(),
         };
         setPreferences(local);
         setLastMapId(state.lastMapId);

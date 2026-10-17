@@ -5,8 +5,15 @@ import { MAX_NODE_TEXT } from "../../utils/nodeText";
 import { isMobileViewport } from "../../utils/canvasLayout";
 import type { TemplateKind } from "../../utils/templates";
 import { CARD_FILL_COLORS } from "../../utils/cardFill";
+import { CARD_FONT_DEFAULT } from "../StickerCard";
+import { CARD_FONT_MAX, CARD_FONT_MIN, CARD_SHAPES } from "../../types";
+import type { CardShape } from "../../types";
 import { useI18n } from "../../i18n/I18nContext";
 import type { NodeDoc } from "../../types";
+
+export type CardLookPatch = Pick<Partial<NodeDoc>, "cardW" | "cardH" | "cardFont" | "cardShape">;
+/** A card's own look, for its owner to change (Node.cardFont/cardShape/cardW/cardH). */
+export type CardLook = { font: number | null; shape: CardShape | null; sized: boolean; onChange: (patch: CardLookPatch) => void } | null;
 
 interface Props {
   node: NodeDoc;
@@ -14,6 +21,8 @@ interface Props {
   busy: boolean;
   /** Set while this node is drawn as a puzzle card — see NodePanel's own prop. */
   cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
+  /** The card's own look, for its owner — see NodePanel's own prop. */
+  cardLook?: CardLook;
   textLocked: boolean;
   onToggleLock?: () => void;
   textareaRef: RefObject<HTMLTextAreaElement>;
@@ -42,7 +51,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   return (
@@ -205,6 +214,61 @@ export function InfoTab({ node, isCreator, busy, cardFill, textLocked, onToggleL
           >
             {t.ui.display.cardColorReset}
           </button>
+        </div>
+      )}
+      {cardLook && (
+        // The card's own text size, outline and size — its owner's, shared
+        // with every member like its spot on the board.
+        <div className="mb-3 flex flex-wrap items-center gap-[0.4rem]" data-testid="card-look">
+          <span className="mr-1 text-[0.75rem] font-semibold text-ink-soft">{t.ui.display.cardText}</span>
+          {(["−", "+"] as const).map((sign) => {
+            const font = cardLook.font ?? CARD_FONT_DEFAULT;
+            const next = Math.min(CARD_FONT_MAX, Math.max(CARD_FONT_MIN, font + (sign === "+" ? 2 : -2)));
+            return (
+              <button
+                key={sign}
+                type="button"
+                aria-label={`${t.ui.display.cardText} ${sign}`}
+                className="h-[24px] min-w-[28px] cursor-pointer rounded-md border border-line px-2 text-[0.8rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={next === font}
+                onClick={() => cardLook.onChange({ cardFont: next })}
+              >
+                {sign === "+" ? "A+" : "A−"}
+              </button>
+            );
+          })}
+          <span className="ml-2 mr-1 text-[0.75rem] font-semibold text-ink-soft">{t.ui.display.cardShape}</span>
+          {CARD_SHAPES.map((shape) => {
+            const active = (cardLook.shape ?? "rounded") === shape;
+            const label =
+              shape === "rounded" ? t.ui.display.cardShapeRounded : shape === "square" ? t.ui.display.cardShapeSquare : t.ui.display.cardShapeRound;
+            return (
+              <button
+                key={shape}
+                type="button"
+                title={label}
+                aria-label={label}
+                aria-pressed={active}
+                className={`flex h-[24px] w-[30px] cursor-pointer items-center justify-center rounded-md border hover:bg-surface-2 ${active ? "border-accent" : "border-line"}`}
+                onClick={() => cardLook.onChange({ cardShape: shape === "rounded" ? null : shape })}
+              >
+                <span
+                  aria-hidden
+                  className="block h-[12px] w-[18px] border-[1.5px] border-ink-soft"
+                  style={{ borderRadius: shape === "rounded" ? 4 : shape === "square" ? 0 : 9999 }}
+                />
+              </button>
+            );
+          })}
+          {cardLook.sized && (
+            <button
+              type="button"
+              className="ml-1 cursor-pointer rounded-md border border-line px-2 py-[0.1rem] text-[0.72rem] text-ink hover:bg-surface-2"
+              onClick={() => cardLook.onChange({ cardW: null, cardH: null })}
+            >
+              {t.ui.display.cardFitText}
+            </button>
+          )}
         </div>
       )}
       {/* Just the text — extendable (a generous min-height so even a

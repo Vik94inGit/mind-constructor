@@ -29,6 +29,14 @@ describe("NodeFlipIcon", () => {
     expect(back.textContent).toBe("TYPE");
   });
 
+  it("never turns over when its emoji is still", () => {
+    const { rerender } = render(
+      <NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst selected={false} still />,
+    );
+    rerender(<NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst selected still flipToken={3} />);
+    expect(faces().root.dataset.flipped).toBe("false");
+  });
+
   it("turns over once when chosen, then settles home on its own", () => {
     const { rerender } = render(
       <NodeFlipIcon typeFace={<span>TYPE</span>} emoji="🔥" emojiFirst={false} selected={false} />,

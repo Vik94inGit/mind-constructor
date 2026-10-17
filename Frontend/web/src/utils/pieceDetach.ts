@@ -1,7 +1,6 @@
-// Puzzle pieces taken out of their puzzle on demand: linked puzzle cards are
-// drawn assembled and drag as one (see MapPage's puzzleAssembly), but a
-// detached piece stands on its own, where it was put, until it's clicked
-// back into a piece. The viewer's own way of laying the map out — kept per
+// Cards unglued on demand: cards glued together drag as one (see
+// usePuzzleConnect's puzzleClusterFor), but an unglued card stands on its
+// own until it's glued to a card again. The viewer's own way of laying the map out — kept per
 // map in this browser (and on the server, see useMapViewerPrefs), like the
 // locks in blockLock.ts.
 export type DetachedPieces = Record<string, true>;

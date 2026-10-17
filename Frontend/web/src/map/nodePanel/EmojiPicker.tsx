@@ -7,12 +7,16 @@ interface Props {
   busy: boolean;
   /** "" removes it. */
   onPick: (emoji: string) => void;
+  /** The emoji stays face up and never turns over (NodeDoc.emojiStill). */
+  still?: boolean;
+  /** Set to offer the "keep it still" switch. */
+  onToggleStill?: () => void;
 }
 
 // NodePanel's emoji choice (owner only): the current one, quick picks, a
 // field for any other emoji (the system emoji keyboard works there), and
 // Remove. The node's icon then flips between it and the type's own symbol.
-export function EmojiPicker({ value, busy, onPick }: Props) {
+export function EmojiPicker({ value, busy, onPick, still = false, onToggleStill }: Props) {
   const { t } = useI18n();
   const s = t.ui.emoji;
   const [custom, setCustom] = useState("");
@@ -46,6 +50,12 @@ export function EmojiPicker({ value, busy, onPick }: Props) {
           >
             {s.remove}
           </button>
+        )}
+        {value && onToggleStill && (
+          <label className="flex cursor-pointer items-center gap-[0.3rem] text-[0.75rem] text-ink" title={s.stillHint}>
+            <input type="checkbox" checked={still} disabled={busy} onChange={onToggleStill} />
+            {s.still}
+          </label>
         )}
       </div>
       <div className="flex flex-wrap gap-[0.2rem]">

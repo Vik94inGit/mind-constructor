@@ -24,6 +24,10 @@ const UserStateSchema = new mongoose.Schema(
       language: { type: String, enum: LANGUAGES },
       readingMode: { type: String, enum: READING_MODES },
       compactView: { type: Boolean },
+      // Emoji face up on every node (its own, or its type's from typeEmoji); false: the type's symbol up.
+      emojiFirst: { type: Boolean },
+      // The user's own emoji for each node type (type -> emoji), over the app's defaults.
+      typeEmoji: { type: mongoose.Schema.Types.Mixed },
     },
     lastMapId: { type: String, default: null }, // public mapId
   },

@@ -38,7 +38,6 @@ import { NodePanel } from "../map/NodePanel";
 import { PackPickerPanel } from "../map/PackPickerPanel";
 import { TextToNodesModal } from "../map/TextToNodesModal";
 import { findFreeSpots } from "../utils/freeSpots";
-import { loadEmojiFirst, saveEmojiFirst } from "../utils/emojiFace";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
@@ -63,9 +62,6 @@ import { SiegePanel } from "../map/SiegePanel";
 import { holdsOf } from "../utils/siege";
 import { MapBanner } from "../map/MapBanner";
 import { MarqueeRect, PuzzleConnectLine, ZoneLoadingSpinner } from "../map/CanvasOverlays";
-import { computePuzzleJoins } from "../utils/puzzleLinks";
-import { assemblePuzzles } from "../utils/puzzleAssembly";
-import { usePuzzleCardSizes } from "../hooks/usePuzzleCardSizes";
 import { zoneModeByNode } from "../utils/zoneDisplay";
 import { MAP_ZONE_KEY } from "../utils/zoneLayout";
 import type { ZoneMode } from "../utils/zoneDisplay";
@@ -189,15 +185,6 @@ export function MapPage() {
   // already-multi-selected group's own drag — both stay available
   // regardless, since neither one is the "accidental" case this addresses.
   const [moveMode, setMoveMode] = useState(false);
-  // "Emoji first" (eye menu): which face of a node's emoji/type card is up —
-  // a per-viewer choice kept in this browser (utils/emojiFace.ts).
-  const [emojiFirst, setEmojiFirst] = useState<boolean>(loadEmojiFirst);
-  function toggleEmojiFirst() {
-    setEmojiFirst((v) => {
-      saveEmojiFirst(!v);
-      return !v;
-    });
-  }
   // The ids the node search currently matches (null = no search): everything else dims.
   const [searchMatches, setSearchMatches] = useState<Set<string> | null>(null);
   // This viewer's own view of the map — reading mode, compact view,
@@ -209,6 +196,11 @@ export function MapPage() {
     storeReadingMode,
     compactView,
     toggleCompactView,
+    // "Emoji first" (eye menu) and the viewer's emoji per type — see utils/emojiFace.ts.
+    emojiFirst,
+    toggleEmojiFirst,
+    typeEmoji,
+    setTypeEmoji,
     nodeDisplay,
     setNodeDisplay,
     zoneDisplay,
@@ -646,10 +638,8 @@ export function MapPage() {
       const b = geometrizeBlend.blend;
       return { x: own.x + (geo.x - own.x) * b, y: own.y + (geo.y - own.y) * b };
     }
-    // Seated against the puzzle piece it's linked to — see puzzleAssembly.
-    const seated = puzzleAssembly.positions.get(node.nodeId);
-    if (seated) return seated;
-    const radial = radialBlend.map?.get(node.nodeId);
+    // A card on the board stays at its own spot among the other cards.
+    const radial = cardSpace.has(node.nodeId) ? undefined : radialBlend.map?.get(node.nodeId);
     if (!radial) return own;
     const b = radialBlend.blend;
     return { x: own.x + (radial.x - own.x) * b, y: own.y + (radial.y - own.y) * b };
@@ -1028,57 +1018,22 @@ export function MapPage() {
     const m = modeOf(n.nodeId);
     return m === "puzzle" || (m === "mixed" && circleRootSentimentByNode.has(n.nodeId));
   }
-  // Linked puzzle cards are drawn assembled, each seated flush against the
-  // piece it's linked to (utils/puzzleAssembly.ts), and interlock along the
-  // map's links (utils/puzzleLinks.ts) — the seated ones claiming their
-  // sides first, so a tab always meets the blank next to it. A piece taken
-  // out of its puzzle on demand (detachedPieces) stays where it was put.
-  // Changes whenever the assembly's own inputs do, so a layout that can't
-  // settle (see usePuzzleCardSizes) is held only until the map changes.
-  const puzzleSettleKey = useMemo(
-    () => ({}),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [visibleNodes, edges, positions, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode],
-  );
-  const puzzleCardSizes = usePuzzleCardSizes(canvasRef, puzzleSettleKey);
-  const puzzleAssembly = useMemo(() => {
-    const ids = visibleNodes.filter((n) => drawnAsCard(n) && !detachedPieces[n.nodeId]).map((n) => n.nodeId);
-    const links = [
-      ...visibleNodes.flatMap((n) => {
-        const parent = nodeRefId(n.parentId);
-        return parent ? [{ from: parent, to: n.nodeId }] : [];
-      }),
-      ...edges.flatMap((e) => {
-        const from = nodeRefId(e.fromNodeId);
-        const to = nodeRefId(e.toNodeId);
-        return from && to ? [{ from, to }] : [];
-      }),
-    ];
-    const sizes = new Map(Array.from(puzzleCardSizes, ([id, s]) => [id, { w: s.w / zoom, h: s.h / zoom }]));
-    // A locked block stays assembled: its whole puzzle locks with it, and
-    // nothing in it can be dragged, so only a chosen circle's members are
-    // held where they're stored.
-    const held = new Set(visibleNodes.filter((n) => n.locked).map((n) => n.nodeId));
-    return assemblePuzzles(ids, links, positions, sizes, held);
-    // drawnAsCard reads the display state below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleNodes, edges, positions, puzzleCardSizes, zoom, nodeDisplay, zoneModes, readingMode, circleRootSentimentByNode, detachedPieces]);
-  const puzzleJoins = useMemo(() => {
-    const at = new Map(positions);
-    for (const [id, p] of puzzleAssembly.positions) at.set(id, p);
-    return computePuzzleJoins(visibleNodes, edges, at, puzzleAssembly.seated);
-  }, [visibleNodes, edges, positions, puzzleAssembly]);
-  // Puzzle pieces: dragging a link out of a piece's tab, and clicking pieces
-  // together — see hooks/usePuzzleConnect.ts.
-  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect } = usePuzzleConnect({
+  // A card on the board: drawn in the cards view, in the canvas's own units
+  // (see NodeCard's canvasCard) — the only cards that glue together and keep
+  // from piling up. A zone parent shown as a card in the mixed view isn't.
+  function onCardBoard(n: NodeDoc): boolean {
+    return !dotZoom && !dottedByZone(n.nodeId) && modeOf(n.nodeId) === "puzzle";
+  }
+  // Cards: dragging a link out of a card's handle, gluing cards together and
+  // keeping them from piling up — see hooks/usePuzzleConnect.ts.
+  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect, cardClearSpot } = usePuzzleConnect({
     mapId,
     nodes,
     edges,
     visibleNodes,
     zoom,
-    puzzleJoins,
     isOwnNode,
-    drawnAsCard,
+    drawnAsCard: onCardBoard,
     posFor,
     screenToCanvas,
     upsertEdge,
@@ -1089,30 +1044,11 @@ export function MapPage() {
     linkFailedMessage: t.ui.link.failed,
     isDetached: (id) => !!detachedPieces[id],
   });
-  // Taking pieces out of their puzzle, on demand from a piece's menu: just
-  // this one, or the whole puzzle into separate blocks. A detached piece is
-  // drawn where it was put, and dragging it into a fitting piece clicks it
-  // back in.
-  // Every piece of the puzzle keeps the spot it's drawn at — saved as its own
-  // first — so taking one out of the middle doesn't send the rest flying back
-  // to wherever they were stored before they were clicked together.
-  async function detachPieces(ids: string[], puzzleIds: string[] = ids) {
-    const moved = Array.from(new Set([...ids, ...puzzleIds])).flatMap((id) => {
-      const seated = puzzleAssembly.positions.get(id);
-      return seated ? [[id, seated] as const] : [];
-    });
+  // Ungluing cards, on demand from a card's menu: just this one, or every
+  // card of its block. An unglued card moves on its own, and dragging it
+  // against another card glues it back.
+  function detachPieces(ids: string[]) {
     setPiecesDetached(ids, true);
-    if (moved.length === 0) return;
-    setNodes((prev) => prev.map((n) => {
-      const at = moved.find(([id]) => id === n.nodeId)?.[1];
-      return at ? { ...n, ...spotFor(n, at) } : n;
-    }));
-    await Promise.all(
-      moved.map(([id, at]) => {
-        const n = nodes.find((m) => m.nodeId === id);
-        return n ? nodesApi.updateNode(id, spotFor(n, at)).then(upsertNode).catch(() => {}) : undefined;
-      }),
-    );
   }
   function attachPiece(nodeId: string) {
     setPiecesDetached([nodeId], false);
@@ -1155,6 +1091,7 @@ export function MapPage() {
     t,
     spotFor,
     snapFor: puzzleSnapFor,
+    clearSpotFor: cardClearSpot,
     // A piece clicked into another is in a puzzle again, detached or not.
     onSnapped: (node, snap) => {
       if (detachedPieces[node.nodeId]) attachPiece(node.nodeId);
@@ -1181,8 +1118,11 @@ export function MapPage() {
   // canvas. selectionSettled: the ghosts (and the dimming that comes with
   // them) wait until centerOnNode's own pan has landed — see its own doc
   // comment.
+  // Not around a card on the board: a card has its own place among the
+  // other cards, and the ghost ring would only sit on top of them.
   const quickAddActive =
-    !!(selectedNode && isOwnNode(selectedNode) && !chooseMode && !packMode && !dragState) && selectionSettled;
+    !!(selectedNode && isOwnNode(selectedNode) && !chooseMode && !packMode && !dragState && !onCardBoard(selectedNode)) &&
+    selectionSettled;
 
   // See forceShowToolbar's own doc comment — every fresh quick-add starts
   // collapsed again, regardless of whether a previous one was manually
@@ -1633,6 +1573,19 @@ export function MapPage() {
     if (failed.length) {
       setNodes((prev) => prev.map((n) => failed.find((f) => f.nodeId === n.nodeId) ?? n));
       setActionError(t.ui.errors.shape);
+    }
+  }
+
+  // A card's own look (Node.cardW/cardH/cardFont/cardShape): shown straight
+  // away, put back if it won't save.
+  async function saveCardLook(node: NodeDoc, patch: Pick<Partial<NodeDoc>, "cardW" | "cardH" | "cardFont" | "cardShape">) {
+    const before = Object.fromEntries(Object.keys(patch).map((k) => [k, node[k as keyof NodeDoc] ?? null]));
+    setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...patch } : n)));
+    try {
+      upsertNode(await nodesApi.updateNode(node.nodeId, patch));
+    } catch (err) {
+      setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.display.cardLookFailed);
     }
   }
 
@@ -2121,6 +2074,8 @@ export function MapPage() {
       onToggleCompact={toggleCompactView}
       emojiFirst={emojiFirst}
       onToggleEmojiFirst={toggleEmojiFirst}
+      typeEmoji={typeEmoji}
+      onTypeEmoji={setTypeEmoji}
       zoneLayout={zoneLayouts[MAP_ZONE_KEY] ?? "zones"}
       onPickZoneLayout={(layout) => setZoneLayout(MAP_ZONE_KEY, layout === "zones" ? null : layout)}
       background={map.background}
@@ -2412,6 +2367,7 @@ export function MapPage() {
                   key={node.nodeId}
                   node={node}
                   emojiFirst={emojiFirst}
+                  typeEmoji={typeEmoji}
                   flipToken={flipTokens.get(node.nodeId)}
                   x={pos.x}
                   y={pos.y}
@@ -2479,7 +2435,7 @@ export function MapPage() {
                   }}
                   onDoubleClick={() => startInlineEdit(node)}
                   onContextMenu={(e) => handleNodeContextMenu(node, e)}
-                  puzzleJoins={puzzleJoins.get(node.nodeId)}
+                  onCardResize={canEditNode(node) ? (size) => void saveCardLook(node, { cardW: size.w, cardH: size.h }) : undefined}
                   cardFill={cardFills[node.nodeId]}
                   dotted={dotZoom || dottedByZone(node.nodeId)}
                   blockLocked={!!blockLocks[node.nodeId]}
@@ -2818,6 +2774,16 @@ export function MapPage() {
                       }
                     : null;
                 })()}
+                cardLook={
+                  onCardBoard(selectedNode) && canEditNode(selectedNode)
+                    ? {
+                        font: selectedNode.cardFont ?? null,
+                        shape: selectedNode.cardShape ?? null,
+                        sized: selectedNode.cardW != null || selectedNode.cardH != null,
+                        onChange: (patch) => void saveCardLook(selectedNode, patch),
+                      }
+                    : null
+                }
                 nodes={nodes}
                 edges={edges}
                 currentUserId={user._id}
@@ -2893,7 +2859,7 @@ export function MapPage() {
               ? {
                   detached: !!detachedPieces[contextMenu.node.nodeId],
                   assembled: puzzleClusterFor(contextMenu.node).length > 1,
-                  onDetach: () => detachPieces([contextMenu.node.nodeId], puzzleClusterFor(contextMenu.node)),
+                  onDetach: () => detachPieces([contextMenu.node.nodeId]),
                   onTakeApart: () => detachPieces(puzzleClusterFor(contextMenu.node)),
                   onAttach: () => attachPiece(contextMenu.node.nodeId),
                 }

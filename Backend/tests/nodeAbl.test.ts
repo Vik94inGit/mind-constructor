@@ -362,6 +362,25 @@ describe("nodeAbl", () => {
       expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { cardX: null, cardY: null });
     });
 
+    it("passes a card's size, text size, shape and a still emoji through, and rejects out-of-range values", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+
+      await updateNodeAbl("node1", "user1", { cardW: 220, cardH: 140, cardFont: 14, cardShape: "round", emojiStill: true });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", {
+        cardW: 220,
+        cardH: 140,
+        cardFont: 14,
+        cardShape: "round",
+        emojiStill: true,
+      });
+      await updateNodeAbl("node1", "user1", { cardW: null, cardH: null, cardFont: null, cardShape: null });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { cardW: null, cardH: null, cardFont: null, cardShape: null });
+
+      await expect(updateNodeAbl("node1", "user1", { cardW: 5 })).rejects.toThrow(ValidationError);
+      await expect(updateNodeAbl("node1", "user1", { cardFont: 100 })).rejects.toThrow(ValidationError);
+      await expect(updateNodeAbl("node1", "user1", { cardShape: "star" })).rejects.toThrow(ValidationError);
+    });
+
     it("passes a valid shape through, null back to the circle, and rejects anything else", async () => {
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
 

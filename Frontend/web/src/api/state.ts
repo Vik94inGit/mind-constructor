@@ -5,6 +5,7 @@ import type { NodeDisplay } from "../utils/nodeDisplay";
 import type { ZoneDisplay } from "../utils/zoneDisplay";
 import type { CardFills } from "../utils/cardFill";
 import type { ZoneLayouts } from "../utils/zoneLayout";
+import type { TypeEmoji } from "../utils/emojiFace";
 
 // The signed-in user's own state on the server (Backend: /api/state), so they
 // pick up on any device where they left off.
@@ -14,6 +15,10 @@ export interface Preferences {
   language?: "en" | "cs" | "uk" | "ru";
   readingMode?: ReadingMode;
   compactView?: boolean;
+  /** Emoji face up on every node; false: symbols first (utils/emojiFace.ts). */
+  emojiFirst?: boolean;
+  /** The user's own emoji per node type. */
+  typeEmoji?: TypeEmoji;
 }
 
 export interface MapViewState {

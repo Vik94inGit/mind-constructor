@@ -19,7 +19,7 @@ export function zoneColorFor(root: NodeDoc | undefined, sentiment: Sentiment): s
 }
 
 /** How bright a zone's outline is when its parent never picked one (Node.zoneEdge). */
-export const ZONE_EDGE_DEFAULT = 0.5;
+export const ZONE_EDGE_DEFAULT = 0.25;
 
 /** Size of one pattern tile, in canvas units. */
 export const ZONE_PATTERN_TILE: Record<ZonePattern, number> = { dots: 18, stripes: 14, grid: 22, chess: 28 };

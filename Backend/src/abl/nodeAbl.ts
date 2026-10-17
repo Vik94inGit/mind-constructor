@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type mongoose from "mongoose";
-import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS, NODE_SHAPES, ZONE_PATTERNS, ZONE_PALETTE } from "../models/Node.js";
+import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS, NODE_SHAPES, ZONE_PATTERNS, ZONE_PALETTE, CARD_SHAPES, CARD_SIZE_MIN, CARD_SIZE_MAX, CARD_FONT_MIN, CARD_FONT_MAX } from "../models/Node.js";
 import { getMapByIdDao, getMapByInternalIdDao } from "../dao/mapsDao.js";
 import { recordEditAbl } from "./historyAbl.js";
 import {
@@ -241,6 +241,13 @@ const updateNodeSchema = z
     // goes back to sitting at x/y.
     cardX: z.number().nullish(),
     cardY: z.number().nullish(),
+    // A card's own size, text size and outline (see Node.cardW) — null goes
+    // back to the default.
+    cardW: z.number().min(CARD_SIZE_MIN).max(CARD_SIZE_MAX).nullish(),
+    cardH: z.number().min(CARD_SIZE_MIN).max(CARD_SIZE_MAX).nullish(),
+    cardFont: z.number().min(CARD_FONT_MIN).max(CARD_FONT_MAX).nullish(),
+    cardShape: z.enum(CARD_SHAPES).nullish(),
+    emojiStill: z.boolean().optional(),
     color: z.string().optional(),
     parentId: z.string().nullish(),
     // null explicitly clears back to "use the type's own default symbol" —

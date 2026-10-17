@@ -154,8 +154,8 @@ export function CanvasBackdrop({
           if (outline.length < 3) return null;
           const d = `M${outline.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(" L")} Z`;
           return (
-            <g key={`realm-${g.rootId}`} data-testid="realm-border" opacity={walls ? 0.7 : 0.45}>
-              {walls && <path d={d} fill="none" stroke="var(--color-ink-soft)" strokeWidth={12} strokeOpacity={0.3} strokeLinejoin="round" />}
+            <g key={`realm-${g.rootId}`} data-testid="realm-border" opacity={walls ? 0.5 : 0.3}>
+              {walls && <path d={d} fill="none" stroke="var(--color-ink-soft)" strokeWidth={12} strokeOpacity={0.2} strokeLinejoin="round" />}
               <path
                 d={d}
                 fill="none"
@@ -193,7 +193,7 @@ export function CanvasBackdrop({
               stroke={color}
               // The parent's own edge brightness (Node.zoneEdge), halved when dimmed.
               strokeOpacity={(root?.zoneEdge ?? ZONE_EDGE_DEFAULT) * (dimmed ? 0.5 : 1)}
-              strokeWidth={2.5}
+              strokeWidth={1.5}
               // The whole overlay SVG is pointer-events-none (so its
               // decorative shapes never steal a drag/click from a
               // NodeCard div sitting underneath) — a zone is one of
@@ -267,9 +267,10 @@ export function CanvasBackdrop({
               data-base={zonePoints}
               fill="none"
               stroke={SOLVED_GOLD}
-              strokeWidth={4}
+              strokeWidth={2.5}
+              strokeOpacity={0.7}
               strokeLinejoin="round"
-              style={{ filter: `drop-shadow(0 0 6px ${SOLVED_GOLD})` }}
+              style={{ filter: `drop-shadow(0 0 3px ${SOLVED_GOLD})` }}
             />
           );
         })}
@@ -287,7 +288,7 @@ export function CanvasBackdrop({
           const dimmed = selectedCircle ? selectedCircle.rootId !== g.rootId : !!focusedZones && !focusedZones.has(g.rootId);
           const zonePoints = pointsOf(g);
           return (
-            <g key={`wall-${g.rootId}`} data-testid={kingdom ? "kingdom-wall" : "castle-wall"} opacity={dimmed ? 0.35 : 0.8}>
+            <g key={`wall-${g.rootId}`} data-testid={kingdom ? "kingdom-wall" : "castle-wall"} opacity={dimmed ? 0.25 : 0.55}>
               {kingdom && (
                 <polygon
                   points={zonePoints}
@@ -296,7 +297,7 @@ export function CanvasBackdrop({
                   fill="none"
                   stroke={color}
                   strokeWidth={14}
-                  strokeOpacity={0.35}
+                  strokeOpacity={0.2}
                   strokeLinejoin="round"
                 />
               )}
