@@ -92,7 +92,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
   layout and look.
-- **Deleting** — a deleted node gives a short shiver (and a phone buzz) before it goes. Questions such
+- **Deleting** — a deleted node pops like a bubble where it stood, or goes off in a small boom when it
+  was a Problem, Problematic option or Fail (`map/NodeBurst.tsx`). Questions such
   as "Delete 3 nodes?" use the app's own dialog (`context/ConfirmContext.tsx`), not the browser's.
 - **First map** — a one-time card lists the main gestures, touch or mouse ones (`map/GestureHint.tsx`).
 - **Loading** — the map editor, *Think it through*, text splitting and admin load on demand

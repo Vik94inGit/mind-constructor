@@ -122,7 +122,6 @@ import { FinishedBanner } from "../map/FinishedBanner";
 import { HistoryPanel } from "../map/HistoryPanel";
 import { BURST_MS, NodeBurst } from "../map/NodeBurst";
 import { mapBackgroundStyle } from "../utils/mapBackground";
-import { sleep } from "../utils/sleep";
 import { useConfirm } from "../context/ConfirmContext";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
@@ -132,9 +131,6 @@ import { useConfirm } from "../context/ConfirmContext";
 // field rather than touching one of these in place.
 const EMPTY_STRING_SET: Set<string> = new Set();
 const EMPTY_POINTS: { x: number; y: number }[] = [];
-
-// How long a deleted node shivers before it goes (index.css node-delete-shake).
-const DELETE_SHAKE_MS = 320;
 
 export function MapPage() {
   const confirm = useConfirm();
@@ -1640,17 +1636,6 @@ export function MapPage() {
     }
   }
 
-  // Nodes about to go give a short shiver first (see NodeCard's shaking), so
-  // a delete is felt, not just a node blinking out.
-  const [shakingIds, setShakingIds] = useState<Set<string>>(() => new Set());
-  async function shakeNodes(ids: string[]) {
-    if (ids.length === 0) return;
-    setShakingIds(new Set(ids));
-    navigator.vibrate?.(30);
-    await sleep(DELETE_SHAKE_MS);
-    setShakingIds(new Set());
-  }
-
   async function deleteNodeWithUndo(node: NodeDoc): Promise<boolean> {
     const undoable = !node.isWeapon && !node.isProtection;
     if (!undoable && !(await confirm(t.ui.node.deleteConfirm, { confirmLabel: t.ui.common.delete, danger: true }))) return false;
@@ -1658,7 +1643,6 @@ export function MapPage() {
     const full = undoable ? await nodesApi.getNode(node.nodeId).catch(() => node) : node;
     const deleted = deletedNodeOf({ ...node, ...full }, nodes, edges, isOwnNode);
     const res = await nodesApi.deleteNode(node.nodeId);
-    await shakeNodes([node.nodeId]);
     applyNodeDeleted(node.nodeId);
     // Deleting a protection node with banked damage releases the whole
     // total onto whatever it was defending — see Backend's deleteNodeDao.
@@ -1870,7 +1854,6 @@ export function MapPage() {
     showNodes,
     setActionError,
     refreshInsights,
-    shakeNodes,
     t,
   });
 
@@ -2436,7 +2419,6 @@ export function MapPage() {
                   selected={selectedId === node.nodeId}
                   multiSelected={multiSelectIds.has(node.nodeId)}
                   dragging={nodeDragged(node)}
-                  shaking={shakingIds.has(node.nodeId)}
                   // Drags off a bare pointer-down only actually happen when
                   // moveMode is on, or the node is already part of an
                   // active 2+-node multi-selection (that path stays live
