@@ -23,10 +23,12 @@ import { FolderModal, primaryBtn, secondaryBtn } from "../dashboard/FolderModal"
 import { MoveToFolderModal } from "../dashboard/MoveToFolderModal";
 import { FolderIcon, LibraryTile, MapIcon } from "../dashboard/LibraryTile";
 import { libraryItems, paginate } from "../dashboard/library";
+import { useConfirm } from "../context/ConfirmContext";
 
 type Filter = mapsApi.MapFilter;
 
 export function DashboardPage() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -148,7 +150,7 @@ export function DashboardPage() {
   }
 
   async function handleDelete(map: MapDoc) {
-    if (!confirm(t.dashboard.deleteConfirm(map.name))) return;
+    if (!(await confirm(t.dashboard.deleteConfirm(map.name), { confirmLabel: t.ui.common.delete, danger: true }))) return;
     setError(null);
     try {
       await mapsApi.deleteMap(map.mapId);
@@ -160,7 +162,7 @@ export function DashboardPage() {
   }
 
   async function handleDeleteFolder(folder: FolderDoc) {
-    if (!confirm(t.dashboard.library.deleteFolderConfirm(folder.name))) return;
+    if (!(await confirm(t.dashboard.library.deleteFolderConfirm(folder.name), { confirmLabel: t.ui.common.delete, danger: true }))) return;
     setError(null);
     try {
       await foldersApi.deleteFolder(folder.folderId);

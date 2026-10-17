@@ -41,6 +41,14 @@ describe("makeZoneRule", () => {
     expect(rule.fits({ x: 1000, y: 1100 })).toBe(true);
   });
 
+  it("free mode lets a dragged node sit in a zone or far from everything, just not on another node", () => {
+    const { nodes, positions } = triangleMap();
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], WIDE, {}, true);
+    expect(rule.fits({ x: 1000, y: 750 })).toBe(true);
+    expect(rule.compact({ x: 2200, y: 1400 })).toBe(true);
+    expect(rule.fits({ x: 1000, y: 400 })).toBe(false);
+  });
+
   it("keeps a node off a zone's line, not just out of its inside", () => {
     const { nodes, positions } = triangleMap();
     const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], WIDE);

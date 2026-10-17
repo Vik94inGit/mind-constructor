@@ -4,12 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { loadDraft } from "../utils/thoughtFlow";
 import { useI18n } from "../i18n/I18nContext";
+import { useConfirm } from "../context/ConfirmContext";
 
 // The way in to the "Think it through" flow (pages/ThinkPage.tsx): a single
 // open question and a box to answer it in, so the first thing on the
 // dashboard is an invitation to write rather than a form to fill in. Whatever
 // is typed here becomes the central thought on the flow's first step.
 export function ThinkEntry() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const { t } = useI18n();
   const tt = t.ui.think.entry;
@@ -19,11 +21,11 @@ export function ThinkEntry() {
   const draftCount = draft?.thoughts.filter((x) => x.text.trim()).length ?? 0;
   const hasDraft = !!draft && (draft.center.trim() !== "" || draftCount > 0);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     // A new thought would replace the draft in progress — ask first, and
     // resume the draft instead if they'd rather keep it.
-    if (hasDraft && text.trim() && !confirm(t.ui.think.startOverConfirm)) {
+    if (hasDraft && text.trim() && !(await confirm(t.ui.think.startOverConfirm))) {
       navigate("/think");
       return;
     }

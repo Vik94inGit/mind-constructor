@@ -9,6 +9,7 @@ import type { CanvasModeAction, DrawBlockReason, Pt } from "./useCanvasMode";
 import type { NodeGroup } from "../utils/canvasLayout";
 import type { ReadingMode } from "../utils/readingMode";
 import type { LineDoc, NodeDoc } from "../types";
+import { useConfirm } from "../context/ConfirmContext";
 
 interface Params {
   drawMode: boolean;
@@ -72,6 +73,7 @@ export function useLineDrawing({
   deleteConfirmMessage,
   deleteFailedMessage,
 }: Params) {
+  const confirm = useConfirm();
   // A blocked-spot/crossing flash (see addDrawPoint) clears itself after a
   // beat — this timer, and the hover ring's own rAF throttle below, are only
   // ever touched from within this hook, so they live here rather than in
@@ -179,7 +181,7 @@ export function useLineDrawing({
 
   async function handleLineClick(line: LineDoc) {
     if (!canDeleteLine(line)) return;
-    if (!confirm(deleteConfirmMessage)) return;
+    if (!(await confirm(deleteConfirmMessage, { danger: true }))) return;
     setActionError(null);
     try {
       await linesApi.deleteLine(line.lineId);

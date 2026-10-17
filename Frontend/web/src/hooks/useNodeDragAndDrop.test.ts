@@ -284,7 +284,7 @@ describe("useNodeDragAndDrop", () => {
       expect(nodesApi.updateNode).toHaveBeenCalledWith("child", { x: 900, y: 300 });
     });
 
-    it("lands a drop wherever the zone rules put it", async () => {
+    it("lands a drop where placeNode's free mode puts it", async () => {
       const node = makeNode({ nodeId: "a", x: 100, y: 100, parentId: null });
       const nodes = [node];
       const positions = new Map<string, Pt>([["a", { x: 100, y: 100 }]]);
@@ -301,7 +301,7 @@ describe("useNodeDragAndDrop", () => {
         await vi.runAllTimersAsync();
       });
 
-      expect(placeNode).toHaveBeenCalledWith({ x: 400, y: 300 }, [{ nodeId: "a" }]);
+      expect(placeNode).toHaveBeenCalledWith({ x: 400, y: 300 }, [{ nodeId: "a" }], [], { free: true });
       expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 333, y: 444 });
     });
 
@@ -404,7 +404,7 @@ describe("useNodeDragAndDrop", () => {
   });
 
   describe("group drag", () => {
-    it("moves every selected member by the same offset, staggering the followers' own catch-up", async () => {
+    it("moves every selected member by the same offset, live and on the drop", async () => {
       // Kept well clear of the drop's own 60px canvas-edge clamp margin —
       // starting near (0,0) would get the target silently clamped back
       // toward the margin instead of landing at the plain offset math this
@@ -438,10 +438,9 @@ describe("useNodeDragAndDrop", () => {
       expect(result.current.groupDragState?.get("follower")).toEqual({ x: 300, y: 600 });
 
       act(() => listeners.pointermove({ clientX: 400, clientY: 200 }));
-      // Only the leader tracks the pointer live — the follower stays put
-      // until the drop.
+      // The whole selection moves under the finger at once.
       expect(result.current.groupDragState?.get("leader")).toEqual({ x: 400, y: 200 });
-      expect(result.current.groupDragState?.get("follower")).toEqual({ x: 300, y: 600 });
+      expect(result.current.groupDragState?.get("follower")).toEqual({ x: 500, y: 600 });
 
       await act(async () => {
         listeners.pointerup({ clientX: 400, clientY: 200 });

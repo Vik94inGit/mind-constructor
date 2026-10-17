@@ -17,7 +17,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 ## What's here
 
 - **Auth** (`/login`, `/register`) — email/password or "Sign in with Google" (one endpoint for
-  both registering and logging in), JWT stored in `localStorage`. "Try it without an account"
+  both registering and logging in); the session is an httpOnly cookie kept in Redis on the backend. "Try it without an account"
   spins up a throwaway demo account with its own seeded map — nothing to configure to try it.
 - **Think it through** (`/think`) — a guided, writing-first way to start a map, opened from the
   dashboard's "What's on your mind?" box. Four steps: pick what kind of thinking it is and write the
@@ -83,8 +83,20 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   the puzzle view).
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
   in the panel; the inline inputs grow taller with the text, never wider.
-- **New node → panel** — confirming a new node's inline name opens its panel with the text field
-  focused, ready for the full text.
+- **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
+  node lands and the map is in view again.
+- **Moving nodes** — a dragged node (or group) lands where it was let go, nudged only so it doesn't
+  cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes. On a
+  phone, holding a node adds it to a group selection and dragging one of them moves the whole group
+  under the finger (`hooks/useNodeDragAndDrop.ts`).
+- **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
+  node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
+  layout and look.
+- **Deleting** — a deleted node gives a short shiver (and a phone buzz) before it goes. Questions such
+  as "Delete 3 nodes?" use the app's own dialog (`context/ConfirmContext.tsx`), not the browser's.
+- **First map** — a one-time card lists the main gestures, touch or mouse ones (`map/GestureHint.tsx`).
+- **Loading** — the map editor, *Think it through*, text splitting and admin load on demand
+  (`App.tsx`); the build writes `asset-list.json` so the service worker keeps them for offline too.
 - **Computer mode** — on a wide screen with a mouse/trackpad (`hooks/useDesktopLayout.ts`), the map's
   toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the

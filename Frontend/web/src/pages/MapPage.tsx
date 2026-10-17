@@ -76,6 +76,7 @@ import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
 import { MapLegend } from "../map/MapLegend";
 import { ZoneMenu } from "../map/ZoneMenu";
+import { GestureHint } from "../map/GestureHint";
 import type { ZoneStylePatch } from "../map/ZoneMenuBody";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
@@ -115,12 +116,14 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeType, ZonePaletteColor } from "../types";
+import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeShape, NodeType, ZonePaletteColor } from "../types";
 import { battleTally, finishState, healthAt } from "../utils/finish";
 import { FinishedBanner } from "../map/FinishedBanner";
 import { HistoryPanel } from "../map/HistoryPanel";
 import { BURST_MS, NodeBurst } from "../map/NodeBurst";
 import { mapBackgroundStyle } from "../utils/mapBackground";
+import { sleep } from "../utils/sleep";
+import { useConfirm } from "../context/ConfirmContext";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -130,7 +133,11 @@ import { mapBackgroundStyle } from "../utils/mapBackground";
 const EMPTY_STRING_SET: Set<string> = new Set();
 const EMPTY_POINTS: { x: number; y: number }[] = [];
 
+// How long a deleted node shivers before it goes (index.css node-delete-shake).
+const DELETE_SHAKE_MS = 320;
+
 export function MapPage() {
+  const confirm = useConfirm();
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
   const desktopLayout = useDesktopLayout();
@@ -667,13 +674,25 @@ export function MapPage() {
   // `desired`: the nearest spot that covers no other node and follows the
   // zone rules — out of zones it isn't in, zones not crossing, and no more
   // than ~2 cm from the nearest node or zone line. See utils/zoneRules.ts.
+  // `free` (a node the person dragged there themselves) keeps only the first
+  // part: nothing on top of another node or its text.
   // Only the moving nodes move; nothing else on the map is pushed around.
-  function placeNode(desired: { x: number; y: number }, moving: MovingNode[], extra: ExtraNode[] = []) {
+  function placeNode(
+    desired: { x: number; y: number },
+    moving: MovingNode[],
+    extra: ExtraNode[] = [],
+    opts: { free?: boolean } = {},
+  ) {
     const obstacles = footprintObstacles(
       [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
       MIN_NODE_GAP,
     );
-    return placeByZoneRules(desired, obstacles, viewportBounds(), makeZoneRule(visibleNodes, positions, moving, extra, undefined, zoneLayouts));
+    return placeByZoneRules(
+      desired,
+      obstacles,
+      viewportBounds(),
+      makeZoneRule(visibleNodes, positions, moving, extra, undefined, zoneLayouts, opts.free),
+    );
   }
 
 
@@ -1579,13 +1598,67 @@ export function MapPage() {
   // without a confirm; a weapon or protection node can't (its damage and
   // shields don't replay), so that one still asks first. Resolves false when
   // the person changed their mind. Throws when the delete fails.
+  // A zone's own menu (ZoneMenu): copy all of its text, give all of your
+  // nodes in it one shape, or delete those nodes — the zone as a whole,
+  // without choosing its nodes one by one first.
+  function zoneActionsFor(rootId: string) {
+    const group = nodeGroups.find((g) => g.rootId === rootId);
+    if (!group) return undefined;
+    const ids = group.members.map((n) => n.nodeId);
+    const own = group.members.filter((n) => isOwnNode(n) && !n.isWeapon);
+    const shapes = new Set(own.map((n) => n.shape ?? null));
+    return {
+      onCopyText: () => void copySelectionAsText(ids),
+      shape:
+        own.length > 0
+          ? {
+              value: shapes.size === 1 ? [...shapes][0] : undefined,
+              onPick: (shape: NodeShape | null) => void setShapeOf(own, shape),
+            }
+          : undefined,
+      onDelete: own.length > 0 ? () => void deleteSelection(own.map((n) => n.nodeId)) : undefined,
+      deleteCount: own.length,
+    };
+  }
+
+  async function setShapeOf(targets: NodeDoc[], shape: NodeShape | null) {
+    setActionError(null);
+    // Shown at once; what the server refuses goes back.
+    setNodes((prev) => prev.map((n) => (targets.some((x) => x.nodeId === n.nodeId) ? { ...n, shape } : n)));
+    const failed: NodeDoc[] = [];
+    await Promise.all(
+      targets.map((n) =>
+        nodesApi
+          .updateNode(n.nodeId, { shape })
+          .then(upsertNode)
+          .catch(() => failed.push(n)),
+      ),
+    );
+    if (failed.length) {
+      setNodes((prev) => prev.map((n) => failed.find((f) => f.nodeId === n.nodeId) ?? n));
+      setActionError(t.ui.errors.shape);
+    }
+  }
+
+  // Nodes about to go give a short shiver first (see NodeCard's shaking), so
+  // a delete is felt, not just a node blinking out.
+  const [shakingIds, setShakingIds] = useState<Set<string>>(() => new Set());
+  async function shakeNodes(ids: string[]) {
+    if (ids.length === 0) return;
+    setShakingIds(new Set(ids));
+    navigator.vibrate?.(30);
+    await sleep(DELETE_SHAKE_MS);
+    setShakingIds(new Set());
+  }
+
   async function deleteNodeWithUndo(node: NodeDoc): Promise<boolean> {
     const undoable = !node.isWeapon && !node.isProtection;
-    if (!undoable && !confirm(t.ui.node.deleteConfirm)) return false;
+    if (!undoable && !(await confirm(t.ui.node.deleteConfirm, { confirmLabel: t.ui.common.delete, danger: true }))) return false;
     // The node list arrives without text and pictures — fetch them so undo has them.
     const full = undoable ? await nodesApi.getNode(node.nodeId).catch(() => node) : node;
     const deleted = deletedNodeOf({ ...node, ...full }, nodes, edges, isOwnNode);
     const res = await nodesApi.deleteNode(node.nodeId);
+    await shakeNodes([node.nodeId]);
     applyNodeDeleted(node.nodeId);
     // Deleting a protection node with banked damage releases the whole
     // total onto whatever it was defending — see Backend's deleteNodeDao.
@@ -1797,6 +1870,7 @@ export function MapPage() {
     showNodes,
     setActionError,
     refreshInsights,
+    shakeNodes,
     t,
   });
 
@@ -1829,11 +1903,9 @@ export function MapPage() {
     viewportBounds,
     showNodes,
     showNotice,
-    openNewNode: (node, at) => {
+    onCreated: () => {
       setMultiSelectIds(new Set());
-      setSelectedId(node.nodeId);
-      setFocusTextNodeId(node.nodeId);
-      centerOnPoint(at.x, at.y);
+      setSelectedId(null);
     },
     t,
   });
@@ -1844,7 +1916,7 @@ export function MapPage() {
   // "+" menu > Delete map (owner only): the map and everything on it, then
   // back to the dashboard.
   async function deleteThisMap() {
-    if (!map || !confirm(t.dashboard.deleteConfirm(map.name))) return;
+    if (!map || !(await confirm(t.dashboard.deleteConfirm(map.name), { confirmLabel: t.ui.common.delete, danger: true }))) return;
     setActionError(null);
     try {
       await mapsApi.deleteMap(map.mapId);
@@ -1854,8 +1926,8 @@ export function MapPage() {
     }
   }
 
-  function exitDemo() {
-    if (!confirm(t.ui.demo.exitConfirm)) return;
+  async function exitDemo() {
+    if (!(await confirm(t.ui.demo.exitConfirm))) return;
     void logout();
   }
 
@@ -1962,7 +2034,7 @@ export function MapPage() {
       setFinishBusy(false);
     }
   }
-  function pressFinish() {
+  async function pressFinish() {
     if (!mapId || finishBusy) return;
     if (!isOwner) {
       void runFinish(() => mapsApi.agreeToFinish(mapId, !iAgreed));
@@ -1976,7 +2048,7 @@ export function MapPage() {
       );
       return;
     }
-    if (!confirm(fs.confirm)) return;
+    if (!(await confirm(fs.confirm))) return;
     setSiegeOpen(false);
     void runFinish(() => mapsApi.finishMap(mapId));
   }
@@ -2349,6 +2421,7 @@ export function MapPage() {
                   selected={selectedId === node.nodeId}
                   multiSelected={multiSelectIds.has(node.nodeId)}
                   dragging={nodeDragged(node)}
+                  shaking={shakingIds.has(node.nodeId)}
                   // Drags off a bare pointer-down only actually happen when
                   // moveMode is on, or the node is already part of an
                   // active 2+-node multi-selection (that path stays live
@@ -2529,6 +2602,7 @@ export function MapPage() {
               uses for NodePanel. */}
           {!presenting && (
             <>
+              {!loading && <GestureHint />}
               <ViewCorner
                 level={abstractionLevel}
                 levels={levelCount(depthByNode)}
@@ -2692,9 +2766,9 @@ export function MapPage() {
             onDisplay={setDisplayForChosen}
             onClearNumbers={() => numberSelection(true)}
             onCopy={copySelection}
-            onCopyText={copySelectionAsText}
+            onCopyText={() => void copySelectionAsText()}
             onGroupCircle={groupSelectionIntoCircle}
-            onDelete={deleteSelection}
+            onDelete={() => void deleteSelection()}
             onDone={exitChooseMode}
           />
         ) : pendingCreate && !presenting ? (
@@ -2890,6 +2964,7 @@ export function MapPage() {
               onChange: (patch) => setZoneStyle(zoneMenu.rootId, patch),
             }
           }
+          actions={zoneActionsFor(zoneMenu.rootId)}
           onClose={() => setZoneMenu(null)}
         />
       )}

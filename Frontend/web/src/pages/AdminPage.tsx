@@ -4,8 +4,10 @@ import { useAuth } from "../context/AuthContext";
 import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
 import type { User } from "../types";
+import { useConfirm } from "../context/ConfirmContext";
 
 export function AdminPage() {
+  const confirm = useConfirm();
   const { user: me } = useAuth();
   const { t } = useI18n();
   const [users, setUsers] = useState<User[]>([]);
@@ -43,7 +45,7 @@ export function AdminPage() {
   }
 
   async function remove(u: User) {
-    if (!confirm(t.ui.admin.deleteConfirm(u.username))) return;
+    if (!(await confirm(t.ui.admin.deleteConfirm(u.username), { confirmLabel: t.ui.common.delete, danger: true }))) return;
     setBusyId(u._id);
     setError(null);
     try {
@@ -57,8 +59,8 @@ export function AdminPage() {
   }
 
   async function wipe() {
-    if (!confirm(t.ui.admin.wipeConfirm)) return;
-    if (!confirm(t.ui.admin.wipeConfirmAgain)) return;
+    if (!(await confirm(t.ui.admin.wipeConfirm, { confirmLabel: t.ui.common.delete, danger: true }))) return;
+    if (!(await confirm(t.ui.admin.wipeConfirmAgain, { confirmLabel: t.ui.common.delete, danger: true }))) return;
     setError(null);
     try {
       await authApi.wipeDatabase();

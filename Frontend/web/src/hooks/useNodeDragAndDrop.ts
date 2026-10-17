@@ -8,14 +8,14 @@ import {
   CANVAS_H,
   CANVAS_W,
   CIRCLE_DROP_RADIUS,
+  FULL_CANVAS_BOUNDS,
   getZoneReach,
   isDescendant,
 } from "../utils/canvasLayout";
 import type { NodeGroup, ViewportBounds } from "../utils/canvasLayout";
-import type { MovingNode } from "../utils/zoneRules";
+import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import { nodeRefId } from "../utils/nodeType";
 import { storedSpots } from "../utils/cardSpace";
-import { sleep } from "../utils/sleep";
 import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
@@ -23,15 +23,9 @@ import type { Snap } from "../utils/puzzleSnap";
 
 type Pt = { x: number; y: number };
 
-// Group-drag "follow the leader" catch-up — see onNodePointerDown's group-
-// drag branch. Only the pointer-downed node ("the leader") tracks the
-// pointer live; every other selected node stays put until the leader is
-// dropped, then catches up to its own new offset in a few discrete hops
-// instead of snapping there in one frame, staggered so the group reads as
-// trailing after the leader rather than teleporting in lockstep with it.
-const GROUP_FOLLOW_STEPS = 3;
-const GROUP_FOLLOW_STEP_DELAY_MS = 130;
-const GROUP_FOLLOW_STAGGER_MS = 90;
+// How long after a long-press finger lifts its trailing click is still swallowed.
+const LONG_PRESS_CLICK_GRACE_MS = 400;
+
 
 interface Params {
   nodes: NodeDoc[];
@@ -49,7 +43,8 @@ interface Params {
   viewportBounds: () => ViewportBounds;
   obstaclePoints: (exclude?: Set<string>) => Pt[];
   /** Where `moving` lands when dropped at `desired`, under the zone rules (utils/zoneRules.ts). */
-  placeNode: (desired: Pt, moving: MovingNode[]) => Pt;
+  /** free: only keep clear of other nodes and their text, not the zone rules (a drag the user aimed). */
+  placeNode: (desired: Pt, moving: MovingNode[], extra?: ExtraNode[], opts?: { free?: boolean }) => Pt;
   upsertNode: (node: NodeDoc) => void;
   setActionError: (message: string | null) => void;
   setNodes: Dispatch<SetStateAction<NodeDoc[]>>;
@@ -169,26 +164,44 @@ export function useNodeDragAndDrop({
     return { target, valid: true };
   }
 
+  // A finger held still on a node (touch's shift+click): toggles it in or out
+  // of the group selection. Same contract onCanvasPointerDown's marquee onUp
+  // already follows — starting a multi-selection always clears any stale
+  // single selection, so it can't resurface (a NodePanel popping back open
+  // for a node nobody re-picked) once the group empties back out. Phones fire
+  // a click when the held finger lifts; without swallowing it, that click
+  // selected the node on its own and threw the group away, so a second node
+  // could never join. Some browsers send no click after a long press, so the
+  // swallow only lasts until the finger could have lifted.
+  function toggleIntoGroup(node: NodeDoc) {
+    setSelectedId(null);
+    setMultiSelectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(node.nodeId)) next.delete(node.nodeId);
+      else next.add(node.nodeId);
+      return next;
+    });
+    suppressNextClick.current = true;
+    window.addEventListener(
+      "pointerup",
+      () => setTimeout(() => (suppressNextClick.current = false), LONG_PRESS_CLICK_GRACE_MS),
+      { once: true },
+    );
+  }
+
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
     if (chooseMode || packMode || drawMode) return;
     if (!isOwnNode(node)) return;
 
     // Group drag: the pointer-downed node is itself a member of a 2+-node
-    // multi-selection — dragging it moves the whole selection, not just
-    // itself. Only this "leader" node actually tracks the pointer live;
-    // every other selected node ("follower") stays put until the leader is
-    // dropped, then catches up to the same offset the leader moved by, in a
-    // few staggered hops (see GROUP_FOLLOW_* above) instead of snapping
-    // there in lockstep — reads as the group trailing after the leader,
-    // like a line of animals following one another, rather than the whole
-    // cluster teleporting as one rigid block. No circle-join drop-target
-    // check here at all (see the plan's own scope note) — a group drop is
-    // always a plain bulk reposition; each member persists with its own
-    // PATCH /api/nodes/:nodeId (no bulk endpoint exists). Skipped when the
-    // pointer-downed node itself is locked (Node.locked — its circle is the
-    // currently-chosen one, see handleCircleBackdropClick): a chosen
-    // cluster holds its position for good, so falls through to the
-    // ordinary long-press/tap paths below instead of starting a reposition.
+    // multi-selection — dragging it moves the whole selection, every member
+    // under the finger at once, as one rigid shape. No circle-join drop-target
+    // check here — a group drop is always a plain bulk reposition; each member
+    // persists with its own PATCH /api/nodes/:nodeId (no bulk endpoint
+    // exists). Skipped when the pointer-downed node itself is locked
+    // (Node.locked — its circle is the currently-chosen one, see
+    // handleCircleBackdropClick): a chosen cluster holds its position for
+    // good, so falls through to the ordinary long-press/tap paths below.
     if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !held(node)) {
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
@@ -201,7 +214,6 @@ export function useNodeDragAndDrop({
         const n = nodes.find((nn) => nn.nodeId === id);
         return !!n && isOwnNode(n) && !n.isWeapon && !held(n);
       });
-      const followerIds = memberIds.filter((id) => id !== node.nodeId);
       const startPositions = new Map(
         memberIds.map((id) => [id, posFor(nodes.find((n) => n.nodeId === id)!)]),
       );
@@ -212,25 +224,30 @@ export function useNodeDragAndDrop({
         x: Math.min(CANVAS_W - margin, Math.max(margin, x)),
         y: Math.min(CANVAS_H - margin, Math.max(margin, y)),
       });
+      const shifted = (dx: number, dy: number) =>
+        new Map(Array.from(startPositions, ([id, p]) => [id, { x: p.x + dx, y: p.y + dy }]));
 
-      // Only the leader's own entry moves during the live drag — followers
-      // are left at their startPositions value (identical to their real
-      // position, so nothing visually shifts for them yet).
+      function stop() {
+        window.removeEventListener("pointermove", onGroupMove);
+        window.removeEventListener("pointerup", onGroupUp);
+        window.removeEventListener("pointercancel", onGroupCancel);
+      }
+
       function onGroupMove(ev: PointerEvent) {
         const p = screenToCanvas(ev.clientX, ev.clientY);
         dragMoved.current = true;
-        const leaderStart = startPositions.get(node.nodeId)!;
-        dispatch({
-          type: "groupSetMember",
-          id: node.nodeId,
-          pos: { x: leaderStart.x + (p.x - startPt.x), y: leaderStart.y + (p.y - startPt.y) },
-          fallback: startPositions,
-        });
+        dispatch({ type: "groupStart", positions: shifted(p.x - startPt.x, p.y - startPt.y) });
+      }
+
+      // The browser took the touch back (a system gesture, an incoming call):
+      // the group goes back where it was, nothing saved.
+      function onGroupCancel() {
+        stop();
+        if (groupDragToken.current === token) dispatch({ type: "groupClear" });
       }
 
       async function onGroupUp(ev: PointerEvent) {
-        window.removeEventListener("pointermove", onGroupMove);
-        window.removeEventListener("pointerup", onGroupUp);
+        stop();
         suppressNextClick.current = true;
         if (!dragMoved.current) {
           dispatch({ type: "groupClear" });
@@ -243,27 +260,12 @@ export function useNodeDragAndDrop({
         setActionError(null);
         recordMove?.(nodes.filter((n) => memberIds.includes(n.nodeId)));
 
-        // The selection lands as one rigid shape, at the nearest spot where
-        // the zone rules hold for every member at once (see placeNode): no
-        // member on another node or in a zone it isn't part of, no zone
-        // crossing another, and nothing left floating far from the rest.
+        // The selection lands where it was let go, as one shape, nudged only
+        // as far as it takes for no member to cover another node or its text
+        // (see placeNode's "free" mode). Each member then steers clear of the
+        // members already placed, in case the nudge pushed them together.
         const memberIdSet = new Set(memberIds);
         const externalObstacles = footprintObstacles(obstaclePoints(memberIdSet));
-
-        // Every member's own final target, worked out up front (leader
-        // first, then followers in order) rather than each one independently
-        // inside the async catch-up loop below. `obstaclePoints(memberIdSet)`
-        // above only ever excludes the *whole* group from each other's
-        // obstacle list — fine for the group's own shape (translating every
-        // member by the same dx/dy can't newly overlap them with each
-        // other), but a member nudged clear of some *external* obstacle
-        // (another zone, another node) had no way to know it was landing on
-        // top of a groupmate, since groupmates were never obstacles to begin
-        // with. Feeding each already-placed member's own target into the
-        // next one's own obstacle list (footprintObstacles(...)) fixes that:
-        // a follower now steers clear of the leader and of every earlier
-        // follower too, not just of the outside world.
-        const memberTargets = new Map<string, Pt>();
         const leaderStart = startPositions.get(node.nodeId)!;
         const leaderTarget = placeNode(
           clamp(leaderStart.x + dx, leaderStart.y + dy),
@@ -271,63 +273,39 @@ export function useNodeDragAndDrop({
             const start = startPositions.get(id)!;
             return { nodeId: id, offset: { x: start.x - leaderStart.x, y: start.y - leaderStart.y } };
           }),
+          [],
+          { free: true },
         );
-        memberTargets.set(node.nodeId, leaderTarget);
-        // Followers keep their place in the shape. The nudge below only does
-        // anything when no spot satisfied the rules for the whole group.
-        for (const id of followerIds) {
+        const targets = new Map<string, Pt>([[node.nodeId, leaderTarget]]);
+        for (const id of memberIds) {
+          if (id === node.nodeId) continue;
           const start = startPositions.get(id)!;
-          const placedSoFar = footprintObstacles(Array.from(memberTargets.values()));
-          const keepShape = { x: leaderTarget.x + start.x - leaderStart.x, y: leaderTarget.y + start.y - leaderStart.y };
-          memberTargets.set(
-            id,
-            avoidOverlap(clamp(keepShape.x, keepShape.y), [...externalObstacles, ...placedSoFar], viewportBounds()),
-          );
+          const placedSoFar = footprintObstacles(Array.from(targets.values()));
+          const keepShape = clamp(leaderTarget.x + start.x - leaderStart.x, leaderTarget.y + start.y - leaderStart.y);
+          targets.set(id, avoidOverlap(keepShape, [...externalObstacles, ...placedSoFar], FULL_CANVAS_BOUNDS));
         }
 
-        dispatch({ type: "groupSetMember", id: node.nodeId, pos: leaderTarget, fallback: startPositions });
-
-        const leaderDone = nodesApi
-          .updateNode(node.nodeId, spotFor(node, leaderTarget))
-          .then(upsertNode)
-          .catch((err) => setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes));
-
-        // Followers catch up in their own selection order, each one's own
-        // stepped animation starting GROUP_FOLLOW_STAGGER_MS after the
-        // previous one's — the cascade the comment above describes — and
-        // every write (each hop, and the final persist) checks `token`
-        // against groupDragToken.current first, so a follower still mid-
-        // animation when a new group drag starts (or this same one's own
-        // drop logic re-enters somehow) quietly stops instead of clobbering
-        // whatever superseded it.
-        const followerDone = followerIds.map(async (id, i) => {
-          if (i > 0) await sleep(i * GROUP_FOLLOW_STAGGER_MS);
-          if (groupDragToken.current !== token) return;
-          const start = startPositions.get(id)!;
-          const target = memberTargets.get(id)!;
-          for (let step = 1; step <= GROUP_FOLLOW_STEPS; step++) {
-            if (groupDragToken.current !== token) return;
-            const frac = step / GROUP_FOLLOW_STEPS;
-            const hop = { x: start.x + (target.x - start.x) * frac, y: start.y + (target.y - start.y) * frac };
-            dispatch({ type: "groupSetMember", id, pos: hop, fallback: startPositions });
-            if (step < GROUP_FOLLOW_STEPS) await sleep(GROUP_FOLLOW_STEP_DELAY_MS);
-          }
-          try {
+        // Shown at once and kept until the saves land, so nothing flashes
+        // back to its old spot in between.
+        dispatch({ type: "groupStart", positions: targets });
+        await Promise.all(
+          memberIds.map(async (id) => {
             const member = nodes.find((n) => n.nodeId === id);
             if (!member) return;
-            const updated = await nodesApi.updateNode(id, spotFor(member, target));
-            if (groupDragToken.current === token) upsertNode(updated);
-          } catch (err) {
-            setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
-          }
-        });
-
-        await Promise.all([leaderDone, ...followerDone]);
+            try {
+              const updated = await nodesApi.updateNode(id, spotFor(member, targets.get(id)!));
+              if (groupDragToken.current === token) upsertNode(updated);
+            } catch (err) {
+              setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
+            }
+          }),
+        );
         if (groupDragToken.current === token) dispatch({ type: "groupClear" });
       }
 
       window.addEventListener("pointermove", onGroupMove);
       window.addEventListener("pointerup", onGroupUp);
+      window.addEventListener("pointercancel", onGroupCancel);
       return;
     }
 
@@ -363,17 +341,7 @@ export function useNodeDragAndDrop({
         window.removeEventListener("pointerup", onIdleUp);
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
         if (onHold?.(node, touchStartX, touchStartY)) return;
-        // Same contract onCanvasPointerDown's marquee onUp already follows —
-        // starting a multi-selection always clears any stale single
-        // selection, so it can't resurface (a NodePanel popping back open
-        // for a node nobody re-picked) once the group empties back out.
-        setSelectedId(null);
-        setMultiSelectIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(node.nodeId)) next.delete(node.nodeId);
-          else next.add(node.nodeId);
-          return next;
-        });
+        toggleIntoGroup(node);
       }, LONG_PRESS_MS);
       function onIdleMove(ev: PointerEvent) {
         if (longPressTimer && Math.hypot(ev.clientX - touchStartX, ev.clientY - touchStartY) > LONG_PRESS_MOVE_TOLERANCE) {
@@ -463,16 +431,7 @@ export function useNodeDragAndDrop({
         dispatch({ type: "reset" });
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
         if (onHold?.(node, touchStartX, touchStartY)) return;
-        // See the other long-press timer's own comment above (the !moveMode
-        // branch) — same "starting a multi-selection clears any stale
-        // single selection" contract the marquee already follows.
-        setSelectedId(null);
-        setMultiSelectIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(node.nodeId)) next.delete(node.nodeId);
-          else next.add(node.nodeId);
-          return next;
-        });
+        toggleIntoGroup(node);
       }, LONG_PRESS_MS);
       cancelLongPressIfMoved = (ev: PointerEvent) => {
         if (longPressTimer && Math.hypot(ev.clientX - touchStartX, ev.clientY - touchStartY) > LONG_PRESS_MOVE_TOLERANCE) {
@@ -613,11 +572,10 @@ export function useNodeDragAndDrop({
           }
           return;
         }
-        // A drop lands as close to where it was let go as the zone rules
-        // allow (see placeNode): not on another node, not inside or on the
-        // line of a zone it isn't part of, its own zone not stretched over
-        // anyone else or across another zone, and no further than ~2 cm
-        // from the nearest node or zone line.
+        // A drop lands where it was let go, moved only as far as it takes not
+        // to cover another node or its text (placeNode's free mode): the
+        // person aimed it there, so the zone rules that place new nodes
+        // don't second-guess it.
         //
         // Dragged clear of its own circle's backdrop (not just repositioned
         // within it) — read as "pull this node out", clearing parentId so it
@@ -639,7 +597,9 @@ export function useNodeDragAndDrop({
         const startDist = rootPos ? Math.hypot(start.x - rootPos.x, start.y - rootPos.y) : 0;
         const staysMember = !!ownCircle && (dropDist <= getZoneReach() || dropDist <= startDist);
         const leftCircle = !!ownCircle && !staysMember;
-        const dropped = placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }]);
+        const dropped = placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }], [], {
+          free: true,
+        });
 
         // Remembered so a failed persist below can put the node back exactly
         // where it actually still is on the server, instead of leaving the

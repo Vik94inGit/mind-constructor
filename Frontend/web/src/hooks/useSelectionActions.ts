@@ -6,6 +6,7 @@ import { closestToCentroidIndex } from "../utils/mapGraph";
 import { nodeRefId } from "../utils/nodeType";
 import type { Translation } from "../i18n/translations";
 import type { EdgeDoc, NodeDoc } from "../types";
+import { useConfirm } from "../context/ConfirmContext";
 
 type Pt = { x: number; y: number };
 
@@ -23,6 +24,8 @@ interface Params {
   showNodes: (ids: string[]) => void;
   setActionError: (message: string | null) => void;
   refreshInsights: (mapId: string) => void;
+  /** A short shiver on the nodes just deleted, before they leave the map. */
+  shakeNodes?: (ids: string[]) => Promise<void>;
   t: Translation;
 }
 
@@ -42,8 +45,10 @@ export function useSelectionActions({
   showNodes,
   setActionError,
   refreshInsights,
+  shakeNodes,
   t,
 }: Params) {
+  const confirm = useConfirm();
   // SelectionMenu's "Delete N nodes" — one bulk DELETE /api/nodes request
   // (Backend's deleteManyNodesDao) instead of N parallel single-node
   // DELETEs. Confirms once for the whole batch rather than once per node
@@ -53,14 +58,16 @@ export function useSelectionActions({
   // strict subset of `ids` — local state is reconciled against `deleted`,
   // not the original selection, so a partial delete doesn't drop nodes that
   // were never actually removed.
-  async function deleteSelection() {
-    const ids = Array.from(multiSelectIds);
+  // `only`: delete these nodes instead of the selection (a zone's menu).
+  async function deleteSelection(only?: string[]) {
+    const ids = only ?? Array.from(multiSelectIds);
     if (ids.length === 0) return;
-    if (!confirm(t.ui.selection.deleteConfirm(ids.length))) return;
+    if (!(await confirm(t.ui.selection.deleteConfirm(ids.length), { confirmLabel: t.ui.common.delete, danger: true }))) return;
     setActionError(null);
     try {
       const { deleted } = await nodesApi.deleteManyNodes(ids);
       const deletedIds = new Set(deleted.map((d) => d.deletedId));
+      await shakeNodes?.(Array.from(deletedIds));
       // Any protection node in the batch releases its own banked damage
       // onto whatever it was defending — see Backend's deleteNodeDao.
       deleted.forEach(({ damagedProtectedNode }) => {

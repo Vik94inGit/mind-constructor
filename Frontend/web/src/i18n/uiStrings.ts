@@ -18,6 +18,8 @@ import type { SiegeStrings } from "./siegeStrings";
 export interface UiStrings {
   common: {
     cancel: string;
+    /** A confirm dialog's yes button. */
+    ok: string;
     close: string;
     delete: string;
     copy: string;
@@ -341,6 +343,8 @@ export interface UiStrings {
   };
   /** The map's canvas (Map.background), picked in the display menu by the map's owner. */
   mapBackground: { title: string; options: Record<"dots" | "plain" | "lined" | "dark", string> };
+  /** The one-time tip on a map with its main gestures (map/GestureHint.tsx). */
+  gestureHint: { title: string; touch: string[]; mouse: string[]; gotIt: string };
   panelDragHandle: string;
   panelResizeHandle: string;
   /** The panel a new node is written in before it exists — map/NewNodePanel.tsx. */
@@ -489,6 +493,7 @@ const slavicPlural = (n: number, one: string, few: string, many: string) => {
 const en: UiStrings = {
   common: {
     cancel: "Cancel",
+    ok: "OK",
     close: "Close",
     delete: "Delete",
     copy: "Copy",
@@ -868,6 +873,22 @@ const en: UiStrings = {
   },
   zoneStyle: { pattern: "Pattern", color: "Colour", none: "None", auto: "Auto", autoHint: "Colour by sentiment", takenBy: (name) => `taken by ${name}`, edge: "Edge brightness", view: "Show zone as", patterns: { dots: "Dots", stripes: "Stripes", grid: "Grid", chess: "Chess" }, colors: { sand: "Sand", sage: "Sage", sky: "Sky", lavender: "Lavender", rose: "Rose", slate: "Slate" } },
   mapBackground: { title: "Background", options: { dots: "Dot grid", plain: "Plain", lined: "Lined paper", dark: "Soft dark" } },
+  gestureHint: {
+    title: "How to use the map",
+    touch: [
+      "Tap a node to open it; tap a ring around it to add a thought.",
+      "Hold a node to pick it, hold more to pick a group, then drag the group.",
+      "Hold a zone for its menu: copy its text, shape, delete, look.",
+      "Pinch to zoom; the eye sets how much detail you see.",
+    ],
+    mouse: [
+      "Click a node to open it; click a ring around it to add a thought.",
+      "Shift+click or drag on empty space to pick a group, then drag the group.",
+      "Right-click a zone for its menu: copy its text, shape, delete, look.",
+      "Ctrl+wheel or − / + to zoom; the eye sets how much detail you see.",
+    ],
+    gotIt: "Got it",
+  },
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
   newNode: { title: "New node", placeholder: "Write your thought…", create: "Create", hint: "Enter creates it, Shift+Enter adds a line", ghost: "Ghost", ghostHint: "Write a question instead of an answer: the node stays faded until someone fills it in", ghostPlaceholder: "Write the question to answer later…", createGhost: "Create ghost" },
@@ -988,6 +1009,7 @@ const csNodes = (n: number) => `${n} ${csPlural(n, "uzel", "uzly", "uzlů")}`;
 const cs: UiStrings = {
   common: {
     cancel: "Zrušit",
+    ok: "OK",
     close: "Zavřít",
     delete: "Smazat",
     copy: "Kopírovat",
@@ -1367,6 +1389,22 @@ const cs: UiStrings = {
   },
   zoneStyle: { pattern: "Vzor", color: "Barva", none: "Žádný", auto: "Auto", autoHint: "Barva podle nálady", takenBy: (name) => `už má ${name}`, edge: "Jas okraje", view: "Zobrazit zónu jako", patterns: { dots: "Tečky", stripes: "Pruhy", grid: "Mřížka", chess: "Šachovnice" }, colors: { sand: "Písková", sage: "Šalvějová", sky: "Nebeská", lavender: "Levandulová", rose: "Růžová", slate: "Břidlicová" } },
   mapBackground: { title: "Pozadí", options: { dots: "Tečkovaná mřížka", plain: "Čisté", lined: "Linkovaný papír", dark: "Jemně tmavé" } },
+  gestureHint: {
+    title: "Jak pracovat s mapou",
+    touch: [
+      "Klepnutím na uzel ho otevřete; klepnutím na kruh kolem něj přidáte myšlenku.",
+      "Podržením uzel vyberete, podržením dalších vyberete skupinu a pak ji přetáhnete.",
+      "Podržením zóny otevřete její menu: kopírovat text, tvar, smazat, vzhled.",
+      "Sevřením prstů měníte přiblížení; oko určuje, kolik detailů vidíte.",
+    ],
+    mouse: [
+      "Kliknutím na uzel ho otevřete; kliknutím na kruh kolem něj přidáte myšlenku.",
+      "Shift+klik nebo tažení po prázdném místě vybere skupinu, pak ji přetáhněte.",
+      "Pravým klikem na zónu otevřete její menu: kopírovat text, tvar, smazat, vzhled.",
+      "Ctrl+kolečko nebo − / + mění přiblížení; oko určuje, kolik detailů vidíte.",
+    ],
+    gotIt: "Rozumím",
+  },
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
   newNode: { title: "Nový uzel", placeholder: "Napište svou myšlenku…", create: "Vytvořit", hint: "Enter vytvoří, Shift+Enter přidá řádek", ghost: "Duch", ghostHint: "Napište otázku místo odpovědi: uzel zůstane vybledlý, dokud ho někdo nevyplní", ghostPlaceholder: "Napište otázku, na kterou odpovíte později…", createGhost: "Vytvořit ducha" },
@@ -1486,6 +1524,7 @@ const ukNodes = (n: number) => `${n} ${slavicPlural(n, "вузол", "вузли
 const uk: UiStrings = {
   common: {
     cancel: "Скасувати",
+    ok: "Гаразд",
     close: "Закрити",
     delete: "Видалити",
     copy: "Копіювати",
@@ -1865,6 +1904,22 @@ const uk: UiStrings = {
   },
   zoneStyle: { pattern: "Візерунок", color: "Колір", none: "Немає", auto: "Авто", autoHint: "Колір за настроєм", takenBy: (name) => `уже в ${name}`, edge: "Яскравість краю", view: "Показати зону як", patterns: { dots: "Крапки", stripes: "Смуги", grid: "Сітка", chess: "Шахи" }, colors: { sand: "Пісок", sage: "Шавлія", sky: "Небо", lavender: "Лаванда", rose: "Троянда", slate: "Графіт" } },
   mapBackground: { title: "Фон", options: { dots: "Сітка з крапок", plain: "Чистий", lined: "Папір у лінійку", dark: "М’який темний" } },
+  gestureHint: {
+    title: "Як працювати з мапою",
+    touch: [
+      "Торкніться вузла, щоб відкрити його; торкніться кільця навколо, щоб додати думку.",
+      "Утримайте вузол, щоб вибрати його, утримайте ще кілька — це група, потім перетягніть її.",
+      "Утримайте зону, щоб відкрити її меню: копіювати текст, форма, видалити, вигляд.",
+      "Зведіть пальці, щоб масштабувати; око задає, скільки деталей видно.",
+    ],
+    mouse: [
+      "Клацніть вузол, щоб відкрити його; клацніть кільце навколо, щоб додати думку.",
+      "Shift+клік або протягування по порожньому місцю вибирає групу, потім перетягніть її.",
+      "Правий клік по зоні відкриває її меню: копіювати текст, форма, видалити, вигляд.",
+      "Ctrl+коліщатко або − / + масштабують; око задає, скільки деталей видно.",
+    ],
+    gotIt: "Зрозуміло",
+  },
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
   newNode: { title: "Новий вузол", placeholder: "Напишіть свою думку…", create: "Створити", hint: "Enter створює, Shift+Enter додає рядок", ghost: "Привид", ghostHint: "Напишіть питання замість відповіді: вузол лишатиметься блідим, доки хтось його не заповнить", ghostPlaceholder: "Напишіть питання, на яке відповісте пізніше…", createGhost: "Створити привида" },
@@ -1987,6 +2042,7 @@ const ruNodes = (n: number) => `${n} ${slavicPlural(n, "узел", "узла", "
 const ru: UiStrings = {
   common: {
     cancel: "Отмена",
+    ok: "ОК",
     close: "Закрыть",
     delete: "Удалить",
     copy: "Копировать",
@@ -2366,6 +2422,22 @@ const ru: UiStrings = {
   },
   zoneStyle: { pattern: "Узор", color: "Цвет", none: "Нет", auto: "Авто", autoHint: "Цвет по настроению", takenBy: (name) => `уже у ${name}`, edge: "Яркость края", view: "Показать зону как", patterns: { dots: "Точки", stripes: "Полосы", grid: "Сетка", chess: "Шахматы" }, colors: { sand: "Песок", sage: "Шалфей", sky: "Небо", lavender: "Лаванда", rose: "Роза", slate: "Графит" } },
   mapBackground: { title: "Фон", options: { dots: "Сетка из точек", plain: "Чистый", lined: "Бумага в линейку", dark: "Мягкий тёмный" } },
+  gestureHint: {
+    title: "Как работать с картой",
+    touch: [
+      "Коснитесь узла, чтобы открыть его; коснитесь кольца вокруг, чтобы добавить мысль.",
+      "Удерживайте узел, чтобы выбрать его, удерживайте ещё несколько — это группа, затем перетащите её.",
+      "Удерживайте зону, чтобы открыть её меню: копировать текст, форма, удалить, вид.",
+      "Сведите пальцы для масштаба; глаз задаёт, сколько деталей видно.",
+    ],
+    mouse: [
+      "Щёлкните узел, чтобы открыть его; щёлкните кольцо вокруг, чтобы добавить мысль.",
+      "Shift+щелчок или протягивание по пустому месту выбирает группу, затем перетащите её.",
+      "Правый щелчок по зоне открывает её меню: копировать текст, форма, удалить, вид.",
+      "Ctrl+колесо или − / + для масштаба; глаз задаёт, сколько деталей видно.",
+    ],
+    gotIt: "Понятно",
+  },
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",
   newNode: { title: "Новый узел", placeholder: "Напишите свою мысль…", create: "Создать", hint: "Enter создаёт, Shift+Enter добавляет строку", ghost: "Призрак", ghostHint: "Напишите вопрос вместо ответа: узел останется бледным, пока кто-то его не заполнит", ghostPlaceholder: "Напишите вопрос, на который ответите позже…", createGhost: "Создать призрака" },

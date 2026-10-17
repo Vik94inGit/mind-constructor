@@ -119,8 +119,9 @@ export function useClipboardActions({
   // use for their own Copy buttons. Ordered top-to-bottom/left-to-right (not
   // selection order) so the text reads in the same spatial order as the
   // canvas, same tie-break buildTreeExport uses.
-  async function copySelectionAsText() {
-    const ids = multiSelectIds.size > 0 ? Array.from(multiSelectIds) : selectedId ? [selectedId] : [];
+  // `only`: copy these nodes instead of the selection (a zone's menu).
+  async function copySelectionAsText(only?: string[]) {
+    const ids = only ?? (multiSelectIds.size > 0 ? Array.from(multiSelectIds) : selectedId ? [selectedId] : []);
     if (ids.length === 0) return;
     const picked = ids
       .map((id) => nodes.find((n) => n.nodeId === id))

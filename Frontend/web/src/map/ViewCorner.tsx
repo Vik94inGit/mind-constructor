@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
-import { VIEW_SCALE } from "../utils/readingMode";
 import type { ReadingMode } from "../utils/readingMode";
 import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { detailIndex, detailSteps } from "../utils/detailScale";
@@ -79,8 +78,9 @@ function Stepper({ label, ends, valueText, value, steps, lessTitle, moreTitle, o
 
 // The map's bottom-right corner: an eye button that opens the view controls —
 // one "simpler ↔ more detail" equalizer (utils/detailScale.ts: first the
-// levels of the tree, then more text), the level and the reading mode on their
-// own under "Fine-tune", and whether the minimap shows. Same z-[45] as the zoom controls
+// levels of the tree, then more text) and whether the minimap shows. The
+// level and the reading mode used to have their own equalizers under
+// "Fine-tune" too; they only repeated what this one already steps through. Same z-[45] as the zoom controls
 // while closed; open, the whole corner lifts to z-[49] — the menu's own
 // z-index only counts inside this wrapper, so without the lift the minimap
 // (a later z-45 sibling) painted over it. Still below a real modal (z-50).
@@ -88,7 +88,6 @@ export function ViewCorner({ level, levels, hiddenCount, onLevelChange, readingM
   const { t } = useI18n();
   const s = t.ui.abstraction;
   const [open, setOpen] = useState(false);
-  const [fineTune, setFineTune] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -109,7 +108,6 @@ export function ViewCorner({ level, levels, hiddenCount, onLevelChange, readingM
 
   const maxLevel = Math.max(1, levels);
   const levelValue = level === null ? maxLevel : Math.min(level, maxLevel);
-  const levelText = (levelValue >= maxLevel ? s.all : s.level(levelValue, maxLevel)) + (hiddenCount > 0 ? ` · ${s.hidden(hiddenCount)}` : "");
 
   const modeLabel: Record<ReadingMode, string> = {
     puzzle: t.map.toolbar.readingPuzzle,
@@ -117,7 +115,6 @@ export function ViewCorner({ level, levels, hiddenCount, onLevelChange, readingM
     iconText: t.map.toolbar.readingIconText,
     actual: t.map.toolbar.readingActual,
   };
-  const modeValue = Math.max(0, VIEW_SCALE.indexOf(readingMode)) + 1;
 
   const steps = detailSteps(maxLevel);
   const detailValue = detailIndex(maxLevel, level, readingMode) + 1;
@@ -145,39 +142,6 @@ export function ViewCorner({ level, levels, hiddenCount, onLevelChange, readingM
             moreTitle={s.richer}
             onStep={stepDetail}
           />
-          <button
-            type="button"
-            aria-expanded={fineTune}
-            className="flex w-full cursor-pointer items-center justify-between rounded-[6px] px-1 py-1 text-left text-[0.78rem] text-ink-soft hover:bg-surface-2"
-            onClick={() => setFineTune((v) => !v)}
-          >
-            <span>{s.fineTune}</span>
-            <span aria-hidden>{fineTune ? "▴" : "▾"}</span>
-          </button>
-          {fineTune && (
-            <>
-              <Stepper
-                label={s.levels}
-                valueText={levelText}
-                value={levelValue}
-                steps={maxLevel}
-                lessTitle={s.lessDetail}
-                moreTitle={s.moreDetail}
-                onStep={(v) => onLevelChange(v >= maxLevel ? null : Math.max(1, v))}
-              />
-              {/* Reversed so + always means "more": left is the most minimal view,
-              right the most text. */}
-              <Stepper
-                label={s.view}
-                valueText={modeLabel[readingMode]}
-                value={VIEW_SCALE.length + 1 - modeValue}
-                steps={VIEW_SCALE.length}
-                lessTitle={s.lessText}
-                moreTitle={s.moreText}
-                onStep={(v) => onReadingModeChange(VIEW_SCALE[VIEW_SCALE.length - Math.min(Math.max(1, v), VIEW_SCALE.length)])}
-              />
-            </>
-          )}
           <button
             type="button"
             role="switch"

@@ -20,6 +20,7 @@ import { btnGhost, btnPrimary, inputCls } from "../think/thinkStyles";
 import { useDraftSync } from "../hooks/useDraftSync";
 import { StepHeader, StepNav } from "../think/StepChrome";
 import { MessageText, SelectionPicker, TypePicker, useTapMarking } from "../think/TextMarking";
+import { useConfirm } from "../context/ConfirmContext";
 
 // "Text → map": the whole text becomes the map's main node; pieces of it,
 // marked by tapping where each starts and ends and given a type, become the
@@ -29,6 +30,7 @@ import { MessageText, SelectionPicker, TypePicker, useTapMarking } from "../thin
 //      splits off as its own bubble. Repeat, then create the map.
 // The draft is kept in this browser until the map is made.
 export function SplitTextPage() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const { t } = useI18n();
   const ts = t.split;
@@ -67,8 +69,8 @@ export function SplitTextPage() {
     clearSelection();
   }
 
-  function startOver() {
-    if (!confirm(ts.startOverConfirm)) return;
+  async function startOver() {
+    if (!(await confirm(ts.startOverConfirm))) return;
     clearSplitDraft(userId);
     discardServerDraft();
     setDraft(emptySplitDraft());

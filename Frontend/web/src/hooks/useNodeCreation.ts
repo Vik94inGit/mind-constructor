@@ -73,8 +73,8 @@ interface Params {
   viewportBounds: () => ViewportBounds;
   showNodes: (ids: string[]) => void;
   showNotice: (message: string) => void;
-  /** Opens a just-created node's panel on its text field, ready to write more (see confirmPendingCreate). */
-  openNewNode: (node: NodeDoc, at: Pt) => void;
+  /** Called once a node is made (see confirmPendingCreate). */
+  onCreated: (node: NodeDoc, at: Pt) => void;
   t: Translation;
 }
 
@@ -94,7 +94,7 @@ export function useNodeCreation({
   viewportBounds,
   showNodes,
   showNotice,
-  openNewNode,
+  onCreated,
   t,
 }: Params) {
   // Grows a template branch (see utils/templates.ts) from `root`: every node
@@ -156,10 +156,9 @@ export function useNodeCreation({
       if (images.length) node = await nodesApi.updateNode(node.nodeId, { images });
       upsertNode(node);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-      // The new node's panel opens straight away on its text field, so the
-      // short line typed into the inline input can grow into the full text
-      // (and pictures) without a second click.
-      openNewNode(node, { x, y });
+      // The text was written in NewNodePanel already, so nothing opens
+      // after it: the node lands and the map is in view again.
+      onCreated(node, { x, y });
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
     } finally {
