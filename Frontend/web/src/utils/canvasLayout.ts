@@ -271,6 +271,16 @@ export interface Obstacle {
 // Icon (48) + gap + a two-row title, roughly — and CAPTION_WIDTH wide.
 export const NODE_FOOTPRINT = { w: CAPTION_WIDTH, h: 90 };
 
+// How much bigger than NODE_FOOTPRINT a node looks on the canvas at `zoom`.
+// Icons and captions keep one size on screen (NodeCard counter-scales them by
+// 1/zoom), so at half zoom a node covers twice the canvas. Never below 1, so
+// nodes placed while zoomed in don't overlap again at normal zoom. Dots (at
+// DOT_ZOOM and below) are tiny, so there the plain footprint holds.
+export function freeFootprintScale(zoom: number): number {
+  if (zoom <= DOT_ZOOM + 0.005) return 1;
+  return Math.max(1, 1 / zoom);
+}
+
 // Spacing obstacles, one per point — see Obstacle. Deliberately one flat
 // minDist for every point, not per-node-size aware — every call site only
 // has bare {x,y} points in hand (stripped of which node each one came from),
@@ -280,9 +290,11 @@ export function nodeObstacles(points: { x: number; y: number }[], minDist = getN
 }
 
 // Footprint obstacles, one per point — see Obstacle. `pad` keeps that much
-// empty space between two footprints on top of not touching.
-export function footprintObstacles(points: { x: number; y: number }[], pad = 0): Obstacle[] {
-  const footprint = { w: NODE_FOOTPRINT.w + pad, h: NODE_FOOTPRINT.h + pad };
+// empty space between two footprints on top of not touching. `scale` grows
+// the footprint itself: a node is drawn the same size on screen at any zoom,
+// so zoomed out it covers more of the canvas (see freeFootprintScale).
+export function footprintObstacles(points: { x: number; y: number }[], pad = 0, scale = 1): Obstacle[] {
+  const footprint = { w: NODE_FOOTPRINT.w * scale + pad, h: NODE_FOOTPRINT.h * scale + pad };
   return points.map((p) => ({ x: p.x, y: p.y, minDist: 0, footprint }));
 }
 
