@@ -43,14 +43,15 @@ describe("DisplayMenu background", () => {
 describe("DisplayMenu emoji for each type", () => {
   const types = TRANSLATIONS.en.ui.types;
 
-  it("lets the viewer give a type its own emoji, and go back to the default", async () => {
+  it("lets the viewer give a type its own emoji, and go back to its symbol", async () => {
     const onTypeEmoji = vi.fn();
+    const symbol = TRANSLATIONS.en.ui.emoji.typeSymbol;
     renderMenu({ emojiFirst: true, typeEmoji: { Solution: "🌟" }, onTypeEmoji });
-    await userEvent.click(screen.getByRole("button", { name: `${types.Problem}: ❗` }));
-    await userEvent.click(screen.getByRole("button", { name: "🔥" }));
-    expect(onTypeEmoji).toHaveBeenCalledWith("Problem", "🔥");
+    await userEvent.click(screen.getByRole("button", { name: `${types.Problem}: ${symbol}` }));
+    await userEvent.click(screen.getByRole("button", { name: "❗" }));
+    expect(onTypeEmoji).toHaveBeenCalledWith("Problem", "❗");
     await userEvent.click(screen.getByRole("button", { name: `${types.Solution}: 🌟` }));
-    await userEvent.click(screen.getByRole("button", { name: TRANSLATIONS.en.ui.emoji.typeEmojiReset }));
+    await userEvent.click(screen.getByRole("button", { name: symbol }));
     expect(onTypeEmoji).toHaveBeenLastCalledWith("Solution", null);
   });
 
@@ -61,9 +62,9 @@ describe("DisplayMenu emoji for each type", () => {
     // A type kept on its symbol says so.
     await userEvent.click(screen.getByRole("button", { name: `${types.Fail}: ${symbol}` }));
     expect(screen.getByRole("button", { name: symbol })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(screen.getByRole("button", { name: `${types.Problem}: ❗` }));
-    await userEvent.click(screen.getByRole("button", { name: symbol }));
-    expect(onTypeEmoji).toHaveBeenCalledWith("Problem", "symbol");
+    // So does a type nobody picked an emoji for.
+    await userEvent.click(screen.getByRole("button", { name: `${types.Problem}: ${symbol}` }));
+    expect(screen.getByRole("button", { name: symbol })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("offers type emoji only while emoji first is on", () => {

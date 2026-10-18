@@ -4,14 +4,15 @@ import type { NodeDoc, NodeType } from "../types";
 // emoji on one face, the type's own symbol (Problem, Solution, …) on the
 // other. Which face is up is a per-viewer preference, kept in this browser
 // and on the server (see useMapViewerPrefs), like the compact view:
-//  - true ("emoji first", the default): every node shows an emoji face up —
-//    its own (NodeDoc.emoji), or else its type's (typeEmojiFor) — with the
-//    type's symbol on the back;
+//  - true ("emoji first", the default): a node with an emoji shows it face up —
+//    its own (NodeDoc.emoji), or else the one the viewer picked for its type
+//    (typeEmojiFor) — with the type's symbol on the back. Every type starts on
+//    its own symbol (bars, play, target, …), so out of the box the canvas shows
+//    the symbols and only nodes with their own emoji show one;
 //  - false ("symbols first"): the type's symbol up, and only a node with its
 //    own emoji carries one, on the back.
 // A node with a picture icon (NodeDoc.iconImage) and no emoji of its own
-// keeps the picture. A type the viewer set to its symbol (TYPE_SYMBOL) keeps that
-// symbol face up. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
+// keeps the picture. A type left on its symbol keeps that symbol face up. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
 // emoji face up either way, and never turns over.
 
 const STORAGE_KEY = "mc_emoji_first";
@@ -33,7 +34,7 @@ export function saveEmojiFirst(on: boolean): void {
   }
 }
 
-/** The emoji each type wears until the viewer picks their own (TypeEmoji). */
+/** The emoji offered first for each type when the viewer picks one (TypeEmojiPicker); a type wears its symbol until then. */
 export const DEFAULT_TYPE_EMOJI: Record<NodeType, string> = {
   Problem: "❗",
   "Problematic option": "⚠️",
@@ -45,17 +46,16 @@ export const DEFAULT_TYPE_EMOJI: Record<NodeType, string> = {
   unknown: "❓",
 };
 
-/** A type's choice that keeps the type's own symbol face up instead of an emoji. */
+/** A type's choice that keeps the type's own symbol face up instead of an emoji (also what no choice means). */
 export const TYPE_SYMBOL = "symbol";
 
-/** The viewer's own emoji for some of the types (or TYPE_SYMBOL), over DEFAULT_TYPE_EMOJI. */
+/** The viewer's own emoji for some of the types (or TYPE_SYMBOL); a type without one keeps its symbol. */
 export type TypeEmoji = Partial<Record<NodeType, string>>;
 
-/** The type's emoji for this viewer — null when they chose the type's symbol instead. */
+/** The emoji this viewer picked for the type — null while the type keeps its symbol, the default. */
 export function typeEmojiFor(type: NodeType, custom: TypeEmoji): string | null {
   const own = custom[type];
-  if (own === TYPE_SYMBOL) return null;
-  return own || DEFAULT_TYPE_EMOJI[type];
+  return own && own !== TYPE_SYMBOL ? own : null;
 }
 
 export function loadTypeEmoji(): TypeEmoji {

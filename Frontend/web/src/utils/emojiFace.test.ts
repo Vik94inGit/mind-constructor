@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_TYPE_EMOJI, loadEmojiFirst, loadTypeEmoji, nodeEmojiFace, saveEmojiFirst, saveTypeEmoji, TYPE_SYMBOL, typeEmojiFor } from "./emojiFace";
+import { loadEmojiFirst, loadTypeEmoji, nodeEmojiFace, saveEmojiFirst, saveTypeEmoji, TYPE_SYMBOL, typeEmojiFor } from "./emojiFace";
 
 describe("emoji first", () => {
   beforeEach(() => localStorage.clear());
@@ -16,8 +16,8 @@ describe("emoji first", () => {
 describe("type emoji", () => {
   beforeEach(() => localStorage.clear());
 
-  it("offers an emoji for every type, and the viewer's own over it", () => {
-    expect(typeEmojiFor("Solution", {})).toBe(DEFAULT_TYPE_EMOJI.Solution);
+  it("keeps every type on its symbol until the viewer picks an emoji for it", () => {
+    expect(typeEmojiFor("Solution", {})).toBeNull();
     expect(typeEmojiFor("Solution", { Solution: "🌟" })).toBe("🌟");
   });
 
@@ -50,9 +50,9 @@ describe("nodeEmojiFace", () => {
     expect(nodeEmojiFace({ type: "Problem" }, false, {})).toEqual({ emoji: null, emojiUp: false, flips: false });
   });
 
-  it("every type wears its emoji by default (🎯 for a Solution, 💡 for an Idea)", () => {
-    expect(nodeEmojiFace({ type: "Idea" }, true, {}).emoji).toBe("💡");
-    expect(nodeEmojiFace({ type: "Solution" }, true, {}).emoji).toBe("🎯");
+  it("emoji first: a node without an emoji of its own shows its type's symbol by default", () => {
+    expect(nodeEmojiFace({ type: "Idea" }, true, {})).toEqual({ emoji: null, emojiUp: false, flips: false });
+    expect(nodeEmojiFace({ type: "Solution" }, true, {})).toEqual({ emoji: null, emojiUp: false, flips: false });
   });
 
   it("keeps a picture icon instead of the type's emoji", () => {
