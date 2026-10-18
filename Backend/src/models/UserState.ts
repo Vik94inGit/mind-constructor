@@ -24,7 +24,9 @@ const UserStateSchema = new mongoose.Schema(
       language: { type: String, enum: LANGUAGES },
       readingMode: { type: String, enum: READING_MODES },
       compactView: { type: Boolean },
-      // Emoji face up on every node (its own, or its type's from typeEmoji); false: the type's symbol up.
+      // Emoji face up on nodes that have one (their own, or their type's from typeEmoji); false or unset: the type's symbol up.
+      emojiUp: { type: Boolean },
+      // The old name for emojiUp, from when emoji first was the default and saved for everyone; no longer read.
       emojiFirst: { type: Boolean },
       // The user's own emoji for each node type (type -> emoji), over the app's defaults.
       typeEmoji: { type: mongoose.Schema.Types.Mixed },

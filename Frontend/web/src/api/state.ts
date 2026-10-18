@@ -15,8 +15,8 @@ export interface Preferences {
   language?: "en" | "cs" | "uk" | "ru";
   readingMode?: ReadingMode;
   compactView?: boolean;
-  /** Emoji face up on every node; false: symbols first (utils/emojiFace.ts). */
-  emojiFirst?: boolean;
+  /** Emoji face up on nodes that have one; false (the default): symbols first (utils/emojiFace.ts). */
+  emojiUp?: boolean;
   /** The user's own emoji per node type. */
   typeEmoji?: TypeEmoji;
 }

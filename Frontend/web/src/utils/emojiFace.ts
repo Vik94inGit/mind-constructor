@@ -3,26 +3,29 @@ import type { NodeDoc, NodeType } from "../types";
 // Node emoji: a node's icon is a two-sided card (map/NodeFlipIcon.tsx) — an
 // emoji on one face, the type's own symbol (Problem, Solution, …) on the
 // other. Which face is up is a per-viewer preference, kept in this browser
-// and on the server (see useMapViewerPrefs), like the compact view:
-//  - true ("emoji first", the default): a node with an emoji shows it face up —
+// and on the server (Preferences.emojiUp, see useMapViewerPrefs), like the
+// compact view:
+//  - false ("symbols first", the default): the type's symbol up, and only a
+//    node with its own emoji carries one, on the back;
+//  - true ("emoji first"): a node with an emoji shows it face up —
 //    its own (NodeDoc.emoji), or else the one the viewer picked for its type
 //    (typeEmojiFor) — with the type's symbol on the back. Every type starts on
 //    its own symbol (bars, play, target, …), so out of the box the canvas shows
-//    the symbols and only nodes with their own emoji show one;
-//  - false ("symbols first"): the type's symbol up, and only a node with its
-//    own emoji carries one, on the back.
+//    the symbols and only nodes with their own emoji show one.
+// Emoji first used to be the default and was saved for everyone as
+// "emojiFirst"; that saved value is ignored now, so everyone starts on symbols.
 // A node with a picture icon (NodeDoc.iconImage) and no emoji of its own
 // keeps the picture. A type left on its symbol keeps that symbol face up. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
 // emoji face up either way, and never turns over.
 
-const STORAGE_KEY = "mc_emoji_first";
+const STORAGE_KEY = "mc_emoji_up";
 const TYPE_EMOJI_KEY = "mc_type_emoji";
 
 export function loadEmojiFirst(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) !== "0";
+    return localStorage.getItem(STORAGE_KEY) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 

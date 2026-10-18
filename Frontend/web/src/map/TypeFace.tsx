@@ -28,7 +28,7 @@ export function TypeFace({ type, size, emojiFirst, typeEmoji }: Props) {
 export function useTypeFacePrefs(): { emojiFirst: boolean; typeEmoji: TypeEmoji } {
   const { preferences } = useUserState();
   return {
-    emojiFirst: preferences?.emojiFirst ?? loadEmojiFirst(),
+    emojiFirst: preferences?.emojiUp ?? loadEmojiFirst(),
     typeEmoji: preferences?.typeEmoji ?? loadTypeEmoji(),
   };
 }
