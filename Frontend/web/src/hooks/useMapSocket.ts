@@ -21,7 +21,12 @@ interface Params {
   refreshInsights: (mapId: string) => void;
   /** The map owner hid or showed a branch — reload what this viewer may see. */
   onVisibilityChanged: () => void;
+  /** Reload the whole map from the server — when live updates may have been missed. */
+  onCatchUp: () => void;
 }
+
+// How often a tab without a working live connection fetches the map again.
+export const CATCH_UP_MS = 10_000;
 
 export function useMapSocket({
   mapId,
@@ -38,6 +43,7 @@ export function useMapSocket({
   applyCircleSelection,
   refreshInsights,
   onVisibilityChanged,
+  onCatchUp,
 }: Params) {
   // Live sync: join this map's room once the initial REST snapshot has
   // landed (guarded on `loading` so an event can't arrive mid-fetch and
@@ -51,7 +57,27 @@ export function useMapSocket({
     if (!mapId || loading) return;
 
     const socket = getSocket();
-    joinMap(mapId);
+    // In the map's room: every change anyone makes arrives on its own. Until
+    // the server confirms that (a refused or lost join, a dropped connection,
+    // a proxy that never lets the connection through), the map is fetched
+    // again every few seconds instead, and the join retried, so others'
+    // attacks and edits still show up without a reload.
+    let joined = false;
+    const join = () => joinMap(mapId, (ok) => (joined = ok));
+    join();
+    const onDisconnect = () => (joined = false);
+    socket.on("disconnect", onDisconnect);
+    const catchUp = setInterval(() => {
+      if (joined || document.hidden) return;
+      join();
+      onCatchUp();
+    }, CATCH_UP_MS);
+    // A phone that slept or a tab left in the background may have missed
+    // events even with the connection up: catch up when it is shown again.
+    const onShown = () => {
+      if (!document.hidden) onCatchUp();
+    };
+    document.addEventListener("visibilitychange", onShown);
 
     const onNodeCreated = (node: NodeDoc) => upsertNode(node);
     const onNodeUpdated = (node: NodeDoc) => upsertNode(node);
@@ -147,13 +173,16 @@ export function useMapSocket({
     // room at all: without joining again nothing more arrives until a
     // reload. Join again, and reload what may have changed meanwhile.
     const onReconnect = () => {
-      joinMap(mapId);
+      join();
       onVisibilityChanged();
       refreshInsights(mapId);
     };
     socket.io.on("reconnect", onReconnect);
 
     return () => {
+      clearInterval(catchUp);
+      document.removeEventListener("visibilitychange", onShown);
+      socket.off("disconnect", onDisconnect);
       socket.io.off("reconnect", onReconnect);
       socket.off("nodes:visibility", onVisibilityChanged);
       socket.off("node:created", onNodeCreated);
@@ -173,7 +202,8 @@ export function useMapSocket({
       leaveMap(mapId);
     };
     // refreshInsights is a fresh closure every render but only ever calls a
-    // state setter, so it is deliberately left out of the dependency list.
+    // state setter, and onCatchUp only changes with mapId, so both are left
+    // out of the dependency list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapId, loading, upsertNode, upsertEdge, upsertLine, applyCircleSelection]);
 }

@@ -255,6 +255,7 @@ export function useMapData({ mapId, setSelectedId, setCelebrateIds, loadErrorMes
     applyCircleSelection,
     refreshInsights,
     onVisibilityChanged: refreshNodesAndEdges,
+    onCatchUp: refreshAll,
   });
 
   return {

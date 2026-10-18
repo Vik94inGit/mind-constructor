@@ -132,6 +132,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
   floating top-left cluster.
+- **Live updates** — everyone with a map open sees each other's nodes, attacks, shields and deletions as
+  they happen (`hooks/useMapSocket.ts`). If the live connection is down or the server never confirms the
+  map's room, the map is fetched again every 10 seconds and the join retried; a tab that is shown again
+  after sleeping catches up at once.
 - **Offline** — the dashboard and every map you've opened before still open with no connection
   (the service worker keeps the app's files, `src/offline/` keeps the last copy of your data in
   IndexedDB). You can keep working: creating, editing, moving and deleting nodes, links and lines,

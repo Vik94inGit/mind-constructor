@@ -43,11 +43,16 @@ export function connectSocket(): Socket {
   return s;
 }
 
-export function joinMap(mapId: string) {
+// onJoined hears whether the server let this tab into the map's room — false
+// when it refused or never answered, so the caller can fall back to fetching.
+export function joinMap(mapId: string, onJoined?: (ok: boolean) => void) {
   const s = getSocket();
   if (!s.connected) s.connect();
-  s.emit("join-map", mapId);
+  if (!onJoined) return void s.emit("join-map", mapId);
+  s.timeout(JOIN_TIMEOUT_MS).emit("join-map", mapId, (err: Error | null, ok?: boolean) => onJoined(!err && ok === true));
 }
+
+const JOIN_TIMEOUT_MS = 10_000;
 
 export function leaveMap(mapId: string) {
   if (socket?.connected) socket.emit("leave-map", mapId);
