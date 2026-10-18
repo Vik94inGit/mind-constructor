@@ -70,9 +70,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
-- **Emoji first** — on by default for notes; a node that came from a template (it carries its
-  question, `Node.prompt`) keeps its type's symbol unless it has an emoji of its own. Every other
-  node's icon is a two-sided card, an emoji face up and its type's symbol on
+- **Emoji first** — on by default, for notes and template nodes alike: every node's icon is a
+  two-sided card, an emoji face up and its type's symbol on
   the back, turning over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the
   node's own (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or else its
   type's: ❗ Problem, ⚠️ Problematic option, 💡 Solution, 🔀 Option, ✅ Success, ❌ Fail, ❓ unknown,
