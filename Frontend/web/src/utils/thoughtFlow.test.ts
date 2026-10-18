@@ -10,7 +10,8 @@ import {
   suggestMapName,
 } from "./thoughtFlow";
 import type { Thought } from "./thoughtFlow";
-import { CANVAS_H, CANVAS_W } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, getZoneReach } from "./canvasLayout";
+import { makeZoneRule } from "./zoneRules";
 import { MAP_KINDS } from "../types";
 
 vi.mock("../api/maps", () => ({ createMap: vi.fn() }));
@@ -79,6 +80,42 @@ describe("layoutThoughts", () => {
     }
     const unique = new Set(pts.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`));
     expect(unique.size).toBe(pts.length);
+  });
+  // The shape from the "Ваша карта сейчас" preview: three branches off the
+  // center, two of them big. Built, every thought used to land on one
+  // spiral around the center, so a branch's children were scattered across
+  // the map and the zones drawn through them crossed each other.
+  const bigTree = (): Thought[] => [
+    th("a"), th("b"), th("c"),
+    ...Array.from({ length: 9 }, (_, i) => th(`a${i}`, "a")),
+    th("b0", "b"), th("b1", "b"), th("b00", "b0"), th("b01", "b0"),
+    ...Array.from({ length: 4 }, (_, i) => th(`c${i}`, "c")),
+  ];
+
+  it("keeps every thought within its parent's zone reach", () => {
+    const ts = bigTree();
+    const { root, positions } = layoutThoughts(ts);
+    for (const t of ts) {
+      const parent = t.parentId === ROOT_ID ? root : positions.get(t.parentId)!;
+      const p = positions.get(t.id)!;
+      expect(Math.hypot(p.x - parent.x, p.y - parent.y)).toBeLessThanOrEqual(getZoneReach());
+    }
+  });
+
+  it("keeps a branch on its own side of the center, the way the preview draws it", () => {
+    const { root, positions } = layoutThoughts(bigTree());
+    // branchAngles gives "a" the first slice, clockwise from the top: the right-hand side.
+    for (let i = 0; i < 9; i++) expect(positions.get(`a${i}`)!.x).toBeGreaterThan(root.x - 80);
+  });
+
+  it("follows the zone rules: no node inside a zone it isn't in, no zones crossing", () => {
+    const ts = bigTree();
+    const { root, positions } = layoutThoughts(ts);
+    const all = [{ nodeId: ROOT_ID, parentId: null, pos: root }, ...ts.map((t) => ({ nodeId: t.id, parentId: t.parentId, pos: positions.get(t.id)! }))];
+    for (const n of all) {
+      const rule = makeZoneRule([], new Map(), [{ nodeId: n.nodeId, parentId: n.parentId }], all.filter((e) => e.nodeId !== n.nodeId));
+      expect(rule.fits(n.pos)).toBe(true);
+    }
   });
 });
 

@@ -1,5 +1,5 @@
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
-import { ROOT_ID, orderParentsFirst } from "../utils/thoughtFlow";
+import { ROOT_ID, branchAngles, orderParentsFirst } from "../utils/thoughtFlow";
 import type { Thought } from "../utils/thoughtFlow";
 import type { NodeType } from "../types";
 
@@ -17,43 +17,26 @@ interface Placed {
 }
 
 // A radial tree: each branch gets a slice of the circle sized by how many
-// leaves it has, and every level sits one ring further out. Only meant to show
-// the shape of the user's thinking as it grows, not where nodes land on the
-// real canvas.
+// leaves it has (branchAngles), and every level sits one ring further out.
+// The real map is laid out from the same angles (layoutThoughts), so what's
+// built keeps this shape; only the distances differ, to fit the box.
 function placeTree(center: string, rootType: NodeType, thoughts: Thought[]): Placed[] {
   const ordered = orderParentsFirst(thoughts);
-  const children = new Map<string, Thought[]>();
-  for (const t of ordered) children.set(t.parentId, [...(children.get(t.parentId) ?? []), t]);
-  const leaves = new Map<string, number>();
-  const countLeaves = (id: string): number => {
-    const kids = children.get(id) ?? [];
-    const n = kids.length === 0 ? 1 : kids.reduce((sum, k) => sum + countLeaves(k.id), 0);
-    leaves.set(id, n);
-    return n;
-  };
-  countLeaves(ROOT_ID);
-
+  const angles = branchAngles(thoughts);
   const cx = W / 2;
   const cy = H / 2;
   const out: Placed[] = [{ id: ROOT_ID, parentId: null, x: cx, y: cy, type: rootType, text: center }];
   const maxDepth = Math.max(1, ...ordered.map((t) => depthOf(t, ordered)));
   // Squeeze the rings so the deepest level still fits inside the box.
   const ring = Math.min(RING, (Math.min(W, H) / 2 - 16) / maxDepth);
-  const walk = (id: string, from: number, to: number, depth: number) => {
-    const kids = children.get(id) ?? [];
-    const total = leaves.get(id) ?? 1;
-    let start = from;
-    for (const k of kids) {
-      const span = ((to - from) * (leaves.get(k.id) ?? 1)) / total;
-      const angle = start + span / 2 - Math.PI / 2;
-      const r = ring * (depth + 1);
-      // Ellipse instead of a circle: the box is wider than it's tall.
-      out.push({ id: k.id, parentId: id, x: cx + r * Math.cos(angle) * 1.25, y: cy + r * Math.sin(angle), type: k.type, text: k.text });
-      walk(k.id, start, start + span, depth + 1);
-      start += span;
-    }
-  };
-  walk(ROOT_ID, 0, Math.PI * 2, 0);
+  const ids = new Set(ordered.map((t) => t.id));
+  for (const t of ordered) {
+    const parentId = ids.has(t.parentId) ? t.parentId : ROOT_ID;
+    const angle = angles.get(t.id) ?? 0;
+    const r = ring * depthOf(t, ordered);
+    // Ellipse instead of a circle: the box is wider than it's tall.
+    out.push({ id: t.id, parentId, x: cx + r * Math.cos(angle) * 1.25, y: cy + r * Math.sin(angle), type: t.type, text: t.text });
+  }
   return out;
 }
 

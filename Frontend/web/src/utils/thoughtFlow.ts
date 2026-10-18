@@ -1,7 +1,9 @@
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
-import { CANVAS_H, CANVAS_W, avoidOverlap, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
-import type { Obstacle } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, footprintObstacles, getCirclePackSpacing } from "./canvasLayout";
+import type { ViewportBounds } from "./canvasLayout";
+import { MIN_NODE_GAP, makeZoneRule, placeByZoneRules } from "./zoneRules";
+import type { ExtraNode } from "./zoneRules";
 import type { MapDoc, MapKind, NodeType } from "../types";
 
 // The "Think it through" flow (pages/ThinkPage.tsx): the user writes the one
@@ -167,23 +169,71 @@ export function orderParentsFirst(thoughts: Thought[]): Thought[] {
 const EDGE = 120;
 
 /**
- * Canvas positions for the root and every thought — the same sunflower spiral
- * around the root a template's nodes get (see layoutTemplate), in
- * parents-first order so a branch's nodes land near each other.
+ * The direction (radians, 0 = right, growing clockwise on screen) each
+ * thought heads off in from the center: a radial tree where every branch gets
+ * a slice of the circle sized by how many leaves it has, and each thought
+ * points at the middle of its own slice. Shared by the live preview
+ * (components/ThoughtPreview.tsx) and the real layout (layoutThoughts), so the
+ * map that gets built has the shape the preview showed.
+ */
+export function branchAngles(thoughts: Thought[]): Map<string, number> {
+  const ordered = orderParentsFirst(thoughts);
+  const children = new Map<string, Thought[]>();
+  for (const t of ordered) children.set(t.parentId, [...(children.get(t.parentId) ?? []), t]);
+  const leaves = new Map<string, number>();
+  const countLeaves = (id: string): number => {
+    const kids = children.get(id) ?? [];
+    const n = kids.length === 0 ? 1 : kids.reduce((sum, k) => sum + countLeaves(k.id), 0);
+    leaves.set(id, n);
+    return n;
+  };
+  countLeaves(ROOT_ID);
+  const angles = new Map<string, number>();
+  const walk = (id: string, from: number, to: number) => {
+    const total = leaves.get(id) ?? 1;
+    let start = from;
+    for (const k of children.get(id) ?? []) {
+      const span = ((to - from) * (leaves.get(k.id) ?? 1)) / total;
+      // Starting at the top, like a clock.
+      angles.set(k.id, start + span / 2 - Math.PI / 2);
+      walk(k.id, start, start + span);
+      start += span;
+    }
+  };
+  walk(ROOT_ID, 0, Math.PI * 2);
+  return angles;
+}
+
+/**
+ * Canvas positions for the root and every thought. Each thought starts out one
+ * step from its own parent, in its branch's direction (see branchAngles), so a
+ * branch grows outwards together the way the preview draws it; then the same
+ * zone rules every other placement follows (utils/zoneRules.ts) nudge it to
+ * the nearest spot where it covers no other node, stays out of zones it isn't
+ * in, and no two zones cross. Parents first, so every parent is already placed.
  */
 export function layoutThoughts(thoughts: Thought[]): { root: { x: number; y: number }; positions: Map<string, { x: number; y: number }> } {
   const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
   const spacing = getCirclePackSpacing();
-  const obstacles: Obstacle[] = [{ ...root, minDist: spacing }];
+  const angles = branchAngles(thoughts);
+  const bounds: ViewportBounds = { minX: EDGE, minY: EDGE, maxX: CANVAS_W - EDGE, maxY: CANVAS_H - EDGE };
+  const placed: ExtraNode[] = [{ nodeId: ROOT_ID, parentId: null, pos: root }];
   const positions = new Map<string, { x: number; y: number }>();
-  orderParentsFirst(thoughts).forEach((t, i) => {
-    const placed = avoidOverlap(spiralPoint(i + 1, root, spacing), obstacles);
-    obstacles.push({ x: placed.x, y: placed.y, minDist: spacing });
-    positions.set(t.id, {
-      x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, placed.x)),
-      y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, placed.y)),
-    });
-  });
+  for (const t of orderParentsFirst(thoughts)) {
+    // A parent that no longer exists means "hang from the center", as in buildMapFromDraft.
+    const parentId = positions.has(t.parentId) ? t.parentId : ROOT_ID;
+    const parent = positions.get(parentId) ?? root;
+    const angle = angles.get(t.id) ?? 0;
+    const desired = { x: parent.x + spacing * Math.cos(angle), y: parent.y + spacing * Math.sin(angle) };
+    const rule = makeZoneRule([], new Map(), [{ nodeId: t.id, parentId }], placed);
+    const p = placeByZoneRules(desired, footprintObstacles(placed.map((e) => e.pos), MIN_NODE_GAP), bounds, rule);
+    const pos = {
+      x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, p.x)),
+      y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, p.y)),
+    };
+    positions.set(t.id, pos);
+    placed.push({ nodeId: t.id, parentId, pos });
+  }
   return { root, positions };
 }
 
