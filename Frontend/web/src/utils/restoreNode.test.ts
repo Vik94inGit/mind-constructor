@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { deletedNodeOf, restoreDeletedNode } from "./restoreNode";
+import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "./restoreNode";
 import { makeNode } from "../test/fixtures";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
@@ -36,5 +36,35 @@ describe("deleted node undo", () => {
     expect(nodesApi.updateNode).toHaveBeenCalledWith("c1", { parentId: "new" });
     expect(edgesApi.createEdge).toHaveBeenCalledWith("m", { fromNodeId: "new", toNodeId: "b", sentiment: "positive" });
     expect(back.children).toHaveLength(1);
+  });
+
+  it("takes along only the leaf children: your own, one generation down, never a child that is a parent", () => {
+    const family = [
+      makeNode({ nodeId: "p" }),
+      makeNode({ nodeId: "leaf", parentId: "p" }),
+      makeNode({ nodeId: "branch", parentId: "p" }),
+      makeNode({ nodeId: "grandchild", parentId: "branch" }),
+      makeNode({ nodeId: "theirs", parentId: "p", userId: "someone else" }),
+      makeNode({ nodeId: "attack", parentId: "p", isWeapon: true }),
+      // An attack hanging from a leaf doesn't make it a parent.
+      makeNode({ nodeId: "hit", parentId: "leaf", isWeapon: true }),
+    ];
+    const leaves = leafChildrenOf(family[0], family, (n) => n.userId === "u1");
+    expect(leaves.map((n) => n.nodeId)).toEqual(["leaf"]);
+    const d = deletedNodeOf(family[0], family, [], (n) => n.userId === "u1", leaves);
+    expect(d.childIds).toEqual(["branch"]);
+  });
+
+  it("brings the leaves back under the restored node, edges between them re-linked to the new ids", async () => {
+    vi.mocked(nodesApi.createNode)
+      .mockResolvedValueOnce(makeNode({ nodeId: "newP" }))
+      .mockResolvedValueOnce(makeNode({ nodeId: "newLeaf" }));
+    const parent = makeNode({ nodeId: "p" });
+    const leaf = makeNode({ nodeId: "leaf", parentId: "p" });
+    const d = deletedNodeOf(parent, [parent, leaf], [edge("e5", "leaf", "p")], () => true, [leaf]);
+    const back = await restoreDeletedNode("m", d);
+    expect(nodesApi.createNode).toHaveBeenLastCalledWith("m", expect.objectContaining({ parentId: "newP" }));
+    expect(back.leaves.map((l) => l.nodeId)).toEqual(["newLeaf"]);
+    expect(edgesApi.createEdge).toHaveBeenCalledWith("m", { fromNodeId: "newLeaf", toNodeId: "newP", sentiment: "positive" });
   });
 });

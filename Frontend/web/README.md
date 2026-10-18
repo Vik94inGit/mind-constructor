@@ -112,6 +112,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Deleting** — a deleted node pops like a bubble where it stood, or goes off in a small boom when it
   was a Problem, Problematic option or Fail (`map/NodeBurst.tsx`). Questions such
   as "Delete 3 nodes?" use the app's own dialog (`context/ConfirmContext.tsx`), not the browser's.
+  Deleting a parent also deletes its own children one generation down that have no children of
+  their own; a child that is itself a parent stays, with its branch, and just loses the link. Undo
+  brings them all back together (`utils/restoreNode.ts` `leafChildrenOf`).
 - **First map** — a one-time card lists the main gestures, touch or mouse ones (`map/GestureHint.tsx`).
 - **Loading** — the map editor, *Think it through*, text splitting and admin load on demand
   (`App.tsx`); the build writes `asset-list.json` so the service worker keeps them for offline too.
