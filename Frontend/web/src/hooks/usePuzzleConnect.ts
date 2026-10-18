@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction } from "react";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { clearOfCards, connectedPieces, findSnap } from "../utils/cardGlue";
+import { clearOfCards, connectedPieces, findSnap, spotBelow } from "../utils/cardGlue";
 import type { CardBox, Snap } from "../utils/cardGlue";
 import { nodeRefId } from "../utils/nodeType";
 import type { Pt } from "./useCanvasMode";
@@ -11,6 +11,11 @@ import type { EdgeDoc, NodeDoc } from "../types";
 // How close (in screen pixels) a dragged card has to come to another before
 // it glues on.
 const SNAP_REACH_PX = 36;
+// A new card's size before it's drawn (canvas units), and the room left
+// between it and the card it branches from.
+const NEW_CARD_W = 160;
+const NEW_CARD_H = 56;
+const BRANCH_GAP = 18;
 
 interface Params {
   mapId: string | undefined;
@@ -118,6 +123,16 @@ export function usePuzzleConnect({
     if (!me) return null;
     return clearOfCards(me, cardsNear(node, x, y, () => false));
   }
+  // Where a branch added from a card's + button starts: just under the card,
+  // clear of the cards around it. null when `parent` isn't a card on the board.
+  function cardBranchSpot(parent: NodeDoc): { x: number; y: number } | null {
+    if (!drawnAsCard(parent)) return null;
+    const p = posFor(parent);
+    const box = cardBox(parent, p);
+    if (!box) return null;
+    const size = { w: Math.min(box.w, NEW_CARD_W), h: NEW_CARD_H };
+    return spotBelow(box, size, cardsNear(parent, p.x, p.y + box.h, () => false), BRANCH_GAP);
+  }
   // A glued block moves as one: every card glued to
   // `node` (linked to it, as a branch or a link, and sitting flush against it
   // — see connectedPieces), directly or through others: what drags as one,
@@ -194,5 +209,5 @@ export function usePuzzleConnect({
     track(e.clientX, e.clientY);
   }
 
-  return { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect, cardClearSpot };
+  return { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect, cardClearSpot, cardBranchSpot };
 }

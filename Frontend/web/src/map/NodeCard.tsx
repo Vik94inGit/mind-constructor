@@ -138,6 +138,8 @@ interface Props {
   dotted?: boolean;
   /** Puzzle cards only: dragging out of one of this piece's tabs starts a connection to another piece (MapPage's startPuzzleConnect). Unset when this viewer can't link from this node. */
   onConnectStart?: (e: ReactPointerEvent) => void;
+  /** Cards only: set on the viewer's own selected card — its + button adds a branch (MapPage's addBranchFromCard). */
+  onAddBranch?: () => void;
   /** Puzzle cards only: locked by its owner (utils/blockLock.ts). */
   blockLocked?: boolean;
   /** Puzzle cards only: locks/unlocks this block. Unset when it isn't this viewer's to lock. */
@@ -188,6 +190,7 @@ export const NodeCard = memo(function NodeCard({
   cardFill,
   dotted = false,
   onConnectStart,
+  onAddBranch,
   blockLocked = false,
   onToggleBlockLock,
   onHoverText,
@@ -830,6 +833,8 @@ export const NodeCard = memo(function NodeCard({
             resizeHint={t.ui.display.resizeCard}
             onConnectStart={onConnectStart}
             connectHint={t.ui.link.dragToConnect}
+            onAddBranch={canvasCard ? onAddBranch : undefined}
+            addBranchHint={t.ui.contextMenu.createBranch}
             locked={blockLocked}
             onToggleLock={onToggleBlockLock}
             lockLabel={
