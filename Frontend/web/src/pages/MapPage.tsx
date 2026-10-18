@@ -55,7 +55,7 @@ import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, sho
 import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { readingOrder, stepNode } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
-import { deletedNodeOf, restoreDeletedNode } from "../utils/restoreNode";
+import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { SiegePanel } from "../map/SiegePanel";
@@ -1590,11 +1590,20 @@ export function MapPage() {
   async function deleteNodeWithUndo(node: NodeDoc): Promise<boolean> {
     const undoable = !node.isWeapon && !node.isProtection;
     if (!undoable && !(await confirm(t.ui.node.deleteConfirm, { confirmLabel: t.ui.common.delete, danger: true }))) return false;
+    // Its leaf children go with it (one generation down, never a child that
+    // is a parent itself — see leafChildrenOf).
+    const leaves = undoable ? leafChildrenOf(node, nodes, isOwnNode) : [];
     // The node list arrives without text and pictures — fetch them so undo has them.
-    const full = undoable ? await nodesApi.getNode(node.nodeId).catch(() => node) : node;
-    const deleted = deletedNodeOf({ ...node, ...full }, nodes, edges, isOwnNode);
+    const withText = (n: NodeDoc) => nodesApi.getNode(n.nodeId).then((f) => ({ ...n, ...f })).catch(() => n);
+    const full = undoable ? await withText(node) : node;
+    const fullLeaves = await Promise.all(leaves.map(withText));
+    const deleted = deletedNodeOf(full, nodes, edges, isOwnNode, fullLeaves);
     const res = await nodesApi.deleteNode(node.nodeId);
     applyNodeDeleted(node.nodeId);
+    if (leaves.length) {
+      const { deleted: gone } = await nodesApi.deleteManyNodes(leaves.map((l) => l.nodeId));
+      gone.forEach((g) => applyNodeDeleted(g.deletedId));
+    }
     // Deleting a protection node with banked damage releases the whole
     // total onto whatever it was defending — see Backend's deleteNodeDao.
     if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
@@ -1602,6 +1611,7 @@ export function MapPage() {
       recordUndo(async () => {
         const back = await restoreDeletedNode(mapId, deleted);
         upsertNode(back.node);
+        back.leaves.forEach(upsertNode);
         back.children.forEach(upsertNode);
         setEdges((prev) => [...prev, ...back.edges]);
         setCelebrateIds((prev) => new Set(prev).add(back.node.nodeId));

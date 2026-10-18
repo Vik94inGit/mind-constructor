@@ -1,4 +1,5 @@
-import { CANVAS_H, CANVAS_W, avoidOverlap, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, avoidOverlap, getCirclePackSpacing } from "./canvasLayout";
+import { shapeStep, shapeTree } from "./shapeLayout";
 import type { Obstacle } from "./canvasLayout";
 import type { MapKind, NodeType } from "../types";
 
@@ -138,13 +139,12 @@ export interface PlacedTemplateNode {
 }
 
 const EDGE = 120;
+// The id the node a template is started on goes by in its shape (shapeTree).
+const ROOT = "__root";
 
-// Parent-before-child walk of the whole tree into one flat list — same order
-// a template used to be *created* in (parents have to exist before a child
-// can point its parentId at them), now also the order it's *placed* in: an
-// early branch and its own children land in neighboring, inner turns of the
-// spiral below before a later branch's, the closest a single flat ordering
-// can read as "still grouped by branch" alongside a plain index sequence.
+// Parent-before-child walk of the whole tree into one flat list — the order a
+// template is created and placed in (parents have to exist before a child can
+// point its parentId at them).
 function flatten(tree: TemplateNode[]): { node: TemplateNode; parentKey: TemplateNodeKey | null }[] {
   const out: { node: TemplateNode; parentKey: TemplateNodeKey | null }[] = [];
   const walk = (nodes: TemplateNode[], parentKey: TemplateNodeKey | null) => {
@@ -157,41 +157,31 @@ function flatten(tree: TemplateNode[]): { node: TemplateNode; parentKey: Templat
   return out;
 }
 
-// Lays a template out fanned around `root` in a ring — root is the node the
-// template was started on (a circle's own root wears NodeCrown's halo/
-// horns, so this reads as the rest of the branch gathering "around the
-// king"), not another tree hanging in a straight column beneath it. Same
-// sunflower-spiral placement spiralPoint already uses everywhere else a
-// cluster of nodes needs packing in around a center point without stacking
-// on each other (computeBasePositions' own fallback layout) — reused as-is
-// rather than a bespoke ring just for
-// this, so the two read as the same visual language.
+// Lays a template out round `root` — the node the template was started on —
+// as plain geometry (utils/shapeLayout.ts): its first level evenly round a
+// circle, a square or an equilateral triangle, depending on how many there
+// are, and each deeper level one step further out from its own parent. A step
+// is the tight "fanned round a shared root" spacing (getCirclePackSpacing).
+// Each node is then only nudged as far as it takes to clear what is already
+// on the canvas and the template's own earlier nodes.
 export function layoutTemplate(
   kind: TemplateKind,
   root: { x: number; y: number },
   existingObstacles: Obstacle[] = [],
 ): PlacedTemplateNode[] {
-  // The tighter "deliberately fanned around a shared root" spacing (see its
-  // own doc comment) — a growing template branch is exactly that case, and
-  // the old getNodeMinDist()-based spacing here was what made even a small
-  // template spread out far wider than its own node count actually needed.
   const spacing = getCirclePackSpacing();
-  // Every node placed so far — both this template's own earlier nodes and
-  // whatever the caller already had on the canvas near `root` — becomes an
-  // obstacle for the next one. The spiral's own golden-angle spacing keeps
-  // a template's nodes clear of *each other* by construction, but nothing
-  // about it knew what else was already sitting on the canvas: a second
-  // template grown from a nearby root (or just an already-crowded spot)
-  // used to spiral its nodes straight on top of whatever was already there,
-  // with zero awareness of it.
+  const step = shapeStep(spacing);
+  const flat = flatten(TEMPLATES[kind]);
+  const shape = shapeTree(
+    flat.map(({ node, parentKey }) => ({ id: node.key, parentId: parentKey ?? ROOT })),
+    ROOT,
+  );
   const obstacles: Obstacle[] = [...existingObstacles];
-  return flatten(TEMPLATES[kind]).map(({ node, parentKey }, i) => {
-    // i+1, not i: spiralPoint(0, root) is root's own position, and this
-    // template's root is a real, already-existing node — every placed node
-    // starts at least one full turn out from it.
-    const desired = spiralPoint(i + 1, root, spacing);
+  return flat.map(({ node, parentKey }) => {
+    const unit = shape.get(node.key)!;
+    const desired = { x: root.x + unit.x * step, y: root.y + unit.y * step };
     const placed = avoidOverlap(desired, obstacles);
-    obstacles.push({ x: placed.x, y: placed.y, minDist: spacing });
+    obstacles.push({ x: placed.x, y: placed.y, minDist: spacing * 0.9 });
     return {
       key: node.key,
       type: node.type,

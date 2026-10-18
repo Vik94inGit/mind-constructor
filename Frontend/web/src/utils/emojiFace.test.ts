@@ -39,6 +39,16 @@ describe("nodeEmojiFace", () => {
     expect(nodeEmojiFace({ type: "Problem" }, false, {})).toEqual({ emoji: null, emojiUp: false, flips: false });
   });
 
+  it("a template's node shows its type's symbol, not the type's emoji, even in emoji first", () => {
+    expect(nodeEmojiFace({ type: "Problem", prompt: "What exactly is the problem?" }, true, {})).toEqual({
+      emoji: null,
+      emojiUp: false,
+      flips: false,
+    });
+    // Its own emoji, once given one, still shows.
+    expect(nodeEmojiFace({ type: "Problem", prompt: "Why?", emoji: "😡" }, true, {}).emoji).toBe("😡");
+  });
+
   it("keeps a picture icon instead of the type's emoji", () => {
     expect(nodeEmojiFace({ type: "Problem", iconImage: "/api/images/x" }, true, {}).emoji).toBeNull();
   });

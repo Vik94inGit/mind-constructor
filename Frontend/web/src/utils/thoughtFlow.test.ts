@@ -10,7 +10,8 @@ import {
   suggestMapName,
 } from "./thoughtFlow";
 import type { Thought } from "./thoughtFlow";
-import { CANVAS_H, CANVAS_W, getZoneReach } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, getCirclePackSpacing, getZoneReach } from "./canvasLayout";
+import { shapeStep, shapeTree } from "./shapeLayout";
 import { makeZoneRule } from "./zoneRules";
 import { MAP_KINDS } from "../types";
 
@@ -103,9 +104,25 @@ describe("layoutThoughts", () => {
   });
 
   it("keeps a branch on its own side of the center, the way the preview draws it", () => {
-    const { root, positions } = layoutThoughts(bigTree());
-    // branchAngles gives "a" the first slice, clockwise from the top: the right-hand side.
-    for (let i = 0; i < 9; i++) expect(positions.get(`a${i}`)!.x).toBeGreaterThan(root.x - 80);
+    const ts = bigTree();
+    const { root, positions } = layoutThoughts(ts);
+    const shape = shapeTree(orderParentsFirst(ts), ROOT_ID);
+    // "a" heads the triangle (its top corner); its children ring round it up there.
+    for (let i = 0; i < 9; i++) expect(positions.get(`a${i}`)!.y).toBeLessThan(root.y);
+    expect(Math.sign(positions.get("b")!.x - root.x)).toBe(Math.sign(shape.get("b")!.x));
+  });
+
+  it("lands an uncrowded map in the shape the preview draws, give or take a small nudge", () => {
+    const ts = [th("a"), th("b"), th("c"), th("a0", "a"), th("b0", "b")];
+    const { root, positions } = layoutThoughts(ts);
+    const shape = shapeTree(orderParentsFirst(ts), ROOT_ID);
+    const spacing = shapeStep(getCirclePackSpacing());
+    for (const t of ts) {
+      const p = positions.get(t.id)!;
+      const want = { x: root.x + shape.get(t.id)!.x * spacing, y: root.y + shape.get(t.id)!.y * spacing };
+      // The zone rules may still nudge one a little (a footprint is a wide box, not a circle).
+      expect(Math.hypot(p.x - want.x, p.y - want.y)).toBeLessThan(40);
+    }
   });
 
   it("follows the zone rules: no node inside a zone it isn't in, no zones crossing", () => {
