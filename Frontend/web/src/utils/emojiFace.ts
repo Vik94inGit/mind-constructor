@@ -10,7 +10,8 @@ import type { NodeDoc, NodeType } from "../types";
 //  - false ("symbols first"): the type's symbol up, and only a node with its
 //    own emoji carries one, on the back.
 // A node with a picture icon (NodeDoc.iconImage) and no emoji of its own
-// keeps the picture. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
+// keeps the picture. A type the viewer set to its symbol (TYPE_SYMBOL) keeps that
+// symbol face up. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
 // emoji face up either way, and never turns over.
 
 const STORAGE_KEY = "mc_emoji_first";
@@ -94,8 +95,10 @@ export function nodeEmojiFace(
 ): { emoji: string | null; emojiUp: boolean; flips: boolean } {
   const own = node.emoji?.trim() || "";
   if (own && node.emojiStill) return { emoji: own, emojiUp: true, flips: false };
-  // A picture icon is the node's own face already — no type emoji over it.
-  if (emojiFirst && (own || !node.iconImage)) return { emoji: own || typeEmojiFor(node.type, custom), emojiUp: true, flips: true };
+  // A picture icon is the node's own face already — no type emoji over it;
+  // nor is there one for a type the viewer keeps on its symbol (TYPE_SYMBOL).
+  const typeEmoji = node.iconImage ? null : typeEmojiFor(node.type, custom);
+  if (emojiFirst && (own || typeEmoji)) return { emoji: own || typeEmoji, emojiUp: true, flips: true };
   return own ? { emoji: own, emojiUp: false, flips: true } : { emoji: null, emojiUp: false, flips: false };
 }
 
