@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   avoidOverlap,
+  footprintObstacles,
+  freeFootprintScale,
+  NODE_FOOTPRINT,
   realmMembers,
   selfIntersects,
   realmOutline,
@@ -104,6 +107,30 @@ describe("avoidOverlap", () => {
     const desired = { x: 500, y: 500 };
     const farObstacle = { x: 2000, y: 1400, minDist: 150 };
     expect(avoidOverlap(desired, [farObstacle])).toEqual(desired);
+  });
+});
+
+describe("freeFootprintScale", () => {
+  it("grows a node's footprint as the map zooms out, since icons keep their size on screen", () => {
+    expect(freeFootprintScale(1)).toBe(1);
+    expect(freeFootprintScale(0.6)).toBeCloseTo(1 / 0.6);
+  });
+
+  it("never shrinks below the plain footprint when zoomed in, and stays plain for dots", () => {
+    expect(freeFootprintScale(2)).toBe(1);
+    expect(freeFootprintScale(0.5)).toBe(1);
+  });
+
+  it("keeps a node dropped beside another clear of it on screen when zoomed out", () => {
+    const zoom = 0.6;
+    const other = { x: 1000, y: 1000 };
+    // Right next to it: clear at normal zoom, but on screen at 60% the two would overlap.
+    const desired = { x: other.x + NODE_FOOTPRINT.w + 10, y: other.y };
+    expect(avoidOverlap(desired, footprintObstacles([other]))).toEqual(desired);
+    const placed = avoidOverlap(desired, footprintObstacles([other], 0, freeFootprintScale(zoom)));
+    const onScreenGapX = (Math.abs(placed.x - other.x) - NODE_FOOTPRINT.w / zoom) * zoom;
+    const onScreenGapY = (Math.abs(placed.y - other.y) - NODE_FOOTPRINT.h / zoom) * zoom;
+    expect(Math.max(onScreenGapX, onScreenGapY)).toBeGreaterThanOrEqual(-0.5);
   });
 });
 

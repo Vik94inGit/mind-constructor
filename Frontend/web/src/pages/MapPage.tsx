@@ -103,6 +103,7 @@ import {
   DOT_ZOOM,
   computeLinkedNeighborIds,
   footprintObstacles,
+  freeFootprintScale,
   computeNodeGroups,
   computeLinkCycles,
   getCirclePackSpacing,
@@ -667,9 +668,12 @@ export function MapPage() {
     extra: ExtraNode[] = [],
     opts: { free?: boolean } = {},
   ) {
+    // A drag the person aimed keeps clear of nodes as they look right now,
+    // at this zoom: zoomed out, each one covers more of the canvas.
     const obstacles = footprintObstacles(
       [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
       MIN_NODE_GAP,
+      opts.free ? freeFootprintScale(zoom) : 1,
     );
     return placeByZoneRules(
       desired,
@@ -1080,6 +1084,7 @@ export function MapPage() {
     viewportBounds,
     obstaclePoints,
     placeNode,
+    footprintScale: freeFootprintScale(zoom),
     upsertNode,
     setActionError,
     setNodes,

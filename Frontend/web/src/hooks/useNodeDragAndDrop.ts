@@ -55,6 +55,8 @@ interface Params {
   /** Where `moving` lands when dropped at `desired`, under the zone rules (utils/zoneRules.ts). */
   /** free: only keep clear of other nodes and their text, not the zone rules (a drag the user aimed). */
   placeNode: (desired: Pt, moving: MovingNode[], extra?: ExtraNode[], opts?: { free?: boolean }) => Pt;
+  /** How much of the canvas a node covers at the current zoom (canvasLayout's freeFootprintScale). */
+  footprintScale?: number;
   upsertNode: (node: NodeDoc) => void;
   setActionError: (message: string | null) => void;
   setNodes: Dispatch<SetStateAction<NodeDoc[]>>;
@@ -109,6 +111,7 @@ export function useNodeDragAndDrop({
   viewportBounds,
   obstaclePoints,
   placeNode,
+  footprintScale = 1,
   upsertNode,
   setActionError,
   setNodes,
@@ -341,7 +344,7 @@ export function useNodeDragAndDrop({
         // (see placeNode's "free" mode). Each member then steers clear of the
         // members already placed, in case the nudge pushed them together.
         const memberIdSet = new Set(memberIds);
-        const externalObstacles = footprintObstacles(obstaclePoints(memberIdSet));
+        const externalObstacles = footprintObstacles(obstaclePoints(memberIdSet), 0, footprintScale);
         const leaderStart = startPositions.get(node.nodeId)!;
         const leaderTarget = placeNode(
           clamp(leaderStart.x + dx, leaderStart.y + dy),
@@ -356,7 +359,7 @@ export function useNodeDragAndDrop({
         for (const id of memberIds) {
           if (id === node.nodeId) continue;
           const start = startPositions.get(id)!;
-          const placedSoFar = footprintObstacles(Array.from(targets.values()));
+          const placedSoFar = footprintObstacles(Array.from(targets.values()), 0, footprintScale);
           const keepShape = clamp(leaderTarget.x + start.x - leaderStart.x, leaderTarget.y + start.y - leaderStart.y);
           targets.set(id, avoidOverlap(keepShape, [...externalObstacles, ...placedSoFar], FULL_CANVAS_BOUNDS));
         }
