@@ -24,7 +24,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   central thought; answer one guiding question at a time (Enter adds a thought, Enter on an empty
   line moves to the next question) while a live preview of the map grows beside it; check each
   thought's kind and what it hangs from; then name it, choose Personal or Discussion, and the
-  thoughts are built into a real map. The draft is kept in the browser until then. See
+  thoughts are built into a real map laid out in the same shape as the preview: each thought next
+  to the one it hangs from, every branch on its own side, placed by the zone rules so no castle
+  wall crosses another. The draft is kept in the browser until then. See
   `src/pages/ThinkPage.tsx` and `src/utils/thoughtFlow.ts`.
 - **Dashboard** (`/`) — maps you own or were invited to; create/rename/delete, invite members, see
   who's on a map and who owns it, copy a whole map's nodes to paste into another one.
