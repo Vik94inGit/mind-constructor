@@ -20,7 +20,8 @@ import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 import type { Snap } from "../utils/cardGlue";
-import { TRAIL_STEP, TRAIL_TICK_MS, shiftAt, stepToward, trailLag, trailOrder } from "../utils/followTrail";
+import { startTrail } from "../utils/followTrail";
+import type { Trail } from "../utils/followTrail";
 
 type Pt = { x: number; y: number };
 
@@ -263,44 +264,14 @@ export function useNodeDragAndDrop({
       // drop keeps hopping until it reaches its own spot.
       stopTrail.current?.();
       const leaderStartPos = startPositions.get(node.nodeId)!;
-      const followers = trailOrder(node.nodeId, startPositions);
-      const smooth = !prefersReducedMotion();
-      const lags = new Map(followers.map((id, i) => [id, smooth ? trailLag(i, followers.length) : 0]));
-      const maxLag = Math.max(0, ...lags.values());
-      let leaderShift: Pt = { x: 0, y: 0 };
-      const history: Pt[] = [leaderShift];
-      const shown = new Map(startPositions);
-      let finalTargets: Map<string, Pt> | null = null;
-      let settled: (() => void) | null = null;
-      const show = () => dispatch({ type: "groupStart", positions: new Map(shown) });
-      function tick() {
-        history.push(leaderShift);
-        if (history.length > maxLag + 2) history.shift();
-        let done = true;
-        for (const id of followers) {
-          const start = startPositions.get(id)!;
-          const lagged = shiftAt(history, lags.get(id)!);
-          // Caught up with the drop: head for its own landing spot, which the
-          // overlap nudge may have moved off the plain shape.
-          const goal =
-            finalTargets && lagged === leaderShift
-              ? finalTargets.get(id)!
-              : { x: start.x + lagged.x, y: start.y + lagged.y };
-          const at = smooth ? stepToward(shown.get(id)!, goal, TRAIL_STEP) : goal;
-          shown.set(id, at);
-          if (at.x !== goal.x || at.y !== goal.y || goal !== finalTargets?.get(id)) done = false;
-        }
-        show();
-        if (finalTargets && done) endTrail();
-      }
-      const timer = setInterval(tick, TRAIL_TICK_MS);
+      const trail = startTrail(node.nodeId, startPositions, !prefersReducedMotion(), (shown) =>
+        dispatch({ type: "groupStart", positions: shown }),
+      );
+      stopTrail.current = trail.stop;
       function endTrail() {
-        clearInterval(timer);
-        if (stopTrail.current === endTrail) stopTrail.current = null;
-        settled?.();
-        settled = null;
+        trail.stop();
+        if (stopTrail.current === trail.stop) stopTrail.current = null;
       }
-      stopTrail.current = endTrail;
 
       function stop() {
         window.removeEventListener("pointermove", onGroupMove);
@@ -311,9 +282,7 @@ export function useNodeDragAndDrop({
       function onGroupMove(ev: PointerEvent) {
         const p = screenToCanvas(ev.clientX, ev.clientY);
         dragMoved.current = true;
-        leaderShift = { x: p.x - startPt.x, y: p.y - startPt.y };
-        shown.set(node.nodeId, { x: leaderStartPos.x + leaderShift.x, y: leaderStartPos.y + leaderShift.y });
-        show();
+        trail.lead({ x: p.x - startPt.x, y: p.y - startPt.y });
       }
 
       // The browser took the touch back (a system gesture, an incoming call):
@@ -367,14 +336,8 @@ export function useNodeDragAndDrop({
         // The leader lands at once; the rest hop after it to their own spots,
         // and all of them stay drawn there until the saves land, so nothing
         // flashes back to its old spot in between.
-        shown.set(node.nodeId, leaderTarget);
-        show();
-        await new Promise<void>((resolve) => {
-          settled = resolve;
-          finalTargets = targets;
-          leaderShift = { x: leaderTarget.x - leaderStartPos.x, y: leaderTarget.y - leaderStartPos.y };
-          if (!followers.length) endTrail();
-        });
+        await trail.land({ x: leaderTarget.x - leaderStartPos.x, y: leaderTarget.y - leaderStartPos.y }, targets);
+        endTrail();
         dispatch({ type: "groupStart", positions: targets });
         await Promise.all(
           memberIds.map(async (id) => {
@@ -482,6 +445,24 @@ export function useNodeDragAndDrop({
       const cdy = Math.min(CANVAS_H - margin - hi("y"), Math.max(margin - lo("y"), dy));
       return new Map(Array.from(clusterStart!, ([id, pt]) => [id, { x: pt.x + cdx, y: pt.y + cdy }]));
     };
+    // Glued cards follow the one under the finger like a group drag does
+    // (utils/followTrail.ts), starting once the drag really moves.
+    let clusterTrail: Trail | null = null;
+    const leadCluster = (moved: Map<string, Pt>) => {
+      if (!clusterTrail) {
+        stopTrail.current?.();
+        clusterTrail = startTrail(node.nodeId, clusterStart!, !prefersReducedMotion(), (shown) =>
+          dispatch({ type: "groupStart", positions: shown }),
+        );
+        stopTrail.current = clusterTrail.stop;
+      }
+      const at = moved.get(node.nodeId)!;
+      return { trail: clusterTrail, shift: { x: at.x - start.x, y: at.y - start.y } };
+    };
+    const endClusterTrail = () => {
+      clusterTrail?.stop();
+      if (stopTrail.current === clusterTrail?.stop) stopTrail.current = null;
+    };
 
     // Long-press, touch only: there's no keyboard on a phone to reach
     // shift+click or right-click, so a finger held still for LONG_PRESS_MS
@@ -514,6 +495,7 @@ export function useNodeDragAndDrop({
     // the lifted finger opens nothing.
     function onCancel() {
       stop();
+      endClusterTrail();
       dispatch({ type: "reset" });
       suppressNextClick.current = true;
       setTimeout(() => (suppressNextClick.current = false), LONG_PRESS_CLICK_GRACE_MS);
@@ -534,7 +516,8 @@ export function useNodeDragAndDrop({
       const y = p.y - offsetY;
       dragMoved.current = true;
       if (clusterStart) {
-        dispatch({ type: "groupStart", positions: movedCluster(x - start.x, y - start.y) });
+        const { trail, shift } = leadCluster(movedCluster(x - start.x, y - start.y));
+        trail.lead(shift);
         return;
       }
       // Close to a fitting puzzle piece: jump flush into it, and light the
@@ -568,6 +551,9 @@ export function useNodeDragAndDrop({
       if (dragMoved.current) recordMove?.(clusterStart ? nodes.filter((n) => clusterStart.has(n.nodeId)) : [node]);
       if (clusterStart && dragMoved.current) {
         const moved = movedCluster(x - start.x, y - start.y);
+        const { trail, shift } = leadCluster(moved);
+        await trail.land(shift, moved);
+        endClusterTrail();
         const members = nodes.filter((n) => moved.has(n.nodeId));
         const before = new Map(members.map((n) => [n.nodeId, storedSpots(n)]));
         const spots = new Map(members.map((n) => [n.nodeId, spotFor(n, moved.get(n.nodeId)!)]));
