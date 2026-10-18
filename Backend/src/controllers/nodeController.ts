@@ -157,7 +157,7 @@ export const attackNode = async (req: Request<nodeIdParams>, res: Response) => {
   try {
     const { nodeId } = req.params;
     const userId = req.user?._id;
-    const { weapon, type, text } = req.body;
+    const { weapon, type, text, byOpponent } = req.body;
 
     if (!userId) {
       return res
@@ -172,7 +172,7 @@ export const attackNode = async (req: Request<nodeIdParams>, res: Response) => {
       });
     }
 
-    const result = await attackNodeAbl(nodeId, userId, weapon, { type, text });
+    const result = await attackNodeAbl(nodeId, userId, weapon, { type, text, byOpponent });
 
     if (!result) {
       return res
@@ -201,13 +201,13 @@ export const protectNode = async (req: Request<nodeIdParams>, res: Response) => 
   try {
     const { nodeId } = req.params;
     const userId = req.user?._id;
-    const { type, text } = req.body;
+    const { type, text, byOpponent } = req.body;
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
 
-    const result = await protectNodeAbl(nodeId, userId, { type, text });
+    const result = await protectNodeAbl(nodeId, userId, { type, text, byOpponent });
 
     if (!result) {
       return res.status(404).json({ success: false, error: "Node not found" });

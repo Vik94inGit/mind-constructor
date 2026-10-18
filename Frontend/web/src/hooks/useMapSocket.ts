@@ -142,8 +142,19 @@ export function useMapSocket({
     socket.on("node:unpacked", onNodeUnpacked);
     socket.on("map:updated", onMapUpdated);
     socket.on("nodes:visibility", onVisibilityChanged);
+    // A dropped connection (sleep, a network blip, the server restarting
+    // after a deploy) comes back as a brand-new socket on the server, in no
+    // room at all: without joining again nothing more arrives until a
+    // reload. Join again, and reload what may have changed meanwhile.
+    const onReconnect = () => {
+      joinMap(mapId);
+      onVisibilityChanged();
+      refreshInsights(mapId);
+    };
+    socket.io.on("reconnect", onReconnect);
 
     return () => {
+      socket.io.off("reconnect", onReconnect);
       socket.off("nodes:visibility", onVisibilityChanged);
       socket.off("node:created", onNodeCreated);
       socket.off("node:updated", onNodeUpdated);
