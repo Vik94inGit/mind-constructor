@@ -2,21 +2,22 @@ import { useState } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { useI18n } from "../i18n/I18nContext";
-import { DEFAULT_TYPE_EMOJI, EMOJI_CHOICES, TYPE_SYMBOL, isValidEmoji, typeEmojiFor } from "../utils/emojiFace";
+import { DEFAULT_TYPE_EMOJI, EMOJI_CHOICES, isValidEmoji, typeEmojiFor } from "../utils/emojiFace";
 import type { TypeEmoji } from "../utils/emojiFace";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { TypeFace } from "./TypeFace";
 
 interface Props {
   typeEmoji: TypeEmoji;
-  /** null goes back to the type's default emoji. */
+  /** null goes back to the type's symbol, the default. */
   onChange: (type: NodeType, emoji: string | null) => void;
 }
 
-// The eye menu's "Emoji for each type": every node type with the emoji its
-// nodes wear in emoji first (utils/emojiFace.ts). Tapping one opens the quick
-// picks under it — the type's own symbol first, then emoji — plus a field for
-// any other emoji and a way back to the default.
+// The eye menu's "Emoji for each type": every node type with the face its
+// nodes wear in emoji first (utils/emojiFace.ts) — its own symbol unless the
+// viewer picked an emoji. Tapping one opens the quick picks under it — the
+// type's own symbol first, then emoji, its usual one first — plus a field for
+// any other emoji.
 export function TypeEmojiPicker({ typeEmoji, onChange }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState<NodeType | null>(null);
@@ -53,16 +54,16 @@ export function TypeEmojiPicker({ typeEmoji, onChange }: Props) {
               type="button"
               aria-label={t.ui.emoji.typeSymbol}
               title={t.ui.emoji.typeSymbol}
-              aria-pressed={typeEmoji[open] === TYPE_SYMBOL}
+              aria-pressed={typeEmojiFor(open, typeEmoji) === null}
               className="flex cursor-pointer items-center justify-center rounded-[4px] p-[0.1rem] hover:bg-surface-2"
               onClick={() => {
-                onChange(open, TYPE_SYMBOL);
+                onChange(open, null);
                 setOpen(null);
               }}
             >
               <NodeTypeSymbol type={open} size={17} />
             </button>
-            {EMOJI_CHOICES.map((e) => (
+            {[DEFAULT_TYPE_EMOJI[open], ...EMOJI_CHOICES.filter((c) => c !== DEFAULT_TYPE_EMOJI[open])].map((e) => (
               <button
                 key={e}
                 type="button"
@@ -70,7 +71,7 @@ export function TypeEmojiPicker({ typeEmoji, onChange }: Props) {
                 aria-pressed={typeEmojiFor(open, typeEmoji) === e}
                 className="cursor-pointer rounded-[4px] p-[0.1rem] text-[1.05rem] leading-none hover:bg-surface-2"
                 onClick={() => {
-                  onChange(open, e === DEFAULT_TYPE_EMOJI[open] ? null : e);
+                  onChange(open, e);
                   setOpen(null);
                 }}
               >
@@ -97,18 +98,6 @@ export function TypeEmojiPicker({ typeEmoji, onChange }: Props) {
             >
               {t.ui.emoji.use}
             </button>
-            {typeEmoji[open] && (
-              <button
-                type="button"
-                className="cursor-pointer rounded-md border border-line px-2 py-[0.1rem] text-[0.75rem] text-ink hover:bg-surface-2"
-                onClick={() => {
-                  onChange(open, null);
-                  setOpen(null);
-                }}
-              >
-                {t.ui.emoji.typeEmojiReset}
-              </button>
-            )}
           </div>
         </div>
       )}

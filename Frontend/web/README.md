@@ -72,13 +72,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
-- **Emoji first** — on by default, for notes and template nodes alike: every node's icon is a
-  two-sided card, an emoji face up and its type's symbol on
-  the back, turning over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the
-  node's own (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or else its
-  type's: ❗ Problem, ⚠️ Problematic option, 🎯 Solution, 🔀 Option, ✅ Success, ❌ Fail, 💡 Idea, ❓ unknown,
-  each changeable under *Emoji for each type* in the display menu, where the type's own symbol is
-  offered first so a type can keep its symbol instead of an emoji. Turning *Emoji first* off goes
+- **Type symbols and emoji** — on the canvas every type shows its own symbol by default: pause bars
+  for a Problem, play for a Problematic option and an Option, target rings for a Solution, ✓ Success,
+  ✗ Fail, a bulb for an Idea and ? for unknown (`map/OutcomeBadge.tsx`). With *Emoji first* on (the
+  default) a node with an emoji shows it face up, its type's symbol on the back of a two-sided card
+  that turns over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the node's own
+  (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or one the viewer
+  picked for its type under *Emoji for each type* in the display menu, where the symbol comes first
+  and each type's usual emoji (❗ ⚠️ 🎯 🔀 ✅ ❌ 💡 ❓) leads the emoji. Turning *Emoji first* off goes
   back to symbols first: the type's symbol up, and an emoji only on nodes that have their own. A
   node's owner can tick *Keep this emoji still* so its own emoji stays up and never turns
   (`Node.emojiStill`). A picture icon stays the face of its node. Choosing a zone (its parent, or
