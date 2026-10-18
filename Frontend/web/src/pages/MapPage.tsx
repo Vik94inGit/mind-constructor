@@ -173,14 +173,12 @@ export function MapPage() {
   // A finish / agree / reopen request is on its way.
   const [finishBusy, setFinishBusy] = useState(false);
   const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
-  // Off by default: a bare tap/click on a node only ever selects it while
-  // this is false — onNodePointerDown's own single-node drag setup is
-  // gated behind it (see its own comment). Arming a drag straight from the
-  // first pointerdown on any node would read lightly grazing one while just
-  // trying to tap it (a phone's own touch imprecision, mainly) as "drag this
-  // node," relocating or even re-parenting it by accident. Turning it on is
-  // a deliberate, explicit act (the
-  // toolbar's own Move toggle) instead of the app's default stance.
+  // Off by default: a bare click on a node only ever selects it while this
+  // is false — onNodePointerDown's single-node mouse drag is gated behind it
+  // (see its own comment), so a click never relocates a node by accident.
+  // Turning it on is a deliberate act (the toolbar's Move toggle). A finger
+  // drags a node either way once it really travels; a tap or a graze below
+  // that distance stays a tap.
   // Doesn't touch double-click-to-edit (startInlineEdit) or an
   // already-multi-selected group's own drag — both stay available
   // regardless, since neither one is the "accidental" case this addresses.

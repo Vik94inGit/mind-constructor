@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useNodeDragAndDrop } from "./useNodeDragAndDrop";
 import { makeNode } from "../test/fixtures";
+import { TRAIL_TICK_MS } from "../utils/followTrail";
 import type { NodeDoc } from "../types";
 import type { NodeGroup } from "../utils/canvasLayout";
 import type { Translation } from "../i18n/translations";
@@ -351,46 +352,127 @@ describe("useNodeDragAndDrop", () => {
     });
   });
 
-  describe("touch long-press outside move mode", () => {
-    it("toggles the node into the multi-selection instead of dragging", () => {
+  describe("touch", () => {
+    it("a finger held still and lifted toggles the node into the multi-selection", async () => {
       const node = makeNode({ nodeId: "a" });
-      const { result, setSelectedId, setMultiSelectIds } = setup({ moveMode: false });
+      const listeners = captureWindowListeners();
+      const { result, setSelectedId, setMultiSelectIds, handleNodeClick } = setup({ moveMode: false });
 
       act(() =>
         result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 0, clientY: 0, pointerType: "touch" })),
       );
       act(() => vi.advanceTimersByTime(500));
+      // Nothing happens while the finger is still down.
+      expect(setMultiSelectIds).not.toHaveBeenCalled();
+      await act(async () => {
+        listeners.pointerup({ clientX: 0, clientY: 0 });
+      });
 
       expect(setSelectedId).toHaveBeenCalledWith(null);
       const updater = setMultiSelectIds.mock.calls[0][0];
       expect(updater(new Set())).toEqual(new Set(["a"]));
+      expect(handleNodeClick).not.toHaveBeenCalled();
       expect(nodesApi.updateNode).not.toHaveBeenCalled();
     });
 
-    it("hands the hold to onHold instead when it handles it (a puzzle card opening its menu)", () => {
+    it("hands the hold to onHold instead when it handles it (a puzzle card opening its menu)", async () => {
       const node = makeNode({ nodeId: "a" });
       const onHold = vi.fn(() => true);
+      const listeners = captureWindowListeners();
       const { result, setMultiSelectIds } = setup({ moveMode: false, onHold });
 
       act(() =>
         result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 12, clientY: 34, pointerType: "touch" })),
       );
       act(() => vi.advanceTimersByTime(500));
+      await act(async () => {
+        listeners.pointerup({ clientX: 12, clientY: 34 });
+      });
 
       expect(onHold).toHaveBeenCalledWith(node, 12, 34);
       expect(setMultiSelectIds).not.toHaveBeenCalled();
     });
 
-
-    it("does not drag on real movement either — moveMode gates touch the same as mouse now", () => {
-      // Regression test: touch used to bypass moveMode entirely, arming a
-      // live single-node drag regardless of its value — only a *held-still*
-      // long-press toggled multi-select instead. Real movement past the
-      // long-press tolerance now has to stay a no-op too when moveMode is
-      // off, same as a bare mouse pointerdown already was.
-      const node = makeNode({ nodeId: "a", x: 100, y: 100 });
+    it("drags a node outside move mode once the finger really travels", async () => {
+      const node = makeNode({ nodeId: "a", x: 300, y: 300 });
       const listeners = captureWindowListeners();
-      const { result } = setup({ moveMode: false, nodes: [node], posFor: () => ({ x: 100, y: 100 }) });
+      const { result, handleNodeClick } = setup({ moveMode: false, nodes: [node] });
+      vi.mocked(nodesApi.updateNode).mockImplementation(async (_id, updates) => ({ ...node, ...updates }));
+
+      act(() =>
+        result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 300, clientY: 300, pointerType: "touch" })),
+      );
+      act(() => listeners.pointermove({ clientX: 500, clientY: 400 }));
+      expect(result.current.dragState).toEqual({ nodeId: "a", x: 500, y: 400 });
+
+      await act(async () => {
+        listeners.pointerup({ clientX: 500, clientY: 400 });
+      });
+      expect(handleNodeClick).not.toHaveBeenCalled();
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 500, y: 400 });
+    });
+
+    it("holding a node a moment and then dragging it moves it instead of opening it", async () => {
+      const node = makeNode({ nodeId: "a", x: 300, y: 300 });
+      const onHold = vi.fn(() => true);
+      const listeners = captureWindowListeners();
+      const { result, handleNodeClick, setMultiSelectIds } = setup({ moveMode: true, nodes: [node], onHold });
+      vi.mocked(nodesApi.updateNode).mockImplementation(async (_id, updates) => ({ ...node, ...updates }));
+
+      act(() =>
+        result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 300, clientY: 300, pointerType: "touch" })),
+      );
+      act(() => vi.advanceTimersByTime(800));
+      act(() => listeners.pointermove({ clientX: 450, clientY: 300 }));
+      await act(async () => {
+        listeners.pointerup({ clientX: 450, clientY: 300 });
+      });
+
+      expect(onHold).not.toHaveBeenCalled();
+      expect(setMultiSelectIds).not.toHaveBeenCalled();
+      expect(handleNodeClick).not.toHaveBeenCalled();
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 450, y: 300 });
+    });
+
+    it("a finger's jitter below the drag distance stays a tap", async () => {
+      const node = makeNode({ nodeId: "a", x: 300, y: 300 });
+      const listeners = captureWindowListeners();
+      const { result, handleNodeClick } = setup({ moveMode: false, nodes: [node] });
+
+      act(() =>
+        result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 300, clientY: 300, pointerType: "touch" })),
+      );
+      act(() => listeners.pointermove({ clientX: 305, clientY: 304 }));
+      expect(result.current.dragState).toEqual({ nodeId: "a", x: 300, y: 300 });
+      await act(async () => {
+        listeners.pointerup({ clientX: 305, clientY: 304 });
+      });
+
+      expect(handleNodeClick).toHaveBeenCalledWith(node);
+      expect(nodesApi.updateNode).not.toHaveBeenCalled();
+    });
+
+    it("a second finger coming down (a pinch) drops the drag without saving or opening", () => {
+      const node = makeNode({ nodeId: "a", x: 300, y: 300 });
+      const listeners = captureWindowListeners();
+      const { result, handleNodeClick } = setup({ moveMode: false, nodes: [node] });
+
+      act(() =>
+        result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 300, clientY: 300, pointerType: "touch" })),
+      );
+      act(() => listeners.pointermove({ clientX: 400, clientY: 300 }));
+      act(() => listeners.pointerdown({ pointerId: 2 }));
+
+      expect(result.current.dragState).toBeNull();
+      expect(listeners.pointerup).toBeUndefined();
+      expect(handleNodeClick).not.toHaveBeenCalled();
+      expect(nodesApi.updateNode).not.toHaveBeenCalled();
+    });
+
+    it("a locked node never drags, even with a finger", () => {
+      const node = makeNode({ nodeId: "a", x: 100, y: 100, locked: true });
+      const listeners = captureWindowListeners();
+      const { result } = setup({ moveMode: false, nodes: [node] });
 
       act(() =>
         result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 0, clientY: 0, pointerType: "touch" })),
@@ -398,7 +480,6 @@ describe("useNodeDragAndDrop", () => {
       act(() => listeners.pointermove({ clientX: 100, clientY: 100 }));
 
       expect(result.current.dragState).toBeNull();
-      act(() => vi.advanceTimersByTime(500));
       expect(nodesApi.updateNode).not.toHaveBeenCalled();
     });
   });
@@ -438,8 +519,15 @@ describe("useNodeDragAndDrop", () => {
       expect(result.current.groupDragState?.get("follower")).toEqual({ x: 300, y: 600 });
 
       act(() => listeners.pointermove({ clientX: 400, clientY: 200 }));
-      // The whole selection moves under the finger at once.
+      // The leader moves under the finger at once; the follower trails after
+      // it in small hops and catches up while the finger rests.
       expect(result.current.groupDragState?.get("leader")).toEqual({ x: 400, y: 200 });
+      expect(result.current.groupDragState?.get("follower")).toEqual({ x: 300, y: 600 });
+      act(() => vi.advanceTimersByTime(TRAIL_TICK_MS * 4));
+      const hop = result.current.groupDragState!.get("follower")!;
+      expect(hop.x).toBeGreaterThan(300);
+      expect(hop.x).toBeLessThan(500);
+      act(() => vi.advanceTimersByTime(TRAIL_TICK_MS * 40));
       expect(result.current.groupDragState?.get("follower")).toEqual({ x: 500, y: 600 });
 
       await act(async () => {
