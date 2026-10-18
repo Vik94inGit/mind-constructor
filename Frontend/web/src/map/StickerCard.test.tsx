@@ -3,6 +3,30 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { StickerCard } from "./StickerCard";
 
 describe("StickerCard", () => {
+  it("adds a branch from its + button, without the click reaching the card", () => {
+    const onAddBranch = vi.fn();
+    const onCardClick = vi.fn();
+    render(
+      <div onClick={onCardClick}>
+        <StickerCard color="red" onAddBranch={onAddBranch} addBranchHint="Create branch" minWidth={96} maxWidth={240}>
+          <span>x</span>
+        </StickerCard>
+      </div>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create branch" }));
+    expect(onAddBranch).toHaveBeenCalledOnce();
+    expect(onCardClick).not.toHaveBeenCalled();
+  });
+
+  it("has no + button unless it may branch", () => {
+    render(
+      <StickerCard color="red" addBranchHint="Create branch" minWidth={96} maxWidth={240}>
+        <span>x</span>
+      </StickerCard>,
+    );
+    expect(screen.queryByRole("button", { name: "Create branch" })).toBeNull();
+  });
+
   it("renders its content inside the card, in its shape and text size", () => {
     render(
       <StickerCard color="red" shape="round" fontSize={18} minWidth={96} maxWidth={240}>

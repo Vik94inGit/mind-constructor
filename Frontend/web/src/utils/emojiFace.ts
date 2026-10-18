@@ -9,9 +9,11 @@ import type { NodeDoc, NodeType } from "../types";
 //    type's symbol on the back;
 //  - false ("symbols first"): the type's symbol up, and only a node with its
 //    own emoji carries one, on the back.
-// A node with a picture icon (NodeDoc.iconImage) and no emoji of its own keeps
-// the picture, and a type the viewer set to its symbol (TYPE_SYMBOL) keeps
-// that symbol face up, as does a template's ghost node until it's written in. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
+// A node that came from a template (it carries the question it was made to
+// answer, NodeDoc.prompt) and has no emoji of its own shows the type's symbol
+// either way: emoji are for notes, a template reads by its symbols. A node
+// with a picture icon (NodeDoc.iconImage) and no emoji of its own keeps the
+// picture. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
 // emoji face up either way, and never turns over.
 
 const STORAGE_KEY = "mc_emoji_first";
@@ -89,18 +91,15 @@ export function saveTypeEmoji(custom: TypeEmoji): void {
  * turns over when the node is chosen.
  */
 export function nodeEmojiFace(
-  node: Pick<NodeDoc, "type" | "emoji" | "emojiStill" | "iconImage"> & Partial<Pick<NodeDoc, "ghost" | "text">>,
+  node: Pick<NodeDoc, "type" | "emoji" | "emojiStill" | "iconImage" | "prompt">,
   emojiFirst: boolean,
   custom: TypeEmoji,
 ): { emoji: string | null; emojiUp: boolean; flips: boolean } {
   const own = node.emoji?.trim() || "";
   if (own && node.emojiStill) return { emoji: own, emojiUp: true, flips: false };
-  // A picture icon is the node's own face already — no type emoji over it;
-  // nor is there one for a type the viewer keeps on its symbol, or on a
-  // template's ghost (not written in yet), which wears the type's symbol.
-  const template = !!node.ghost && !node.text?.trim();
-  const typeEmoji = node.iconImage || template ? null : typeEmojiFor(node.type, custom);
-  if (emojiFirst && (own || typeEmoji)) return { emoji: own || typeEmoji, emojiUp: true, flips: true };
+  // A picture icon is the node's own face already — no type emoji over it.
+  const fromTemplate = !!node.prompt?.trim();
+  if (emojiFirst && (own || (!node.iconImage && !fromTemplate))) return { emoji: own || typeEmojiFor(node.type, custom), emojiUp: true, flips: true };
   return own ? { emoji: own, emojiUp: false, flips: true } : { emoji: null, emojiUp: false, flips: false };
 }
 

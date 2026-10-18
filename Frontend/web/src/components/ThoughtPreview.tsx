@@ -1,11 +1,14 @@
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { ROOT_ID, orderParentsFirst } from "../utils/thoughtFlow";
+import { shapeTree } from "../utils/shapeLayout";
 import type { Thought } from "../utils/thoughtFlow";
 import type { NodeType } from "../types";
 
 const W = 320;
 const H = 240;
-const RING = 62;
+// One step (node to child) at most this many pixels; less when the tree needs it to fit.
+const STEP = 62;
+const PAD = 16;
 
 interface Placed {
   id: string;
@@ -16,56 +19,31 @@ interface Placed {
   text: string;
 }
 
-// A radial tree: each branch gets a slice of the circle sized by how many
-// leaves it has, and every level sits one ring further out. Only meant to show
-// the shape of the user's thinking as it grows, not where nodes land on the
-// real canvas.
+// The map's shape in miniature: the same geometry the real map is built from
+// (shapeTree — the first ring round a circle, a square or a triangle, each
+// deeper level a step further out), scaled evenly to fit the box, so what's
+// built looks like what's drawn here.
 function placeTree(center: string, rootType: NodeType, thoughts: Thought[]): Placed[] {
   const ordered = orderParentsFirst(thoughts);
-  const children = new Map<string, Thought[]>();
-  for (const t of ordered) children.set(t.parentId, [...(children.get(t.parentId) ?? []), t]);
-  const leaves = new Map<string, number>();
-  const countLeaves = (id: string): number => {
-    const kids = children.get(id) ?? [];
-    const n = kids.length === 0 ? 1 : kids.reduce((sum, k) => sum + countLeaves(k.id), 0);
-    leaves.set(id, n);
-    return n;
-  };
-  countLeaves(ROOT_ID);
-
+  const shape = shapeTree(ordered, ROOT_ID);
   const cx = W / 2;
   const cy = H / 2;
   const out: Placed[] = [{ id: ROOT_ID, parentId: null, x: cx, y: cy, type: rootType, text: center }];
-  const maxDepth = Math.max(1, ...ordered.map((t) => depthOf(t, ordered)));
-  // Squeeze the rings so the deepest level still fits inside the box.
-  const ring = Math.min(RING, (Math.min(W, H) / 2 - 16) / maxDepth);
-  const walk = (id: string, from: number, to: number, depth: number) => {
-    const kids = children.get(id) ?? [];
-    const total = leaves.get(id) ?? 1;
-    let start = from;
-    for (const k of kids) {
-      const span = ((to - from) * (leaves.get(k.id) ?? 1)) / total;
-      const angle = start + span / 2 - Math.PI / 2;
-      const r = ring * (depth + 1);
-      // Ellipse instead of a circle: the box is wider than it's tall.
-      out.push({ id: k.id, parentId: id, x: cx + r * Math.cos(angle) * 1.25, y: cy + r * Math.sin(angle), type: k.type, text: k.text });
-      walk(k.id, start, start + span, depth + 1);
-      start += span;
-    }
-  };
-  walk(ROOT_ID, 0, Math.PI * 2, 0);
-  return out;
-}
-
-function depthOf(t: Thought, all: Thought[]): number {
-  const byId = new Map(all.map((x) => [x.id, x]));
-  let d = 1;
-  let cur = byId.get(t.parentId);
-  while (cur && d < 50) {
-    d++;
-    cur = byId.get(cur.parentId);
+  // The farthest a node reaches from the center, either way, sets the scale.
+  let reachX = 0;
+  let reachY = 0;
+  for (const p of shape.values()) {
+    reachX = Math.max(reachX, Math.abs(p.x));
+    reachY = Math.max(reachY, Math.abs(p.y));
   }
-  return d;
+  const scale = Math.min(STEP, (W / 2 - PAD) / Math.max(reachX, 1e-6), (H / 2 - PAD) / Math.max(reachY, 1e-6));
+  const ids = new Set(ordered.map((t) => t.id));
+  for (const t of ordered) {
+    const parentId = ids.has(t.parentId) ? t.parentId : ROOT_ID;
+    const p = shape.get(t.id) ?? { x: 0, y: -1 };
+    out.push({ id: t.id, parentId, x: cx + p.x * scale, y: cy + p.y * scale, type: t.type, text: t.text });
+  }
+  return out;
 }
 
 export function ThoughtPreview({

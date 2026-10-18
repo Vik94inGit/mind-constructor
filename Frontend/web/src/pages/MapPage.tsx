@@ -55,7 +55,7 @@ import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, sho
 import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { readingOrder, stepNode } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
-import { deletedNodeOf, restoreDeletedNode } from "../utils/restoreNode";
+import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { SiegePanel } from "../map/SiegePanel";
@@ -103,6 +103,7 @@ import {
   DOT_ZOOM,
   computeLinkedNeighborIds,
   footprintObstacles,
+  freeFootprintScale,
   computeNodeGroups,
   computeLinkCycles,
   getCirclePackSpacing,
@@ -173,14 +174,12 @@ export function MapPage() {
   // A finish / agree / reopen request is on its way.
   const [finishBusy, setFinishBusy] = useState(false);
   const [pictureView, setPictureView] = useState<{ nodeId: string; images: string[] | null } | null>(null);
-  // Off by default: a bare tap/click on a node only ever selects it while
-  // this is false — onNodePointerDown's own single-node drag setup is
-  // gated behind it (see its own comment). Arming a drag straight from the
-  // first pointerdown on any node would read lightly grazing one while just
-  // trying to tap it (a phone's own touch imprecision, mainly) as "drag this
-  // node," relocating or even re-parenting it by accident. Turning it on is
-  // a deliberate, explicit act (the
-  // toolbar's own Move toggle) instead of the app's default stance.
+  // Off by default: a bare click on a node only ever selects it while this
+  // is false — onNodePointerDown's single-node mouse drag is gated behind it
+  // (see its own comment), so a click never relocates a node by accident.
+  // Turning it on is a deliberate act (the toolbar's Move toggle). A finger
+  // drags a node either way once it really travels; a tap or a graze below
+  // that distance stays a tap.
   // Doesn't touch double-click-to-edit (startInlineEdit) or an
   // already-multi-selected group's own drag — both stay available
   // regardless, since neither one is the "accidental" case this addresses.
@@ -669,9 +668,12 @@ export function MapPage() {
     extra: ExtraNode[] = [],
     opts: { free?: boolean } = {},
   ) {
+    // A drag the person aimed keeps clear of nodes as they look right now,
+    // at this zoom: zoomed out, each one covers more of the canvas.
     const obstacles = footprintObstacles(
       [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
       MIN_NODE_GAP,
+      opts.free ? freeFootprintScale(zoom) : 1,
     );
     return placeByZoneRules(
       desired,
@@ -1026,7 +1028,7 @@ export function MapPage() {
   }
   // Cards: dragging a link out of a card's handle, gluing cards together and
   // keeping them from piling up — see hooks/usePuzzleConnect.ts.
-  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect, cardClearSpot } = usePuzzleConnect({
+  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect, cardClearSpot, cardBranchSpot } = usePuzzleConnect({
     mapId,
     nodes,
     edges,
@@ -1082,6 +1084,7 @@ export function MapPage() {
     viewportBounds,
     obstaclePoints,
     placeNode,
+    footprintScale: freeFootprintScale(zoom),
     upsertNode,
     setActionError,
     setNodes,
@@ -1592,11 +1595,20 @@ export function MapPage() {
   async function deleteNodeWithUndo(node: NodeDoc): Promise<boolean> {
     const undoable = !node.isWeapon && !node.isProtection;
     if (!undoable && !(await confirm(t.ui.node.deleteConfirm, { confirmLabel: t.ui.common.delete, danger: true }))) return false;
+    // Its leaf children go with it (one generation down, never a child that
+    // is a parent itself — see leafChildrenOf).
+    const leaves = undoable ? leafChildrenOf(node, nodes, isOwnNode) : [];
     // The node list arrives without text and pictures — fetch them so undo has them.
-    const full = undoable ? await nodesApi.getNode(node.nodeId).catch(() => node) : node;
-    const deleted = deletedNodeOf({ ...node, ...full }, nodes, edges, isOwnNode);
+    const withText = (n: NodeDoc) => nodesApi.getNode(n.nodeId).then((f) => ({ ...n, ...f })).catch(() => n);
+    const full = undoable ? await withText(node) : node;
+    const fullLeaves = await Promise.all(leaves.map(withText));
+    const deleted = deletedNodeOf(full, nodes, edges, isOwnNode, fullLeaves);
     const res = await nodesApi.deleteNode(node.nodeId);
     applyNodeDeleted(node.nodeId);
+    if (leaves.length) {
+      const { deleted: gone } = await nodesApi.deleteManyNodes(leaves.map((l) => l.nodeId));
+      gone.forEach((g) => applyNodeDeleted(g.deletedId));
+    }
     // Deleting a protection node with banked damage releases the whole
     // total onto whatever it was defending — see Backend's deleteNodeDao.
     if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
@@ -1604,6 +1616,7 @@ export function MapPage() {
       recordUndo(async () => {
         const back = await restoreDeletedNode(mapId, deleted);
         upsertNode(back.node);
+        back.leaves.forEach(upsertNode);
         back.children.forEach(upsertNode);
         setEdges((prev) => [...prev, ...back.edges]);
         setCelebrateIds((prev) => new Set(prev).add(back.node.nodeId));
@@ -1694,6 +1707,17 @@ export function MapPage() {
     // Emoji first: the feeling was already picked (or skipped, "") on the
     // ring before the types. Otherwise it's offered around the new node.
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, prompt: text, emoji: emojiFirst ? (emoji ?? "") : undefined });
+  }
+
+  // A card has no quick-add ring (it would sit on top of the cards around
+  // it), so the selected card's own + button branches from it instead: the
+  // new node starts just under the card, and its type and feeling are picked
+  // as it's written, like the right-click menu's Create branch.
+  function addBranchFromCard(parent: NodeDoc) {
+    setActionError(null);
+    const pos = cardBranchSpot(parent) ?? placeNode(posFor(parent), [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
+    setInlineEditId(null);
+    setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: parent.nodeId });
   }
 
   // Draw first, write later: a type ghost dragged out of the selected node's
@@ -2442,6 +2466,18 @@ export function MapPage() {
                   onToggleBlockLock={isOwnNode(node) ? () => toggleBlockLock(node.nodeId) : undefined}
                   onConnectStart={
                     isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
+                  }
+                  onAddBranch={
+                    node.nodeId === selectedId &&
+                    isOwnNode(node) &&
+                    onCardBoard(node) &&
+                    !chooseMode &&
+                    !packMode &&
+                    !drawMode &&
+                    !pendingCreate &&
+                    !inlineEditId
+                      ? () => addBranchFromCard(node)
+                      : undefined
                   }
                   onHoverText={() => void ensureNodeText([node.nodeId])}
                 />

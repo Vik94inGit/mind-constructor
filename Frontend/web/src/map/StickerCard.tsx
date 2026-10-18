@@ -36,6 +36,9 @@ export interface StickerCardProps {
   onConnectStart?: (e: ReactPointerEvent) => void;
   /** The link handle's tooltip. */
   connectHint?: string;
+  /** Set on the selected card of its owner: a + button under the card starts a branch from it (no quick-add ring rings a card). */
+  onAddBranch?: () => void;
+  addBranchHint?: string;
   /** Locked by its owner (utils/blockLock.ts): shows a padlock. */
   locked?: boolean;
   /** Locks/unlocks the block — the padlock becomes a button. Unset for someone else's card. */
@@ -60,6 +63,8 @@ export function StickerCard({
   resizeHint,
   onConnectStart,
   connectHint,
+  onAddBranch,
+  addBranchHint,
   locked = false,
   onToggleLock,
   lockLabel,
@@ -168,6 +173,27 @@ export function StickerCard({
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         />
+      )}
+      {/* Add a branch — the middle of the bottom edge, on the selected card
+          only, where the quick-add ring would be for an icon. */}
+      {onAddBranch && (
+        <button
+          type="button"
+          aria-label={addBranchHint}
+          title={addBranchHint}
+          data-card-add
+          className="pointer-events-auto absolute -bottom-[13px] left-1/2 z-[3] flex h-[26px] w-[26px] -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-accent bg-surface text-accent shadow-card hover:bg-accent hover:text-white"
+          onPointerDown={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddBranch();
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M6 1.5 V10.5 M1.5 6 H10.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
       )}
       {/* Resize grip — bottom-right corner, faint until hovered. */}
       {onResize && !locked && (

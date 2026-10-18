@@ -24,7 +24,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   central thought; answer one guiding question at a time (Enter adds a thought, Enter on an empty
   line moves to the next question) while a live preview of the map grows beside it; check each
   thought's kind and what it hangs from; then name it, choose Personal or Discussion, and the
-  thoughts are built into a real map. The draft is kept in the browser until then. See
+  thoughts are built into a real map laid out in the same shape as the preview (both drawn from
+  `utils/shapeLayout.ts`): the thoughts on the center sit round a circle, a square or an
+  equilateral triangle, each deeper one a step out from the one it hangs from, and the zone rules
+  only nudge what would cover another node or cross a castle wall. The draft is kept in the browser until then. See
   `src/pages/ThinkPage.tsx` and `src/utils/thoughtFlow.ts`.
 - **Dashboard** (`/`) — maps you own or were invited to; create/rename/delete, invite members, see
   who's on a map and who owns it, copy a whole map's nodes to paste into another one.
@@ -41,7 +44,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   card let go on top of others is moved just clear of them, and one dragged close to another (with
   Move on) glues flush against its side — two of your cards glued together get linked and then drag
   as one (`utils/cardGlue.ts`); drag from a card's side handle onto another of your cards to link
-  them. No quick-add ghosts ring a card. Each card's fill color can be changed in
+  them. No quick-add ghosts ring a card; instead your selected card has a + button on its bottom edge
+  that starts a branch just under it, clear of the cards around (`cardGlue.ts` `spotBelow`). Each card's fill color can be changed in
   its panel's Info tab (per browser). Each zone can also take its own view (cards, mixed, icons + text, the default look, or
   dots) from the ⋯ button beside its name, so one canvas can show different
   sides of the same map at once (per browser). The ⋯ buttons sit on a compact list, just left of the minimap, of the zones currently in view.
@@ -68,7 +72,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
-- **Emoji first** — every node's icon is a two-sided card, an emoji face up and its type's symbol on
+- **Emoji first** — on by default for notes; a node that came from a template (it carries its
+  question, `Node.prompt`) keeps its type's symbol unless it has an emoji of its own. Every other
+  node's icon is a two-sided card, an emoji face up and its type's symbol on
   the back, turning over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the
   node's own (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or else its
   type's: ❗ Problem, ⚠️ Problematic option, 💡 Solution, 🔀 Option, ✅ Success, ❌ Fail, ❓ unknown,
@@ -99,14 +105,21 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node lands and the map is in view again.
 - **Moving nodes** — a dragged node (or group) lands where it was let go, nudged only so it doesn't
   cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes. On a
-  phone, holding a node adds it to a group selection and dragging one of them moves the whole group
-  under the finger (`hooks/useNodeDragAndDrop.ts`).
+  phone, a finger drags a node once it really travels (a tap or a small graze still opens it; with a
+  mouse a single node drags in Move mode), and holding a node still then lifting adds it to a group
+  selection or opens a card's menu, so holding a moment before dragging still drags. Dragging one
+  member of a group moves the group like a creature: the touched node follows the finger and the rest
+  walk its path behind it in small hops, one after another, catching up after the drop
+  (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
   layout and look.
 - **Deleting** — a deleted node pops like a bubble where it stood, or goes off in a small boom when it
   was a Problem, Problematic option or Fail (`map/NodeBurst.tsx`). Questions such
   as "Delete 3 nodes?" use the app's own dialog (`context/ConfirmContext.tsx`), not the browser's.
+  Deleting a parent also deletes its own children one generation down that have no children of
+  their own; a child that is itself a parent stays, with its branch, and just loses the link. Undo
+  brings them all back together (`utils/restoreNode.ts` `leafChildrenOf`).
 - **First map** — a one-time card lists the main gestures, touch or mouse ones (`map/GestureHint.tsx`).
 - **Loading** — the map editor, *Think it through*, text splitting and admin load on demand
   (`App.tsx`); the build writes `asset-list.json` so the service worker keeps them for offline too.
@@ -132,7 +145,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   messages (`src/i18n/`), node type names included (the stored value stays English).
 - **Templates** — the node panel's Info tab offers a ready branch on a node with no children yet:
   a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
-  breakdown, and a failed (Fail) node gets "Analyze and try again". See `src/utils/templates.ts`.
+  breakdown, and a failed (Fail) node gets "Analyze and try again". A template's first level lands
+  on a shape round the node: three (or six) make an equilateral triangle, four a square, any other
+  number a circle, and each deeper level fans a step further out (`src/utils/shapeLayout.ts`,
+  `src/utils/templates.ts`).
 - **Map types** — creating a map asks for one of four kinds (Problem analysis, Decision, Goal planning,
   Retrospective), each seeded with a starter structure in your language, and for a mode (Discussion or
   Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn

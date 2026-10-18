@@ -1,7 +1,10 @@
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
-import { CANVAS_H, CANVAS_W, avoidOverlap, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
-import type { Obstacle } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, footprintObstacles, getCirclePackSpacing } from "./canvasLayout";
+import type { ViewportBounds } from "./canvasLayout";
+import { MIN_NODE_GAP, makeZoneRule, placeByZoneRules } from "./zoneRules";
+import { shapeStep, shapeTree } from "./shapeLayout";
+import type { ExtraNode } from "./zoneRules";
 import type { MapDoc, MapKind, NodeType } from "../types";
 
 // The "Think it through" flow (pages/ThinkPage.tsx): the user writes the one
@@ -167,23 +170,37 @@ export function orderParentsFirst(thoughts: Thought[]): Thought[] {
 const EDGE = 120;
 
 /**
- * Canvas positions for the root and every thought — the same sunflower spiral
- * around the root a template's nodes get (see layoutTemplate), in
- * parents-first order so a branch's nodes land near each other.
+ * Canvas positions for the root and every thought. The thoughts hanging
+ * straight from the center go evenly round a circle, a square or a triangle
+ * about it, and every deeper one a step out from its parent (shapeTree, in
+ * utils/shapeLayout.ts) — the same shape the live preview draws
+ * (components/ThoughtPreview.tsx), at full size. Then the zone rules every
+ * other placement follows (utils/zoneRules.ts) nudge each one only as far as
+ * it takes to cover no other node, stay out of zones it isn't in, and keep
+ * zones from crossing. Parents first, so every parent is already placed.
  */
 export function layoutThoughts(thoughts: Thought[]): { root: { x: number; y: number }; positions: Map<string, { x: number; y: number }> } {
   const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-  const spacing = getCirclePackSpacing();
-  const obstacles: Obstacle[] = [{ ...root, minDist: spacing }];
+  const step = shapeStep(getCirclePackSpacing());
+  const ordered = orderParentsFirst(thoughts);
+  const shape = shapeTree(ordered, ROOT_ID);
+  const bounds: ViewportBounds = { minX: EDGE, minY: EDGE, maxX: CANVAS_W - EDGE, maxY: CANVAS_H - EDGE };
+  const placed: ExtraNode[] = [{ nodeId: ROOT_ID, parentId: null, pos: root }];
   const positions = new Map<string, { x: number; y: number }>();
-  orderParentsFirst(thoughts).forEach((t, i) => {
-    const placed = avoidOverlap(spiralPoint(i + 1, root, spacing), obstacles);
-    obstacles.push({ x: placed.x, y: placed.y, minDist: spacing });
-    positions.set(t.id, {
-      x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, placed.x)),
-      y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, placed.y)),
-    });
-  });
+  for (const t of ordered) {
+    // A parent that no longer exists means "hang from the center", as in buildMapFromDraft.
+    const parentId = positions.has(t.parentId) ? t.parentId : ROOT_ID;
+    const unit = shape.get(t.id) ?? { x: 0, y: -1 };
+    const desired = { x: root.x + unit.x * step, y: root.y + unit.y * step };
+    const rule = makeZoneRule([], new Map(), [{ nodeId: t.id, parentId }], placed);
+    const p = placeByZoneRules(desired, footprintObstacles(placed.map((e) => e.pos), MIN_NODE_GAP), bounds, rule);
+    const pos = {
+      x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, p.x)),
+      y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, p.y)),
+    };
+    positions.set(t.id, pos);
+    placed.push({ nodeId: t.id, parentId, pos });
+  }
   return { root, positions };
 }
 
