@@ -11,7 +11,7 @@ import type { NodeDoc, NodeType } from "../types";
 //    own emoji carries one, on the back.
 // A node with a picture icon (NodeDoc.iconImage) and no emoji of its own keeps
 // the picture, and a type the viewer set to its symbol (TYPE_SYMBOL) keeps
-// that symbol face up. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
+// that symbol face up, as does a template's ghost node until it's written in. A node whose owner set its emoji still (NodeDoc.emojiStill) shows its own
 // emoji face up either way, and never turns over.
 
 const STORAGE_KEY = "mc_emoji_first";
@@ -89,15 +89,17 @@ export function saveTypeEmoji(custom: TypeEmoji): void {
  * turns over when the node is chosen.
  */
 export function nodeEmojiFace(
-  node: Pick<NodeDoc, "type" | "emoji" | "emojiStill" | "iconImage">,
+  node: Pick<NodeDoc, "type" | "emoji" | "emojiStill" | "iconImage"> & Partial<Pick<NodeDoc, "ghost" | "text">>,
   emojiFirst: boolean,
   custom: TypeEmoji,
 ): { emoji: string | null; emojiUp: boolean; flips: boolean } {
   const own = node.emoji?.trim() || "";
   if (own && node.emojiStill) return { emoji: own, emojiUp: true, flips: false };
   // A picture icon is the node's own face already — no type emoji over it;
-  // nor is there one for a type the viewer keeps on its symbol.
-  const typeEmoji = node.iconImage ? null : typeEmojiFor(node.type, custom);
+  // nor is there one for a type the viewer keeps on its symbol, or on a
+  // template's ghost (not written in yet), which wears the type's symbol.
+  const template = !!node.ghost && !node.text?.trim();
+  const typeEmoji = node.iconImage || template ? null : typeEmojiFor(node.type, custom);
   if (emojiFirst && (own || typeEmoji)) return { emoji: own || typeEmoji, emojiUp: true, flips: true };
   return own ? { emoji: own, emojiUp: false, flips: true } : { emoji: null, emojiUp: false, flips: false };
 }
