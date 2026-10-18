@@ -106,8 +106,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   phone, a finger drags a node once it really travels (a tap or a small graze still opens it; with a
   mouse a single node drags in Move mode), and holding a node still then lifting adds it to a group
   selection or opens a card's menu, so holding a moment before dragging still drags. Dragging one
-  member of a group moves the group like a creature: the touched node follows the finger and the rest
-  walk its path behind it in small hops, one after another, catching up after the drop
+  member of a group (a whole zone picked out, or any selection) moves it like a creature: the touched
+  node follows the finger and the rest walk its path behind it, one after another, each hopping on
+  its own beat, and catch up after the drop; cards glued together follow the same way
   (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,

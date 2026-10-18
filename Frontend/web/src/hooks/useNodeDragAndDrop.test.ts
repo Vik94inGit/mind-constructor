@@ -523,7 +523,7 @@ describe("useNodeDragAndDrop", () => {
       // it in small hops and catches up while the finger rests.
       expect(result.current.groupDragState?.get("leader")).toEqual({ x: 400, y: 200 });
       expect(result.current.groupDragState?.get("follower")).toEqual({ x: 300, y: 600 });
-      act(() => vi.advanceTimersByTime(TRAIL_TICK_MS * 4));
+      act(() => vi.advanceTimersByTime(TRAIL_TICK_MS * 10));
       const hop = result.current.groupDragState!.get("follower")!;
       expect(hop.x).toBeGreaterThan(300);
       expect(hop.x).toBeLessThan(500);
@@ -538,6 +538,34 @@ describe("useNodeDragAndDrop", () => {
       expect(zoomToEditAt).not.toHaveBeenCalled();
       expect(nodesApi.updateNode).toHaveBeenCalledWith("leader", { x: 400, y: 200 });
       expect(nodesApi.updateNode).toHaveBeenCalledWith("follower", { x: 500, y: 600 });
+      expect(result.current.groupDragState).toBeNull();
+    });
+
+    it("cards glued together follow the dragged one in hops, then save where they landed", async () => {
+      const a = makeNode({ nodeId: "a", x: 400, y: 400 });
+      const b = makeNode({ nodeId: "b", x: 500, y: 400 });
+      const listeners = captureWindowListeners();
+      const { result } = setup({ nodes: [a, b], clusterFor: () => ["a", "b"] });
+      vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, updates) => ({
+        ...(nodeId === "a" ? a : b),
+        ...updates,
+      }));
+
+      act(() => result.current.onNodePointerDown(a, fakePointerDownEvent({ clientX: 400, clientY: 400 })));
+      act(() => listeners.pointermove({ clientX: 400, clientY: 600 }));
+      expect(result.current.groupDragState?.get("a")).toEqual({ x: 400, y: 600 });
+      expect(result.current.groupDragState?.get("b")).toEqual({ x: 500, y: 400 });
+      act(() => vi.advanceTimersByTime(TRAIL_TICK_MS * 10));
+      const hop = result.current.groupDragState!.get("b")!;
+      expect(hop.y).toBeGreaterThan(400);
+      expect(hop.y).toBeLessThan(600);
+
+      await act(async () => {
+        listeners.pointerup({ clientX: 400, clientY: 600 });
+        await vi.runAllTimersAsync();
+      });
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 400, y: 600 });
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("b", { x: 500, y: 600 });
       expect(result.current.groupDragState).toBeNull();
     });
 
