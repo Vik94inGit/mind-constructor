@@ -7,6 +7,7 @@ export const NODE_TYPES = [
   "Option",
   "Success",
   "Fail",
+  "Idea",
   "unknown",
 ] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
@@ -54,6 +55,7 @@ export const ATTACK_NODE_TYPES = [
   "Option",
   "Success",
   "Fail",
+  "Idea",
 ] as const;
 export type AttackNodeType = (typeof ATTACK_NODE_TYPES)[number];
 

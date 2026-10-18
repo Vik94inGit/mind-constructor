@@ -521,6 +521,7 @@ const en: UiStrings = {
     Option: "Option",
     Success: "Success",
     Fail: "Fail",
+    Idea: "Idea",
     unknown: "Question (unknown)",
   },
   templates: {
@@ -718,6 +719,7 @@ const en: UiStrings = {
       "Option": ["What if we…", "Alternative:", "Quick experiment:"],
       "Success": ["It worked because…", "Measurable result:", "Keep doing:"],
       "Fail": ["It failed because…", "Lesson learned:", "Don't repeat:"],
+      "Idea": ["Idea:", "What if…", "Worth trying:"],
       "unknown": ["Open question:", "Need more info on…", "Idea:"],
     },
     ghostTemplatesTitle: "Start from this phrase",
@@ -1051,6 +1053,7 @@ const cs: UiStrings = {
     Option: "Varianta",
     Success: "Úspěch",
     Fail: "Neúspěch",
+    Idea: "Nápad",
     unknown: "Otázka (neznámé)",
   },
   templates: {
@@ -1248,6 +1251,7 @@ const cs: UiStrings = {
       "Option": ["Co kdybychom…", "Alternativa:", "Rychlý experiment:"],
       "Success": ["Vyšlo to, protože…", "Měřitelný výsledek:", "Pokračovat v:"],
       "Fail": ["Nevyšlo to, protože…", "Poučení:", "Neopakovat:"],
+      "Idea": ["Nápad:", "Co kdyby…", "Stojí za zkoušku:"],
       "unknown": ["Otevřená otázka:", "Potřebujeme víc info o…", "Nápad:"],
     },
     ghostTemplatesTitle: "Začít touto frází",
@@ -1580,6 +1584,7 @@ const uk: UiStrings = {
     Option: "Варіант",
     Success: "Успіх",
     Fail: "Невдача",
+    Idea: "Ідея",
     unknown: "Питання (невідоме)",
   },
   templates: {
@@ -1777,6 +1782,7 @@ const uk: UiStrings = {
       "Option": ["А що, якби…", "Альтернатива:", "Швидкий експеримент:"],
       "Success": ["Спрацювало, бо…", "Вимірюваний результат:", "Продовжувати:"],
       "Fail": ["Не вийшло, бо…", "Урок:", "Не повторювати:"],
+      "Idea": ["Ідея:", "А що як…", "Варто спробувати:"],
       "unknown": ["Відкрите питання:", "Потрібно більше інформації про…", "Ідея:"],
     },
     ghostTemplatesTitle: "Почати з цієї фрази",
@@ -2112,6 +2118,7 @@ const ru: UiStrings = {
     Option: "Вариант",
     Success: "Успех",
     Fail: "Неудача",
+    Idea: "Идея",
     unknown: "Вопрос (неизвестное)",
   },
   templates: {
@@ -2309,6 +2316,7 @@ const ru: UiStrings = {
       "Option": ["А что, если…", "Альтернатива:", "Быстрый эксперимент:"],
       "Success": ["Сработало, потому что…", "Измеримый результат:", "Продолжать:"],
       "Fail": ["Не вышло, потому что…", "Урок:", "Не повторять:"],
+      "Idea": ["Идея:", "А что если…", "Стоит попробовать:"],
       "unknown": ["Открытый вопрос:", "Нужно больше информации о…", "Идея:"],
     },
     ghostTemplatesTitle: "Начать с этой фразы",

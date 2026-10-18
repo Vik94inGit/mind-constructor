@@ -8,6 +8,7 @@ export const NODE_TYPE_COLORS: Record<NodeType, string> = {
   Solution: "var(--n-solution)",
   Success: "var(--n-success)",
   Fail: "var(--n-fail)",
+  Idea: "var(--n-idea)",
   unknown: "var(--n-unknown)",
 };
 
@@ -56,7 +57,7 @@ export const ZONE_COLORS: Record<Sentiment, string> = {
 // — nothing to vote with, nothing to color a dot by. Shared by MapPage's
 // own circleSentiment (majority vote across a group) and MiniMap's per-node
 // dot coloring, so the two can never disagree about which side a type is on.
-const POSITIVE_TYPES = new Set<NodeType>(["Success", "Solution", "Option"]);
+const POSITIVE_TYPES = new Set<NodeType>(["Success", "Solution", "Option", "Idea"]);
 const NEGATIVE_TYPES = new Set<NodeType>(["Fail", "Problem", "Problematic option"]);
 
 export function sentimentOf(type: NodeType): "positive" | "negative" | null {
@@ -115,6 +116,6 @@ export function cycleAttackNodeType(current: NodeType): NodeType {
 // or a negative problem/option. Personal mode has no such limit.
 export function allowedAttackTypes(isMapOwner: boolean, targetType: NodeType): NodeType[] {
   if (isMapOwner) return [...NODE_TYPES];
-  if (sentimentOf(targetType) === "negative") return ["Solution", "Option", "Success"];
+  if (sentimentOf(targetType) === "negative") return ["Solution", "Option", "Success", "Idea"];
   return ["unknown", "Problem", "Problematic option"];
 }

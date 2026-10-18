@@ -20,7 +20,7 @@
     --del-bg:#F6E1E3; --del-fg:#A23B3F;
 
     --n-problem:#C1502E; --n-poption:#B8862E; --n-option:#3B5BA5;
-    --n-solution:#1F7A6C; --n-success:#3F7D53; --n-fail:#B23A48; --n-unknown:#8A8F98;
+    --n-solution:#1F7A6C; --n-success:#3F7D53; --n-fail:#B23A48; --n-idea:#C99A06; --n-unknown:#8A8F98;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -1096,7 +1096,8 @@ export const setMemberColorMutationDao = async (mapInternalId, userId, color) =>
         <span class="mono-text" style="color:var(--n-option)">Option</span>,
         <span class="mono-text" style="color:var(--n-solution)">Solution</span>,
         <span class="mono-text" style="color:var(--n-success)">Success</span>,
-        <span class="mono-text" style="color:var(--n-fail)">Fail</span>, or
+        <span class="mono-text" style="color:var(--n-fail)">Fail</span>,
+        <span class="mono-text" style="color:var(--n-idea)">Idea</span>, or
         <span class="mono-text" style="color:var(--n-unknown)">unknown</span> as a conscious "not
         categorized yet" choice), and linked to its parent node via <code>parentId</code> for the
         tree shape. Mounted at <code>/api/nodes</code>.

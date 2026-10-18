@@ -61,6 +61,7 @@ export const ATTACK_NODE_TYPES = [
   "Option",
   "Success",
   "Fail",
+  "Idea",
 ] as const;
 export type AttackNodeType = (typeof ATTACK_NODE_TYPES)[number];
 
@@ -68,7 +69,7 @@ export type AttackNodeType = (typeof ATTACK_NODE_TYPES)[number];
 // draws no ring, so it only ever reads as "are you sure?" — which is why it
 // is an attack type but not a protection type (see PROTECT_NODE_TYPES).
 const ATTACK_TYPES_WITH_QUESTION = [...ATTACK_NODE_TYPES, "unknown"] as const;
-const POSITIVE_TYPES: readonly string[] = ["Solution", "Option", "Success"];
+const POSITIVE_TYPES: readonly string[] = ["Solution", "Option", "Success", "Idea"];
 const NEGATIVE_TYPES: readonly string[] = ["Problem", "Problematic option", "Fail"];
 
 // Discussion-mode rule for a member who is not the map's owner: a negative

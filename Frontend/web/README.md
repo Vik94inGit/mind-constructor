@@ -76,10 +76,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   two-sided card, an emoji face up and its type's symbol on
   the back, turning over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the
   node's own (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or else its
-  type's: ❗ Problem, ⚠️ Problematic option, 💡 Solution, 🔀 Option, ✅ Success, ❌ Fail, ❓ unknown,
+  type's: ❗ Problem, ⚠️ Problematic option, 🎯 Solution, 🔀 Option, ✅ Success, ❌ Fail, 💡 Idea, ❓ unknown,
   each changeable under *Emoji for each type* in the display menu, where the type's own symbol is
-  offered first so a type can keep its symbol instead of an emoji. A template's ghost nodes wear
-  their type's symbol until written in. Turning *Emoji first* off goes
+  offered first so a type can keep its symbol instead of an emoji. Turning *Emoji first* off goes
   back to symbols first: the type's symbol up, and an emoji only on nodes that have their own. A
   node's owner can tick *Keep this emoji still* so its own emoji stays up and never turns
   (`Node.emojiStill`). A picture icon stays the face of its node. Choosing a zone (its parent, or

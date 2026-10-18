@@ -69,7 +69,7 @@ describe("userStateAbl", () => {
 
     it("rejects a type emoji with letters, or for a type that doesn't exist", async () => {
       await expect(updatePreferencesAbl({ typeEmoji: { Problem: "abc" } }, "u1")).rejects.toThrow(ValidationError);
-      await expect(updatePreferencesAbl({ typeEmoji: { Idea: "💡" } }, "u1")).rejects.toThrow(ValidationError);
+      await expect(updatePreferencesAbl({ typeEmoji: { Banana: "🍌" } }, "u1")).rejects.toThrow(ValidationError);
     });
 
     it("rejects unknown values and unknown fields", async () => {

@@ -506,17 +506,17 @@ describe("attackAbl", () => {
   describe("allowedAttackTypes — Discussion-mode type rules", () => {
     it("lets the map owner use every type, question included, on anything", () => {
       expect(allowedAttackTypes(true, "Problem")).toContain("unknown");
-      expect(allowedAttackTypes(true, "Success")).toHaveLength(7);
+      expect(allowedAttackTypes(true, "Success")).toHaveLength(8);
     });
 
     it("answers a negative target with positive types only, for a non-owner", () => {
       for (const target of ["Problem", "Problematic option", "Fail"]) {
-        expect([...allowedAttackTypes(false, target)].sort()).toEqual(["Option", "Solution", "Success"]);
+        expect([...allowedAttackTypes(false, target)].sort()).toEqual(["Idea", "Option", "Solution", "Success"]);
       }
     });
 
     it("answers a positive or unknown target with a question or a negative problem/option, for a non-owner", () => {
-      for (const target of ["Solution", "Option", "Success", "unknown"]) {
+      for (const target of ["Solution", "Option", "Success", "Idea", "unknown"]) {
         expect([...allowedAttackTypes(false, target)].sort()).toEqual(["Problem", "Problematic option", "unknown"]);
       }
     });
