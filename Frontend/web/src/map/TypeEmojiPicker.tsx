@@ -2,9 +2,10 @@ import { useState } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { useI18n } from "../i18n/I18nContext";
-import { DEFAULT_TYPE_EMOJI, EMOJI_CHOICES, isValidEmoji, typeEmojiFor } from "../utils/emojiFace";
+import { DEFAULT_TYPE_EMOJI, EMOJI_CHOICES, TYPE_SYMBOL, isValidEmoji, typeEmojiFor } from "../utils/emojiFace";
 import type { TypeEmoji } from "../utils/emojiFace";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
+import { TypeFace } from "./TypeFace";
 
 interface Props {
   typeEmoji: TypeEmoji;
@@ -14,8 +15,8 @@ interface Props {
 
 // The eye menu's "Emoji for each type": every node type with the emoji its
 // nodes wear in emoji first (utils/emojiFace.ts). Tapping one opens the quick
-// picks under it, plus a field for any other emoji and a way back to the
-// default.
+// picks under it — the type's own symbol first, then emoji — plus a field for
+// any other emoji and a way back to the default.
 export function TypeEmojiPicker({ typeEmoji, onChange }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState<NodeType | null>(null);
@@ -29,7 +30,7 @@ export function TypeEmojiPicker({ typeEmoji, onChange }: Props) {
           <button
             key={type}
             type="button"
-            aria-label={`${t.ui.types[type]}: ${typeEmojiFor(type, typeEmoji)}`}
+            aria-label={`${t.ui.types[type]}: ${typeEmojiFor(type, typeEmoji) ?? t.ui.emoji.typeSymbol}`}
             aria-expanded={open === type}
             title={t.ui.types[type]}
             className={`flex cursor-pointer items-center gap-[0.2rem] rounded-md border px-[0.35rem] py-[0.15rem] hover:bg-surface-2 ${
@@ -41,13 +42,26 @@ export function TypeEmojiPicker({ typeEmoji, onChange }: Props) {
             }}
           >
             <NodeTypeSymbol type={type} size={13} />
-            <span className="text-[1rem] leading-none">{typeEmojiFor(type, typeEmoji)}</span>
+            <TypeFace type={type} size={16} emojiFirst typeEmoji={typeEmoji} />
           </button>
         ))}
       </div>
       {open && (
         <div className="mt-[0.2rem] flex flex-col gap-[0.3rem] rounded-md border border-line p-[0.35rem]">
           <div className="grid grid-cols-8 gap-[0.15rem]">
+            <button
+              type="button"
+              aria-label={t.ui.emoji.typeSymbol}
+              title={t.ui.emoji.typeSymbol}
+              aria-pressed={typeEmoji[open] === TYPE_SYMBOL}
+              className="flex cursor-pointer items-center justify-center rounded-[4px] p-[0.1rem] hover:bg-surface-2"
+              onClick={() => {
+                onChange(open, TYPE_SYMBOL);
+                setOpen(null);
+              }}
+            >
+              <NodeTypeSymbol type={open} size={17} />
+            </button>
             {EMOJI_CHOICES.map((e) => (
               <button
                 key={e}

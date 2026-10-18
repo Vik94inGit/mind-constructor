@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useI18n } from "../i18n/I18nContext";
-import { NodeTypeIcon } from "../map/NodeTypeIcon";
+import { ViewerTypeFace } from "../map/TypeFace";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
@@ -113,7 +113,7 @@ export function MessageText({
               style={{ background: tint(color, 14), borderColor: tint(color, 55) }}
             >
               <div className="mb-1 flex items-center gap-[0.35rem]">
-                <NodeTypeIcon type={p.type} size={15} />
+                <ViewerTypeFace type={p.type} size={15} />
                 <select
                   className="min-w-0 rounded-md border-0 bg-transparent py-0 pr-1 text-[0.75rem] font-semibold text-ink-soft"
                   value={p.type}
@@ -236,7 +236,7 @@ export function TypePicker({ value, onPick }: { value?: NodeType; onPick: (type:
           aria-pressed={value === undefined ? undefined : value === type}
           onClick={() => onPick(type)}
         >
-          <NodeTypeIcon type={type} size={15} />
+          <ViewerTypeFace type={type} size={15} />
           {t.ui.types[type]}
         </button>
       ))}

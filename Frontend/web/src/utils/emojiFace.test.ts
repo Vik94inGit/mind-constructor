@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_TYPE_EMOJI, loadEmojiFirst, loadTypeEmoji, nodeEmojiFace, saveEmojiFirst, saveTypeEmoji, typeEmojiFor } from "./emojiFace";
+import { DEFAULT_TYPE_EMOJI, loadEmojiFirst, loadTypeEmoji, nodeEmojiFace, saveEmojiFirst, saveTypeEmoji, TYPE_SYMBOL, typeEmojiFor } from "./emojiFace";
 
 describe("emoji first", () => {
   beforeEach(() => localStorage.clear());
@@ -21,6 +21,12 @@ describe("type emoji", () => {
     expect(typeEmojiFor("Solution", { Solution: "🌟" })).toBe("🌟");
   });
 
+  it("has no emoji for a type kept on its own symbol", () => {
+    expect(typeEmojiFor("Fail", { Fail: TYPE_SYMBOL })).toBeNull();
+    saveTypeEmoji({ Fail: TYPE_SYMBOL });
+    expect(loadTypeEmoji()).toEqual({ Fail: TYPE_SYMBOL });
+  });
+
   it("keeps the viewer's own, dropping anything that isn't an emoji", () => {
     saveTypeEmoji({ Problem: "🔥" });
     localStorage.setItem("mc_type_emoji", JSON.stringify({ Problem: "🔥", Fail: "abc", Nope: "💡" }));
@@ -32,6 +38,16 @@ describe("nodeEmojiFace", () => {
   it("emoji first: its own emoji, else its type's, face up, turning over when chosen", () => {
     expect(nodeEmojiFace({ type: "Problem", emoji: "😡" }, true, {})).toEqual({ emoji: "😡", emojiUp: true, flips: true });
     expect(nodeEmojiFace({ type: "Problem", emoji: "" }, true, { Problem: "🔥" })).toEqual({ emoji: "🔥", emojiUp: true, flips: true });
+  });
+
+  it("emoji first: a type kept on its symbol shows the symbol, still", () => {
+    expect(nodeEmojiFace({ type: "Fail" }, true, { Fail: TYPE_SYMBOL })).toEqual({ emoji: null, emojiUp: false, flips: false });
+    expect(nodeEmojiFace({ type: "Fail", emoji: "😡" }, true, { Fail: TYPE_SYMBOL })).toEqual({ emoji: "😡", emojiUp: true, flips: true });
+  });
+
+  it("emoji first: a template's ghost wears its type's symbol until written in", () => {
+    expect(nodeEmojiFace({ type: "Problem", ghost: true, text: "" }, true, {})).toEqual({ emoji: null, emojiUp: false, flips: false });
+    expect(nodeEmojiFace({ type: "Problem", ghost: true, text: "Written" }, true, {})).toEqual({ emoji: DEFAULT_TYPE_EMOJI.Problem, emojiUp: true, flips: true });
   });
 
   it("symbols first: the type's symbol up, and an emoji only when the node has its own", () => {

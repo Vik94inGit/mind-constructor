@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { ApiRequestError } from "../api/client";
-import { NodeTypeIcon } from "./NodeTypeIcon";
+import { ViewerTypeFace } from "./TypeFace";
 import type { NodeType } from "../types";
 import type { TextNodesPlan } from "../hooks/useNodeCreation";
 import { addPiece, autoPieces } from "../utils/textSplit";
@@ -203,7 +203,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
               <section className="rounded-card border border-line bg-surface-2 p-3">
                 {withRoot && (
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-[0.78rem] font-semibold text-ink-soft">
-                    <NodeTypeIcon type={rootType} size={15} />
+                    <ViewerTypeFace type={rootType} size={15} />
                     {t.split.mainNode} · {t.ui.types[rootType]}
                   </div>
                 )}
@@ -251,7 +251,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
                               })
                             }
                           />
-                          <NodeTypeIcon type={p.type} size={16} />
+                          <ViewerTypeFace type={p.type} size={16} />
                           <span className="min-w-0 flex-1 truncate text-[0.88rem]">{text.slice(p.start, p.end)}</span>
                         </label>
                       </li>

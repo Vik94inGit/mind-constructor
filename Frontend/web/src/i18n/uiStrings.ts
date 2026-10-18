@@ -427,6 +427,7 @@ export interface UiStrings {
     /** The eye menu's per-type emoji (utils/typeEmoji.ts). */
     typeEmoji: string;
     typeEmojiHint: string;
+    typeSymbol: string;
     typeEmojiReset: string;
     /** Node.emojiStill, in the Modify tab. */
     still: string;
@@ -970,6 +971,7 @@ const en: UiStrings = {
     firstHint: "Every node shows an emoji face up (its own, or its type's), and new nodes offer the emoji before the type; choosing a node flips it to its type for a moment. Turned off, the type's symbol is up and an emoji is optional",
     typeEmoji: "Emoji for each type",
     typeEmojiHint: "A node without its own emoji shows its type's",
+    typeSymbol: "Its own symbol",
     typeEmojiReset: "Default",
     still: "Keep this emoji still",
     stillHint: "It stays face up and never turns over to the type",
@@ -1499,6 +1501,7 @@ const cs: UiStrings = {
     firstHint: "Každý uzel ukazuje navrchu emoji (své vlastní, nebo emoji svého typu) a nové uzly nabízejí emoji před typem; výběr uzlu ho na chvíli otočí na jeho typ. Vypnuto: navrchu je symbol typu a emoji je volitelné",
     typeEmoji: "Emoji pro každý typ",
     typeEmojiHint: "Uzel bez vlastního emoji ukáže emoji svého typu",
+    typeSymbol: "Vlastní symbol",
     typeEmojiReset: "Výchozí",
     still: "Pevné emoji",
     stillHint: "Zůstane navrchu a nikdy se neotočí na typ",
@@ -2027,6 +2030,7 @@ const uk: UiStrings = {
     firstHint: "Кожен вузол показує зверху емодзі (власне або свого типу), а нові вузли пропонують емодзі перед типом; вибір вузла на мить перевертає його на тип. Вимкнено: зверху символ типу, а емодзі необов’язкове",
     typeEmoji: "Емодзі для кожного типу",
     typeEmojiHint: "Вузол без власного емодзі показує емодзі свого типу",
+    typeSymbol: "Власний символ",
     typeEmojiReset: "Типове",
     still: "Стале емодзі",
     stillHint: "Лишається зверху й ніколи не перевертається на тип",
@@ -2558,6 +2562,7 @@ const ru: UiStrings = {
     firstHint: "Каждый узел показывает сверху эмодзи (своё или своего типа), а новые узлы предлагают эмодзи перед типом; выбор узла на миг переворачивает его на тип. Выключено: сверху символ типа, а эмодзи необязательно",
     typeEmoji: "Эмодзи для каждого типа",
     typeEmojiHint: "Узел без своего эмодзи показывает эмодзи своего типа",
+    typeSymbol: "Свой символ",
     typeEmojiReset: "По умолчанию",
     still: "Постоянное эмодзи",
     stillHint: "Остаётся сверху и никогда не переворачивается на тип",

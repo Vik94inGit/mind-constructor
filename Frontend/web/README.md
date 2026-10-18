@@ -63,7 +63,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Text → nodes** — paste a text on the map itself, mark its pieces (by hand, or every line/sentence
   at once) and they become nodes around the click point, hanging from the whole text as a main node.
   The map's free room is counted first (`utils/freeSpots.ts`); when not every new node fits, the user
-  sees how many do and chooses which pieces to pack into the main node. See `src/map/TextToNodesModal.tsx`.
+  sees how many do and chooses which pieces to pack into the main node. Its type buttons show each
+  type the way the viewer's nodes do: its emoji in emoji first, else its symbol (`map/TypeFace.tsx`).
+  See `src/map/TextToNodesModal.tsx`.
 - **Pictures on nodes** — the node panel's Info tab shows the text and its pictures in one box, like
   a post: screenshots pasted with Ctrl+V, images dropped on the box or picked with its 🖼️ button land
   under the text; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
@@ -75,7 +77,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   the back, turning over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the
   node's own (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or else its
   type's: ❗ Problem, ⚠️ Problematic option, 💡 Solution, 🔀 Option, ✅ Success, ❌ Fail, ❓ unknown,
-  each changeable under *Emoji for each type* in the display menu. Turning *Emoji first* off goes
+  each changeable under *Emoji for each type* in the display menu, where the type's own symbol is
+  offered first so a type can keep its symbol instead of an emoji. A template's ghost nodes wear
+  their type's symbol until written in. Turning *Emoji first* off goes
   back to symbols first: the type's symbol up, and an emoji only on nodes that have their own. A
   node's owner can tick *Keep this emoji still* so its own emoji stays up and never turns
   (`Node.emojiStill`). A picture icon stays the face of its node. Choosing a zone (its parent, or

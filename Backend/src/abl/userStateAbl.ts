@@ -34,10 +34,14 @@ const preferencesSchema = z
     readingMode: z.enum(READING_MODES),
     compactView: z.boolean(),
     emojiFirst: z.boolean(),
-    // Same rule as a node's emoji: no letters or digits, short.
+    // Same rule as a node's emoji: no letters or digits, short — or
+    // "symbol", for a type that keeps its own symbol instead of an emoji.
     typeEmoji: z.partialRecord(
       z.enum(NODE_TYPES),
-      z.string().max(32).refine((v) => !/[\p{L}\p{N}]/u.test(v), "an emoji has no letters or digits"),
+      z.union([
+        z.literal("symbol"),
+        z.string().max(32).refine((v) => !/[\p{L}\p{N}]/u.test(v), "an emoji has no letters or digits"),
+      ]),
     ),
   })
   .partial()

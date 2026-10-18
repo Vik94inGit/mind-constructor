@@ -43,11 +43,17 @@ export const DEFAULT_TYPE_EMOJI: Record<NodeType, string> = {
   unknown: "❓",
 };
 
-/** The viewer's own emoji for some of the types, over DEFAULT_TYPE_EMOJI. */
+/** A type's choice that keeps the type's own symbol face up instead of an emoji. */
+export const TYPE_SYMBOL = "symbol";
+
+/** The viewer's own emoji for some of the types (or TYPE_SYMBOL), over DEFAULT_TYPE_EMOJI. */
 export type TypeEmoji = Partial<Record<NodeType, string>>;
 
-export function typeEmojiFor(type: NodeType, custom: TypeEmoji): string {
-  return custom[type] || DEFAULT_TYPE_EMOJI[type];
+/** The type's emoji for this viewer — null when they chose the type's symbol instead. */
+export function typeEmojiFor(type: NodeType, custom: TypeEmoji): string | null {
+  const own = custom[type];
+  if (own === TYPE_SYMBOL) return null;
+  return own || DEFAULT_TYPE_EMOJI[type];
 }
 
 export function loadTypeEmoji(): TypeEmoji {
@@ -58,7 +64,8 @@ export function loadTypeEmoji(): TypeEmoji {
     const out: TypeEmoji = {};
     for (const type of Object.keys(DEFAULT_TYPE_EMOJI) as NodeType[]) {
       const v = parsed[type];
-      if (typeof v === "string" && v.trim() && isValidEmoji(v)) out[type] = v.trim();
+      if (v === TYPE_SYMBOL) out[type] = TYPE_SYMBOL;
+      else if (typeof v === "string" && v.trim() && isValidEmoji(v)) out[type] = v.trim();
     }
     return out;
   } catch {

@@ -54,6 +54,18 @@ describe("DisplayMenu emoji for each type", () => {
     expect(onTypeEmoji).toHaveBeenLastCalledWith("Solution", null);
   });
 
+  it("offers the type's own symbol among the choices", async () => {
+    const onTypeEmoji = vi.fn();
+    renderMenu({ emojiFirst: true, typeEmoji: { Fail: "symbol" }, onTypeEmoji });
+    const symbol = TRANSLATIONS.en.ui.emoji.typeSymbol;
+    // A type kept on its symbol says so.
+    await userEvent.click(screen.getByRole("button", { name: `${types.Fail}: ${symbol}` }));
+    expect(screen.getByRole("button", { name: symbol })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: `${types.Problem}: ❗` }));
+    await userEvent.click(screen.getByRole("button", { name: symbol }));
+    expect(onTypeEmoji).toHaveBeenCalledWith("Problem", "symbol");
+  });
+
   it("offers type emoji only while emoji first is on", () => {
     renderMenu({ emojiFirst: false, typeEmoji: {}, onTypeEmoji: vi.fn() });
     expect(screen.queryByTestId("type-emoji-picker")).not.toBeInTheDocument();
