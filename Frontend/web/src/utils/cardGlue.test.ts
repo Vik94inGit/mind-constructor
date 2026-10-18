@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearOfCards, connectedPieces, findSnap } from "./cardGlue";
+import { clearOfCards, connectedPieces, findSnap, spotBelow } from "./cardGlue";
 import type { CardBox } from "./cardGlue";
 
 const card = (id: string, x: number, y: number, w = 100, h = 40): CardBox => ({ id, x, y, w, h });
@@ -64,5 +64,17 @@ describe("connectedPieces", () => {
 
   it("doesn't count cards that only meet at a corner", () => {
     expect(connectedPieces("a", [card("a", 100, 100), card("b", 200, 140)], all, 2)).toEqual(["a"]);
+  });
+});
+
+describe("spotBelow", () => {
+  it("puts a new card just under its parent", () => {
+    expect(spotBelow(card("p", 100, 100), { w: 100, h: 40 }, [], 10)).toEqual({ x: 100, y: 150 });
+  });
+
+  it("moves it clear of a card already sitting there", () => {
+    const spot = spotBelow(card("p", 100, 100), { w: 100, h: 40 }, [card("c", 100, 150)], 10);
+    expect(spot).not.toEqual({ x: 100, y: 150 });
+    expect(Math.abs(spot.x - 100) >= 100 || Math.abs(spot.y - 150) >= 40).toBe(true);
   });
 });

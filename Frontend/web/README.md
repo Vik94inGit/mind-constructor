@@ -44,7 +44,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   card let go on top of others is moved just clear of them, and one dragged close to another (with
   Move on) glues flush against its side — two of your cards glued together get linked and then drag
   as one (`utils/cardGlue.ts`); drag from a card's side handle onto another of your cards to link
-  them. No quick-add ghosts ring a card. Each card's fill color can be changed in
+  them. No quick-add ghosts ring a card; instead your selected card has a + button on its bottom edge
+  that starts a branch just under it, clear of the cards around (`cardGlue.ts` `spotBelow`). Each card's fill color can be changed in
   its panel's Info tab (per browser). Each zone can also take its own view (cards, mixed, icons + text, the default look, or
   dots) from the ⋯ button beside its name, so one canvas can show different
   sides of the same map at once (per browser). The ⋯ buttons sit on a compact list, just left of the minimap, of the zones currently in view.

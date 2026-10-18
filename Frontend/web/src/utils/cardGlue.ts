@@ -109,6 +109,16 @@ export function clearOfCards(dragged: CardBox, others: CardBox[]): Pt {
 }
 
 /**
+ * Where a new card of `size` goes when it branches off `parent`: just under
+ * it with a `gap` between (not glued flush; the new card's own size is only a
+ * guess until it's drawn), moved clear of `others` like a dropped card.
+ */
+export function spotBelow(parent: CardBox, size: { w: number; h: number }, others: CardBox[], gap: number): Pt {
+  const below = { id: "", x: parent.x, y: parent.y + parent.h / 2 + gap + size.h / 2, ...size };
+  return clearOfCards(below, [parent, ...others]);
+}
+
+/**
  * Every card glued to `startId`, directly or through others — the whole
  * block it's part of, `startId` first. Two cards count as glued when they're
  * `linked` and sit flush, their boxes touching (within `tolerance` canvas

@@ -1024,7 +1024,7 @@ export function MapPage() {
   }
   // Cards: dragging a link out of a card's handle, gluing cards together and
   // keeping them from piling up — see hooks/usePuzzleConnect.ts.
-  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect, cardClearSpot } = usePuzzleConnect({
+  const { puzzleConnect, puzzleSnapFor, puzzleClusterFor, linkSnappedPieces, startPuzzleConnect, cardClearSpot, cardBranchSpot } = usePuzzleConnect({
     mapId,
     nodes,
     edges,
@@ -1702,6 +1702,17 @@ export function MapPage() {
     // Emoji first: the feeling was already picked (or skipped, "") on the
     // ring before the types. Otherwise it's offered around the new node.
     setPendingCreate({ x: placed.x, y: placed.y, type, parentId: parent.nodeId, prompt: text, emoji: emojiFirst ? (emoji ?? "") : undefined });
+  }
+
+  // A card has no quick-add ring (it would sit on top of the cards around
+  // it), so the selected card's own + button branches from it instead: the
+  // new node starts just under the card, and its type and feeling are picked
+  // as it's written, like the right-click menu's Create branch.
+  function addBranchFromCard(parent: NodeDoc) {
+    setActionError(null);
+    const pos = cardBranchSpot(parent) ?? placeNode(posFor(parent), [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
+    setInlineEditId(null);
+    setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: parent.nodeId });
   }
 
   // Draw first, write later: a type ghost dragged out of the selected node's
@@ -2450,6 +2461,18 @@ export function MapPage() {
                   onToggleBlockLock={isOwnNode(node) ? () => toggleBlockLock(node.nodeId) : undefined}
                   onConnectStart={
                     isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
+                  }
+                  onAddBranch={
+                    node.nodeId === selectedId &&
+                    isOwnNode(node) &&
+                    onCardBoard(node) &&
+                    !chooseMode &&
+                    !packMode &&
+                    !drawMode &&
+                    !pendingCreate &&
+                    !inlineEditId
+                      ? () => addBranchFromCard(node)
+                      : undefined
                   }
                   onHoverText={() => void ensureNodeText([node.nodeId])}
                 />
