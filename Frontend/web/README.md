@@ -24,9 +24,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   central thought; answer one guiding question at a time (Enter adds a thought, Enter on an empty
   line moves to the next question) while a live preview of the map grows beside it; check each
   thought's kind and what it hangs from; then name it, choose Personal or Discussion, and the
-  thoughts are built into a real map laid out in the same shape as the preview: each thought next
-  to the one it hangs from, every branch on its own side, placed by the zone rules so no castle
-  wall crosses another. The draft is kept in the browser until then. See
+  thoughts are built into a real map laid out in the same shape as the preview (both drawn from
+  `utils/shapeLayout.ts`): the thoughts on the center sit round a circle, a square or an
+  equilateral triangle, each deeper one a step out from the one it hangs from, and the zone rules
+  only nudge what would cover another node or cross a castle wall. The draft is kept in the browser until then. See
   `src/pages/ThinkPage.tsx` and `src/utils/thoughtFlow.ts`.
 - **Dashboard** (`/`) — maps you own or were invited to; create/rename/delete, invite members, see
   who's on a map and who owns it, copy a whole map's nodes to paste into another one.
@@ -68,7 +69,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
-- **Emoji first** — every node's icon is a two-sided card, an emoji face up and its type's symbol on
+- **Emoji first** — on by default for notes; a node that came from a template (it carries its
+  question, `Node.prompt`) keeps its type's symbol unless it has an emoji of its own. Every other
+  node's icon is a two-sided card, an emoji face up and its type's symbol on
   the back, turning over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the
   node's own (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or else its
   type's: ❗ Problem, ⚠️ Problematic option, 💡 Solution, 🔀 Option, ✅ Success, ❌ Fail, ❓ unknown,
@@ -134,7 +137,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   messages (`src/i18n/`), node type names included (the stored value stays English).
 - **Templates** — the node panel's Info tab offers a ready branch on a node with no children yet:
   a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
-  breakdown, and a failed (Fail) node gets "Analyze and try again". See `src/utils/templates.ts`.
+  breakdown, and a failed (Fail) node gets "Analyze and try again". A template's first level lands
+  on a shape round the node: three (or six) make an equilateral triangle, four a square, any other
+  number a circle, and each deeper level fans a step further out (`src/utils/shapeLayout.ts`,
+  `src/utils/templates.ts`).
 - **Map types** — creating a map asks for one of four kinds (Problem analysis, Decision, Goal planning,
   Retrospective), each seeded with a starter structure in your language, and for a mode (Discussion or
   Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn

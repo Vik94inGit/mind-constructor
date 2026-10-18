@@ -1,11 +1,14 @@
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
-import { ROOT_ID, branchAngles, orderParentsFirst } from "../utils/thoughtFlow";
+import { ROOT_ID, orderParentsFirst } from "../utils/thoughtFlow";
+import { shapeTree } from "../utils/shapeLayout";
 import type { Thought } from "../utils/thoughtFlow";
 import type { NodeType } from "../types";
 
 const W = 320;
 const H = 240;
-const RING = 62;
+// One step (node to child) at most this many pixels; less when the tree needs it to fit.
+const STEP = 62;
+const PAD = 16;
 
 interface Placed {
   id: string;
@@ -16,39 +19,31 @@ interface Placed {
   text: string;
 }
 
-// A radial tree: each branch gets a slice of the circle sized by how many
-// leaves it has (branchAngles), and every level sits one ring further out.
-// The real map is laid out from the same angles (layoutThoughts), so what's
-// built keeps this shape; only the distances differ, to fit the box.
+// The map's shape in miniature: the same geometry the real map is built from
+// (shapeTree — the first ring round a circle, a square or a triangle, each
+// deeper level a step further out), scaled evenly to fit the box, so what's
+// built looks like what's drawn here.
 function placeTree(center: string, rootType: NodeType, thoughts: Thought[]): Placed[] {
   const ordered = orderParentsFirst(thoughts);
-  const angles = branchAngles(thoughts);
+  const shape = shapeTree(ordered, ROOT_ID);
   const cx = W / 2;
   const cy = H / 2;
   const out: Placed[] = [{ id: ROOT_ID, parentId: null, x: cx, y: cy, type: rootType, text: center }];
-  const maxDepth = Math.max(1, ...ordered.map((t) => depthOf(t, ordered)));
-  // Squeeze the rings so the deepest level still fits inside the box.
-  const ring = Math.min(RING, (Math.min(W, H) / 2 - 16) / maxDepth);
+  // The farthest a node reaches from the center, either way, sets the scale.
+  let reachX = 0;
+  let reachY = 0;
+  for (const p of shape.values()) {
+    reachX = Math.max(reachX, Math.abs(p.x));
+    reachY = Math.max(reachY, Math.abs(p.y));
+  }
+  const scale = Math.min(STEP, (W / 2 - PAD) / Math.max(reachX, 1e-6), (H / 2 - PAD) / Math.max(reachY, 1e-6));
   const ids = new Set(ordered.map((t) => t.id));
   for (const t of ordered) {
     const parentId = ids.has(t.parentId) ? t.parentId : ROOT_ID;
-    const angle = angles.get(t.id) ?? 0;
-    const r = ring * depthOf(t, ordered);
-    // Ellipse instead of a circle: the box is wider than it's tall.
-    out.push({ id: t.id, parentId, x: cx + r * Math.cos(angle) * 1.25, y: cy + r * Math.sin(angle), type: t.type, text: t.text });
+    const p = shape.get(t.id) ?? { x: 0, y: -1 };
+    out.push({ id: t.id, parentId, x: cx + p.x * scale, y: cy + p.y * scale, type: t.type, text: t.text });
   }
   return out;
-}
-
-function depthOf(t: Thought, all: Thought[]): number {
-  const byId = new Map(all.map((x) => [x.id, x]));
-  let d = 1;
-  let cur = byId.get(t.parentId);
-  while (cur && d < 50) {
-    d++;
-    cur = byId.get(cur.parentId);
-  }
-  return d;
 }
 
 export function ThoughtPreview({

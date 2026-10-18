@@ -82,7 +82,7 @@ npm run build        # tsc -b && vite build
   `canvasLayout.ts`, `siege.ts` (opponent strategies and moves), `finish.ts` (mirrors the backend's
   `finishRule` so the Finish button can say why it waits; the server still decides), `nodeType.ts`
   (mirrors `allowedAttackTypes`), `seedMap.ts`/`templates.ts` (starter structures as ghosts, in the
-  user's language), `textSplit.ts`, `cardGlue.ts` (cards glue side to side and never
+  user's language), `shapeLayout.ts` (templates and the Think map laid out as a circle, square or triangle, shared with the preview), `textSplit.ts`, `cardGlue.ts` (cards glue side to side and never
   overlap), `emojiFace.ts` (emoji first, each type's emoji, a still emoji).
 - **`offline/`** — read cache of every GET plus an outbox of changes made offline, replayed in order
   once the server is back (temporary `local_…` ids swapped for real ones); `public/sw.js` caches the

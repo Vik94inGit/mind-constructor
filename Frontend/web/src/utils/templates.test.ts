@@ -1,20 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { layoutTemplate } from "./templates";
-import { CANVAS_H, CANVAS_W, getCirclePackSpacing, spiralPoint } from "./canvasLayout";
+import { CANVAS_H, CANVAS_W, getCirclePackSpacing } from "./canvasLayout";
+import { outlinePoints, shapeStep, shapeTree } from "./shapeLayout";
 import type { Obstacle } from "./canvasLayout";
 
 const EDGE = 120;
 
 describe("layoutTemplate", () => {
-  it("fans nodes around the root using the tighter circle-pack spacing, not the general spacing floor", () => {
+  it("lays the first level out on its shape round the root, a step out", () => {
     const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const placed = layoutTemplate("retry", root);
-    expect(placed.length).toBeGreaterThan(0);
-    // i+1, not i — spiralPoint(0, root) would be root's own position, and
-    // the root is the real, already-existing node the template grows from.
-    const expected = spiralPoint(1, root, getCirclePackSpacing());
-    expect(placed[0].x).toBeCloseTo(expected.x, 5);
-    expect(placed[0].y).toBeCloseTo(expected.y, 5);
+    const step = shapeStep(getCirclePackSpacing());
+    // "decision": a question and three options — four, so a square.
+    const placed = layoutTemplate("decision", root).filter((p) => p.parentKey === null);
+    const want = outlinePoints(4, "square");
+    const radius = Math.max(1, 4 / (4 * Math.SQRT2));
+    placed.forEach((p, i) => {
+      expect(p.x).toBeCloseTo(root.x + want[i].x * radius * step, 5);
+      expect(p.y).toBeCloseTo(root.y + want[i].y * radius * step, 5);
+    });
+  });
+
+  it("puts three children of one node at the corners of an equilateral triangle", () => {
+    const shape = shapeTree([{ id: "a", parentId: "r" }, { id: "b", parentId: "r" }, { id: "c", parentId: "r" }], "r");
+    const [a, b, c] = ["a", "b", "c"].map((id) => shape.get(id)!);
+    const d = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y);
+    expect(d(a, b)).toBeCloseTo(d(b, c), 6);
+    expect(d(b, c)).toBeCloseTo(d(c, a), 6);
   });
 
   it("keeps every placed node within the canvas edge margin", () => {
@@ -37,16 +48,15 @@ describe("layoutTemplate", () => {
     expect(subProblem1?.parentKey).toBeNull();
   });
 
-  it("steers a placed node clear of an obstacle already sitting where its raw spiral point would land", () => {
-    // Regression test: layoutTemplate used to place every node purely off
-    // spiralPoint, with zero awareness of anything already on the canvas —
-    // a second template (or just a crowded spot) grown near an existing
-    // node/zone could spiral straight on top of it. existingObstacles is
-    // what MapPage's own applyTemplate now feeds in (every visible node
-    // plus every zone backdrop).
+  it("steers a placed node clear of an obstacle already sitting where its shape would put it", () => {
+    // existingObstacles is what MapPage's applyTemplate feeds in (every
+    // visible node plus every zone backdrop), so a template grown near other
+    // nodes never lands on top of them.
     const root = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const rawFirst = spiralPoint(1, root, getCirclePackSpacing());
-    const obstacle: Obstacle = { x: rawFirst.x, y: rawFirst.y, minDist: 200 };
+    const step = shapeStep(getCirclePackSpacing());
+    // "retry" has two nodes: the first straight above the root.
+    const raw = { x: root.x, y: root.y - step };
+    const obstacle: Obstacle = { x: raw.x, y: raw.y, minDist: 200 };
     const placed = layoutTemplate("retry", root, [obstacle]);
     const dist = Math.hypot(placed[0].x - obstacle.x, placed[0].y - obstacle.y);
     expect(dist).toBeGreaterThanOrEqual(obstacle.minDist - 1);
