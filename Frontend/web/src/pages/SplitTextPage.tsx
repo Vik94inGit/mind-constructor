@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
 import { ApiRequestError } from "../api/client";
-import { NodeTypeIcon } from "../map/NodeTypeIcon";
+import { ViewerTypeFace } from "../map/TypeFace";
 import type { NodeType } from "../types";
 import { buildMapFromDraft, newThoughtId, suggestMapName } from "../utils/thoughtFlow";
 import {
@@ -159,7 +159,7 @@ export function SplitTextPage() {
 
           <section className="rounded-card border border-line bg-surface p-4 shadow-card">
             <div className="mb-3 flex flex-wrap items-center gap-2 text-[0.8rem] font-semibold text-ink-soft">
-              <NodeTypeIcon type={draft.rootType} size={16} />
+              <ViewerTypeFace type={draft.rootType} size={16} />
               {ts.mainNode} · {typeLabel(draft.rootType)}
             </div>
             <MessageText
