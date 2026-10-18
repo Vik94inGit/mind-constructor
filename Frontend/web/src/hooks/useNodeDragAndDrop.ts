@@ -1,4 +1,4 @@
-import { useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import type { Dispatch, MutableRefObject, PointerEvent as ReactPointerEvent, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
@@ -20,11 +20,21 @@ import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 import type { Snap } from "../utils/cardGlue";
+import { TRAIL_STEP, TRAIL_TICK_MS, shiftAt, stepToward, trailLag, trailOrder } from "../utils/followTrail";
 
 type Pt = { x: number; y: number };
 
 // How long after a long-press finger lifts its trailing click is still swallowed.
 const LONG_PRESS_CLICK_GRACE_MS = 400;
+// Holding a finger still this long on a node is a hold, not a tap.
+const LONG_PRESS_MS = 500;
+// How far a finger may wander before a press stops being a tap or a hold and
+// becomes a drag. Below it the node stays put, so grazing one while tapping
+// never moves it.
+const TOUCH_DRAG_SLOP = 10;
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 
 interface Params {
@@ -129,6 +139,10 @@ export function useNodeDragAndDrop({
   // so its now-stale writes never land on top of whatever drag superseded
   // it.
   const groupDragToken = useRef(0);
+  // The running group-drag trail (see utils/followTrail.ts): stops its timer
+  // and lets the drop it belongs to save at once.
+  const stopTrail = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopTrail.current?.(), []);
 
   // What dragging `dragged` to (x,y) would land it on, if anything — the
   // nearest other node within CIRCLE_DROP_RADIUS. Every restriction on
@@ -178,7 +192,7 @@ export function useNodeDragAndDrop({
   // selected the node on its own and threw the group away, so a second node
   // could never join. Some browsers send no click after a long press, so the
   // swallow only lasts until the finger could have lifted.
-  function toggleIntoGroup(node: NodeDoc) {
+  function toggleIntoGroup(node: NodeDoc, lifted = false) {
     setSelectedId(null);
     setMultiSelectIds((prev) => {
       const next = new Set(prev);
@@ -187,11 +201,21 @@ export function useNodeDragAndDrop({
       return next;
     });
     suppressNextClick.current = true;
-    window.addEventListener(
-      "pointerup",
-      () => setTimeout(() => (suppressNextClick.current = false), LONG_PRESS_CLICK_GRACE_MS),
-      { once: true },
-    );
+    const release = () => setTimeout(() => (suppressNextClick.current = false), LONG_PRESS_CLICK_GRACE_MS);
+    if (lifted) release();
+    else window.addEventListener("pointerup", release, { once: true });
+  }
+
+  // A finger held still on a node and lifted without moving: a puzzle card
+  // opens its menu (onHold), anything else joins or leaves the group
+  // selection. Done on the lift, not while the finger is still down, so
+  // holding a node a moment before dragging it still drags it instead of
+  // opening it.
+  function finishHold(node: NodeDoc, clientX: number, clientY: number) {
+    suppressNextClick.current = true;
+    setTimeout(() => (suppressNextClick.current = false), LONG_PRESS_CLICK_GRACE_MS);
+    if (onHold?.(node, clientX, clientY)) return;
+    toggleIntoGroup(node, true);
   }
 
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
@@ -229,8 +253,51 @@ export function useNodeDragAndDrop({
         x: Math.min(CANVAS_W - margin, Math.max(margin, x)),
         y: Math.min(CANVAS_H - margin, Math.max(margin, y)),
       });
-      const shifted = (dx: number, dy: number) =>
-        new Map(Array.from(startPositions, ([id, p]) => [id, { x: p.x + dx, y: p.y + dy }]));
+
+      // Follow the leader (utils/followTrail.ts): the node under the finger
+      // tracks it live; every other member walks the leader's path a few
+      // ticks behind the one in front of it, in small hops, and after the
+      // drop keeps hopping until it reaches its own spot.
+      stopTrail.current?.();
+      const leaderStartPos = startPositions.get(node.nodeId)!;
+      const followers = trailOrder(node.nodeId, startPositions);
+      const smooth = !prefersReducedMotion();
+      const lags = new Map(followers.map((id, i) => [id, smooth ? trailLag(i, followers.length) : 0]));
+      const maxLag = Math.max(0, ...lags.values());
+      let leaderShift: Pt = { x: 0, y: 0 };
+      const history: Pt[] = [leaderShift];
+      const shown = new Map(startPositions);
+      let finalTargets: Map<string, Pt> | null = null;
+      let settled: (() => void) | null = null;
+      const show = () => dispatch({ type: "groupStart", positions: new Map(shown) });
+      function tick() {
+        history.push(leaderShift);
+        if (history.length > maxLag + 2) history.shift();
+        let done = true;
+        for (const id of followers) {
+          const start = startPositions.get(id)!;
+          const lagged = shiftAt(history, lags.get(id)!);
+          // Caught up with the drop: head for its own landing spot, which the
+          // overlap nudge may have moved off the plain shape.
+          const goal =
+            finalTargets && lagged === leaderShift
+              ? finalTargets.get(id)!
+              : { x: start.x + lagged.x, y: start.y + lagged.y };
+          const at = smooth ? stepToward(shown.get(id)!, goal, TRAIL_STEP) : goal;
+          shown.set(id, at);
+          if (at.x !== goal.x || at.y !== goal.y || goal !== finalTargets?.get(id)) done = false;
+        }
+        show();
+        if (finalTargets && done) endTrail();
+      }
+      const timer = setInterval(tick, TRAIL_TICK_MS);
+      function endTrail() {
+        clearInterval(timer);
+        if (stopTrail.current === endTrail) stopTrail.current = null;
+        settled?.();
+        settled = null;
+      }
+      stopTrail.current = endTrail;
 
       function stop() {
         window.removeEventListener("pointermove", onGroupMove);
@@ -241,13 +308,16 @@ export function useNodeDragAndDrop({
       function onGroupMove(ev: PointerEvent) {
         const p = screenToCanvas(ev.clientX, ev.clientY);
         dragMoved.current = true;
-        dispatch({ type: "groupStart", positions: shifted(p.x - startPt.x, p.y - startPt.y) });
+        leaderShift = { x: p.x - startPt.x, y: p.y - startPt.y };
+        shown.set(node.nodeId, { x: leaderStartPos.x + leaderShift.x, y: leaderStartPos.y + leaderShift.y });
+        show();
       }
 
       // The browser took the touch back (a system gesture, an incoming call):
       // the group goes back where it was, nothing saved.
       function onGroupCancel() {
         stop();
+        endTrail();
         if (groupDragToken.current === token) dispatch({ type: "groupClear" });
       }
 
@@ -255,6 +325,7 @@ export function useNodeDragAndDrop({
         stop();
         suppressNextClick.current = true;
         if (!dragMoved.current) {
+          endTrail();
           dispatch({ type: "groupClear" });
           handleNodeClick(node, false);
           return;
@@ -290,8 +361,17 @@ export function useNodeDragAndDrop({
           targets.set(id, avoidOverlap(keepShape, [...externalObstacles, ...placedSoFar], FULL_CANVAS_BOUNDS));
         }
 
-        // Shown at once and kept until the saves land, so nothing flashes
-        // back to its old spot in between.
+        // The leader lands at once; the rest hop after it to their own spots,
+        // and all of them stay drawn there until the saves land, so nothing
+        // flashes back to its old spot in between.
+        shown.set(node.nodeId, leaderTarget);
+        show();
+        await new Promise<void>((resolve) => {
+          settled = resolve;
+          finalTargets = targets;
+          leaderShift = { x: leaderTarget.x - leaderStartPos.x, y: leaderTarget.y - leaderStartPos.y };
+          if (!followers.length) endTrail();
+        });
         dispatch({ type: "groupStart", positions: targets });
         await Promise.all(
           memberIds.map(async (id) => {
@@ -314,53 +394,43 @@ export function useNodeDragAndDrop({
       return;
     }
 
-    // Outside explicit move mode, a bare pointer-down on a single node never
-    // arms a reposition/reparent drag, on either input type — a plain
-    // click/tap falls straight through to NodeCard's own onClick, untouched.
-    // This does NOT apply to the multi-select group drag above, which stays
-    // reachable on touch regardless of moveMode (see its own doc comment) —
-    // dragging an existing selection around is a deliberate, already-
-    // disambiguated-by-multi-select gesture, unlike a bare single-node
-    // pointerdown, which reads as accidental relocation far too easily on
-    // any stray touch. node.locked still blocks dragging outright, on both
-    // input types — a chosen circle's own members hold their position for
-    // good (see the group-drag branch's own comment above); touch long-
-    // press-to-multiselect still works on one, since picking a locked node
-    // into some other selection doesn't move anything.
+    // A mouse only drags a single node in explicit move mode, so a click
+    // never relocates one by accident. A finger drags one whenever it really
+    // travels (past TOUCH_DRAG_SLOP): on a phone there is no other way to move
+    // a node, and a tap or a graze below that distance stays a tap. This does
+    // not apply to the group drag above, which works either way. A node held
+    // in place (node.locked, a locked block) never drags; a long press still
+    // works on one, since picking it into a selection doesn't move anything.
     // Puzzle pieces clicked together drag as one (see clusterFor below), so a
     // puzzle with any piece held in place is held as a whole.
-    const clusterIds = moveMode && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];
+    const touch = e.pointerType === "touch";
+    const canDrag = moveMode || touch;
+    const clusterIds = canDrag && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];
     const clusterHeld = clusterIds.some((id) => {
       const n = nodes.find((nn) => nn.nodeId === id);
       return !!n && held(n);
     });
-    if (!moveMode || held(node) || clusterHeld) {
-      if (e.pointerType !== "touch") return;
+    if (!canDrag || held(node) || clusterHeld) {
+      if (!touch) return;
       const touchStartX = e.clientX;
       const touchStartY = e.clientY;
-      const LONG_PRESS_MS = 500;
-      const LONG_PRESS_MOVE_TOLERANCE = 10;
-      let longPressTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => {
-        longPressTimer = undefined;
-        window.removeEventListener("pointermove", onIdleMove);
-        window.removeEventListener("pointerup", onIdleUp);
+      let heldLong = false;
+      let wandered = false;
+      const longPressTimer = setTimeout(() => {
+        heldLong = true;
         navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
-        if (onHold?.(node, touchStartX, touchStartY)) return;
-        toggleIntoGroup(node);
       }, LONG_PRESS_MS);
       function onIdleMove(ev: PointerEvent) {
-        if (longPressTimer && Math.hypot(ev.clientX - touchStartX, ev.clientY - touchStartY) > LONG_PRESS_MOVE_TOLERANCE) {
+        if (Math.hypot(ev.clientX - touchStartX, ev.clientY - touchStartY) > TOUCH_DRAG_SLOP) {
+          wandered = true;
           clearTimeout(longPressTimer);
-          longPressTimer = undefined;
         }
       }
       function onIdleUp() {
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          longPressTimer = undefined;
-        }
+        clearTimeout(longPressTimer);
         window.removeEventListener("pointermove", onIdleMove);
         window.removeEventListener("pointerup", onIdleUp);
+        if (heldLong && !wandered) finishHold(node, touchStartX, touchStartY);
       }
       window.addEventListener("pointermove", onIdleMove);
       window.addEventListener("pointerup", onIdleUp);
@@ -410,46 +480,52 @@ export function useNodeDragAndDrop({
       return new Map(Array.from(clusterStart!, ([id, pt]) => [id, { x: pt.x + cdx, y: pt.y + cdy }]));
     };
 
-    // Long-press to multi-select, touch only — there's no keyboard on a
-    // phone to reach shift+click's own toggle any other way, and
-    // marquee-drag is already claimed by native canvas panning on touch
-    // (see onCanvasPointerDown's own comment), so touch had no path into
-    // multi-select at all. Holding still for LONG_PRESS_MS toggles this
-    // node into/out of the multi-selection, same common "long-press to
-    // start picking" gesture photo/file picker apps already use; moving
-    // more than a few px (real drag, not a held finger's own jitter) or
-    // releasing early cancels it and falls through to the ordinary
-    // tap-to-select/drag paths below, untouched.
-    const LONG_PRESS_MS = 500;
-    const LONG_PRESS_MOVE_TOLERANCE = 10;
-    let longPressTimer: ReturnType<typeof setTimeout> | undefined;
-    // Reused below by onMove's own cancellation check — stays undefined
-    // (a no-op) for a mouse pointerdown, only ever assigned for touch.
-    let cancelLongPressIfMoved: ((ev: PointerEvent) => void) | undefined;
-    if (e.pointerType === "touch") {
-      const touchStartX = e.clientX;
-      const touchStartY = e.clientY;
-      longPressTimer = setTimeout(() => {
-        longPressTimer = undefined;
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-        dispatch({ type: "reset" });
-        navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
-        if (onHold?.(node, touchStartX, touchStartY)) return;
-        toggleIntoGroup(node);
-      }, LONG_PRESS_MS);
-      cancelLongPressIfMoved = (ev: PointerEvent) => {
-        if (longPressTimer && Math.hypot(ev.clientX - touchStartX, ev.clientY - touchStartY) > LONG_PRESS_MOVE_TOLERANCE) {
-          clearTimeout(longPressTimer);
-          longPressTimer = undefined;
-        }
-      };
+    // Long-press, touch only: there's no keyboard on a phone to reach
+    // shift+click or right-click, so a finger held still for LONG_PRESS_MS
+    // and lifted without moving opens a puzzle card's menu (onHold) or toggles
+    // the node into the multi-selection. The hold only counts on the lift: a
+    // finger that rests on a node a moment and then moves still drags it.
+    // Below TOUCH_DRAG_SLOP a finger's own jitter moves nothing, so a tap
+    // stays a tap.
+    let heldLong = false;
+    const longPressTimer = touch
+      ? setTimeout(() => {
+          heldLong = true;
+          navigator.vibrate?.(15); // subtle haptic confirmation; a silent no-op wherever unsupported
+        }, LONG_PRESS_MS)
+      : undefined;
+    const pressX = e.clientX;
+    const pressY = e.clientY;
+    const pointerId = e.pointerId;
+
+    function stop() {
+      clearTimeout(longPressTimer);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("pointerdown", onOtherDown);
+    }
+
+    // The browser took the touch back, or a second finger came down (a
+    // pinch to zoom): the node goes back where it was, nothing saved, and
+    // the lifted finger opens nothing.
+    function onCancel() {
+      stop();
+      dispatch({ type: "reset" });
+      suppressNextClick.current = true;
+      setTimeout(() => (suppressNextClick.current = false), LONG_PRESS_CLICK_GRACE_MS);
+    }
+    function onOtherDown(ev: PointerEvent) {
+      if (ev.pointerId !== pointerId) onCancel();
     }
 
     // The piece the dragged one is currently clicked into, if any.
     let snappedTo: string | null = null;
     function onMove(ev: PointerEvent) {
-      cancelLongPressIfMoved?.(ev);
+      if (!dragMoved.current) {
+        if (touch && Math.hypot(ev.clientX - pressX, ev.clientY - pressY) <= TOUCH_DRAG_SLOP) return;
+        clearTimeout(longPressTimer);
+      }
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
@@ -478,12 +554,7 @@ export function useNodeDragAndDrop({
     }
 
     async function onUp(ev: PointerEvent) {
-      if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = undefined;
-      }
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      stop();
       // See suppressNextClick's own comment — this interaction's outcome
       // (below) is the real one; the click still about to fire on this same
       // node is the captured-pointer artifact, not a second user action.
@@ -641,6 +712,8 @@ export function useNodeDragAndDrop({
             err instanceof ApiRequestError ? err.message : leftCircle ? t.ui.errors.leaveCircle : t.ui.errors.moveNodes,
           );
         }
+      } else if (heldLong) {
+        finishHold(node, pressX, pressY);
       } else {
         handleNodeClick(node);
       }
@@ -648,6 +721,8 @@ export function useNodeDragAndDrop({
 
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    if (touch) window.addEventListener("pointerdown", onOtherDown);
   }
 
   return {

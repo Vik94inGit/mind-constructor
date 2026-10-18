@@ -892,7 +892,7 @@ const en: UiStrings = {
     title: "How to use the map",
     touch: [
       "Tap a node to open it; tap a ring around it to add a thought.",
-      "Hold a node to pick it, hold more to pick a group, then drag the group.",
+      "Drag a node to move it. Hold and lift to pick it, pick more for a group, then drag the group.",
       "Hold a zone for its menu: copy its text, shape, delete, look.",
       "Pinch to zoom; the eye sets how much detail you see.",
     ],
@@ -1421,7 +1421,7 @@ const cs: UiStrings = {
     title: "Jak pracovat s mapou",
     touch: [
       "Klepnutím na uzel ho otevřete; klepnutím na kruh kolem něj přidáte myšlenku.",
-      "Podržením uzel vyberete, podržením dalších vyberete skupinu a pak ji přetáhnete.",
+      "Uzel přesunete tažením. Podržením a puštěním ho vyberete, dalšími vyberete skupinu a pak ji přetáhnete.",
       "Podržením zóny otevřete její menu: kopírovat text, tvar, smazat, vzhled.",
       "Sevřením prstů měníte přiblížení; oko určuje, kolik detailů vidíte.",
     ],
@@ -1949,7 +1949,7 @@ const uk: UiStrings = {
     title: "Як працювати з мапою",
     touch: [
       "Торкніться вузла, щоб відкрити його; торкніться кільця навколо, щоб додати думку.",
-      "Утримайте вузол, щоб вибрати його, утримайте ще кілька — це група, потім перетягніть її.",
+      "Перетягніть вузол, щоб пересунути його. Утримайте й відпустіть, щоб вибрати, виберіть ще кілька — це група, потім перетягніть її.",
       "Утримайте зону, щоб відкрити її меню: копіювати текст, форма, видалити, вигляд.",
       "Зведіть пальці, щоб масштабувати; око задає, скільки деталей видно.",
     ],
@@ -2480,7 +2480,7 @@ const ru: UiStrings = {
     title: "Как работать с картой",
     touch: [
       "Коснитесь узла, чтобы открыть его; коснитесь кольца вокруг, чтобы добавить мысль.",
-      "Удерживайте узел, чтобы выбрать его, удерживайте ещё несколько — это группа, затем перетащите её.",
+      "Перетащите узел, чтобы передвинуть его. Удержите и отпустите, чтобы выбрать, выберите ещё несколько — это группа, затем перетащите её.",
       "Удерживайте зону, чтобы открыть её меню: копировать текст, форма, удалить, вид.",
       "Сведите пальцы для масштаба; глаз задаёт, сколько деталей видно.",
     ],

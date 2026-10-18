@@ -97,8 +97,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node lands and the map is in view again.
 - **Moving nodes** — a dragged node (or group) lands where it was let go, nudged only so it doesn't
   cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes. On a
-  phone, holding a node adds it to a group selection and dragging one of them moves the whole group
-  under the finger (`hooks/useNodeDragAndDrop.ts`).
+  phone, a finger drags a node once it really travels (a tap or a small graze still opens it; with a
+  mouse a single node drags in Move mode), and holding a node still then lifting adds it to a group
+  selection or opens a card's menu, so holding a moment before dragging still drags. Dragging one
+  member of a group moves the group like a creature: the touched node follows the finger and the rest
+  walk its path behind it in small hops, one after another, catching up after the drop
+  (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
   layout and look.
