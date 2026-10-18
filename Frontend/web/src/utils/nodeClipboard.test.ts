@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildNodeClipboard, nodeClipboardSize, readNodeClipboard, writeNodeClipboard } from "./nodeClipboard";
+import { buildNodeClipboard, nodeClipboardSize, pastedExtras, readNodeClipboard, writeNodeClipboard } from "./nodeClipboard";
 import type { NodeClipboard } from "./nodeClipboard";
 import type { EdgeDoc, NodeDoc } from "../types";
 
@@ -65,6 +65,33 @@ describe("buildNodeClipboard", () => {
   it("prefers the backfilled text over the node's own (possibly still-empty) text", () => {
     const clip = buildNodeClipboard("m1", nodes, ["root"], { root: "the real text" }, []);
     expect(clip!.nodes[0].text).toBe("the real text");
+  });
+});
+
+describe("pictures, emoji and look", () => {
+  it("copies a node's pictures, emoji and card look along with its text", () => {
+    const node = makeNode({ nodeId: "a", emoji: "🔥", shape: "square", cardW: 200, iconImage: "/api/images/icon1234", cardImage: "/api/images/card1234" });
+    const clip = buildNodeClipboard("m1", [node], ["a"], {}, [], { a: ["/api/images/pic12345"] });
+    expect(clip!.nodes[0]).toMatchObject({
+      emoji: "🔥",
+      shape: "square",
+      cardW: 200,
+      images: ["/api/images/pic12345"],
+      iconImage: "/api/images/icon1234",
+      cardImage: "/api/images/card1234",
+    });
+  });
+
+  it("pastes them back as new pictures, dropping one that can't be read", async () => {
+    const extras = await pastedExtras(
+      { id: "a", text: "", type: "Idea", x: 0, y: 0, parentId: null, emoji: "🔥", images: ["/api/images/ok123456", "/api/images/gone1234"], iconImage: "/api/images/icon1234" },
+      async (ref) => (ref.includes("gone") ? null : `data:image/png;base64,${ref.slice(-4)}`),
+    );
+    expect(extras).toEqual({ emoji: "🔥", images: ["data:image/png;base64,3456"], iconImage: "data:image/png;base64,1234" });
+  });
+
+  it("adds nothing to a plain node", async () => {
+    expect(await pastedExtras({ id: "a", text: "x", type: "Idea", x: 0, y: 0, parentId: null }, async () => null)).toEqual({});
   });
 });
 

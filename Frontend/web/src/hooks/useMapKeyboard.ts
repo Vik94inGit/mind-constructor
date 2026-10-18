@@ -20,6 +20,8 @@ interface Params {
   pasteClipboard: () => void;
   /** A picture was pasted with no node of your own open to take it (an open node's panel takes it itself — see NodePanel). */
   onImagePasteWithoutNode?: () => void;
+  /** Delete (or Backspace) with nothing editable focused: delete the chosen node(s). */
+  deleteSelection?: () => void;
   /** ← / → (and ↑ / ↓) with nothing editable focused: read the previous / next node. */
   stepReading?: (dir: -1 | 1) => void;
 }
@@ -41,6 +43,7 @@ export function useMapKeyboard({
   copySelection,
   pasteClipboard,
   onImagePasteWithoutNode,
+  deleteSelection,
   stepReading,
 }: Params) {
   // Global Ctrl/Cmd+C / Ctrl/Cmd+V for the current node selection — ignored
@@ -128,6 +131,20 @@ export function useMapKeyboard({
         if (e.target instanceof HTMLElement && e.target.closest("select, [role=menu], [role=slider], input")) return;
         e.preventDefault();
         stepReading(arrowDir);
+        return;
+      }
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        deleteSelection &&
+        !drawMode &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        // A focused button or menu keeps the key (Backspace there must never delete a node).
+        if (e.target instanceof HTMLElement && e.target.closest("button, a, select, [role=menu], [role=slider]")) return;
+        e.preventDefault();
+        deleteSelection();
         return;
       }
       if (!(e.ctrlKey || e.metaKey)) return;

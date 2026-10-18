@@ -114,6 +114,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
   layout and look.
+- **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
+  node or group and Ctrl/Cmd+V pastes it, on this map or another, with its text, pictures, picture
+  icon and card, emoji, shape and card size (`utils/nodeClipboard.ts`, `hooks/useClipboardActions.ts`);
+  Delete or Backspace deletes the chosen node (undoable) or your nodes in the group
+  (`hooks/useMapKeyboard.ts`).
 - **Deleting** — a deleted node pops like a bubble where it stood, or goes off in a small boom when it
   was a Problem, Problematic option or Fail (`map/NodeBurst.tsx`). Questions such
   as "Delete 3 nodes?" use the app's own dialog (`context/ConfirmContext.tsx`), not the browser's.
