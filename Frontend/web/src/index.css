@@ -28,6 +28,7 @@
   --n-solution: #1f7a6c;
   --n-success: #3f7d53;
   --n-fail: #b23a48;
+  --n-idea: #c99a06;
   --n-unknown: #8a8f98;
 
   /* The one green/red pair every "which side is this on" signal shares —
@@ -106,6 +107,7 @@
     --n-solution: #3d7d72;
     --n-success: #5c8f68;
     --n-fail: #a15561;
+    --n-idea: #b08d2e;
     --n-unknown: #7d828c;
 
     --zone-positive: #4b9f63;
@@ -148,6 +150,7 @@
   --color-n-solution: var(--n-solution);
   --color-n-success: var(--n-success);
   --color-n-fail: var(--n-fail);
+  --color-n-idea: var(--n-idea);
   --color-n-unknown: var(--n-unknown);
 
   --color-zone-positive: var(--zone-positive);

@@ -32,6 +32,7 @@ export const OUTCOME_TYPES: readonly OutcomeType[] = [
   "Option",
   "Success",
   "Fail",
+  "Idea",
 ];
 
 // "ring" here is a classification (positive/halo vs negative/horns
@@ -112,6 +113,17 @@ function GoalSymbol({ color }: SymbolProps) {
   );
 }
 
+// Idea: a light bulb — a thought worth trying.
+function BulbSymbol({ color }: SymbolProps) {
+  return (
+    <g stroke={color} strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M190,163 C190,155 180,152 180,142 A20,20 0 0 1 220,142 C220,152 210,155 210,163 Z" />
+      <line x1="191" y1="170" x2="209" y2="170" />
+      <line x1="195" y1="176" x2="205" y2="176" />
+    </g>
+  );
+}
+
 const OUTCOME_CONFIG: Record<
   OutcomeType,
   {
@@ -125,6 +137,7 @@ const OUTCOME_CONFIG: Record<
   "Problematic option": { ring: "horns", Symbol: PlaySymbol },
   Solution: { ring: "halo", Symbol: GoalSymbol },
   Option: { ring: "halo", Symbol: PlaySymbol },
+  Idea: { ring: "halo", Symbol: BulbSymbol },
 };
 
 // Every symbol above is drawn within roughly this box (checked against

@@ -7,6 +7,7 @@ export const NODE_TYPES = [
   "Option",
   "Success",
   "Fail",
+  "Idea",
   "unknown",
 ] as const;
 

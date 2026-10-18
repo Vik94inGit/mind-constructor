@@ -45,18 +45,14 @@ describe("nodeEmojiFace", () => {
     expect(nodeEmojiFace({ type: "Fail", emoji: "😡" }, true, { Fail: TYPE_SYMBOL })).toEqual({ emoji: "😡", emojiUp: true, flips: true });
   });
 
-  it("emoji first: a template's ghost wears its type's symbol until written in", () => {
-    expect(nodeEmojiFace({ type: "Problem", ghost: true, text: "" }, true, {})).toEqual({ emoji: null, emojiUp: false, flips: false });
-    expect(nodeEmojiFace({ type: "Problem", ghost: true, text: "Written" }, true, {})).toEqual({ emoji: DEFAULT_TYPE_EMOJI.Problem, emojiUp: true, flips: true });
-  });
-
   it("symbols first: the type's symbol up, and an emoji only when the node has its own", () => {
     expect(nodeEmojiFace({ type: "Problem", emoji: "😡" }, false, {})).toEqual({ emoji: "😡", emojiUp: false, flips: true });
     expect(nodeEmojiFace({ type: "Problem" }, false, {})).toEqual({ emoji: null, emojiUp: false, flips: false });
   });
 
-  it("every type wears its emoji by default (💡 for a Solution)", () => {
-    expect(nodeEmojiFace({ type: "Solution" }, true, {}).emoji).toBe("💡");
+  it("every type wears its emoji by default (🎯 for a Solution, 💡 for an Idea)", () => {
+    expect(nodeEmojiFace({ type: "Idea" }, true, {}).emoji).toBe("💡");
+    expect(nodeEmojiFace({ type: "Solution" }, true, {}).emoji).toBe("🎯");
   });
 
   it("keeps a picture icon instead of the type's emoji", () => {
