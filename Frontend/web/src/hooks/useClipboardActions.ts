@@ -2,7 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
-import { buildNodeClipboard, readNodeClipboard, writeNodeClipboard } from "../utils/nodeClipboard";
+import { buildNodeClipboard, pastedExtras, readNodeClipboard, writeNodeClipboard } from "../utils/nodeClipboard";
+import { pictureDataUrl } from "../utils/images";
 import { stepPrefix, stepRank } from "../utils/textExport";
 import { avoidOverlap, nodeObstacles, pickNonOverlappingPosition } from "../utils/canvasLayout";
 import type { NodeGroup, Obstacle, ViewportBounds } from "../utils/canvasLayout";
@@ -85,8 +86,15 @@ export function useClipboardActions({
       const n = nodes.find((x) => x.nodeId === id);
       return !!n && !n.isWeapon && !n.isProtection;
     });
-    const textById = await ensureNodeText(wanted);
-    const clipboard = buildNodeClipboard(mapId, nodes, pickIds, textById, edges);
+    // The map's node list carries no pictures, so each copied node is fetched
+    // whole for its own; one that can't be read is copied without them.
+    const [textById, full] = await Promise.all([
+      ensureNodeText(wanted),
+      Promise.all(wanted.map((id) => nodesApi.getNode(id).catch(() => null))),
+    ]);
+    const imagesById: Record<string, string[]> = {};
+    for (const n of full) if (n?.images?.length) imagesById[n.nodeId] = n.images;
+    const clipboard = buildNodeClipboard(mapId, nodes, pickIds, textById, edges, imagesById);
     if (!clipboard) {
       showNotice(t.ui.clipboard.nothingToCopy);
       return;
@@ -258,6 +266,13 @@ export function useClipboardActions({
           }),
         );
         ready.forEach((n, i) => newIdBySource.set(n.id, batch[i].nodeId));
+        // Then each one's emoji, look and pictures, which creating a node doesn't take.
+        await Promise.all(
+          ready.map(async (n, i) => {
+            const extras = await pastedExtras(n, pictureDataUrl);
+            if (Object.keys(extras).length) batch[i] = await nodesApi.updateNode(batch[i].nodeId, extras);
+          }),
+        );
         batch.forEach((n) => {
           upsertNode(n);
           setCelebrateIds((prev) => new Set(prev).add(n.nodeId));

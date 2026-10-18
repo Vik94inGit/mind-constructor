@@ -7,6 +7,8 @@ import type { Translation } from "../i18n/translations";
 
 vi.mock("../api/nodes", () => ({
   createNode: vi.fn(),
+  getNode: vi.fn(async (nodeId: string) => ({ nodeId })),
+  updateNode: vi.fn(),
 }));
 vi.mock("../api/edges", () => ({
   createEdge: vi.fn(),

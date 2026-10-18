@@ -1,11 +1,11 @@
 import { computeBasePositions } from "./nodePositions";
 import { nodeRefId } from "./nodeType";
-import type { EdgeDoc, EdgeSentiment, NodeDoc, NodeType, SizeTier, SymbolOverride, ManualZoneColor } from "../types";
+import type { CardShape, EdgeDoc, EdgeSentiment, NodeDoc, NodeShape, NodeType, SizeTier, SymbolOverride, ManualZoneColor } from "../types";
 
 // The app's own copy/paste of nodes — what "Copy" in the selection menu, the
 // "+" menu's "Copy whole map", the dashboard's "Copy map" and Ctrl/Cmd+C all
 // write, and what "Paste", "Paste here" and Ctrl/Cmd+V read. A snapshot, not
-// a live link: text, look and layout of each node, which of the copied nodes
+// a live link: text, pictures, emoji, look and layout of each node, which of the copied nodes
 // is whose branch child (`parentId`), and the connections among them (`edges`).
 // Health, attacks, protection and packing don't carry over, and neither does
 // anything pointing at a node that wasn't copied.
@@ -27,6 +27,17 @@ export interface ClipboardNode {
   symbolOverride?: SymbolOverride | null;
   sizeTier?: SizeTier | null;
   manualZone?: ManualZoneColor | null;
+  emoji?: string;
+  emojiStill?: boolean;
+  shape?: NodeShape | null;
+  cardW?: number | null;
+  cardH?: number | null;
+  cardFont?: number | null;
+  cardShape?: CardShape | null;
+  /** Addresses of the node's pictures (NodeDoc.images); the paste fetches them and sends them as new pictures, since a node can't point at another node's stored picture. */
+  images?: string[];
+  iconImage?: string;
+  cardImage?: string;
 }
 
 export interface ClipboardEdge {
@@ -76,7 +87,8 @@ export function writeNodeClipboard(clipboard: NodeClipboard): boolean {
 // one map's nodes and edges. `allNodes` is the whole map even when only some are
 // picked — a node without a stored x/y is laid out by rule (computeBasePositions)
 // relative to the rest, so its position needs the whole set. `textById` supplies
-// each picked node's real text (the map list doesn't carry it). Weapon and
+// each picked node's real text (the map list doesn't carry it), and
+// `imagesById` its pictures (nor does it carry those). Weapon and
 // protection nodes are left out: they only mean something next to the node they
 // were aimed at.
 export function buildNodeClipboard(
@@ -85,6 +97,7 @@ export function buildNodeClipboard(
   pickIds: string[] | null,
   textById: Record<string, string>,
   edges: EdgeDoc[],
+  imagesById: Record<string, string[]> = {},
 ): NodeClipboard | null {
   const positions = computeBasePositions(allNodes);
   const wanted = pickIds ? new Set(pickIds) : null;
@@ -109,6 +122,15 @@ export function buildNodeClipboard(
       symbolOverride: n.symbolOverride ?? null,
       sizeTier: n.sizeTier ?? null,
       manualZone: n.manualZone ?? null,
+      ...(n.emoji ? { emoji: n.emoji, emojiStill: !!n.emojiStill } : {}),
+      ...(n.shape ? { shape: n.shape } : {}),
+      ...(n.cardW != null ? { cardW: n.cardW } : {}),
+      ...(n.cardH != null ? { cardH: n.cardH } : {}),
+      ...(n.cardFont != null ? { cardFont: n.cardFont } : {}),
+      ...(n.cardShape ? { cardShape: n.cardShape } : {}),
+      ...(imagesById[n.nodeId]?.length ? { images: imagesById[n.nodeId] } : {}),
+      ...(n.iconImage ? { iconImage: n.iconImage } : {}),
+      ...(n.cardImage ? { cardImage: n.cardImage } : {}),
     };
   });
 
@@ -119,4 +141,32 @@ export function buildNodeClipboard(
     if (from && to && inSet.has(from) && inSet.has(to)) clipEdges.push({ from, to, sentiment: e.sentiment });
   }
   return { sourceMapId, nodes, edges: clipEdges };
+}
+
+/**
+ * What a pasted node gets after it is made: its emoji, look and pictures, the
+ * pictures turned into data URLs by `toDataUrl` (null drops one that can't be
+ * read any more). Empty when there is nothing to add.
+ */
+export async function pastedExtras(n: ClipboardNode, toDataUrl: (ref: string) => Promise<string | null>): Promise<Partial<NodeDoc>> {
+  const out: Partial<NodeDoc> = {};
+  if (n.emoji) {
+    out.emoji = n.emoji;
+    if (n.emojiStill) out.emojiStill = true;
+  }
+  if (n.shape) out.shape = n.shape;
+  if (n.cardW != null) out.cardW = n.cardW;
+  if (n.cardH != null) out.cardH = n.cardH;
+  if (n.cardFont != null) out.cardFont = n.cardFont;
+  if (n.cardShape) out.cardShape = n.cardShape;
+  const [images, iconImage, cardImage] = await Promise.all([
+    Promise.all((n.images ?? []).map(toDataUrl)),
+    n.iconImage ? toDataUrl(n.iconImage) : null,
+    n.cardImage ? toDataUrl(n.cardImage) : null,
+  ]);
+  const kept = images.filter((x): x is string => !!x);
+  if (kept.length) out.images = kept;
+  if (iconImage) out.iconImage = iconImage;
+  if (cardImage) out.cardImage = cardImage;
+  return out;
 }

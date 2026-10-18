@@ -16,6 +16,28 @@ export function imageSrc(ref: string): string {
   return ref.startsWith("/api/") ? API_URL + ref : ref;
 }
 
+/**
+ * A picture as a data URL, so it can be sent to another node as its own
+ * picture (a stored address only works on the node it belongs to). null when
+ * it can't be read.
+ */
+export async function pictureDataUrl(ref: string): Promise<string | null> {
+  if (ref.startsWith("data:")) return ref;
+  try {
+    const res = await fetch(imageSrc(ref), { credentials: "include" });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 // Loads a picture to draw it onto a canvas. A stored picture may come from the
 // backend's own domain (a local dev setup), so it's fetched with CORS and the
 // session cookie, which keeps the canvas readable.

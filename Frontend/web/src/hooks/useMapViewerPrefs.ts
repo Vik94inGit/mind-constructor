@@ -46,14 +46,14 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     saveCompactView(next);
     savePreferences({ compactView: next });
   }
-  // Emoji first (on by default) or symbols first, and the viewer's own emoji
+  // Symbols first (the default) or emoji first, and the viewer's own emoji
   // for each type — see utils/emojiFace.ts.
   const [emojiFirst, setEmojiFirstState] = useState<boolean>(loadEmojiFirst);
   function toggleEmojiFirst() {
     const next = !emojiFirst;
     setEmojiFirstState(next);
     saveEmojiFirst(next);
-    savePreferences({ emojiFirst: next });
+    savePreferences({ emojiUp: next });
   }
   const [typeEmoji, setTypeEmojiState] = useState<TypeEmoji>(loadTypeEmoji);
   function setTypeEmoji(type: NodeType, emoji: string | null) {
@@ -68,9 +68,9 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   useEffect(() => {
     if (preferences?.readingMode) setReadingModeState(preferences.readingMode);
     if (preferences?.compactView !== undefined) setCompactViewState(preferences.compactView);
-    if (preferences?.emojiFirst !== undefined) setEmojiFirstState(preferences.emojiFirst);
+    if (preferences?.emojiUp !== undefined) setEmojiFirstState(preferences.emojiUp);
     if (preferences?.typeEmoji) setTypeEmojiState(preferences.typeEmoji);
-  }, [preferences?.readingMode, preferences?.compactView, preferences?.emojiFirst, preferences?.typeEmoji]);
+  }, [preferences?.readingMode, preferences?.compactView, preferences?.emojiUp, preferences?.typeEmoji]);
 
   // Nodes shown in their own reading mode instead of the map's (a chosen group
   // as puzzle cards, say) — per map, see utils/nodeDisplay.ts.

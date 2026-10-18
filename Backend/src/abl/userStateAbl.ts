@@ -33,6 +33,8 @@ const preferencesSchema = z
     language: z.enum(LANGUAGES),
     readingMode: z.enum(READING_MODES),
     compactView: z.boolean(),
+    emojiUp: z.boolean(),
+    // Still accepted from clients that predate emojiUp; nothing reads it.
     emojiFirst: z.boolean(),
     // Same rule as a node's emoji: no letters or digits, short — or
     // "symbol", for a type that keeps its own symbol instead of an emoji.

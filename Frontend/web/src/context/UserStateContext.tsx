@@ -70,7 +70,7 @@ export function UserStateProvider({ children }: { children: ReactNode }) {
         if (saved.language) setLanguage(saved.language);
         if (saved.readingMode) saveReadingMode(saved.readingMode);
         if (saved.compactView !== undefined) saveCompactView(saved.compactView);
-        if (saved.emojiFirst !== undefined) saveEmojiFirst(saved.emojiFirst);
+        if (saved.emojiUp !== undefined) saveEmojiFirst(saved.emojiUp);
         if (saved.typeEmoji) saveTypeEmoji(saved.typeEmoji);
         // …and whatever it doesn't have yet comes from this device.
         const local: Preferences = {
@@ -78,7 +78,7 @@ export function UserStateProvider({ children }: { children: ReactNode }) {
           language: saved.language ?? language,
           readingMode: saved.readingMode ?? loadReadingMode(),
           compactView: saved.compactView ?? loadCompactView(),
-          emojiFirst: saved.emojiFirst ?? loadEmojiFirst(),
+          emojiUp: saved.emojiUp ?? loadEmojiFirst(),
           typeEmoji: saved.typeEmoji ?? loadTypeEmoji(),
         };
         setPreferences(local);

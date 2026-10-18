@@ -74,13 +74,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
 - **Type symbols and emoji** — on the canvas every type shows its own symbol by default: pause bars
   for a Problem, play for a Problematic option and an Option, target rings for a Solution, ✓ Success,
-  ✗ Fail, a bulb for an Idea and ? for unknown (`map/OutcomeBadge.tsx`). With *Emoji first* on (the
-  default) a node with an emoji shows it face up, its type's symbol on the back of a two-sided card
+  ✗ Fail, a bulb for an Idea and ? for unknown (`map/OutcomeBadge.tsx`). Symbols first is the default: the
+  type's symbol is face up and a node's own emoji sits on the back. With *Emoji first* turned on in
+  the display menu (`Preferences.emojiUp`) a node with an emoji shows it face up, its type's symbol on the back of a two-sided card
   that turns over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the node's own
   (Modify tab, `map/nodePanel/EmojiPicker.tsx`, or the emoji ghost ring below), or one the viewer
   picked for its type under *Emoji for each type* in the display menu, where the symbol comes first
-  and each type's usual emoji (❗ ⚠️ 🎯 🔀 ✅ ❌ 💡 ❓) leads the emoji. Turning *Emoji first* off goes
-  back to symbols first: the type's symbol up, and an emoji only on nodes that have their own. A
+  and each type's usual emoji (❗ ⚠️ 🎯 🔀 ✅ ❌ 💡 ❓) leads the emoji. A
   node's owner can tick *Keep this emoji still* so its own emoji stays up and never turns
   (`Node.emojiStill`). A picture icon stays the face of its node. Choosing a zone (its parent, or
   holding it still) turns its cards over one after another, parent first, then the children by
@@ -114,6 +114,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
   layout and look.
+- **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
+  node or group and Ctrl/Cmd+V pastes it, on this map or another, with its text, pictures, picture
+  icon and card, emoji, shape and card size (`utils/nodeClipboard.ts`, `hooks/useClipboardActions.ts`);
+  Delete or Backspace deletes the chosen node (undoable) or your nodes in the group
+  (`hooks/useMapKeyboard.ts`).
 - **Deleting** — a deleted node pops like a bubble where it stood, or goes off in a small boom when it
   was a Problem, Problematic option or Fail (`map/NodeBurst.tsx`). Questions such
   as "Delete 3 nodes?" use the app's own dialog (`context/ConfirmContext.tsx`), not the browser's.

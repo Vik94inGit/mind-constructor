@@ -55,6 +55,29 @@ describe("useMapKeyboard", () => {
     expect(p.pasteClipboard).toHaveBeenCalledTimes(1);
   });
 
+  it("deletes the chosen nodes with Delete or Backspace, but not from a focused button or field", () => {
+    const deleteSelection = vi.fn();
+    setup({ deleteSelection });
+    press("Delete");
+    press("Backspace");
+    expect(deleteSelection).toHaveBeenCalledTimes(2);
+    const button = document.createElement("button");
+    const input = document.createElement("input");
+    document.body.append(button, input);
+    press("Backspace", {}, button);
+    press("Delete", {}, input);
+    expect(deleteSelection).toHaveBeenCalledTimes(2);
+    button.remove();
+    input.remove();
+  });
+
+  it("never deletes while drawing a line", () => {
+    const deleteSelection = vi.fn();
+    setup({ deleteSelection, drawMode: true });
+    press("Delete");
+    expect(deleteSelection).not.toHaveBeenCalled();
+  });
+
   it("still pastes nodes when a browser fires no paste event", () => {
     vi.useFakeTimers();
     const p = setup();

@@ -4,12 +4,13 @@ import { loadEmojiFirst, loadTypeEmoji, nodeEmojiFace, saveEmojiFirst, saveTypeE
 describe("emoji first", () => {
   beforeEach(() => localStorage.clear());
 
-  it("is on until the viewer turns it off", () => {
-    expect(loadEmojiFirst()).toBe(true);
-    saveEmojiFirst(false);
+  it("is off until the viewer turns it on, whatever the old setting said", () => {
+    localStorage.setItem("mc_emoji_first", "1");
     expect(loadEmojiFirst()).toBe(false);
     saveEmojiFirst(true);
     expect(loadEmojiFirst()).toBe(true);
+    saveEmojiFirst(false);
+    expect(loadEmojiFirst()).toBe(false);
   });
 });
 

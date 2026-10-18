@@ -1910,6 +1910,15 @@ export function MapPage() {
     copySelection,
     pasteClipboard,
     onImagePasteWithoutNode: () => showNotice(t.ui.images.selectNode),
+    // Your own chosen nodes; a single node goes the way its panel's Delete does (undoable).
+    deleteSelection: () => {
+      if (multiSelectIds.size > 0) {
+        const own = nodes.filter((n) => multiSelectIds.has(n.nodeId) && isOwnNode(n)).map((n) => n.nodeId);
+        if (own.length > 0) void deleteSelection(own);
+        return;
+      }
+      if (selectedNode && isOwnNode(selectedNode)) void handleDeleteNode(selectedNode);
+    },
     stepReading: (dir) => stepReading(dir, false),
   });
 
