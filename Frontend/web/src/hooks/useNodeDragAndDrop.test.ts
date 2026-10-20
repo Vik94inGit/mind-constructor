@@ -177,6 +177,38 @@ describe("useNodeDragAndDrop", () => {
       expect(result.current.dropTarget).toBeNull();
     });
 
+    it("pulls the dragged parent's own far children in after it, and leaves others' alone", async () => {
+      const nodes = [
+        makeNode({ nodeId: "p", x: 300, y: 800 }),
+        makeNode({ nodeId: "mine", x: 400, y: 700, parentId: "p" }),
+        makeNode({ nodeId: "theirs", x: 400, y: 900, parentId: "p" }),
+      ];
+      const positions = new Map<string, Pt>(nodes.map((n) => [n.nodeId, { x: n.x!, y: n.y! }]));
+      const listeners = captureWindowListeners();
+      const recordMove = vi.fn();
+      const { result, isOwnNode } = setup({ nodes, positions, posFor: (n) => positions.get(n.nodeId)!, recordMove });
+      isOwnNode.mockImplementation((n: NodeDoc) => n.nodeId !== "theirs");
+      vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, updates) => ({
+        ...nodes.find((n) => n.nodeId === nodeId)!,
+        ...updates,
+      }));
+
+      act(() => result.current.onNodePointerDown(nodes[0], fakePointerDownEvent({ clientX: 300, clientY: 800 })));
+      act(() => listeners.pointermove({ clientX: 1900, clientY: 800 }));
+      await act(async () => {
+        listeners.pointerup({ clientX: 1900, clientY: 800 });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("p", { x: 1900, y: 800 });
+      const pulled = vi.mocked(nodesApi.updateNode).mock.calls.find(([id]) => id === "mine")?.[1];
+      expect(pulled).toBeDefined();
+      expect(Math.hypot(pulled!.x! - 1900, pulled!.y! - 800)).toBeLessThan(500);
+      expect(nodesApi.updateNode).not.toHaveBeenCalledWith("theirs", expect.anything());
+      // One undo step puts the parent and the pulled child back together.
+      expect(recordMove).toHaveBeenCalledWith([nodes[0], nodes[1]]);
+    });
+
     it("joins the target's circle when dropped anywhere on its card, landing in free mode", async () => {
       const dragged = makeNode({ nodeId: "a", x: 0, y: 0 });
       const target = makeNode({ nodeId: "b", x: 500, y: 500 });
