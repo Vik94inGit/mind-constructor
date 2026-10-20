@@ -6,7 +6,11 @@ import * as mapsApi from "../api/maps";
 import * as offline from "./sync";
 import { kvResetForTests } from "./store";
 
-type Handler = (method: string, path: string, body: any) => { status: number; body?: unknown } | "offline";
+type Handler = (
+  method: string,
+  path: string,
+  body: any,
+) => { status: number; body?: unknown } | "offline" | { gateway: number };
 
 let handler: Handler;
 const calls: { method: string; path: string; body: any }[] = [];
@@ -30,6 +34,7 @@ beforeEach(() => {
       calls.push({ method, path, body });
       const res = handler(method, path, body);
       if (res === "offline") throw new TypeError("Failed to fetch");
+      if ("gateway" in res) return new Response("An error occurred with your deployment", { status: res.gateway });
       return json(res.status, res.body ?? {});
     }),
   );
@@ -193,5 +198,41 @@ describe("changing things while offline", () => {
     calls.length = 0;
     await offline.flush();
     expect(calls.map((c) => c.path)).toEqual(["/api/", "/api/nodes/real-map"]);
+  });
+
+  it("creates a map while the server is down behind its gateway, and sends it once it's back", async () => {
+    handler = () => ({ gateway: 502 });
+    const map = await mapsApi.createMap({ name: "Trip", ownerColor: "#000" });
+    expect(offline.isLocalId(map.mapId)).toBe(true);
+    expect((await mapsApi.getMap(map.mapId)).name).toBe("Trip");
+    await nodesApi.createNode(map.mapId, { text: "", type: "Problem" });
+    expect(offline.pendingCount()).toBe(2);
+
+    handler = (method, path) => {
+      if (path === "/api/") return { status: 201, body: { mapId: "real-map" } };
+      return { status: 201, body: { nodeId: "real-root" } };
+    };
+    calls.length = 0;
+    await offline.flush();
+    expect(calls.map((c) => c.path)).toEqual(["/api/", "/api/nodes/real-map"]);
+    expect(offline.pendingCount()).toBe(0);
+  });
+
+  it("still reports the server's own errors, even a 503", async () => {
+    handler = () => ({ status: 503, body: { error: "Database unavailable" } });
+    await expect(mapsApi.createMap({ name: "Trip", ownerColor: "#000" })).rejects.toMatchObject({
+      status: 503,
+      message: "Database unavailable",
+    });
+    expect(offline.pendingCount()).toBe(0);
+  });
+});
+
+describe("reading while the server is down behind its gateway", () => {
+  it("answers from the kept copy", async () => {
+    handler = () => ({ status: 200, body: [{ nodeId: "n1", type: "Problem" }] });
+    await nodesApi.listNodes("m1");
+    handler = () => ({ gateway: 504 });
+    expect(await nodesApi.listNodes("m1")).toEqual([{ nodeId: "n1", type: "Problem" }]);
   });
 });

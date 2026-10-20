@@ -145,7 +145,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   IndexedDB). You can keep working: creating, editing, moving and deleting nodes, links and lines,
   creating/renaming/deleting maps and folders. Each change answers right away and waits in an
   outbox; when the server is reachable again they're sent in order, and anything made offline gets
-  its real id swapped in for the temporary `local_…` one in every later request. A pill at the
+  its real id swapped in for the temporary `local_…` one in every later request. A server that
+  can't be reached counts as offline too: a bare 502/503/504 page from the proxy in front of it
+  (Vercel's rewrite, Render while it's down or waking up) is treated like no connection. A pill at the
   bottom shows offline / waiting / syncing, and which changes the server refused (e.g. a node
   someone else deleted meanwhile — the server's state wins). Attacks, shields, packing, hiding a
   branch, choosing a circle and inviting need a connection, since only the server can decide them.
