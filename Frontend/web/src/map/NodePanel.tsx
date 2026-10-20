@@ -87,6 +87,9 @@ type Tab = "info" | "links" | "attack" | "protect" | "pack" | "history";
 
 const closeBtn =
   "inline-flex flex-shrink-0 cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.5rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50";
+// The previous/next node arrows in the sheet's bottom row: big round targets.
+const stepBtn =
+  "inline-flex h-[2.75rem] w-[2.75rem] flex-shrink-0 cursor-pointer items-center justify-center rounded-full border border-line bg-surface-2 text-[1.5rem] leading-none font-semibold text-ink shadow-sm transition-[background-color,border-color] duration-[120ms] hover:border-ink-soft active:bg-line";
 const tabBtn = (active: boolean) =>
   `inline-flex cursor-pointer items-center justify-center gap-[0.3rem] rounded-lg border px-[0.6rem] py-[0.3rem] text-[0.76rem] font-semibold transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 ${
     active
@@ -939,16 +942,6 @@ export function NodePanel({
             </div>
           )}
         </div>
-        {onStepNode && (
-          <>
-            <button className={closeBtn} title={t.ui.node.prevNode} aria-label={t.ui.node.prevNode} onClick={() => onStepNode(-1, false)}>
-              ←
-            </button>
-            <button className={closeBtn} title={t.ui.node.nextNode} aria-label={t.ui.node.nextNode} onClick={() => onStepNode(1, false)}>
-              →
-            </button>
-          </>
-        )}
         <button className={closeBtn} onClick={onClose}>
           ✕
         </button>
@@ -1080,15 +1073,30 @@ export function NodePanel({
 
       {tab === "history" && <HistoryTab history={history} />}
       </div>
-      {/* Resize handle, pinned to the sheet's bottom edge: drag it down to
-          give the panel (and the text box in it) more room, up for less (see
-          panelHeight/onResizeHandlePointerDown). */}
-      <div
-        className="flex h-[1.1rem] flex-shrink-0 touch-none cursor-ns-resize items-center justify-center select-none"
-        onPointerDown={onResizeHandlePointerDown}
-        title={t.ui.panelResizeHandle}
-      >
-        <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
+      {/* Bottom row, pinned to the sheet's bottom edge: the big previous/next
+          arrows at either end, where a thumb reaches them right next to the
+          canvas, and the resize handle between them: drag it down to give
+          the panel (and the text box in it) more room, up for less (see
+          panelHeight/onResizeHandlePointerDown). The handle is its own
+          element so pressing an arrow never starts a resize. */}
+      <div className="flex flex-shrink-0 items-center gap-2 px-3 pb-2">
+        {onStepNode && (
+          <button className={stepBtn} title={t.ui.node.prevNode} aria-label={t.ui.node.prevNode} onClick={() => onStepNode(-1, false)}>
+            ←
+          </button>
+        )}
+        <div
+          className="flex h-[2.75rem] flex-1 touch-none cursor-ns-resize items-center justify-center select-none"
+          onPointerDown={onResizeHandlePointerDown}
+          title={t.ui.panelResizeHandle}
+        >
+          <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
+        </div>
+        {onStepNode && (
+          <button className={stepBtn} title={t.ui.node.nextNode} aria-label={t.ui.node.nextNode} onClick={() => onStepNode(1, false)}>
+            →
+          </button>
+        )}
       </div>
     </div>
   );

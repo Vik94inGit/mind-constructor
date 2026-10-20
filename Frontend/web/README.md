@@ -94,6 +94,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   below it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
   node (any way) opens `map/NewNodePanel.tsx` with its text field focused — with the feelings offered
   as a ring around the new node, optional — and editing opens the node's panel on its text.
+  Big round ← / → arrows at either end of the sheet's bottom edge step to the previous or next
+  node, with the resize handle between them.
 - **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
