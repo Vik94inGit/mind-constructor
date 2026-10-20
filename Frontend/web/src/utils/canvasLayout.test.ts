@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   avoidOverlap,
+  dropTargetDistance,
   footprintObstacles,
   freeFootprintScale,
   NODE_FOOTPRINT,
@@ -371,5 +372,21 @@ describe("computeNodeGroups — sticky corners", () => {
   it("re-orders when keeping the old order would cross itself", () => {
     expect(selfIntersects([{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 0 }, { x: 0, y: 100 }])).toBe(true);
     expect(selfIntersects([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }])).toBe(false);
+  });
+});
+
+describe("dropTargetDistance", () => {
+  it("hits anywhere on the card plus a small margin, and misses past it", () => {
+    const t = { x: 500, y: 500 };
+    expect(dropTargetDistance({ x: 500, y: 500 }, t)).toBe(0);
+    expect(dropTargetDistance({ x: 500 + NODE_FOOTPRINT.w / 2 + 10, y: 500 }, t)).not.toBeNull();
+    expect(dropTargetDistance({ x: 500 + NODE_FOOTPRINT.w / 2 + 30, y: 500 }, t)).toBeNull();
+    expect(dropTargetDistance({ x: 500, y: 500 + NODE_FOOTPRINT.h / 2 + 30 }, t)).toBeNull();
+  });
+
+  it("grows with the card when zoomed out", () => {
+    const p = { x: 500 + NODE_FOOTPRINT.w, y: 500 };
+    expect(dropTargetDistance(p, { x: 500, y: 500 })).toBeNull();
+    expect(dropTargetDistance(p, { x: 500, y: 500 }, 2)).not.toBeNull();
   });
 });

@@ -7,7 +7,7 @@ import {
   footprintObstacles,
   CANVAS_H,
   CANVAS_W,
-  CIRCLE_DROP_RADIUS,
+  dropTargetDistance,
   FULL_CANVAS_BOUNDS,
   getZoneReach,
   isDescendant,
@@ -27,6 +27,9 @@ type Pt = { x: number; y: number };
 
 // How long after a long-press finger lifts its trailing click is still swallowed.
 const LONG_PRESS_CLICK_GRACE_MS = 400;
+// A member dragged within this many zone reaches (getZoneReach) of its root
+// stays in its circle; only past that is it pulled out.
+const MEMBER_REACH_FACTOR = 1.5;
 // Holding a finger still this long on a node is a hold, not a tap.
 const LONG_PRESS_MS = 500;
 // How far a finger may wander before a press stops being a tap or a hold and
@@ -149,7 +152,8 @@ export function useNodeDragAndDrop({
   useEffect(() => () => stopTrail.current?.(), []);
 
   // What dragging `dragged` to (x,y) would land it on, if anything — the
-  // nearest other node within CIRCLE_DROP_RADIUS. Every restriction on
+  // nearest other node whose card (plus a small margin, dropTargetDistance)
+  // the drop lands on. Every restriction on
   // *joining* a circle this way (own-node-only, the 7-node cap, matching
   // sentiment) has been removed — any node can be dropped onto any other to
   // join its circle, any number of nodes, any mix of sentiment, same
@@ -168,13 +172,13 @@ export function useNodeDragAndDrop({
     // An attack stays tied to what it hit; dropping it is only ever a move.
     if (dragged.isWeapon) return null;
     let closest: NodeDoc | null = null;
-    let closestDist = CIRCLE_DROP_RADIUS;
+    let closestDist = Infinity;
     for (const n of nodes) {
       if (n.nodeId === dragged.nodeId || n.isWeapon) continue;
       const p = positions.get(n.nodeId);
       if (!p) continue;
-      const d = Math.hypot(p.x - x, p.y - y);
-      if (d < closestDist) {
+      const d = dropTargetDistance({ x, y }, p, footprintScale);
+      if (d !== null && d < closestDist) {
         closest = n;
         closestDist = d;
       }
@@ -611,10 +615,10 @@ export function useNodeDragAndDrop({
         if (found && found.valid) {
           // Dropped onto an eligible node — join its circle instead of a
           // plain reposition. Land just next to the target rather than
-          // exactly on top of it: the nearest spot that clears it and keeps
-          // the zone rules as a member of the target's zone (see placeNode).
+          // exactly on top of it: the nearest spot that covers no node
+          // (placeNode's free mode, the person aimed it here).
           const target = found.target;
-          const placed = placeNode({ x, y }, [{ nodeId: node.nodeId, parentId: target.nodeId }]);
+          const placed = placeNode({ x, y }, [{ nodeId: node.nodeId, parentId: target.nodeId }], [], { free: true });
           setActionError(null);
           // Moved over right away, same as a plain drop below — waiting for
           // the server left the node flashing back at its old spot (dragState
@@ -655,8 +659,8 @@ export function useNodeDragAndDrop({
         // inside one.
         const parentId = node.isWeapon ? undefined : nodeRefId(node.parentId);
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
-        // Still a member at the raw drop point? Within the zone's reach of
-        // its root (see getZoneReach) it is. Past it, it leaves the circle —
+        // Still a member at the raw drop point? Within one and a half zone
+        // reaches of its root (see getZoneReach) it is. Past it, it leaves the circle —
         // so dragging a member outward can't stretch the zone across the map
         // — unless it is no farther out than it already was: a member that
         // already sat out there can be moved around or pulled back in
@@ -664,7 +668,7 @@ export function useNodeDragAndDrop({
         const rootPos = ownCircle ? posFor(ownCircle.members[0]) : null;
         const dropDist = rootPos ? Math.hypot(x - rootPos.x, y - rootPos.y) : 0;
         const startDist = rootPos ? Math.hypot(start.x - rootPos.x, start.y - rootPos.y) : 0;
-        const staysMember = !!ownCircle && (dropDist <= getZoneReach() || dropDist <= startDist);
+        const staysMember = !!ownCircle && (dropDist <= getZoneReach() * MEMBER_REACH_FACTOR || dropDist <= startDist);
         const leftCircle = !!ownCircle && !staysMember;
         // A card on the board keeps clear of the other cards instead — in
         // the board's own units, where the icon spacing means nothing.

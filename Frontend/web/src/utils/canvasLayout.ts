@@ -471,11 +471,18 @@ export function computeDominantSentiment(nodes: { type: NodeType }[]): "positive
 }
 
 // How close a drop has to land to an existing node to read as "onto it"
-// (join its circle) instead of just "near it" (a normal reposition) — well
-// inside getNodeMinDist()'s smallest value, so a deliberate drop-to-join
-// never gets confused with two nodes that simply ended up in the same
-// neighborhood.
-export const CIRCLE_DROP_RADIUS = 70;
+// (join its circle) instead of just "near it" (a normal reposition): anywhere
+// over the node's whole card as it looks at this zoom (`scale`, see
+// freeFootprintScale), plus a small margin round it. A drop that covers no
+// node at all is a plain reposition and lands right where it was let go.
+export const DROP_TARGET_PAD = 16;
+export function dropTargetDistance(p: Pt, target: Pt, scale = 1): number | null {
+  const dx = Math.abs(p.x - target.x);
+  const dy = Math.abs(p.y - target.y);
+  if (dx > (NODE_FOOTPRINT.w * scale) / 2 + DROP_TARGET_PAD) return null;
+  if (dy > (NODE_FOOTPRINT.h * scale) / 2 + DROP_TARGET_PAD) return null;
+  return Math.hypot(dx, dy);
+}
 
 // Would setting candidateId's parentId to ancestorId close a loop? Walks up
 // from candidateId's *current* parent chain — if ancestorId is already up
