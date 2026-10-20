@@ -177,7 +177,58 @@ describe("useNodeDragAndDrop", () => {
       expect(result.current.dropTarget).toBeNull();
     });
 
-    it("joins the target's circle when dropped within CIRCLE_DROP_RADIUS of it", async () => {
+    it("joins the target's circle when dropped anywhere on its card, landing in free mode", async () => {
+      const dragged = makeNode({ nodeId: "a", x: 0, y: 0 });
+      const target = makeNode({ nodeId: "b", x: 500, y: 500 });
+      const nodes = [dragged, target];
+      const positions = new Map<string, Pt>([
+        ["a", { x: 0, y: 0 }],
+        ["b", { x: 500, y: 500 }],
+      ]);
+      const placeNode = vi.fn((p: Pt) => p);
+      const listeners = captureWindowListeners();
+      const { result } = setup({ nodes, positions, placeNode, posFor: (n) => positions.get(n.nodeId)! });
+
+      act(() => result.current.onNodePointerDown(dragged, fakePointerDownEvent({ clientX: 0, clientY: 0 })));
+      // Near the card's right edge, well off its center.
+      act(() => listeners.pointermove({ clientX: 585, clientY: 540 }));
+      expect(result.current.dropTarget).toEqual({ nodeId: "b", valid: true });
+
+      vi.mocked(nodesApi.updateNode).mockResolvedValue({ ...dragged, x: 585, y: 540, parentId: "b" });
+      await act(async () => {
+        listeners.pointerup({ clientX: 585, clientY: 540 });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(placeNode).toHaveBeenCalledWith({ x: 585, y: 540 }, [{ nodeId: "a", parentId: "b" }], [], { free: true });
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("a", expect.objectContaining({ parentId: "b" }));
+    });
+
+    it("is a plain move when dropped clear of every card", async () => {
+      const dragged = makeNode({ nodeId: "a", x: 0, y: 0 });
+      const target = makeNode({ nodeId: "b", x: 500, y: 500 });
+      const nodes = [dragged, target];
+      const positions = new Map<string, Pt>([
+        ["a", { x: 0, y: 0 }],
+        ["b", { x: 500, y: 500 }],
+      ]);
+      const listeners = captureWindowListeners();
+      const { result } = setup({ nodes, positions, posFor: (n) => positions.get(n.nodeId)! });
+
+      act(() => result.current.onNodePointerDown(dragged, fakePointerDownEvent({ clientX: 0, clientY: 0 })));
+      act(() => listeners.pointermove({ clientX: 700, clientY: 500 }));
+      expect(result.current.dropTarget).toBeNull();
+
+      vi.mocked(nodesApi.updateNode).mockResolvedValue({ ...dragged, x: 700, y: 500 });
+      await act(async () => {
+        listeners.pointerup({ clientX: 700, clientY: 500 });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 700, y: 500 });
+    });
+
+    it("joins the target's circle when dropped right next to its center", async () => {
       const dragged = makeNode({ nodeId: "a", x: 0, y: 0 });
       const target = makeNode({ nodeId: "b", x: 500, y: 500 });
       const nodes = [dragged, target];
@@ -256,6 +307,33 @@ describe("useNodeDragAndDrop", () => {
       });
 
       expect(nodesApi.updateNode).toHaveBeenCalledWith("child", { x: 1000, y: 1000, parentId: null });
+    });
+
+    it("keeps a member dragged a little past the zone's reach in its circle", async () => {
+      const root = makeNode({ nodeId: "root", x: 0, y: 0, parentId: null });
+      const child = makeNode({ nodeId: "child", parentId: "root", x: 200, y: 0 });
+      const nodes = [root, child];
+      const positions = new Map<string, Pt>([
+        ["root", { x: 0, y: 0 }],
+        ["child", { x: 200, y: 0 }],
+      ]);
+      const nodeGroups: NodeGroup[] = [
+        { rootId: "root", members: [root, child], sentiment: "neutral", cx: 0, cy: 0, r: 100, outline: [] },
+      ];
+      const listeners = captureWindowListeners();
+      const { result } = setup({ nodes, positions, nodeGroups, posFor: (n) => positions.get(n.nodeId)! });
+
+      act(() => result.current.onNodePointerDown(child, fakePointerDownEvent({ clientX: 200, clientY: 0 })));
+      // Past the reach (two pack spacings), inside one and a half of it.
+      act(() => listeners.pointermove({ clientX: 420, clientY: 0 }));
+
+      vi.mocked(nodesApi.updateNode).mockResolvedValue({ ...child, x: 420, y: 0 });
+      await act(async () => {
+        listeners.pointerup({ clientX: 420, clientY: 0 });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("child", { x: 420, y: 0 });
     });
 
     it("keeps a member that already sat past the zone's reach when it's moved without going farther out", async () => {

@@ -103,7 +103,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
 - **Moving nodes** — a dragged node (or group) lands where it was let go, nudged only so it doesn't
-  cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes. On a
+  cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes, except
+  a type dragged out of a node's ring, which lands where it was let go too. Dropping a node anywhere on
+  another node's card (plus a small margin, `canvasLayout.ts` `dropTargetDistance`) joins that node's
+  zone, and it then lands at the nearest spot that covers nothing; a member stays in its own zone until
+  it's dragged past one and a half zone reaches from its root. On a
   phone, a finger drags a node once it really travels (a tap or a small graze still opens it; with a
   mouse a single node drags in Move mode), and holding a node still then lifting adds it to a group
   selection or opens a card's menu, so holding a moment before dragging still drags. Dragging one

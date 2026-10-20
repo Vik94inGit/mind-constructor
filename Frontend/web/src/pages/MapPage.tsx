@@ -1721,14 +1721,14 @@ export function MapPage() {
   }
 
   // Draw first, write later: a type ghost dragged out of the selected node's
-  // ring drops an empty node of that type where it was let go (nudged clear
-  // of other nodes, see placeNode). The parent stays selected, so its ring
+  // ring drops an empty node of that type where it was let go (nudged only
+  // clear of other nodes, placeNode's free mode: the person aimed it there). The parent stays selected, so its ring
   // stays up for the next branch; the new node's text is written whenever
   // it's opened.
   async function sketchBranch(type: NodeType, pos: { x: number; y: number }, parent: NodeDoc) {
     if (!mapId) return;
     setActionError(null);
-    const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
+    const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }], [], { free: true });
     try {
       const node = await nodesApi.createNode(mapId, { text: "", type, x: placed.x, y: placed.y, parentId: parent.nodeId });
       upsertNode(node);
