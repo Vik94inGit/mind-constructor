@@ -62,9 +62,12 @@ interface RequestOptions<T> {
   cache?: boolean;
 }
 
+const GATEWAY_DOWN = new Set([502, 503, 504]);
+
 // The one place a request actually goes out — also what offline/sync.ts uses
 // to send queued changes. Throws NetworkError only when the server was never
-// reached; any HTTP answer, error or not, comes back as { status, payload }.
+// reached (a gateway page in front of it counts too); any answer from the server
+// itself, error or not, comes back as { status, payload }.
 async function send(method: string, path: string, body: unknown): Promise<{ status: number; payload: any }> {
   let res: Response;
   try {
@@ -82,6 +85,12 @@ async function send(method: string, path: string, body: unknown): Promise<{ stat
     throw new NetworkError("unreachable");
   }
   const isJson = res.headers.get("content-type")?.includes("application/json");
+  // The backend always answers in JSON. A bare 502/503/504 page comes from
+  // whatever stands in front of it (vercel.json's rewrite, Render while the
+  // service is down or waking up): the server wasn't reached, the same as
+  // having no connection, so the change waits in the outbox and reads come
+  // from the kept copy instead of failing outright.
+  if (!isJson && GATEWAY_DOWN.has(res.status)) throw new NetworkError(`gateway ${res.status}`);
   const payload = isJson ? await res.json().catch(() => null) : null;
   return { status: res.status, payload };
 }
