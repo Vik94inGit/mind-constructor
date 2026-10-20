@@ -80,6 +80,20 @@ export function nodeRefId(ref: string | EdgeNodeRef | undefined | null): string 
   return typeof ref === "string" ? ref : ref.nodeId;
 }
 
+// The parent that puts a node in a zone. An attack hangs from the node it hit
+// (parentId is its target) but stands outside that castle, so that parent
+// doesn't count; once it is dropped onto another attack, it joins that one's
+// zone like any other node.
+export function zoneParentId(n: {
+  parentId?: string | EdgeNodeRef | null;
+  isWeapon?: boolean;
+  targetNodeId?: string | EdgeNodeRef | null;
+}): string | null {
+  const parentId = nodeRefId(n.parentId) ?? null;
+  if (!n.isWeapon || parentId === nodeRefId(n.targetNodeId)) return n.isWeapon ? null : parentId;
+  return parentId;
+}
+
 export function usernameOf(ref: string | { username: string } | undefined | null): string {
   if (!ref) return "unknown";
   return typeof ref === "string" ? ref : ref.username;

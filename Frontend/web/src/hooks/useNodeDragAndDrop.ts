@@ -14,7 +14,7 @@ import {
 } from "../utils/canvasLayout";
 import type { NodeGroup, ViewportBounds } from "../utils/canvasLayout";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
-import { nodeRefId } from "../utils/nodeType";
+import { nodeRefId, zoneParentId } from "../utils/nodeType";
 import { storedSpots } from "../utils/cardSpace";
 import { dragUIReducer, initialDragUIState } from "./dragUIState";
 import type { Translation } from "../i18n/translations";
@@ -169,12 +169,12 @@ export function useNodeDragAndDrop({
     x: number,
     y: number,
   ): { target: NodeDoc; valid: boolean; reason?: string } | null {
-    // An attack stays tied to what it hit; dropping it is only ever a move.
-    if (dragged.isWeapon) return null;
+    // An attack stays tied to what it hit: it can only join another attack,
+    // making a zone of attacks. Anything else can join an attack's zone too.
     let closest: NodeDoc | null = null;
     let closestDist = Infinity;
     for (const n of nodes) {
-      if (n.nodeId === dragged.nodeId || n.isWeapon) continue;
+      if (n.nodeId === dragged.nodeId || (dragged.isWeapon && !n.isWeapon)) continue;
       const p = positions.get(n.nodeId);
       if (!p) continue;
       const d = dropTargetDistance({ x, y }, p, footprintScale);
@@ -653,11 +653,11 @@ export function useNodeDragAndDrop({
         // just moves the root. A circle with only one member left after this
         // simply stops being one — nodeGroups requires 2+ children, so its
         // backdrop disappears on its own, no separate cleanup needed here.
-        // An attack hangs from its target but is no member of its zone: it
-        // never leaves a circle (that would cut it off its target), and the
-        // zone rules keep it outside every castle, so it can't be dropped
-        // inside one.
-        const parentId = node.isWeapon ? undefined : nodeRefId(node.parentId);
+        // An attack hangs from its target but is no member of its zone, so
+        // only a zone of attacks it was dropped into counts here; leaving
+        // that hangs it back from its target. The zone rules keep it outside
+        // every castle, so it can't be dropped inside one.
+        const parentId = zoneParentId(node) ?? undefined;
         const ownCircle = parentId ? nodeGroups.find((g) => g.rootId === parentId) : undefined;
         // Still a member at the raw drop point? Within one and a half zone
         // reaches of its root (see getZoneReach) it is. Past it, it leaves the circle —
@@ -685,15 +685,16 @@ export function useNodeDragAndDrop({
         // real bug: a courtesy update still has to be honest about whether
         // it landed.
         const before = { ...storedSpots(node), parentId: node.parentId };
+        const leftTo = node.isWeapon ? (nodeRefId(node.targetNodeId) ?? null) : null;
         const spot = spotFor(node, dropped);
         setNodes((prev) =>
           prev.map((n) =>
-            n.nodeId === node.nodeId ? { ...n, ...spot, ...(leftCircle ? { parentId: null } : {}) } : n,
+            n.nodeId === node.nodeId ? { ...n, ...spot, ...(leftCircle ? { parentId: leftTo } : {}) } : n,
           ),
         );
         try {
           if (leftCircle) {
-            const updated = await nodesApi.updateNode(node.nodeId, { ...spot, parentId: null });
+            const updated = await nodesApi.updateNode(node.nodeId, { ...spot, parentId: leftTo });
             upsertNode(updated);
           } else {
             const updated = await nodesApi.updateNode(node.nodeId, spot);

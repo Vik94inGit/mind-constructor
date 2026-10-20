@@ -192,6 +192,25 @@ describe("computeNodeGroups", () => {
     expect(groups[0].members.map((m) => m.nodeId).sort()).toEqual(["c1", "c2", "root"]);
   });
 
+  it("makes a zone of attacks dropped onto another attack", () => {
+    const nodes: NodeDoc[] = [
+      makeNode({ nodeId: "keep", type: "Solution" }),
+      makeNode({ nodeId: "w1", type: "Problem", parentId: "keep", isWeapon: true, targetNodeId: "keep" }),
+      makeNode({ nodeId: "w2", type: "Problem", parentId: "w1", isWeapon: true, targetNodeId: "keep" }),
+      makeNode({ nodeId: "w3", type: "Fail", parentId: "w1", isWeapon: true, targetNodeId: "keep" }),
+    ];
+    const positions = new Map([
+      ["keep", { x: 0, y: 0 }],
+      ["w1", { x: 600, y: 0 }],
+      ["w2", { x: 700, y: 100 }],
+      ["w3", { x: 700, y: -100 }],
+    ]);
+    const groups = computeNodeGroups(nodes, nodes, positions);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].rootId).toBe("w1");
+    expect(groups[0].members.map((m) => m.nodeId).sort()).toEqual(["w1", "w2", "w3"]);
+  });
+
   it("does not form a group for a root with only one child", () => {
     const nodes: NodeDoc[] = [
       makeNode({ nodeId: "root" }),

@@ -225,8 +225,8 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
 - **Hidden branches** (`Node.hiddenFromMembers`, `dao/visibilityDao.ts`, `POST /api/nodes/:nodeId/visibility`
   body `{ hidden }`) — the map's *owner* (not merely the node's creator; `NotMapOwnerError` → 403
   otherwise) can hide a branch from invited members. A node is hidden when it, or any ancestor by
-  `parentId`, is flagged, or when it is a protection node guarding a hidden node (weapon nodes are
-  parented to their target, so they follow it). Enforced server-side for non-owners: the node list
+  `parentId`, is flagged, or when it is a protection node guarding a hidden node, or a weapon node
+  aimed at one (by `targetNodeId`, so an attack moved under another attack still follows its target). Enforced server-side for non-owners: the node list
   (`getNodesByMapDao`), the lazy text backfill, the edge list (links touching a hidden node),
   `findNodeDao` (single node → 404) and `attackNodeAbl` (→ null/404). Not filtered: the map summary
   counts, attack indicators and the selected-circle id lists. Realtime: `io.ts` puts the map's owner in

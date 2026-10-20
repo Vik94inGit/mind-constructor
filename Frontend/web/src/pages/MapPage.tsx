@@ -110,7 +110,7 @@ import {
   nodeObstacles,
 } from "../utils/canvasLayout";
 import type { Obstacle } from "../utils/canvasLayout";
-import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "../utils/zoneRules";
+import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, othersTerritory, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
 import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeShape, NodeType, ZonePaletteColor } from "../types";
@@ -660,7 +660,8 @@ export function MapPage() {
   // zone rules — out of zones it isn't in, zones not crossing, and no more
   // than ~2 cm from the nearest node or zone line. See utils/zoneRules.ts.
   // `free` (a node the person dragged there themselves) keeps only the first
-  // part: nothing on top of another node or its text.
+  // part: nothing on top of another node or its text. In a discussion no drop
+  // lands inside another player's castle either.
   // Only the moving nodes move; nothing else on the map is pushed around.
   function placeNode(
     desired: { x: number; y: number },
@@ -679,7 +680,16 @@ export function MapPage() {
       desired,
       obstacles,
       viewportBounds(),
-      makeZoneRule(visibleNodes, positions, moving, extra, undefined, zoneLayouts, opts.free),
+      makeZoneRule(
+        visibleNodes,
+        positions,
+        moving,
+        extra,
+        undefined,
+        zoneLayouts,
+        opts.free,
+        discussionOn ? othersTerritory(visibleNodes, user?._id) : undefined,
+      ),
     );
   }
 

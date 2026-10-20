@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeNode } from "../test/fixtures";
 import { FULL_CANVAS_BOUNDS, NODE_FOOTPRINT, footprintObstacles } from "./canvasLayout";
-import { MAX_ZONE_GAP, MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, placeByZoneRules } from "./zoneRules";
+import { MAX_ZONE_GAP, MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, othersTerritory, placeByZoneRules } from "./zoneRules";
 import type { NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
@@ -47,6 +47,20 @@ describe("makeZoneRule", () => {
     expect(rule.fits({ x: 1000, y: 750 })).toBe(true);
     expect(rule.compact({ x: 2200, y: 1400 })).toBe(true);
     expect(rule.fits({ x: 1000, y: 400 })).toBe(false);
+  });
+
+  it("keeps even a dragged node out of another player's castle", () => {
+    const { nodes, positions } = triangleMap();
+    const castle = nodes.map((n) => ({ ...n, userId: "owner" }));
+    const mine = makeNode({ nodeId: "m", parentId: null, userId: "member" });
+    const all = [...castle, mine];
+    const at = new Map(positions).set("m", { x: 2000, y: 1400 });
+    const rule = makeZoneRule(all, at, [{ nodeId: "m" }], [], WIDE, {}, true, othersTerritory(all, "member"));
+    expect(rule.fits({ x: 1000, y: 750 })).toBe(false);
+    expect(rule.fits({ x: 1000, y: 1100 })).toBe(true);
+    // The castle's own player still drags freely inside it.
+    const own = makeZoneRule(all, at, [{ nodeId: "m" }], [], WIDE, {}, true, othersTerritory(all, "owner"));
+    expect(own.fits({ x: 1000, y: 750 })).toBe(true);
   });
 
   it("keeps a node off a zone's line, not just out of its inside", () => {
