@@ -3,7 +3,7 @@
 // React state/refs/closures — just plain inputs to plain outputs. Kept
 // separate from MapPage.tsx so that component stays just the component and
 // its own state/handlers.
-import { nodeRefId, sentimentOf } from "./nodeType";
+import { nodeRefId, sentimentOf, zoneParentId } from "./nodeType";
 import type { Sentiment } from "./nodeType";
 import type { EdgeDoc, NodeDoc, NodeType } from "../types";
 import { zoneLayoutResolver } from "./zoneLayout";
@@ -670,8 +670,9 @@ export function computeNodeGroups(
   for (const n of visibleNodes) {
     byId.set(n.nodeId, byId.get(n.nodeId) ?? n);
     // An attack hangs from its target by parentId, but it isn't part of the
-    // target's castle: it stays outside, so it never joins or stretches a zone.
-    const parentId = n.isWeapon ? null : nodeRefId(n.parentId);
+    // target's castle: it stays outside, so it never joins or stretches that
+    // zone. Attacks dropped onto another attack make a zone of their own.
+    const parentId = zoneParentId(n);
     if (!parentId) continue;
     if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
     childrenByParent.get(parentId)!.push(n.nodeId);
@@ -796,7 +797,7 @@ export function realmMembers(rootId: string, nodes: NodeDoc[]): NodeDoc[] {
   const children = new Map<string, NodeDoc[]>();
   for (const n of nodes) {
     // Attacks stay outside the realm they hit (see computeNodeGroups).
-    const p = n.isWeapon ? null : nodeRefId(n.parentId);
+    const p = zoneParentId(n);
     if (p) children.set(p, [...(children.get(p) ?? []), n]);
   }
   const root = nodes.find((n) => n.nodeId === rootId);

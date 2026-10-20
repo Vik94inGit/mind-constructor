@@ -4,7 +4,7 @@ import { CANVAS_W, CANVAS_H, realmMembers, realmOutline } from "../utils/canvasL
 import { roundedPath } from "../utils/drawLine";
 import { useI18n } from "../i18n/I18nContext";
 import type { NodeGroup } from "../utils/canvasLayout";
-import { nodeRefId, ZONE_COLORS } from "../utils/nodeType";
+import { nodeRefId, zoneParentId, ZONE_COLORS } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
 import { ZONE_EDGE_DEFAULT, zoneColorFor } from "../utils/zoneStyle";
@@ -419,11 +419,11 @@ export function CanvasBackdrop({
         unclickable accent dash.
       */}
       {visibleNodes.map((node) => {
-        const parentId = nodeRefId(node.parentId);
-        if (!parentId) return null;
         // An attack node hangs from its target, but the bow-and-arrows mark
-        // already says what it points at — no branch line as well.
-        if (node.isWeapon) return null;
+        // already says what it points at — no branch line as well, unless it
+        // was moved into another attack's zone.
+        const parentId = zoneParentId(node);
+        if (!parentId) return null;
         const parentNode = visibleNodes.find((n) => n.nodeId === parentId);
         if (!parentNode) return null;
         const a = posFor(parentNode);

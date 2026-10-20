@@ -178,7 +178,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node with a question or a Problem / Problematic option (enforced by the backend's `attackAbl.ts`).
   In Creating mode attacks only add their node and do no damage. The one way to stop a battle-mode
   attack is a protection node, created by the target's own owner.
-- An attack belongs to no zone. Another member's attack, or the imitated opponent's move, is placed
-  outside the walls of the castle it hits and can't be dragged into any castle. Opening an attack on
+- An attack belongs to no zone of the castle it hits. Another member's attack, or the imitated opponent's
+  move, is placed outside the walls of that castle and can't be dragged into any castle. Dragging an
+  attack onto another attack makes a zone of attacks (dragging it back out hangs it from its target
+  again), and any node can join that zone; attacks link to each other like any nodes (Choose, then
+  Link). In a discussion nobody can drag their own nodes into another player's castle either
+  (`utils/zoneRules.ts` `othersTerritory`). Opening an attack on
   one of your nodes lands on its Attack tab, ready to strike back (each hit on it heals your node by
   10); the opponent's-turn panel offers the same right after its move.

@@ -1,7 +1,8 @@
 // Which nodes of a map are hidden from its invited members. The map's owner
 // can hide a whole branch (Node.hiddenFromMembers on its root): the node
 // itself, everything hanging from it by parentId (weapon nodes included,
-// since they are parented to their target), and any protection node guarding
+// since they are parented to their target), any attack aimed at one of those
+// (even one moved under another attack), and any protection node guarding
 // one of those. The owner always sees everything.
 import type mongoose from "mongoose";
 import { Node } from "../models/Node.js";
@@ -22,7 +23,7 @@ export const getHiddenNodesDao = async (mapInternalId: mongoose.Types.ObjectId):
   if (!(await Node.exists({ mapId: mapInternalId, hiddenFromMembers: true }))) return NONE();
 
   const rows = await Node.find({ mapId: mapInternalId })
-    .select("_id nodeId parentId hiddenFromMembers protectsNodeId")
+    .select("_id nodeId parentId hiddenFromMembers protectsNodeId targetNodeId")
     .lean<
       {
         _id: { toString(): string };
@@ -30,6 +31,7 @@ export const getHiddenNodesDao = async (mapInternalId: mongoose.Types.ObjectId):
         parentId?: { toString(): string } | null;
         hiddenFromMembers?: boolean;
         protectsNodeId?: { toString(): string } | null;
+        targetNodeId?: { toString(): string } | null;
       }[]
     >();
   const byId = new globalThis.Map(rows.map((r) => [r._id.toString(), r]));
@@ -44,6 +46,7 @@ export const getHiddenNodesDao = async (mapInternalId: mongoose.Types.ObjectId):
     let hidden = !!row.hiddenFromMembers;
     if (!hidden && row.parentId) hidden = isHidden(row.parentId.toString(), visiting);
     if (!hidden && row.protectsNodeId) hidden = isHidden(row.protectsNodeId.toString(), visiting);
+    if (!hidden && row.targetNodeId) hidden = isHidden(row.targetNodeId.toString(), visiting);
     memo.set(id, hidden);
     return hidden;
   };

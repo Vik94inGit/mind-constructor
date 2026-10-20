@@ -1,7 +1,7 @@
 import { NODE_FOOTPRINT, avoidOverlap, getZoneReach, zoneMemberships, zoneShape } from "./canvasLayout";
 import type { Obstacle, ViewportBounds, ZoneMembership } from "./canvasLayout";
 import type { ZoneLayouts } from "./zoneLayout";
-import { nodeRefId } from "./nodeType";
+import { idOf, zoneParentId } from "./nodeType";
 import type { NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
@@ -144,6 +144,8 @@ export function makeZoneRule(
   layouts: ZoneLayouts = {},
   /** Only keep the moving nodes off other nodes: no zone rules, no rule 3. */
   free = false,
+  /** Zones the moving nodes may never enter, free or not: another player's castles in a discussion. */
+  offLimits?: (zoneRootId: string) => boolean,
 ): ZoneRule {
   const offsetOf = new Map(moving.map((m) => [m.nodeId, m.offset ?? { x: 0, y: 0 }]));
   const parentOf = new Map<string, string | null>();
@@ -152,7 +154,7 @@ export function makeZoneRule(
   // a dragged attack out of every castle, its target's included.
   const weapons = new Set<string>();
   for (const n of nodes) {
-    parentOf.set(n.nodeId, nodeRefId(n.parentId) ?? null);
+    parentOf.set(n.nodeId, zoneParentId(n));
     if (n.isWeapon) weapons.add(n.nodeId);
     const p = positions.get(n.nodeId);
     if (p && !offsetOf.has(n.nodeId)) fixedPos.set(n.nodeId, p);
@@ -168,8 +170,8 @@ export function makeZoneRule(
 
   const childrenOf = new Map<string, string[]>();
   for (const [id, parentId] of parentOf) {
-    // An attack is in no zone: it stays outside the castle it hits.
-    if (!parentId || weapons.has(id)) continue;
+    // An attack stays outside the castle it hits (zoneParentId is null for it).
+    if (!parentId) continue;
     if (!childrenOf.has(parentId)) childrenOf.set(parentId, []);
     childrenOf.get(parentId)!.push(id);
   }
@@ -218,6 +220,7 @@ export function makeZoneRule(
       // A follower in a group can't land on a node outside it either (the
       // first moving node is held to that by the caller's own obstacles).
       for (const f of fixedPoints) if (footprintsOverlap(m.p, f.p)) return false;
+      if (offLimits) for (const z of fixedZones) if (!z.memberIds.has(m.id) && offLimits(z.rootId) && intrudes(m.p, z)) return false;
       if (free) continue;
       // Rule 1: not in a zone it isn't part of.
       for (const z of fixedZones) if (!z.memberIds.has(m.id) && intrudes(m.p, z)) return false;
@@ -246,6 +249,18 @@ export function makeZoneRule(
   }
 
   return { fits, compact };
+}
+
+/**
+ * In a discussion every player's castles are their own territory: a zone whose
+ * parent someone else created is off limits to `userId`'s nodes.
+ */
+export function othersTerritory(nodes: NodeDoc[], userId: string | undefined): (zoneRootId: string) => boolean {
+  const owner = new Map(nodes.map((n) => [n.nodeId, idOf(n.userId)]));
+  return (rootId) => {
+    const by = owner.get(rootId);
+    return !!by && by !== userId;
+  };
 }
 
 /**

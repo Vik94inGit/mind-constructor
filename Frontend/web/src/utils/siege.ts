@@ -36,7 +36,8 @@ const isPiece = (n: NodeDoc) => !n.isWeapon && !n.isProtection && !nodeRefId(n.p
 export function holdsOf(rootIds: string[], nodes: NodeDoc[]): Hold[] {
   const byId = new Map(nodes.map((n) => [n.nodeId, n]));
   return rootIds
-    .filter((id) => byId.has(id))
+    // A camp of attacks (attacks dropped onto one another) is no hold to besiege.
+    .filter((id) => byId.has(id) && !byId.get(id)!.isWeapon)
     .map((id) => ({ rootId: id, kind: nodeRefId(byId.get(id)!.parentId) ? "castle" : "kingdom" }));
 }
 
