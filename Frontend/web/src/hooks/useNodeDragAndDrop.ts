@@ -206,24 +206,26 @@ export function useNodeDragAndDrop({
 
   // Moves the pulled children over at once (the map glides them there, see
   // usePositionGlide) and saves them; any that don't save go back.
-  async function savePulls(pulls: Map<string, Pt>, pulled: NodeDoc[]) {
-    if (pulled.length === 0) return;
-    const before = new Map(pulled.map((n) => [n.nodeId, storedSpots(n)]));
-    const spots = new Map(pulled.map((n) => [n.nodeId, spotFor(n, pulls.get(n.nodeId)!)]));
+  // Several nodes' new spots, saved in one request (nodesApi.moveNodes).
+  function moveAll(spots: Map<string, Partial<NodeDoc>>) {
+    return nodesApi.moveNodes(Array.from(spots, ([nodeId, spot]) => ({ nodeId, ...spot })));
+  }
+
+  // Shown at their new spots at once, put back if the save fails.
+  async function saveSpots(members: NodeDoc[], spots: Map<string, Partial<NodeDoc>>) {
+    const before = new Map(members.map((n) => [n.nodeId, storedSpots(n)]));
     setNodes((prev) => prev.map((n) => (spots.has(n.nodeId) ? { ...n, ...spots.get(n.nodeId)! } : n)));
-    const failed: string[] = [];
-    await Promise.all(
-      Array.from(spots, ([id, spot]) =>
-        nodesApi
-          .updateNode(id, spot)
-          .then(upsertNode)
-          .catch(() => failed.push(id)),
-      ),
-    );
-    if (failed.length) {
-      setNodes((prev) => prev.map((n) => (failed.includes(n.nodeId) ? { ...n, ...before.get(n.nodeId)! } : n)));
+    try {
+      (await moveAll(spots)).forEach(upsertNode);
+    } catch {
+      setNodes((prev) => prev.map((n) => (before.has(n.nodeId) ? { ...n, ...before.get(n.nodeId)! } : n)));
       setActionError(t.ui.errors.moveNodes);
     }
+  }
+
+  async function savePulls(pulls: Map<string, Pt>, pulled: NodeDoc[]) {
+    if (pulled.length === 0) return;
+    await saveSpots(pulled, new Map(pulled.map((n) => [n.nodeId, spotFor(n, pulls.get(n.nodeId)!)])));
   }
 
   // The parent's magnet button: calls every one of its own nodes outside the
@@ -393,18 +395,13 @@ export function useNodeDragAndDrop({
         endTrail();
         dispatch({ type: "groupStart", positions: targets });
         const pulling = savePulls(pulls, pulled);
-        await Promise.all(
-          memberIds.map(async (id) => {
-            const member = nodes.find((n) => n.nodeId === id);
-            if (!member) return;
-            try {
-              const updated = await nodesApi.updateNode(id, spotFor(member, targets.get(id)!));
-              if (groupDragToken.current === token) upsertNode(updated);
-            } catch (err) {
-              setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
-            }
-          }),
-        );
+        const members = nodes.filter((n) => memberIdSet.has(n.nodeId));
+        try {
+          const updated = await moveAll(new Map(members.map((m) => [m.nodeId, spotFor(m, targets.get(m.nodeId)!)])));
+          if (groupDragToken.current === token) updated.forEach(upsertNode);
+        } catch (err) {
+          setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.moveNodes);
+        }
         if (groupDragToken.current === token) dispatch({ type: "groupClear" });
         await pulling;
       }
@@ -618,25 +615,9 @@ export function useNodeDragAndDrop({
         await trail.land(shift, moved);
         endClusterTrail();
         const members = nodes.filter((n) => moved.has(n.nodeId));
-        const before = new Map(members.map((n) => [n.nodeId, storedSpots(n)]));
-        const spots = new Map(members.map((n) => [n.nodeId, spotFor(n, moved.get(n.nodeId)!)]));
         dispatch({ type: "reset" });
-        setNodes((prev) => prev.map((n) => (spots.has(n.nodeId) ? { ...n, ...spots.get(n.nodeId)! } : n)));
         setActionError(null);
-        const failed: string[] = [];
-        await Promise.all(
-          Array.from(spots, ([id, spot]) =>
-            nodesApi
-              .updateNode(id, spot)
-              .then(upsertNode)
-              .catch(() => failed.push(id)),
-          ),
-        );
-        if (failed.length) {
-          // Put back only what didn't save, so the canvas matches the server.
-          setNodes((prev) => prev.map((n) => (failed.includes(n.nodeId) ? { ...n, ...before.get(n.nodeId)! } : n)));
-          setActionError(t.ui.errors.moveNodes);
-        }
+        await saveSpots(members, new Map(members.map((n) => [n.nodeId, spotFor(n, moved.get(n.nodeId)!)])));
         return;
       }
       const snap = dragMoved.current ? snapFor?.(node, x, y) : null;

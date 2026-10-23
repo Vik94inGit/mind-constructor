@@ -10,7 +10,9 @@ import {
   zoneColorTakenDao,
   findNodeByPublicIdDao,
   setBranchHiddenMutationDao,
+  moveNodesDao,
 } from "../dao/nodeDao.js";
+import { getHiddenNodesDao } from "../dao/visibilityDao.js";
 import { MapFinishedError, parseOrThrow, ValidationError } from "./errors.js";
 import { IMAGE_URL_PREFIX } from "../models/Image.js";
 import { createImageDao, findNodeImageIdsDao, deleteNodeImagesExceptDao } from "../dao/imageDao.js";
@@ -341,6 +343,62 @@ export const updateNodeAbl = async (
   // icon) is deleted from the store.
   await deleteNodeImagesExceptDao(node._id, referencedImageIds(updated ?? node));
   return updated;
+};
+
+// The most nodes one move may carry — far more than any selection on a map.
+export const MAX_MOVED_NODES = 500;
+
+const moveNodesSchema = z.object({
+  moves: z
+    .array(
+      z.object({
+        nodeId: z.string().min(1),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        // A puzzle card's own spot (see Node.cardX); null forgets it.
+        cardX: z.number().nullish(),
+        cardY: z.number().nullish(),
+      }),
+    )
+    .min(1, "moves must list at least one node")
+    .max(MAX_MOVED_NODES, `moves can list at most ${MAX_MOVED_NODES} nodes`),
+});
+
+type MovedNode = Awaited<ReturnType<typeof moveNodesDao>>[number];
+
+// Several nodes moved at once, saved in one go (see moveNodesDao). Returns
+// the moved nodes, and how to tell each map about them: one batch for
+// everyone, and a separate one for nodes in a branch hidden from invited
+// members, so a hidden node in the group doesn't keep the visible ones'
+// moves from the members too (broadcastToMap sends a batch that mentions a
+// hidden node to the owner alone).
+export const moveNodesAbl = async (userId: string, input: unknown) => {
+  const { moves } = parseOrThrow(moveNodesSchema, input);
+  const nodes = await moveNodesDao(
+    moves.map(({ nodeId, ...spot }) => ({
+      nodeId,
+      spot: Object.fromEntries(Object.entries(spot).filter(([, v]) => v !== undefined)) as Record<string, number | null>,
+    })),
+    userId,
+  );
+
+  const byMap = new Map<string, { internalId: mongoose.Types.ObjectId; nodes: MovedNode[] }>();
+  for (const node of nodes) {
+    const map = node.mapId as unknown as { _id: mongoose.Types.ObjectId; mapId?: string } | null;
+    if (!map?.mapId) continue;
+    const entry = byMap.get(map.mapId) ?? { internalId: map._id, nodes: [] };
+    entry.nodes.push(node);
+    byMap.set(map.mapId, entry);
+  }
+  const broadcasts: { publicMapId: string; nodes: MovedNode[] }[] = [];
+  for (const [publicMapId, { internalId, nodes: onMap }] of byMap) {
+    const hidden = (await getHiddenNodesDao(internalId)).publicIds;
+    const shown = onMap.filter((n) => !hidden.has(n.nodeId));
+    const hiddenOnes = onMap.filter((n) => hidden.has(n.nodeId));
+    if (shown.length) broadcasts.push({ publicMapId, nodes: shown });
+    if (hiddenOnes.length) broadcasts.push({ publicMapId, nodes: hiddenOnes });
+  }
+  return { nodes, broadcasts };
 };
 
 const setBranchHiddenSchema = z.object({ hidden: z.boolean({ error: () => "hidden must be true or false" }) });

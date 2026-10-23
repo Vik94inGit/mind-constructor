@@ -25,6 +25,7 @@ import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
+import { useStableActions } from "../hooks/useStableActions";
 import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
@@ -33,7 +34,8 @@ import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } fr
 import type { CaptionSpec } from "../utils/nodePriority";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
-import { NodeCard } from "../map/NodeCard";
+import { CanvasNodeCard } from "../map/CanvasNodeCard";
+import type { CanvasNodeActions } from "../map/CanvasNodeCard";
 import { NodePanel } from "../map/NodePanel";
 import { PackPickerPanel } from "../map/PackPickerPanel";
 import { TextToNodesModal } from "../map/TextToNodesModal";
@@ -555,6 +557,8 @@ export function MapPage() {
   // recomputed from current parentId links, so it can't disagree with
   // what's actually locked.
   const spotlightedNodeIds = map?.selectedCircle?.nodeIds;
+  const spotlightedSet = useMemo(() => (spotlightedNodeIds ? new Set(spotlightedNodeIds) : null), [spotlightedNodeIds]);
+  const nodeById = useMemo(() => new Map(nodes.map((n) => [n.nodeId, n])), [nodes]);
 
   // Selecting either end of an attack (clicking the objection node or the
   // node it's aimed at — see handleNodeClick) keeps *that pair* visible
@@ -1932,6 +1936,28 @@ export function MapPage() {
     stepReading: (dir) => stepReading(dir, false),
   });
 
+  // What a card on the canvas does when used: one stable object for every
+  // card, so CanvasNodeCard only re-renders when its own node changed.
+  const nodeActions = useStableActions<CanvasNodeActions>({
+    inlineConfirm: (node, text, type) => void confirmInlineEdit(node, text, type),
+    inlineCancel: () => setInlineEditId(null),
+    pointerDown: (node, e) => onNodePointerDown(node, e),
+    click: (node, e) => {
+      if (suppressNextClick.current) {
+        suppressNextClick.current = false;
+        return;
+      }
+      handleNodeClick(node, e.shiftKey);
+    },
+    doubleClick: (node) => startInlineEdit(node),
+    contextMenu: (node, e) => handleNodeContextMenu(node, e),
+    resize: (node, size) => void saveCardLook(node, { cardW: size.w, cardH: size.h }),
+    toggleBlockLock: (nodeId) => toggleBlockLock(nodeId),
+    connectStart: (node, e) => startPuzzleConnect(node, e),
+    addBranch: (node) => addBranchFromCard(node),
+    hoverText: (nodeId) => void ensureNodeText([nodeId]),
+  });
+
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
   if (error || !map) {
     return (
@@ -2064,7 +2090,7 @@ export function MapPage() {
       selectedId === n.nodeId ||
       selectedId === parentId ||
       multiSelectIds.has(n.nodeId) ||
-      spotlightedNodeIds?.includes(n.nodeId) ||
+      spotlightedSet?.has(n.nodeId) ||
       inlineEditId === n.nodeId ||
       nodeDragged(n)
     );
@@ -2402,11 +2428,11 @@ export function MapPage() {
               let flightVector: { x: number; y: number } | undefined;
               if (node.isWeapon) {
                 const targetId = nodeRefId(node.targetNodeId);
-                const target = targetId ? nodes.find((t) => t.nodeId === targetId) : undefined;
+                const target = targetId ? nodeById.get(targetId) : undefined;
                 if (target) flightVector = weaponFlightVector(pos, posFor(target));
               }
               return (
-                <NodeCard
+                <CanvasNodeCard
                   key={node.nodeId}
                   node={node}
                   emojiFirst={emojiFirst}
@@ -2432,7 +2458,7 @@ export function MapPage() {
                   }
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
                   parentCrownSentiment={circleRootSentimentByNode.get(node.nodeId)}
-                  inChosenCircle={!!spotlightedNodeIds?.includes(node.nodeId)}
+                  inChosenCircle={!!spotlightedSet?.has(node.nodeId)}
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
@@ -2443,10 +2469,11 @@ export function MapPage() {
                   hiddenBranch={hiddenBranchIds.has(node.nodeId)}
                   discussionMode={isDiscussionMode}
                   celebrate={celebrateIds.has(node.nodeId)}
-                  flightVector={flightVector}
+                  flightX={flightVector?.x}
+                  flightY={flightVector?.y}
                   muted={
                     ((quickAddActive && !dotZoom && node.nodeId !== selectedId) ||
-                      (!!spotlightedNodeIds && !spotlightedNodeIds.includes(node.nodeId)) ||
+                      (!!spotlightedSet && !spotlightedSet.has(node.nodeId)) ||
                       (!chooseMode && multiSelectIds.size > 0 && !multiSelectIds.has(node.nodeId)) ||
                       (!!searchMatches && !searchMatches.has(node.nodeId))) &&
                     !unmutedAttackNodeIds?.has(node.nodeId)
@@ -2466,27 +2493,14 @@ export function MapPage() {
                         : undefined
                   }
                   inlineEditing={editingThis}
-                  onInlineConfirm={(text, type) => confirmInlineEdit(node, text, type)}
-                  onInlineCancel={() => setInlineEditId(null)}
-                  onPointerDown={editingThis ? undefined : (e) => onNodePointerDown(node, e)}
-                  onClick={(e) => {
-                    if (suppressNextClick.current) {
-                      suppressNextClick.current = false;
-                      return;
-                    }
-                    handleNodeClick(node, e.shiftKey);
-                  }}
-                  onDoubleClick={() => startInlineEdit(node)}
-                  onContextMenu={(e) => handleNodeContextMenu(node, e)}
-                  onCardResize={canEditNode(node) ? (size) => void saveCardLook(node, { cardW: size.w, cardH: size.h }) : undefined}
+                  actions={nodeActions}
+                  canResize={canEditNode(node)}
                   cardFill={cardFills[node.nodeId]}
                   dotted={dotZoom || dottedByZone(node.nodeId)}
                   blockLocked={!!blockLocks[node.nodeId]}
-                  onToggleBlockLock={isOwnNode(node) ? () => toggleBlockLock(node.nodeId) : undefined}
-                  onConnectStart={
-                    isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
-                  }
-                  onAddBranch={
+                  canToggleLock={isOwnNode(node)}
+                  canConnect={isOwnNode(node) && !drawMode}
+                  canAddBranch={
                     node.nodeId === selectedId &&
                     isOwnNode(node) &&
                     onCardBoard(node) &&
@@ -2495,10 +2509,7 @@ export function MapPage() {
                     !drawMode &&
                     !pendingCreate &&
                     !inlineEditId
-                      ? () => addBranchFromCard(node)
-                      : undefined
                   }
-                  onHoverText={() => void ensureNodeText([node.nodeId])}
                 />
               );
             })}

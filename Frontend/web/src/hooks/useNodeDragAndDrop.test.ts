@@ -9,8 +9,21 @@ import type { Translation } from "../i18n/translations";
 
 vi.mock("../api/nodes", () => ({
   updateNode: vi.fn(),
+  moveNodes: vi.fn(),
 }));
 import * as nodesApi from "../api/nodes";
+
+// A node's spot as sent in a group move (nodesApi.moveNodes), if it was.
+function movedSpot(nodeId: string) {
+  for (const [moves] of vi.mocked(nodesApi.moveNodes).mock.calls) {
+    const move = moves.find((m) => m.nodeId === nodeId);
+    if (move) {
+      const { nodeId: _id, ...spot } = move;
+      return spot;
+    }
+  }
+  return undefined;
+}
 
 type Pt = { x: number; y: number };
 
@@ -108,6 +121,7 @@ describe("useNodeDragAndDrop", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    vi.mocked(nodesApi.moveNodes).mockImplementation(async (moves) => moves.map((m) => makeNode(m)));
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -201,10 +215,10 @@ describe("useNodeDragAndDrop", () => {
       });
 
       expect(nodesApi.updateNode).toHaveBeenCalledWith("p", { x: 1900, y: 800 });
-      const pulled = vi.mocked(nodesApi.updateNode).mock.calls.find(([id]) => id === "mine")?.[1];
+      const pulled = movedSpot("mine");
       expect(pulled).toBeDefined();
       expect(Math.hypot(pulled!.x! - 1900, pulled!.y! - 800)).toBeLessThan(500);
-      expect(nodesApi.updateNode).not.toHaveBeenCalledWith("theirs", expect.anything());
+      expect(movedSpot("theirs")).toBeUndefined();
       // One undo step puts the parent and the pulled child back together.
       expect(recordMove).toHaveBeenCalledWith([nodes[0], nodes[1]]);
     });
@@ -229,11 +243,12 @@ describe("useNodeDragAndDrop", () => {
       });
 
       expect(count).toBe(1);
-      const pulled = vi.mocked(nodesApi.updateNode).mock.calls.find(([id]) => id === "far")?.[1];
+      const pulled = movedSpot("far");
       expect(pulled!.x!).toBeGreaterThan(1200);
       expect(pulled!.x!).toBeLessThan(2100);
-      expect(nodesApi.updateNode).not.toHaveBeenCalledWith("near", expect.anything());
-      expect(nodesApi.updateNode).not.toHaveBeenCalledWith("p", expect.anything());
+      expect(movedSpot("near")).toBeUndefined();
+      expect(movedSpot("p")).toBeUndefined();
+      expect(nodesApi.moveNodes).toHaveBeenCalledTimes(1);
       expect(recordMove).toHaveBeenCalledWith([nodes[1]]);
     });
 
@@ -696,8 +711,10 @@ describe("useNodeDragAndDrop", () => {
       });
 
       expect(zoomToEditAt).not.toHaveBeenCalled();
-      expect(nodesApi.updateNode).toHaveBeenCalledWith("leader", { x: 400, y: 200 });
-      expect(nodesApi.updateNode).toHaveBeenCalledWith("follower", { x: 500, y: 600 });
+      // The whole group in one request.
+      expect(nodesApi.moveNodes).toHaveBeenCalledTimes(1);
+      expect(movedSpot("leader")).toEqual({ x: 400, y: 200 });
+      expect(movedSpot("follower")).toEqual({ x: 500, y: 600 });
       expect(result.current.groupDragState).toBeNull();
     });
 
@@ -724,8 +741,9 @@ describe("useNodeDragAndDrop", () => {
         listeners.pointerup({ clientX: 400, clientY: 600 });
         await vi.runAllTimersAsync();
       });
-      expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 400, y: 600 });
-      expect(nodesApi.updateNode).toHaveBeenCalledWith("b", { x: 500, y: 600 });
+      expect(nodesApi.moveNodes).toHaveBeenCalledTimes(1);
+      expect(movedSpot("a")).toEqual({ x: 400, y: 600 });
+      expect(movedSpot("b")).toEqual({ x: 500, y: 600 });
       expect(result.current.groupDragState).toBeNull();
     });
 

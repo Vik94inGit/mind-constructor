@@ -7,6 +7,7 @@ import { broadcastToMap } from "../realtime/io.js";
 import {
   createNodeAbl,
   updateNodeAbl,
+  moveNodesAbl,
   setBranchHiddenAbl,
   NotMapOwnerError,
   MapNotFoundError,
@@ -149,6 +150,23 @@ export const updateNode = async (
       ],
       { message: "Failed to update node", logLabel: "updateNode" },
     );
+  }
+};
+
+// ========== MOVE SEVERAL NODES ==========
+// PATCH /api/nodes { moves: [{ nodeId, x, y, cardX?, cardY? }] } — a group
+// moved at once. Everyone else on the map hears one "nodes:moved" event.
+export const moveNodes = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Unauthorized User missing" });
+    }
+    const { nodes, broadcasts } = await moveNodesAbl(userId, req.body);
+    for (const { publicMapId, nodes: batch } of broadcasts) broadcastToMap(publicMapId, "nodes:moved", batch);
+    return res.status(200).json(nodes);
+  } catch (error) {
+    return handleAblError(res, error, [], { message: "Failed to move nodes", logLabel: "moveNodes" });
   }
 };
 
