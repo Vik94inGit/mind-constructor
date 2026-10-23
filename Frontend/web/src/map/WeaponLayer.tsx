@@ -66,10 +66,9 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState, cho
           return (
             <g
               key={`weapon-${weaponNode.nodeId}`}
-              // The sentiment show stretches the bow and its arrows between
-              // the weapon and whatever it's aimed at (see applyRevealFrame).
+              // The map's entrance shows the bow once both the weapon and
+              // whatever it's aimed at are there (see applyEntranceFrame).
               data-reveal-seg={`${weaponNode.nodeId} ${aimedAt.nodeId}`}
-              data-base={`${a.x} ${a.y} ${b.x} ${b.y}`}
             >
             <WeaponMark
               x={a.x}

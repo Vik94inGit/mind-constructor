@@ -448,28 +448,6 @@ export function circleSentiment(members: NodeDoc[]): Sentiment {
   return pos > neg ? "positive" : "negative";
 }
 
-// Same pos/neg tally as circleSentiment above, but whole-map and three-way
-// tie-aware rather than per-circle — the trigger for MapPage's own
-// majority-swap auto-reposition effect (a tie never fires it, only pos or
-// neg strictly outnumbering the other does, and only on the swing from one
-// decisive side to the other — see MapPage's own edge-detecting ref).
-// Takes just `{ type }`, not a full NodeDoc[] — a real node array satisfies
-// this trivially, but it also lets MapPage fold in a lightweight synthetic
-// entry for a node that's still being drafted (not yet a real NodeDoc at
-// all — see the pendingCreate-aware dominantSentiment memo) without needing
-// to fake up every other NodeDoc field just to satisfy this signature.
-export function computeDominantSentiment(nodes: { type: NodeType }[]): "positive" | "negative" | "tie" {
-  let pos = 0;
-  let neg = 0;
-  for (const n of nodes) {
-    const s = sentimentOf(n.type);
-    if (s === "positive") pos++;
-    else if (s === "negative") neg++;
-  }
-  if (pos === neg) return "tie";
-  return pos > neg ? "positive" : "negative";
-}
-
 // How close a drop has to land to an existing node to read as "onto it"
 // (join its circle) instead of just "near it" (a normal reposition): anywhere
 // over the node's whole card as it looks at this zoom (`scale`, see

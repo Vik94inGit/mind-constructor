@@ -25,6 +25,7 @@ import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
+import { useStableActions } from "../hooks/useStableActions";
 import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
@@ -34,7 +35,8 @@ import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } fr
 import type { CaptionSpec } from "../utils/nodePriority";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
-import { NodeCard } from "../map/NodeCard";
+import { CanvasNodeCard } from "../map/CanvasNodeCard";
+import type { CanvasNodeActions } from "../map/CanvasNodeCard";
 import { NodePanel } from "../map/NodePanel";
 import { PackPickerPanel } from "../map/PackPickerPanel";
 import { TextToNodesModal } from "../map/TextToNodesModal";
@@ -79,7 +81,7 @@ import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId, sentimentOf, ZONE_COLORS, zoneParentId } from "../utils/nodeType";
 import { useRadialBlend } from "../hooks/useRadialBlend";
-import { useSentimentShow } from "../hooks/useSentimentShow";
+import { useNodeEntrance } from "../hooks/useNodeEntrance";
 import { useCanvasFraming } from "../hooks/useCanvasFraming";
 import { useClipboardActions } from "../hooks/useClipboardActions";
 import { useLineDrawing } from "../hooks/useLineDrawing";
@@ -558,6 +560,8 @@ export function MapPage() {
   // recomputed from current parentId links, so it can't disagree with
   // what's actually locked.
   const spotlightedNodeIds = map?.selectedCircle?.nodeIds;
+  const spotlightedSet = useMemo(() => (spotlightedNodeIds ? new Set(spotlightedNodeIds) : null), [spotlightedNodeIds]);
+  const nodeById = useMemo(() => new Map(nodes.map((n) => [n.nodeId, n])), [nodes]);
 
   // Selecting either end of an attack (clicking the objection node or the
   // node it's aimed at — see handleNodeClick) keeps *that pair* visible
@@ -619,9 +623,7 @@ export function MapPage() {
     const grouped = groupDragState?.get(node.nodeId);
     if (grouped) return glide.shown(node.nodeId, grouped);
     if (dragState && dragState.nodeId === node.nodeId) return glide.shown(node.nodeId, { x: dragState.x, y: dragState.y });
-    // Always the real position — the sentiment show's travel is drawn on top
-    // of this directly on the canvas DOM (see useSentimentShow), never here.
-    // Gliding there when it changes, not jumping (see usePositionGlide).
+    // Always the real position, gliding there when it changes, not jumping (see usePositionGlide).
     const stored = glide.shown(
       node.nodeId,
       glide.at(node.nodeId, positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 }),
@@ -1007,24 +1009,11 @@ export function MapPage() {
     [nodeGroups, solved],
   );
 
-  // The sentiment show (see hooks/useSentimentShow.ts): on open, and on every
-  // majority swing, the majority type's nodes travel toward the center and
-  // the minority's toward the edge, one after another, hold, and come back.
-  // Drawn straight onto the canvas DOM on top of the real positions (posFor
-  // never sees it); skip is wired to any pointer-down on the canvas.
-  // A Personal map stays calm: no majority notice, nothing travels on open.
-  const sentimentShow = useSentimentShow({
-    enabled: discussionOn,
-    nodes,
-    visibleNodes,
-    positions,
-    canvasRef,
-    draftType: pendingCreate?.type,
-    showPoints,
-    showNotice,
-    positiveMajorityNotice: t.ui.positiveMajorityNotice,
-    negativeMajorityNotice: t.ui.negativeMajorityNotice,
-  });
+  // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
+  // appear one after another in the order they were made, drawn straight onto
+  // the canvas DOM (posFor never sees it); skip is wired to any pointer-down
+  // on the canvas. A Personal map stays calm and opens already laid out.
+  const entrance = useNodeEntrance({ enabled: discussionOn, visibleNodes, canvasRef });
 
   // Whether a node is drawn as a puzzle card right now — the only nodes that
   // snap together (see usePuzzleConnect).
@@ -1935,6 +1924,29 @@ export function MapPage() {
     stepReading: (dir) => stepReading(dir, false),
   });
 
+  // What a card on the canvas does when used: one stable object for every
+  // card, so CanvasNodeCard only re-renders when its own node changed.
+  const nodeActions = useStableActions<CanvasNodeActions>({
+    inlineConfirm: (node, text, type) => void confirmInlineEdit(node, text, type),
+    inlineCancel: () => setInlineEditId(null),
+    pointerDown: (node, e) => onNodePointerDown(node, e),
+    click: (node, e) => {
+      if (suppressNextClick.current) {
+        suppressNextClick.current = false;
+        return;
+      }
+      handleNodeClick(node, e.shiftKey);
+    },
+    doubleClick: (node) => startInlineEdit(node),
+    contextMenu: (node, e) => handleNodeContextMenu(node, e),
+    resize: (node, size) => void saveCardLook(node, { cardW: size.w, cardH: size.h }),
+    toggleBlockLock: (nodeId) => toggleBlockLock(nodeId),
+    connectStart: (node, e) => startPuzzleConnect(node, e),
+    addBranch: (node) => addBranchFromCard(node),
+    hoverText: (nodeId) => void ensureNodeText([nodeId]),
+    iconHover: (nodeId, on) => setChompId((cur) => (on ? nodeId : cur === nodeId ? null : cur)),
+  });
+
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
   if (error || !map) {
     return (
@@ -2067,7 +2079,7 @@ export function MapPage() {
       selectedId === n.nodeId ||
       selectedId === parentId ||
       multiSelectIds.has(n.nodeId) ||
-      spotlightedNodeIds?.includes(n.nodeId) ||
+      spotlightedSet?.has(n.nodeId) ||
       inlineEditId === n.nodeId ||
       nodeDragged(n)
     );
@@ -2295,9 +2307,9 @@ export function MapPage() {
               outline: "3px solid color-mix(in srgb, var(--ink) 55%, transparent)",
             }}
             // Capture phase, so any press anywhere on the canvas — empty
-            // space, a node, a zone, a link — cuts the sentiment show short,
+            // space, a node, a zone, a link — cuts the entrance short,
             // even when that element stops the event from bubbling.
-            onPointerDownCapture={sentimentShow.skip}
+            onPointerDownCapture={entrance.skip}
             onClick={(e) => {
               // See onCanvasPointerDown's own onUp comment — the trailing
               // native click a completed marquee drag leaves behind on this
@@ -2405,11 +2417,11 @@ export function MapPage() {
               let flightVector: { x: number; y: number } | undefined;
               if (node.isWeapon) {
                 const targetId = nodeRefId(node.targetNodeId);
-                const target = targetId ? nodes.find((t) => t.nodeId === targetId) : undefined;
+                const target = targetId ? nodeById.get(targetId) : undefined;
                 if (target) flightVector = weaponFlightVector(pos, posFor(target));
               }
               return (
-                <NodeCard
+                <CanvasNodeCard
                   key={node.nodeId}
                   node={node}
                   emojiFirst={emojiFirst}
@@ -2435,7 +2447,7 @@ export function MapPage() {
                   }
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
                   parentCrownSentiment={circleRootSentimentByNode.get(node.nodeId)}
-                  inChosenCircle={!!spotlightedNodeIds?.includes(node.nodeId)}
+                  inChosenCircle={!!spotlightedSet?.has(node.nodeId)}
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
@@ -2446,10 +2458,11 @@ export function MapPage() {
                   hiddenBranch={hiddenBranchIds.has(node.nodeId)}
                   discussionMode={isDiscussionMode}
                   celebrate={celebrateIds.has(node.nodeId)}
-                  flightVector={flightVector}
+                  flightX={flightVector?.x}
+                  flightY={flightVector?.y}
                   muted={
                     ((quickAddActive && !dotZoom && node.nodeId !== selectedId) ||
-                      (!!spotlightedNodeIds && !spotlightedNodeIds.includes(node.nodeId)) ||
+                      (!!spotlightedSet && !spotlightedSet.has(node.nodeId)) ||
                       (!chooseMode && multiSelectIds.size > 0 && !multiSelectIds.has(node.nodeId)) ||
                       (!!searchMatches && !searchMatches.has(node.nodeId))) &&
                     !unmutedAttackNodeIds?.has(node.nodeId)
@@ -2469,27 +2482,14 @@ export function MapPage() {
                         : undefined
                   }
                   inlineEditing={editingThis}
-                  onInlineConfirm={(text, type) => confirmInlineEdit(node, text, type)}
-                  onInlineCancel={() => setInlineEditId(null)}
-                  onPointerDown={editingThis ? undefined : (e) => onNodePointerDown(node, e)}
-                  onClick={(e) => {
-                    if (suppressNextClick.current) {
-                      suppressNextClick.current = false;
-                      return;
-                    }
-                    handleNodeClick(node, e.shiftKey);
-                  }}
-                  onDoubleClick={() => startInlineEdit(node)}
-                  onContextMenu={(e) => handleNodeContextMenu(node, e)}
-                  onCardResize={canEditNode(node) ? (size) => void saveCardLook(node, { cardW: size.w, cardH: size.h }) : undefined}
+                  actions={nodeActions}
+                  canResize={canEditNode(node)}
                   cardFill={cardFills[node.nodeId]}
                   dotted={dotZoom || dottedByZone(node.nodeId)}
                   blockLocked={!!blockLocks[node.nodeId]}
-                  onToggleBlockLock={isOwnNode(node) ? () => toggleBlockLock(node.nodeId) : undefined}
-                  onConnectStart={
-                    isOwnNode(node) && !drawMode ? (e) => startPuzzleConnect(node, e) : undefined
-                  }
-                  onAddBranch={
+                  canToggleLock={isOwnNode(node)}
+                  canConnect={isOwnNode(node) && !drawMode}
+                  canAddBranch={
                     node.nodeId === selectedId &&
                     isOwnNode(node) &&
                     onCardBoard(node) &&
@@ -2498,15 +2498,8 @@ export function MapPage() {
                     !drawMode &&
                     !pendingCreate &&
                     !inlineEditId
-                      ? () => addBranchFromCard(node)
-                      : undefined
                   }
-                  onHoverText={() => void ensureNodeText([node.nodeId])}
-                  onIconHover={
-                    chompsOnHover(node)
-                      ? (on) => setChompId((cur) => (on ? node.nodeId : cur === node.nodeId ? null : cur))
-                      : undefined
-                  }
+                  canChomp={chompsOnHover(node)}
                   chomping={chompId === node.nodeId && !dotZoom}
                 />
               );
@@ -2602,9 +2595,7 @@ export function MapPage() {
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}
                 // Keeps pendingCreate.type in sync with whichever type is
-                // currently armed in the card, live — the dominantSentiment
-                // memo below reads it straight off pendingCreate rather
-                // than needing its own separate piece of state.
+                // currently armed in the card, live.
                 onTypeChange={(draftType) =>
                   setPendingCreate((prev) => (prev ? { ...prev, type: draftType } : prev))
                 }

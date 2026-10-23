@@ -359,8 +359,6 @@ export interface UiStrings {
     ghostPlaceholder: string;
     createGhost: string;
   };
-  negativeMajorityNotice: string;
-  positiveMajorityNotice: string;
   presentation: {
     exit: string;
     prev: string;
@@ -913,8 +911,6 @@ const en: UiStrings = {
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
   newNode: { title: "New node", placeholder: "Write your thought…", create: "Create", hint: "Enter creates it, Shift+Enter adds a line", ghost: "Ghost", ghostHint: "Write a question instead of an answer: the node stays faded until someone fills it in", ghostPlaceholder: "Write the question to answer later…", createGhost: "Create ghost" },
-  negativeMajorityNotice: "Negative arguments are now the majority — the map has shifted",
-  positiveMajorityNotice: "Positive arguments are now the majority — the map has shifted",
   presentation: {
     exit: "Exit",
     prev: "Prev",
@@ -1448,8 +1444,6 @@ const cs: UiStrings = {
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
   newNode: { title: "Nový uzel", placeholder: "Napište svou myšlenku…", create: "Vytvořit", hint: "Enter vytvoří, Shift+Enter přidá řádek", ghost: "Duch", ghostHint: "Napište otázku místo odpovědi: uzel zůstane vybledlý, dokud ho někdo nevyplní", ghostPlaceholder: "Napište otázku, na kterou odpovíte později…", createGhost: "Vytvořit ducha" },
-  negativeMajorityNotice: "Negativní argumenty jsou nyní většinou — mapa se přeuspořádala",
-  positiveMajorityNotice: "Pozitivní argumenty jsou nyní většinou — mapa se přeuspořádala",
   presentation: {
     exit: "Ukončit",
     prev: "Předchozí",
@@ -1982,8 +1976,6 @@ const uk: UiStrings = {
   panelDragHandle: "Перетягніть, щоб пересунути цю панель",
   panelResizeHandle: "Перетягніть, щоб змінити розмір цієї панелі",
   newNode: { title: "Новий вузол", placeholder: "Напишіть свою думку…", create: "Створити", hint: "Enter створює, Shift+Enter додає рядок", ghost: "Привид", ghostHint: "Напишіть питання замість відповіді: вузол лишатиметься блідим, доки хтось його не заповнить", ghostPlaceholder: "Напишіть питання, на яке відповісте пізніше…", createGhost: "Створити привида" },
-  negativeMajorityNotice: "Негативні аргументи тепер у більшості — мапа перебудувалася",
-  positiveMajorityNotice: "Позитивні аргументи тепер у більшості — мапа перебудувалася",
   presentation: {
     exit: "Вийти",
     prev: "Назад",
@@ -2519,8 +2511,6 @@ const ru: UiStrings = {
   panelDragHandle: "Перетащите, чтобы передвинуть эту панель",
   panelResizeHandle: "Перетащите, чтобы изменить размер этой панели",
   newNode: { title: "Новый узел", placeholder: "Напишите свою мысль…", create: "Создать", hint: "Enter создаёт, Shift+Enter добавляет строку", ghost: "Призрак", ghostHint: "Напишите вопрос вместо ответа: узел останется бледным, пока кто-то его не заполнит", ghostPlaceholder: "Напишите вопрос, на который ответите позже…", createGhost: "Создать призрака" },
-  negativeMajorityNotice: "Негативные аргументы теперь в большинстве — карта перестроилась",
-  positiveMajorityNotice: "Позитивные аргументы теперь в большинстве — карта перестроилась",
   presentation: {
     exit: "Выйти",
     prev: "Назад",

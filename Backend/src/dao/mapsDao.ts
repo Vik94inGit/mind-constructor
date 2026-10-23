@@ -379,11 +379,11 @@ export const searchNodesDao = async (userId: string, pattern: RegExp, limit: num
     .lean<{ _id: mongoose.Types.ObjectId; mapId: string; name: string; ownerId: { toString(): string } }[]>();
   if (maps.length === 0) return [];
 
-  const hiddenIds: string[] = [];
-  for (const m of maps) {
-    if (m.ownerId.toString() === userId.toString()) continue;
-    hiddenIds.push(...(await getHiddenNodesDao(m._id)).ids);
-  }
+  // Branches hidden in maps shared with this user, every map at once.
+  const hidden = await Promise.all(
+    maps.filter((m) => m.ownerId.toString() !== userId.toString()).map((m) => getHiddenNodesDao(m._id)),
+  );
+  const hiddenIds = hidden.flatMap((h) => [...h.ids]);
 
   const rows = await Node.find({
     mapId: { $in: maps.map((m) => m._id) },

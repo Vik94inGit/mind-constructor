@@ -4,6 +4,7 @@ import {
   getNodeById,
   createNode,
   updateNode,
+  moveNodes,
   deleteNode,
   deleteManyNodes,
   attackNode,
@@ -24,6 +25,8 @@ router.get<{ nodeId: string }>("/:nodeId", protect, getNodeById);
 // requires a :nodeId segment, so registration order doesn't matter here,
 // unlike a bulk route that could collide with a param route).
 router.delete("/", protect, deleteManyNodes);
+// Bulk move — a bare PATCH /api/nodes with a { moves } body, the same way.
+router.patch("/", protect, moveNodes);
 
 router.patch<{ nodeId: string }>("/:nodeId", protect, updateNode);
 router.delete<{ nodeId: string }>("/:nodeId", protect, deleteNode);

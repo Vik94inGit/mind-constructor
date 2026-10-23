@@ -183,11 +183,9 @@ export function CanvasBackdrop({
           <g key={`zone-${g.rootId}`}>
             <polygon
               points={zonePoints}
-              // Tagged for the sentiment show (see applyRevealFrame): each
-              // corner follows its own node, so the zone stretches and shrinks
-              // as they move and is redrawn from data-base when they're home.
+              // Tagged for the map's entrance (see applyEntranceFrame): the
+              // zone fills in as the nodes it's drawn through appear.
               data-reveal-points={g.outlineIds?.join(" ")}
-              data-base={zonePoints}
               fill={color}
               fillOpacity={dimmed ? 0.06 : 0.14}
               stroke={color}
@@ -241,7 +239,6 @@ export function CanvasBackdrop({
                 <polygon
                   points={zonePoints}
                   data-reveal-points={g.outlineIds?.join(" ")}
-                  data-base={zonePoints}
                   fill={`url(#${patternId})`}
                   opacity={dimmed ? 0.4 : 1}
                 />
@@ -264,7 +261,6 @@ export function CanvasBackdrop({
               key={`solved-${g.rootId}`}
               points={zonePoints}
               data-reveal-points={g.outlineIds?.join(" ")}
-              data-base={zonePoints}
               fill="none"
               stroke={SOLVED_GOLD}
               strokeWidth={2.5}
@@ -293,7 +289,6 @@ export function CanvasBackdrop({
                 <polygon
                   points={zonePoints}
                   data-reveal-points={g.outlineIds?.join(" ")}
-                  data-base={zonePoints}
                   fill="none"
                   stroke={color}
                   strokeWidth={14}
@@ -304,7 +299,6 @@ export function CanvasBackdrop({
               <polygon
                 points={zonePoints}
                 data-reveal-points={g.outlineIds?.join(" ")}
-                data-base={zonePoints}
                 fill="none"
                 stroke={color}
                 strokeWidth={kingdom ? 8 : 6}
@@ -334,7 +328,6 @@ export function CanvasBackdrop({
               cx={p.x}
               cy={p.y}
               data-reveal-at={n.nodeId}
-              data-base={`${p.x} ${p.y}`}
               r={55}
               fill={color}
               fillOpacity={0.14}
@@ -365,7 +358,6 @@ export function CanvasBackdrop({
               cx={p.x}
               cy={p.y}
               data-reveal-at={n.nodeId}
-              data-base={`${p.x} ${p.y}`}
               r={34}
               fill={color}
               fillOpacity={0.16}
@@ -396,7 +388,6 @@ export function CanvasBackdrop({
             key={`figure-${cycle.slice().sort().join("-")}`}
             points={figurePoints}
             data-reveal-points={members.map((n) => n.nodeId).join(" ")}
-            data-base={figurePoints}
             fill="var(--accent)"
             fillOpacity={0.1}
             stroke="var(--accent)"
@@ -473,7 +464,6 @@ export function CanvasBackdrop({
             // the old backdrop circle used), so it has to explicitly
             // opt back in; an ungrouped one stays inert.
             data-reveal-line={`${parentId} ${node.nodeId}`}
-            data-base={`${a.x} ${a.y} ${b.x} ${b.y}`}
             style={group && interactive ? { cursor: "pointer", pointerEvents: "auto" } : undefined}
             onClick={
               group
@@ -549,7 +539,6 @@ export function CanvasBackdrop({
             x2={b.x}
             y2={b.y}
             data-reveal-line={`${fromId} ${toId}`}
-            data-base={`${a.x} ${a.y} ${b.x} ${b.y}`}
             stroke={color}
             strokeWidth={2}
             strokeOpacity={dimmed ? 0.06 : highlighted ? 0.9 : 0.55}
@@ -638,7 +627,6 @@ export function CanvasBackdrop({
             cx={p.x}
             cy={p.y}
             data-reveal-at={n.nodeId}
-            data-base={`${p.x} ${p.y}`}
             r={18}
             fill="none"
             stroke="var(--accent)"
