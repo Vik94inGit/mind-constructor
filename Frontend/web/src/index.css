@@ -421,83 +421,39 @@
 }
 
 /* A strong attack's Pac-Man run on hover (map/PacmanChomp.tsx): out to the
-   target, two bites, back home, on a loop. Everything moves along the
-   group's own x axis, which PacmanChomp already turned toward the target. */
+   target with its mouth open, one small nudge into it, back home, on a loop.
+   Everything moves along the group's own x axis, which PacmanChomp already
+   turned toward the target. The jaws stay open the whole way. */
 .pacman-run {
-  animation: pacman-run 2.6s ease-in-out infinite;
+  animation: pacman-run 2.4s ease-in-out infinite;
 }
 .pacman-jaw-top {
-  animation: pacman-jaw-top 0.3s ease-in-out infinite;
+  transform: rotate(-38deg);
 }
 .pacman-jaw-bottom {
-  animation: pacman-jaw-bottom 0.3s ease-in-out infinite;
-}
-.pacman-crumbs {
-  opacity: 0;
-  animation: pacman-crumbs 2.6s ease-out infinite;
+  transform: rotate(38deg);
 }
 @keyframes pacman-run {
   0%,
-  6% {
+  8% {
     transform: translateX(0);
   }
-  34% {
-    transform: translateX(var(--chomp-reach));
-  }
-  42% {
-    transform: translateX(calc(var(--chomp-reach) + var(--chomp-lunge)));
-  }
-  50% {
-    transform: translateX(var(--chomp-reach));
-  }
-  58% {
-    transform: translateX(calc(var(--chomp-reach) + var(--chomp-lunge)));
-  }
-  66% {
-    transform: translateX(var(--chomp-reach));
-  }
-  94%,
-  100% {
-    transform: translateX(0);
-  }
-}
-@keyframes pacman-jaw-top {
-  0%,
-  100% {
-    transform: rotate(-38deg);
-  }
-  50% {
-    transform: rotate(0deg);
-  }
-}
-@keyframes pacman-jaw-bottom {
-  0%,
-  100% {
-    transform: rotate(38deg);
-  }
-  50% {
-    transform: rotate(0deg);
-  }
-}
-@keyframes pacman-crumbs {
-  0%,
   40% {
-    opacity: 0;
-    transform: translateX(0);
+    transform: translateX(var(--chomp-reach));
   }
-  44%,
-  62% {
-    opacity: 1;
+  50% {
+    transform: translateX(calc(var(--chomp-reach) + var(--chomp-lunge)));
   }
-  70%,
+  60% {
+    transform: translateX(var(--chomp-reach));
+  }
+  92%,
   100% {
-    opacity: 0;
-    transform: translateX(6px);
+    transform: translateX(0);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pacman-run,
-  .pacman-crumbs {
+  .pacman-run {
     animation: none;
   }
 }

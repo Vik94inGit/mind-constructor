@@ -3,8 +3,8 @@ import type { NodeDoc } from "../types";
 type Pt = { x: number; y: number };
 
 // A strong attack plays Pac-Man while the pointer rests on it: the attack's
-// icon turns into a round pie with a mouth, runs over to whatever it hit,
-// takes a few bites and runs back home (map/PacmanChomp.tsx). Strong means a
+// icon turns into a round pie with an open mouth, runs over to whatever it
+// hit, nudges into it and runs back home (map/PacmanChomp.tsx). Strong means a
 // counterpoint (axe, leaves a fresh node at 75%) or a fatal flaw (spear,
 // leaves it at 50%); a nitpick stays still.
 const CHOMPING_ICONS = new Set(["axe", "spear"]);
