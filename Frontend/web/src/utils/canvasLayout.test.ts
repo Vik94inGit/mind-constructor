@@ -9,7 +9,6 @@ import {
   selfIntersects,
   realmOutline,
   CAPTION_WIDTH,
-  computeDominantSentiment,
   computeLinkCycles,
   computeNodeGroups,
   getCirclePackSpacing,
@@ -36,32 +35,6 @@ function makeNode(overrides: Partial<NodeDoc> & { nodeId: string }): NodeDoc {
 function makeEdge(fromNodeId: string, toNodeId: string): EdgeDoc {
   return { edgeId: `${fromNodeId}-${toNodeId}`, mapId: "m1", fromNodeId, toNodeId, sentiment: "neutral", userId: "u1" };
 }
-
-describe("computeDominantSentiment", () => {
-  it("is a tie when nothing has a lean", () => {
-    expect(computeDominantSentiment([{ type: "unknown" }])).toBe("tie");
-  });
-
-  it("is a tie when positive and negative counts are equal", () => {
-    const types: { type: NodeType }[] = [{ type: "Success" }, { type: "Fail" }];
-    expect(computeDominantSentiment(types)).toBe("tie");
-  });
-
-  it("is positive when Success/Solution/Option strictly outnumber Fail/Problem/Problematic option", () => {
-    const types: { type: NodeType }[] = [{ type: "Success" }, { type: "Option" }, { type: "Fail" }];
-    expect(computeDominantSentiment(types)).toBe("positive");
-  });
-
-  it("is negative when the negative side strictly outnumbers the positive one", () => {
-    const types: { type: NodeType }[] = [{ type: "Problem" }, { type: "Fail" }, { type: "Success" }];
-    expect(computeDominantSentiment(types)).toBe("negative");
-  });
-
-  it("ignores unknown-typed entries entirely — they vote for neither side", () => {
-    const types: { type: NodeType }[] = [{ type: "Success" }, { type: "unknown" }, { type: "unknown" }];
-    expect(computeDominantSentiment(types)).toBe("positive");
-  });
-});
 
 describe("isDescendant", () => {
   const nodes: NodeDoc[] = [

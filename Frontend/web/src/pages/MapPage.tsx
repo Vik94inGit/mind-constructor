@@ -80,7 +80,7 @@ import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId, sentimentOf, ZONE_COLORS, zoneParentId } from "../utils/nodeType";
 import { useRadialBlend } from "../hooks/useRadialBlend";
-import { useSentimentShow } from "../hooks/useSentimentShow";
+import { useNodeEntrance } from "../hooks/useNodeEntrance";
 import { useCanvasFraming } from "../hooks/useCanvasFraming";
 import { useClipboardActions } from "../hooks/useClipboardActions";
 import { useLineDrawing } from "../hooks/useLineDrawing";
@@ -620,9 +620,7 @@ export function MapPage() {
     const grouped = groupDragState?.get(node.nodeId);
     if (grouped) return glide.shown(node.nodeId, grouped);
     if (dragState && dragState.nodeId === node.nodeId) return glide.shown(node.nodeId, { x: dragState.x, y: dragState.y });
-    // Always the real position — the sentiment show's travel is drawn on top
-    // of this directly on the canvas DOM (see useSentimentShow), never here.
-    // Gliding there when it changes, not jumping (see usePositionGlide).
+    // Always the real position, gliding there when it changes, not jumping (see usePositionGlide).
     const stored = glide.shown(
       node.nodeId,
       glide.at(node.nodeId, positions.get(node.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 }),
@@ -1008,24 +1006,11 @@ export function MapPage() {
     [nodeGroups, solved],
   );
 
-  // The sentiment show (see hooks/useSentimentShow.ts): on open, and on every
-  // majority swing, the majority type's nodes travel toward the center and
-  // the minority's toward the edge, one after another, hold, and come back.
-  // Drawn straight onto the canvas DOM on top of the real positions (posFor
-  // never sees it); skip is wired to any pointer-down on the canvas.
-  // A Personal map stays calm: no majority notice, nothing travels on open.
-  const sentimentShow = useSentimentShow({
-    enabled: discussionOn,
-    nodes,
-    visibleNodes,
-    positions,
-    canvasRef,
-    draftType: pendingCreate?.type,
-    showPoints,
-    showNotice,
-    positiveMajorityNotice: t.ui.positiveMajorityNotice,
-    negativeMajorityNotice: t.ui.negativeMajorityNotice,
-  });
+  // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
+  // appear one after another in the order they were made, drawn straight onto
+  // the canvas DOM (posFor never sees it); skip is wired to any pointer-down
+  // on the canvas. A Personal map stays calm and opens already laid out.
+  const entrance = useNodeEntrance({ enabled: discussionOn, visibleNodes, canvasRef });
 
   // Whether a node is drawn as a puzzle card right now — the only nodes that
   // snap together (see usePuzzleConnect).
@@ -2318,9 +2303,9 @@ export function MapPage() {
               outline: "3px solid color-mix(in srgb, var(--ink) 55%, transparent)",
             }}
             // Capture phase, so any press anywhere on the canvas — empty
-            // space, a node, a zone, a link — cuts the sentiment show short,
+            // space, a node, a zone, a link — cuts the entrance short,
             // even when that element stops the event from bubbling.
-            onPointerDownCapture={sentimentShow.skip}
+            onPointerDownCapture={entrance.skip}
             onClick={(e) => {
               // See onCanvasPointerDown's own onUp comment — the trailing
               // native click a completed marquee drag leaves behind on this
@@ -2600,9 +2585,7 @@ export function MapPage() {
                 onConfirm={confirmPendingCreate}
                 onCancel={() => setPendingCreate(null)}
                 // Keeps pendingCreate.type in sync with whichever type is
-                // currently armed in the card, live — the dominantSentiment
-                // memo below reads it straight off pendingCreate rather
-                // than needing its own separate piece of state.
+                // currently armed in the card, live.
                 onTypeChange={(draftType) =>
                   setPendingCreate((prev) => (prev ? { ...prev, type: draftType } : prev))
                 }

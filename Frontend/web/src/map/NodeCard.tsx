@@ -651,8 +651,8 @@ export const NodeCard = memo(function NodeCard({
     <div
       className={`${classes} ${flying ? "animate-weapon-fly-in" : ""}`}
       style={{ ...style, ...flightStyle, ...chaosCss }}
-      // The sentiment show (see applyRevealFrame) moves this node through
-      // the individual CSS `translate` property, which composes with the
+      // The map's entrance (see applyEntranceFrame) grows this node in
+      // through the individual CSS `scale` property, which composes with the
       // `transform` the centering and the chaos-drift/fly-in keyframes own.
       data-reveal-node={node.nodeId}
       onPointerDown={handlePointerDown}

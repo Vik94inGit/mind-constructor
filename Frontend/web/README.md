@@ -176,8 +176,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Map types** — creating a map asks for one of four kinds (Problem analysis, Decision, Goal planning,
   Retrospective), each seeded with a starter structure in your language, and for a mode (Discussion or
   Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
-  calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, no "majority" notice
-  or sentiment show when it opens, and no Attack tab or menu item (switch to Discussion for those).
+  calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, no entrance when it
+  opens, and no Attack tab or menu item (switch to Discussion for those).
+- **Entrance** — a Discussion map builds itself up as it opens: its nodes appear one after another in
+  the order they were made, each fading and growing in where it already sits, with zones, links and
+  weapon bows filling in as their nodes arrive. It takes under three seconds on any map, and a click
+  anywhere on the canvas brings everything in at once (`src/hooks/useNodeEntrance.ts`,
+  `src/utils/nodeEntrance.ts`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
   matches stay lit while everything else dims, and a result takes you to that node.
 - **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden
