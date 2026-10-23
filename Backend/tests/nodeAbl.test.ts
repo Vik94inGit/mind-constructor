@@ -7,10 +7,13 @@ import {
   findNodeByPublicIdDao,
   setBranchHiddenMutationDao,
   zoneColorTakenDao,
+  moveNodesDao,
 } from "../src/dao/nodeDao.js";
+import { getHiddenNodesDao } from "../src/dao/visibilityDao.js";
 import {
   createNodeAbl,
   updateNodeAbl,
+  moveNodesAbl,
   setBranchHiddenAbl,
   NotMapOwnerError,
   MapNotFoundError,
@@ -34,6 +37,10 @@ vi.mock("../src/dao/nodeDao.js", () => ({
   zoneColorTakenDao: vi.fn(),
   findNodeByPublicIdDao: vi.fn(),
   setBranchHiddenMutationDao: vi.fn(),
+  moveNodesDao: vi.fn(),
+}));
+vi.mock("../src/dao/visibilityDao.js", () => ({
+  getHiddenNodesDao: vi.fn(),
 }));
 
 vi.mock("../src/dao/imageDao.js", () => ({
@@ -536,6 +543,42 @@ describe("nodeAbl", () => {
       await expect(setBranchHiddenAbl("node1", "user1", { hidden: "yes" })).rejects.toThrow(ValidationError);
       vi.mocked(findNodeByPublicIdDao).mockResolvedValue(null as never);
       expect(await setBranchHiddenAbl("node1", "user1", { hidden: false })).toBeNull();
+    });
+  });
+
+  describe("moveNodesAbl", () => {
+    const moved = (nodeId: string, mapId = "pub1") => ({ nodeId, mapId: { _id: `int-${mapId}`, mapId } });
+
+    it("rejects an empty or malformed list", async () => {
+      await expect(moveNodesAbl("user1", { moves: [] })).rejects.toThrow(ValidationError);
+      await expect(moveNodesAbl("user1", { moves: [{ nodeId: "a", x: "1" }] })).rejects.toThrow(ValidationError);
+      expect(moveNodesDao).not.toHaveBeenCalled();
+    });
+
+    it("saves only the spot fields that were sent", async () => {
+      vi.mocked(moveNodesDao).mockResolvedValue([] as never);
+      await moveNodesAbl("user1", { moves: [{ nodeId: "a", x: 1, y: 2 }, { nodeId: "b", cardX: 3, cardY: null }] });
+      expect(moveNodesDao).toHaveBeenCalledWith(
+        [
+          { nodeId: "a", spot: { x: 1, y: 2 } },
+          { nodeId: "b", spot: { cardX: 3, cardY: null } },
+        ],
+        "user1",
+      );
+    });
+
+    it("tells each map once, keeping hidden nodes in a batch of their own", async () => {
+      vi.mocked(moveNodesDao).mockResolvedValue([moved("a"), moved("b"), moved("c", "pub2")] as never);
+      vi.mocked(getHiddenNodesDao).mockImplementation(async (id) =>
+        String(id) === "int-pub1" ? { ids: new Set(["x"]), publicIds: new Set(["b"]) } : { ids: new Set(), publicIds: new Set() },
+      );
+      const { nodes, broadcasts } = await moveNodesAbl("user1", { moves: [{ nodeId: "a", x: 1, y: 1 }] });
+      expect(nodes).toHaveLength(3);
+      expect(broadcasts.map((b) => [b.publicMapId, b.nodes.map((n) => n.nodeId)])).toEqual([
+        ["pub1", ["a"]],
+        ["pub1", ["b"]],
+        ["pub2", ["c"]],
+      ]);
     });
   });
 });

@@ -98,6 +98,29 @@ export async function updateNode(nodeId: string, updates: Partial<NodeDoc>): Pro
   return node;
 }
 
+/** One node's new spot in a group move: its icon spot (x/y), its card spot (cardX/cardY), or both. */
+export type NodeMove = { nodeId: string } & Pick<Partial<NodeDoc>, "x" | "y" | "cardX" | "cardY">;
+
+// A group moved at once (a dragged selection, glued cards, a parent's
+// magnet), saved in one request instead of one per node. Only the caller's
+// own nodes move; the rest are left out of the answer.
+export async function moveNodes(moves: NodeMove[]): Promise<NodeDoc[]> {
+  const nodes = await apiRequest<NodeDoc[]>(`/api/nodes`, {
+    method: "PATCH",
+    body: { moves },
+    offline: {
+      optimistic: () =>
+        moves.map(({ nodeId, ...spot }) => ({
+          ...(offline.knownNode<NodeDoc>(nodeId) ?? ({ nodeId } as NodeDoc)),
+          ...spot,
+          updatedAt: new Date().toISOString(),
+        })),
+    },
+  });
+  offline.rememberNodes(nodes);
+  return nodes;
+}
+
 // damagedProtectedNode: set only when the deleted node was a protection
 // node with a nonzero blockedDamage — that whole running total just landed
 // on the node it used to defend in one lump sum (see Backend's

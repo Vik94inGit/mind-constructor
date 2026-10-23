@@ -81,6 +81,8 @@ export function useMapSocket({
 
     const onNodeCreated = (node: NodeDoc) => upsertNode(node);
     const onNodeUpdated = (node: NodeDoc) => upsertNode(node);
+    // A group someone moved at once (see nodesApi.moveNodes).
+    const onNodesMoved = (moved: NodeDoc[]) => moved.forEach(upsertNode);
     const onNodeDeleted = ({ nodeId: deletedId }: { nodeId: string }) => {
       setNodes((prev) => prev.filter((n) => n.nodeId !== deletedId));
       setEdges((prev) =>
@@ -151,6 +153,7 @@ export function useMapSocket({
 
     socket.on("node:created", onNodeCreated);
     socket.on("node:updated", onNodeUpdated);
+    socket.on("nodes:moved", onNodesMoved);
     socket.on("node:deleted", onNodeDeleted);
     socket.on("node:attacked", onNodeAttacked);
     const onLineCreated = (line: LineDoc) => upsertLine(line);
@@ -187,6 +190,7 @@ export function useMapSocket({
       socket.off("nodes:visibility", onVisibilityChanged);
       socket.off("node:created", onNodeCreated);
       socket.off("node:updated", onNodeUpdated);
+      socket.off("nodes:moved", onNodesMoved);
       socket.off("node:deleted", onNodeDeleted);
       socket.off("node:attacked", onNodeAttacked);
       socket.off("edge:created", onEdgeCreated);

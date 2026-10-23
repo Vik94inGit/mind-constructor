@@ -291,6 +291,22 @@ export const updateNodeDao = async (
   ).populate(NODE_POPULATE);
 };
 
+// A group of nodes moved at once (a dragged selection, glued cards, a
+// parent's magnet): one write for all of them instead of one request per
+// node. Same rule as updateNodeDao: only the node's creator may move it, so
+// someone else's node in `moves` is left where it is and isn't returned.
+export const moveNodesDao = async (
+  moves: { nodeId: string; spot: Record<string, number | null> }[],
+  userId: string,
+) => {
+  if (moves.length === 0) return [];
+  await Node.bulkWrite(
+    moves.map(({ nodeId, spot }) => ({ updateOne: { filter: { nodeId, userId }, update: { $set: spot } } })),
+    { ordered: false },
+  );
+  return await Node.find({ nodeId: { $in: moves.map((m) => m.nodeId) }, userId }).populate(NODE_POPULATE);
+};
+
 // Only the node's creator may delete it. Deleting a node takes the rest of
 // the graph down with it too, so nothing is left dangling (an Edge's
 // fromNodeId/toNodeId populating as null, say): edges touching the node,

@@ -73,7 +73,11 @@ Strict layering, one direction only: **routes → controllers → abl → dao �
 attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `GET /api/search?q=` (same router, declared before `/:mapId`; `searchNodesAbl` + `searchNodesDao`) searches every node the caller can see across all their maps — text, title, prompt or zone name, case-insensitive substring, newest first, at most 50 — and returns a snippet around the match rather than the full text, with the hidden-branch rule of `getNodesByMapDao`. `DELETE /api/nodes` (body: `{ nodeIds }`)
   is the bulk counterpart of `DELETE /api/nodes/:nodeId` — one request for a multi-select delete
   instead of N parallel single-node ones; same per-node ownership check, silently skipping any id
-  the caller doesn't own rather than failing the whole batch. `GET /:mapId/nodes` omits each node's
+  the caller doesn't own rather than failing the whole batch. `PATCH /api/nodes` (body:
+  `{ moves: [{ nodeId, x?, y?, cardX?, cardY? }] }`, at most 500; `moveNodesAbl` + `moveNodesDao`, one
+  `bulkWrite`) saves a group move (dragged selection, glued cards, a parent's magnet) the same way, only
+  the caller's own nodes, and broadcasts one `nodes:moved` (the moved nodes) per map, with nodes in a
+  hidden branch in a separate batch so they don't hold back the rest. `GET /:mapId/nodes` omits each node's
   own `text` (see `getNodesByMapDao`'s `.select("-text")`) — a frontend hides most node captions by
   default, so sending the full text of every node on every load would mostly go to waste;
   `POST /:mapId/nodes/text` (body: `{ nodeIds }`, via `getNodesTextDao`) is the lazy backfill the
