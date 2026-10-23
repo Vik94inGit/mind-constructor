@@ -364,17 +364,19 @@ export function useNodeDragAndDrop({
       return;
     }
 
-    // A mouse only drags a single node in explicit move mode, so a click
-    // never relocates one by accident. A finger drags one whenever it really
-    // travels (past TOUCH_DRAG_SLOP): on a phone there is no other way to move
-    // a node, and a tap or a graze below that distance stays a tap. This does
-    // not apply to the group drag above, which works either way. A node held
-    // in place (node.locked, a locked block) never drags; a long press still
-    // works on one, since picking it into a selection doesn't move anything.
+    // A single node only drags in explicit move mode (the ✥ button), with a
+    // mouse or a finger alike, so a click never relocates one and a swipe
+    // across the map to look around never drags the node it started on: out
+    // of move mode that swipe pans the map (NodeCard drops touch-none then).
+    // In move mode a finger only drags once it really travels (past
+    // TOUCH_DRAG_SLOP), so a tap or a graze stays a tap. This does not apply
+    // to the group drag above, which works either way. A node held in place
+    // (node.locked, a locked block) never drags; a long press still works on
+    // any node, since picking it into a selection doesn't move anything.
     // Puzzle pieces clicked together drag as one (see clusterFor below), so a
     // puzzle with any piece held in place is held as a whole.
     const touch = e.pointerType === "touch";
-    const canDrag = moveMode || touch;
+    const canDrag = moveMode;
     const clusterIds = canDrag && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];
     const clusterHeld = clusterIds.some((id) => {
       const n = nodes.find((nn) => nn.nodeId === id);
@@ -396,14 +398,20 @@ export function useNodeDragAndDrop({
           clearTimeout(longPressTimer);
         }
       }
-      function onIdleUp() {
+      function stopIdle() {
         clearTimeout(longPressTimer);
         window.removeEventListener("pointermove", onIdleMove);
         window.removeEventListener("pointerup", onIdleUp);
+        window.removeEventListener("pointercancel", stopIdle);
+      }
+      function onIdleUp() {
+        stopIdle();
         if (heldLong && !wandered) finishHold(node, touchStartX, touchStartY);
       }
       window.addEventListener("pointermove", onIdleMove);
       window.addEventListener("pointerup", onIdleUp);
+      // The browser took the finger to pan the map: that is no hold.
+      window.addEventListener("pointercancel", stopIdle);
       return;
     }
 
