@@ -114,10 +114,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   zone reaches away glides back towards it on the side it was on, and if that spot is taken it slides on
   to the nearest free one still within reach; a pulled child brings its own far children along the same
   way, and one undo puts them all back. The 🧲 *Call its nodes back* button on a parent's Info tab does the
-  same on demand, for every one of your children outside its zone. On a
-  phone, a finger drags a node once it really travels (a tap or a small graze still opens it; with a
-  mouse a single node drags in Move mode), and holding a node still then lifting adds it to a group
-  selection or opens a card's menu, so holding a moment before dragging still drags. Dragging one
+  same on demand, for every one of your children outside its zone. A single
+  node only drags in Move mode (the ✥ button), with a mouse or a finger, so looking around the map
+  never moves anything: out of Move mode a swipe that starts on a node pans the map. In Move mode a
+  finger drags a node once it really travels (a tap or a small graze still opens it), and on any node
+  holding still then lifting adds it to a group selection or opens a card's menu, so holding a moment
+  before dragging still drags. Dragging one
   member of a group (a whole zone picked out, or any selection) moves it like a creature: the touched
   node follows the finger and the rest walk its path behind it, one after another, each hopping on
   its own beat, and catch up after the drop; cards glued together follow the same way
