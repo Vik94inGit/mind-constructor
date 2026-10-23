@@ -260,6 +260,10 @@ export const NodeSchema = new mongoose.Schema(
 // mapId: every map-load query (getNodesByMapDao, listNodesByMapInternalIdDao,
 // countNodesByMapInternalIdDao, ...) filters on this.
 NodeSchema.index({ mapId: 1 });
+// mapId + hiddenFromMembers: visibilityDao's "does this map hide any branch?"
+// check, run on every live event and every map load, answered from the index
+// alone instead of reading each of the map's nodes.
+NodeSchema.index({ mapId: 1, hiddenFromMembers: 1 });
 // parentId: circleAbl.ts's circle detection and the cascadeAfterNodeDeleted
 // parentId-clearing update both filter on this unscoped by anything else.
 NodeSchema.index({ parentId: 1 });
