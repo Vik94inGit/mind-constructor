@@ -36,7 +36,7 @@ interface Params {
   readonlyTextRef: RefObject<HTMLDivElement>;
 }
 
-// NodePanel's top sheet as something you can move and size: the grip drags it
+// NodePanel's bottom sheet as something you can move and size: the grip drags it
 // off its dock and the bottom edge resizes it — both reset per node by the
 // panel itself (setDragOffset, setPanelHeight).
 export function usePanelSheet({ textareaRef, readonlyTextRef }: Params) {
@@ -77,7 +77,7 @@ export function usePanelSheet({ textareaRef, readonlyTextRef }: Params) {
     function onMove(ev: PointerEvent) {
       if (!draggingHeightRef.current) return;
       // The sheet is top-docked, so dragging its bottom edge down grows it.
-      const next = Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT_PX, startHeight + (ev.clientY - startClientY)));
+      const next = Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT_PX, startHeight - (ev.clientY - startClientY)));
       setPanelHeight(next);
       if (startText != null) setTextHeight(Math.max(MIN_TEXT_HEIGHT_PX, startText + (next - startHeight)));
     }
@@ -114,10 +114,10 @@ export function usePanelSheet({ textareaRef, readonlyTextRef }: Params) {
     const panelH = panelRef.current?.offsetHeight ?? 0;
     const minX = PANEL_DRAG_MIN_VISIBLE_PX - panelW;
     const maxX = window.innerWidth - PANEL_DRAG_MIN_VISIBLE_PX;
-    // Base (untransformed) top is top-docked: 0. dy is relative to that
-    // dock, so its own bounds are expressed the same way maxX/minX are for
+    // Base (untransformed) top is bottom-docked: the screen's height less
+    // the panel's. dy is relative to that dock, so its own bounds are expressed the same way maxX/minX are for
     // the left-anchored x axis above.
-    const baseTop = 0;
+    const baseTop = window.innerHeight - panelH;
     const minY = PANEL_DRAG_MIN_VISIBLE_PX - panelH - baseTop;
     const maxY = window.innerHeight - PANEL_DRAG_MIN_VISIBLE_PX - baseTop;
 

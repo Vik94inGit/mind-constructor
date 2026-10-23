@@ -48,17 +48,17 @@ describe("useCanvasViewport dead zone", () => {
     // 1400x900 view at the starting zoom.
     const zoom = result.current.zoom;
     expect((result.current.hScrollMargin + 60) * zoom).toBeGreaterThanOrEqual(700 - 1);
-    expect((result.current.vScrollMarginBottom + 60) * zoom).toBeGreaterThanOrEqual(450 - 1);
+    expect((result.current.vScrollMargin + 60) * zoom).toBeGreaterThanOrEqual(450 - 1);
     // ...and no wider than that.
     expect(result.current.hScrollMargin * zoom).toBeLessThanOrEqual(700);
-    expect(result.current.vScrollMarginBottom * zoom).toBeLessThanOrEqual(450);
+    expect(result.current.vScrollMargin * zoom).toBeLessThanOrEqual(450);
   });
 
-  it("keeps room at the top for the top sheet, open or not, so the map never jumps", () => {
+  it("keeps room at the bottom for the bottom sheet, open or not, so the map never jumps", () => {
     const closed = margins(false).result.current;
     const open = margins(true).result.current;
-    // A node at the top edge still reaches the middle of the half below the sheet.
-    expect((closed.vScrollMargin + 60) * closed.zoom).toBeGreaterThanOrEqual(450 + 900 / 4 - 1);
+    // A node at the bottom edge still reaches the middle of the half above the sheet.
+    expect((closed.vScrollMarginBottom + 60) * closed.zoom).toBeGreaterThanOrEqual(450 + 900 / 4 - 1);
     expect(open.vScrollMargin).toBe(closed.vScrollMargin);
     expect(open.vScrollMarginBottom).toBe(closed.vScrollMarginBottom);
   });

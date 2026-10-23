@@ -25,8 +25,8 @@ const NODE_EDGE_INSET = 60;
 // and no wider. (It was briefly cut to nothing, which pinned edge nodes to
 // the screen's edge with half their ghosts clamped or off screen.) When the
 // whole canvas fits across the screen at this zoom, it's whatever centers
-// the canvas instead, if that's more. The top edge also has room for the
-// node panel's top sheet (vScrollMargin below).
+// the canvas instead, if that's more. The bottom edge also has room for the
+// node panel's bottom sheet (vScrollMarginBottom below).
 export function axisMarginPx(viewPx: number, canvasUnits: number, zoom: number): number {
   return Math.max(0, viewPx / 2 - NODE_EDGE_INSET * zoom, (viewPx - canvasUnits * zoom) / 2);
 }
@@ -190,13 +190,14 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions, openAt
   const hMarginPx = axisMarginPx(viewSize.w, CANVAS_W, zoom);
   const vMarginPx = axisMarginPx(viewSize.h, CANVAS_H, zoom);
   const hScrollMargin = viewSize.w ? Math.ceil(hMarginPx / zoom) : 0;
-  // The top edge always keeps room for the node panel's top sheet, open or
-  // not, so a node at the canvas's top edge can still be centered in the half
-  // of the screen below the sheet. Always, not only while the sheet is open:
-  // every scroll<->canvas conversion measures from this top margin, so it
-  // growing and shrinking with the sheet would make the whole map jump.
-  const vScrollMargin = viewSize.h ? Math.ceil((vMarginPx + viewSize.h * panelReserveFrac(isMobileViewport())) / zoom) : 0;
-  const vScrollMarginBottom = viewSize.h ? Math.ceil(vMarginPx / zoom) : 0;
+  // The bottom edge always keeps room for the node panel's bottom sheet, open
+  // or not, so a node at the canvas's bottom edge can still be centered in
+  // the half of the screen above the sheet. Always, not only while the sheet
+  // is open, so the scroll area never changes size when the sheet opens.
+  const vScrollMargin = viewSize.h ? Math.ceil(vMarginPx / zoom) : 0;
+  const vScrollMarginBottom = viewSize.h ? Math.ceil((vMarginPx + viewSize.h * panelReserveFrac(isMobileViewport())) / zoom) : 0;
+  const vBottomRef = useRef(vScrollMarginBottom);
+  vBottomRef.current = vScrollMarginBottom;
   // Latest values for the camera functions below, which can run from a timer
   // or an animation frame after the render that created them.
   const zoomRef = useRef(zoom);
@@ -526,9 +527,9 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions, openAt
     // conversion screenToCanvas uses.
     return {
       minX: wrap.scrollLeft / zoom + pad - hScrollMargin,
-      minY: (wrap.scrollTop + reserve) / zoom + pad - vScrollMargin,
+      minY: wrap.scrollTop / zoom + pad - vScrollMargin,
       maxX: (wrap.scrollLeft + wrap.clientWidth) / zoom - pad - hScrollMargin,
-      maxY: (wrap.scrollTop + wrap.clientHeight) / zoom - pad - vScrollMargin,
+      maxY: (wrap.scrollTop + wrap.clientHeight - reserve) / zoom - pad - vScrollMargin,
     };
   }
 
@@ -557,9 +558,9 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions, openAt
     // conversion screenToCanvas uses.
     return {
       minX: target.left / zoom + pad - hScrollMargin,
-      minY: (target.top + reserve) / zoom + pad - vScrollMargin,
+      minY: target.top / zoom + pad - vScrollMargin,
       maxX: (target.left + wrap.clientWidth) / zoom - pad - hScrollMargin,
-      maxY: (target.top + wrap.clientHeight) / zoom - pad - vScrollMargin,
+      maxY: (target.top + wrap.clientHeight - reserve) / zoom - pad - vScrollMargin,
     };
   }
 
@@ -616,16 +617,16 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions, openAt
     // maxTop for a node sitting right at the real 0/CANVAS_W/CANVAS_H edge
     // instead of leaving it pinned there with nowhere left to scroll to.
     const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
-    const bottomMargin = axisMarginPx(wrap.clientHeight, CANVAS_H, zoom) / zoom;
+    const bottomMargin = vBottomRef.current;
     const maxTop = Math.max(0, (CANVAS_H + vScrollMargin + bottomMargin) * zoom - wrap.clientHeight);
     // + hScrollMargin/+ vScrollMargin: pos.x/y are real canvas coordinates;
     // scrollTo deals in screen pixels within the *padded* canvasRef (see
     // screenToCanvas's own doc comment) — same conversion, just the other
     // direction.
     const targetLeft = Math.min(maxLeft, Math.max(0, (pos.x + hScrollMargin) * zoom - wrap.clientWidth / 2));
-    // Dead center of the part of the screen the top sheet leaves clear, which
-    // it is about to cover (this runs in the same click that opens it).
-    const screenY = reserve + (wrap.clientHeight - reserve) / 2;
+    // Dead center of the part of the screen the bottom sheet leaves clear,
+    // which it is about to cover (this runs in the same click that opens it).
+    const screenY = (wrap.clientHeight - reserve) / 2;
     const targetTop = Math.min(maxTop, Math.max(0, (pos.y + vScrollMargin) * zoom - screenY));
     // See its own doc comment — recorded regardless of which branch below
     // actually runs, since settledViewportBounds() should always reflect
@@ -668,10 +669,10 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions, openAt
     const reserveSheet = aboveSheet || sheetOpen;
     const reserve = reserveSheet ? wrap.clientHeight * panelReserveFrac(isMobileViewport()) : 0;
     const maxLeft = Math.max(0, (CANVAS_W + hScrollMargin * 2) * zoom - wrap.clientWidth);
-    const bottomMargin = axisMarginPx(wrap.clientHeight, CANVAS_H, zoom) / zoom;
+    const bottomMargin = vBottomRef.current;
     const maxTop = Math.max(0, (CANVAS_H + vScrollMargin + bottomMargin) * zoom - wrap.clientHeight);
     const targetLeft = Math.min(maxLeft, Math.max(0, (x + hScrollMargin) * zoom - wrap.clientWidth / 2));
-    const targetTop = Math.min(maxTop, Math.max(0, (y + vScrollMargin) * zoom - (reserve + (wrap.clientHeight - reserve) / 2)));
+    const targetTop = Math.min(maxTop, Math.max(0, (y + vScrollMargin) * zoom - (wrap.clientHeight - reserve) / 2));
     animateScrollTo(targetLeft, targetTop);
   }
 

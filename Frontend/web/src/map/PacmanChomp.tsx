@@ -24,9 +24,11 @@ interface Props {
 export function PacmanChomp({ from, to, radius, targetRadius, color }: Props) {
   const { angle, reach } = chompRun(from, to, radius, targetRadius);
   const r = radius;
+  // Facing left it would run upside down, eye underneath; mirror it instead.
+  const mirror = Math.abs(angle) > 90 ? " scale(1 -1)" : "";
   const runStyle = { "--chomp-reach": `${reach}px`, "--chomp-lunge": `${r * 0.25}px` } as CSSProperties;
   return (
-    <g transform={`translate(${from.x} ${from.y}) rotate(${angle})`} data-testid="pacman-chomp" aria-hidden="true">
+    <g transform={`translate(${from.x} ${from.y}) rotate(${angle})${mirror}`} data-testid="pacman-chomp" aria-hidden="true">
       <g className="pacman-run" style={runStyle}>
         <g className="pacman-jaw-top">
           <path d={`M ${-r} 0 A ${r} ${r} 0 0 1 ${r} 0 Z`} fill={color} stroke="var(--surface)" strokeWidth={r * 0.08} />

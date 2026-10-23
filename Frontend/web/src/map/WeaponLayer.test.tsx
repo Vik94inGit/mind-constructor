@@ -34,4 +34,17 @@ describe("WeaponLayer's Pac-Man run", () => {
     rerender(layer("attack"));
     expect(screen.getByTestId("pacman-chomp").getAttribute("transform")).toBe("translate(100 100) rotate(0)");
   });
+
+  it("runs the right way up toward a target on its left", () => {
+    render(
+      <WeaponLayer
+        visibleNodes={[{ ...target, x: 0 }, attack]}
+        posFor={(n) => ({ x: n.x ?? 0, y: n.y ?? 0 })}
+        celebrateIds={new Set()}
+        shotState={null}
+        chompId="attack"
+      />,
+    );
+    expect(screen.getByTestId("pacman-chomp").getAttribute("transform")).toBe("translate(100 100) rotate(180) scale(1 -1)");
+  });
 });

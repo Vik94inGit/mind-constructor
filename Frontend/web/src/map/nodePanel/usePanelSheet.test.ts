@@ -20,11 +20,11 @@ function setup() {
 describe("usePanelSheet", () => {
   beforeEach(() => localStorage.clear());
 
-  it("grows the sheet when its bottom edge is dragged down, and doesn't keep the size for the next panel", () => {
+  it("grows the sheet when its top edge is dragged up, and doesn't keep the size for the next panel", () => {
     const { result } = setup();
     expect(result.current.panelHeight).toBeNull();
-    act(() => result.current.onResizeHandlePointerDown(pointerDown(0, 400)));
-    act(() => move(0, 500));
+    act(() => result.current.onResizeHandlePointerDown(pointerDown(0, 500)));
+    act(() => move(0, 400));
     act(() => {
       window.dispatchEvent(new Event("pointerup"));
     });
@@ -35,8 +35,8 @@ describe("usePanelSheet", () => {
 
   it("never shrinks below the minimum", () => {
     const { result } = setup();
-    act(() => result.current.onResizeHandlePointerDown(pointerDown(0, 500)));
-    act(() => move(0, 100));
+    act(() => result.current.onResizeHandlePointerDown(pointerDown(0, 100)));
+    act(() => move(0, 500));
     expect(result.current.panelHeight).toBe(200);
   });
 
@@ -64,6 +64,7 @@ describe("usePanelSheet", () => {
     (result.current.panelRef as { current: HTMLDivElement | null }).current = panel;
     act(() => result.current.onGripPointerDown(pointerDown(100, 100)));
     act(() => move(-5000, 5000));
-    expect(result.current.dragOffset).toEqual({ x: 48 - 400, y: window.innerHeight - 48 });
+    // Docked to the bottom, so it can only go down until 48px of it is left.
+    expect(result.current.dragOffset).toEqual({ x: 48 - 400, y: 300 - 48 });
   });
 });
