@@ -30,6 +30,13 @@ function renderNode(overrides: Partial<React.ComponentProps<typeof NodeCard>> & 
 }
 
 describe("NodeCard", () => {
+  it("keeps a finger for dragging only on a node that will drag, so a swipe elsewhere pans the map", () => {
+    const node = makeNode({ nodeId: "a", text: "hello" });
+    const root = (container: HTMLElement) => container.querySelector("[data-reveal-node]")!;
+    expect(root(renderNode({ node }).container).className).toContain("touch-none");
+    expect(root(renderNode({ node, canDrag: false }).container).className).not.toContain("touch-none");
+  });
+
   describe("parent priority", () => {
     const root = (container: HTMLElement) => container.querySelector("[data-reveal-node]")!;
 

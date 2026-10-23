@@ -471,10 +471,10 @@ describe("useNodeDragAndDrop", () => {
       expect(setMultiSelectIds).not.toHaveBeenCalled();
     });
 
-    it("drags a node outside move mode once the finger really travels", async () => {
+    it("drags a node in move mode once the finger really travels", async () => {
       const node = makeNode({ nodeId: "a", x: 300, y: 300 });
       const listeners = captureWindowListeners();
-      const { result, handleNodeClick } = setup({ moveMode: false, nodes: [node] });
+      const { result, handleNodeClick } = setup({ moveMode: true, nodes: [node] });
       vi.mocked(nodesApi.updateNode).mockImplementation(async (_id, updates) => ({ ...node, ...updates }));
 
       act(() =>
@@ -488,6 +488,28 @@ describe("useNodeDragAndDrop", () => {
       });
       expect(handleNodeClick).not.toHaveBeenCalled();
       expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 500, y: 400 });
+    });
+
+    it("a swipe that starts on a node outside move mode pans the map and moves nothing", async () => {
+      const node = makeNode({ nodeId: "a", x: 300, y: 300 });
+      const listeners = captureWindowListeners();
+      const { result, setMultiSelectIds } = setup({ moveMode: false, nodes: [node] });
+      const e = fakePointerDownEvent({ clientX: 300, clientY: 300, pointerType: "touch" });
+
+      act(() => result.current.onNodePointerDown(node, e));
+      // The canvas still gets the finger, so the browser can pan with it.
+      expect(e.stopPropagation).not.toHaveBeenCalled();
+      act(() => listeners.pointermove({ clientX: 500, clientY: 400 }));
+      expect(result.current.dragState).toBeNull();
+      // The browser takes the finger over for the pan, past the long press.
+      act(() => listeners.pointercancel({}));
+      act(() => vi.advanceTimersByTime(800));
+      await act(async () => {
+        listeners.pointerup?.({ clientX: 500, clientY: 400 });
+      });
+
+      expect(nodesApi.updateNode).not.toHaveBeenCalled();
+      expect(setMultiSelectIds).not.toHaveBeenCalled();
     });
 
     it("holding a node a moment and then dragging it moves it instead of opening it", async () => {
@@ -515,7 +537,7 @@ describe("useNodeDragAndDrop", () => {
     it("a finger's jitter below the drag distance stays a tap", async () => {
       const node = makeNode({ nodeId: "a", x: 300, y: 300 });
       const listeners = captureWindowListeners();
-      const { result, handleNodeClick } = setup({ moveMode: false, nodes: [node] });
+      const { result, handleNodeClick } = setup({ moveMode: true, nodes: [node] });
 
       act(() =>
         result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 300, clientY: 300, pointerType: "touch" })),
@@ -533,7 +555,7 @@ describe("useNodeDragAndDrop", () => {
     it("a second finger coming down (a pinch) drops the drag without saving or opening", () => {
       const node = makeNode({ nodeId: "a", x: 300, y: 300 });
       const listeners = captureWindowListeners();
-      const { result, handleNodeClick } = setup({ moveMode: false, nodes: [node] });
+      const { result, handleNodeClick } = setup({ moveMode: true, nodes: [node] });
 
       act(() =>
         result.current.onNodePointerDown(node, fakePointerDownEvent({ clientX: 300, clientY: 300, pointerType: "touch" })),

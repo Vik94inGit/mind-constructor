@@ -109,10 +109,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   a type dragged out of a node's ring, which lands where it was let go too. Dropping a node anywhere on
   another node's card (plus a small margin, `canvasLayout.ts` `dropTargetDistance`) joins that node's
   zone, and it then lands at the nearest spot that covers nothing; a member stays in its own zone until
-  it's dragged past one and a half zone reaches from its root. On a
-  phone, a finger drags a node once it really travels (a tap or a small graze still opens it; with a
-  mouse a single node drags in Move mode), and holding a node still then lifting adds it to a group
-  selection or opens a card's menu, so holding a moment before dragging still drags. Dragging one
+  it's dragged past one and a half zone reaches from its root. A single
+  node only drags in Move mode (the ✥ button), with a mouse or a finger, so looking around the map
+  never moves anything: out of Move mode a swipe that starts on a node pans the map. In Move mode a
+  finger drags a node once it really travels (a tap or a small graze still opens it), and on any node
+  holding still then lifting adds it to a group selection or opens a card's menu, so holding a moment
+  before dragging still drags. Dragging one
   member of a group (a whole zone picked out, or any selection) moves it like a creature: the touched
   node follows the finger and the rest walk its path behind it, one after another, each hopping on
   its own beat, and catch up after the drop; cards glued together follow the same way
