@@ -25,6 +25,8 @@ interface Props {
   cardLook?: CardLook;
   textLocked: boolean;
   onToggleLock?: () => void;
+  /** Calls this parent's far nodes back in — see NodePanel's own prop. */
+  onMagnet?: () => Promise<number>;
   textareaRef: RefObject<HTMLTextAreaElement>;
   readonlyTextRef: RefObject<HTMLDivElement>;
   textDraft: string;
@@ -51,7 +53,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked, onToggleLock, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked, onToggleLock, onMagnet, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   return (
@@ -171,6 +173,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked,
         )}
       </div>
     <div className="mt-3">
+      {onMagnet && <MagnetButton onMagnet={onMagnet} />}
       {isCreator && onToggleLock && (
         // Lock/unlock: a locked block can't be moved, clicked into
         // another piece or have its text edited.
@@ -310,6 +313,35 @@ export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked,
         </button>
       </div>
     )}
+    </div>
+  );
+}
+
+// The parent's magnet: one press pulls its own nodes that sit outside its zone
+// back in, and says so when they were all close already.
+function MagnetButton({ onMagnet }: { onMagnet: () => Promise<number> }) {
+  const { t } = useI18n();
+  const [state, setState] = useState<"idle" | "busy" | "none">("idle");
+  async function run() {
+    setState("busy");
+    try {
+      setState((await onMagnet()) === 0 ? "none" : "idle");
+    } catch {
+      setState("idle");
+    }
+  }
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        className="cursor-pointer rounded-md border border-line px-2 py-[0.2rem] text-[0.75rem] font-semibold text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+        title={t.ui.display.magnetHint}
+        disabled={state === "busy"}
+        onClick={run}
+      >
+        🧲 {t.ui.display.magnet}
+      </button>
+      {state === "none" && <span className="text-[0.75rem] text-ink-soft">{t.ui.display.magnetNone}</span>}
     </div>
   );
 }

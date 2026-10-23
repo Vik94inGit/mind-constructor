@@ -21,6 +21,7 @@ import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 import type { Snap } from "../utils/cardGlue";
 import { startTrail } from "../utils/followTrail";
+import { MAGNET_BUTTON_FAR_FACTOR, MAGNET_FAR_FACTOR, magnetPulls } from "../utils/parentMagnet";
 import type { Trail } from "../utils/followTrail";
 
 type Pt = { x: number; y: number };
@@ -191,6 +192,53 @@ export function useNodeDragAndDrop({
     return { target, valid: true };
   }
 
+  // A parent pulls its own nodes left too far back in once it has moved
+  // (utils/parentMagnet.ts): the children that will move when `moved` lands
+  // at its new spots, and where to. Cards on the board keep their own spots.
+  function pullsFor(moved: Map<string, Pt>, farFactor = MAGNET_FAR_FACTOR): { pulls: Map<string, Pt>; pulled: NodeDoc[] } {
+    const canPull = (n: NodeDoc) => {
+      const p = positions.get(n.nodeId);
+      return isOwnNode(n) && !n.isWeapon && !held(n) && !!p && !clearSpotFor?.(n, p.x, p.y);
+    };
+    const pulls = magnetPulls(moved, nodes, positions, canPull, obstaclePoints, viewportBounds(), undefined, footprintScale, farFactor);
+    return { pulls, pulled: nodes.filter((n) => pulls.has(n.nodeId)) };
+  }
+
+  // Moves the pulled children over at once (the map glides them there, see
+  // usePositionGlide) and saves them; any that don't save go back.
+  async function savePulls(pulls: Map<string, Pt>, pulled: NodeDoc[]) {
+    if (pulled.length === 0) return;
+    const before = new Map(pulled.map((n) => [n.nodeId, storedSpots(n)]));
+    const spots = new Map(pulled.map((n) => [n.nodeId, spotFor(n, pulls.get(n.nodeId)!)]));
+    setNodes((prev) => prev.map((n) => (spots.has(n.nodeId) ? { ...n, ...spots.get(n.nodeId)! } : n)));
+    const failed: string[] = [];
+    await Promise.all(
+      Array.from(spots, ([id, spot]) =>
+        nodesApi
+          .updateNode(id, spot)
+          .then(upsertNode)
+          .catch(() => failed.push(id)),
+      ),
+    );
+    if (failed.length) {
+      setNodes((prev) => prev.map((n) => (failed.includes(n.nodeId) ? { ...n, ...before.get(n.nodeId)! } : n)));
+      setActionError(t.ui.errors.moveNodes);
+    }
+  }
+
+  // The parent's magnet button: calls every one of its own nodes outside the
+  // zone back in, where it stands. How many it pulled; undo puts them back.
+  async function magnetize(parent: NodeDoc): Promise<number> {
+    const at = positions.get(parent.nodeId);
+    if (!at) return 0;
+    const { pulls, pulled } = pullsFor(new Map([[parent.nodeId, at]]), MAGNET_BUTTON_FAR_FACTOR);
+    if (pulled.length === 0) return 0;
+    setActionError(null);
+    recordMove?.(pulled);
+    await savePulls(pulls, pulled);
+    return pulled.length;
+  }
+
   // A finger held still on a node (touch's shift+click): toggles it in or out
   // of the group selection. Same contract onCanvasPointerDown's marquee onUp
   // already follows — starting a multi-selection always clears any stale
@@ -310,7 +358,6 @@ export function useNodeDragAndDrop({
         const dx = p.x - startPt.x;
         const dy = p.y - startPt.y;
         setActionError(null);
-        recordMove?.(nodes.filter((n) => memberIds.includes(n.nodeId)));
 
         // The selection lands where it was let go, as one shape, nudged only
         // as far as it takes for no member to cover another node or its text
@@ -336,6 +383,8 @@ export function useNodeDragAndDrop({
           const keepShape = clamp(leaderTarget.x + start.x - leaderStart.x, leaderTarget.y + start.y - leaderStart.y);
           targets.set(id, avoidOverlap(keepShape, [...externalObstacles, ...placedSoFar], FULL_CANVAS_BOUNDS));
         }
+        const { pulls, pulled } = pullsFor(targets);
+        recordMove?.([...nodes.filter((n) => memberIds.includes(n.nodeId)), ...pulled]);
 
         // The leader lands at once; the rest hop after it to their own spots,
         // and all of them stay drawn there until the saves land, so nothing
@@ -343,6 +392,7 @@ export function useNodeDragAndDrop({
         await trail.land({ x: leaderTarget.x - leaderStartPos.x, y: leaderTarget.y - leaderStartPos.y }, targets);
         endTrail();
         dispatch({ type: "groupStart", positions: targets });
+        const pulling = savePulls(pulls, pulled);
         await Promise.all(
           memberIds.map(async (id) => {
             const member = nodes.find((n) => n.nodeId === id);
@@ -356,6 +406,7 @@ export function useNodeDragAndDrop({
           }),
         );
         if (groupDragToken.current === token) dispatch({ type: "groupClear" });
+        await pulling;
       }
 
       window.addEventListener("pointermove", onGroupMove);
@@ -560,8 +611,8 @@ export function useNodeDragAndDrop({
       const p = screenToCanvas(ev.clientX, ev.clientY);
       const x = p.x - offsetX;
       const y = p.y - offsetY;
-      if (dragMoved.current) recordMove?.(clusterStart ? nodes.filter((n) => clusterStart.has(n.nodeId)) : [node]);
       if (clusterStart && dragMoved.current) {
+        recordMove?.(nodes.filter((n) => clusterStart.has(n.nodeId)));
         const moved = movedCluster(x - start.x, y - start.y);
         const { trail, shift } = leadCluster(moved);
         await trail.land(shift, moved);
@@ -594,6 +645,7 @@ export function useNodeDragAndDrop({
         // against its partner (no overlap nudging — sitting right against it
         // is the point), and the caller links the two.
         dispatch({ type: "reset" });
+        recordMove?.([node]);
         const before = storedSpots(node);
         const spot = spotFor(node, snap);
         setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...spot } : n)));
@@ -627,6 +679,8 @@ export function useNodeDragAndDrop({
           // (placeNode's free mode, the person aimed it here).
           const target = found.target;
           const placed = placeNode({ x, y }, [{ nodeId: node.nodeId, parentId: target.nodeId }], [], { free: true });
+          const { pulls, pulled } = pullsFor(new Map([[node.nodeId, placed]]));
+          recordMove?.([node, ...pulled]);
           setActionError(null);
           // Moved over right away, same as a plain drop below — waiting for
           // the server left the node flashing back at its old spot (dragState
@@ -637,6 +691,7 @@ export function useNodeDragAndDrop({
               n.nodeId === node.nodeId ? { ...n, ...spotFor(node, placed), parentId: target.nodeId } : n,
             ),
           );
+          const pulling = savePulls(pulls, pulled);
           try {
             const updated = await nodesApi.updateNode(node.nodeId, {
               ...spotFor(node, placed),
@@ -647,6 +702,7 @@ export function useNodeDragAndDrop({
             setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, ...before } : n)));
             setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.joinCircle);
           }
+          await pulling;
           return;
         }
         // A drop lands where it was let go, moved only as far as it takes not
@@ -680,11 +736,15 @@ export function useNodeDragAndDrop({
         const leftCircle = !!ownCircle && !staysMember;
         // A card on the board keeps clear of the other cards instead — in
         // the board's own units, where the icon spacing means nothing.
+        const cardSpot = clearSpotFor?.(node, x, y);
         const dropped =
-          clearSpotFor?.(node, x, y) ??
+          cardSpot ??
           placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }], [], {
             free: !node.isWeapon,
           });
+        // Its own nodes left too far follow it in (a card on the board doesn't pull).
+        const { pulls, pulled } = cardSpot ? { pulls: new Map<string, Pt>(), pulled: [] } : pullsFor(new Map([[node.nodeId, dropped]]));
+        recordMove?.([node, ...pulled]);
 
         // Remembered so a failed persist below can put the node back exactly
         // where it actually still is on the server, instead of leaving the
@@ -700,6 +760,7 @@ export function useNodeDragAndDrop({
             n.nodeId === node.nodeId ? { ...n, ...spot, ...(leftCircle ? { parentId: leftTo } : {}) } : n,
           ),
         );
+        const pulling = savePulls(pulls, pulled);
         try {
           if (leftCircle) {
             const updated = await nodesApi.updateNode(node.nodeId, { ...spot, parentId: leftTo });
@@ -714,6 +775,7 @@ export function useNodeDragAndDrop({
             err instanceof ApiRequestError ? err.message : leftCircle ? t.ui.errors.leaveCircle : t.ui.errors.moveNodes,
           );
         }
+        await pulling;
       } else if (heldLong) {
         finishHold(node, pressX, pressY);
       } else {
@@ -729,6 +791,7 @@ export function useNodeDragAndDrop({
 
   return {
     onNodePointerDown,
+    magnetize,
     dragState: dragUI.drag,
     groupDragState: dragUI.group,
     dropTarget: dragUI.dropTarget,

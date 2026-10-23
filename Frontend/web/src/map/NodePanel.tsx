@@ -145,6 +145,8 @@ interface Props {
   textLocked?: boolean;
   /** Locks/unlocks this node — owner only. */
   onToggleLock?: () => void;
+  /** Set on a parent with nodes of yours: pulls those outside its zone back in (utils/parentMagnet.ts), resolving to how many moved. */
+  onMagnet?: () => Promise<number>;
   /** Set right after this node was created: open on its text, focused, ready to write more. Fired back through onAutoFocused once done. */
   autoFocusText?: boolean;
   onAutoFocused?: () => void;
@@ -179,6 +181,7 @@ export function NodePanel({
   cardLook,
   textLocked = false,
   onToggleLock,
+  onMagnet,
   autoFocusText = false,
   onAutoFocused,
 }: Props) {
@@ -960,6 +963,7 @@ export function NodePanel({
           cardLook={cardLook}
           textLocked={textLocked}
           onToggleLock={onToggleLock}
+          onMagnet={onMagnet}
           textareaRef={textareaRef}
           readonlyTextRef={readonlyTextRef}
           textDraft={textDraft}

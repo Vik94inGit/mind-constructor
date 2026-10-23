@@ -109,7 +109,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   a type dragged out of a node's ring, which lands where it was let go too. Dropping a node anywhere on
   another node's card (plus a small margin, `canvasLayout.ts` `dropTargetDistance`) joins that node's
   zone, and it then lands at the nearest spot that covers nothing; a member stays in its own zone until
-  it's dragged past one and a half zone reaches from its root. A single
+  it's dragged past one and a half zone reaches from its root. A parent keeps its own nodes close like a
+  magnet (`utils/parentMagnet.ts`): once it has moved, each of your children left more than one and a half
+  zone reaches away glides back towards it on the side it was on, and if that spot is taken it slides on
+  to the nearest free one still within reach; a pulled child brings its own far children along the same
+  way, and one undo puts them all back. The 🧲 *Call its nodes back* button on a parent's Info tab does the
+  same on demand, for every one of your children outside its zone. A single
   node only drags in Move mode (the ✥ button), with a mouse or a finger, so looking around the map
   never moves anything: out of Move mode a swipe that starts on a node pans the map. In Move mode a
   finger drags a node once it really travels (a tap or a small graze still opens it), and on any node
