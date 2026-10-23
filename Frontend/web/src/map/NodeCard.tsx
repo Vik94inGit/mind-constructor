@@ -146,6 +146,10 @@ interface Props {
   onToggleBlockLock?: () => void;
   /** Asks for this node's text to be loaded (it loads lazily) — fired when hovering a node that shows no caption, so its hover label has something to say. */
   onHoverText?: () => void;
+  /** The pointer (not a finger) came onto or left this node's icon — a strong attack's Pac-Man run listens (see utils/pacman.ts). */
+  onIconHover?: (hovered: boolean) => void;
+  /** This attack is off on its Pac-Man run, so its own icon fades to a faint spot the pie runs back to. */
+  chomping?: boolean;
 }
 
 export const NodeCard = memo(function NodeCard({
@@ -194,6 +198,8 @@ export const NodeCard = memo(function NodeCard({
   blockLocked = false,
   onToggleBlockLock,
   onHoverText,
+  onIconHover,
+  chomping = false,
 }: Props) {
   const { t } = useI18n();
   const particlesRef = useRef<HTMLDivElement | null>(null);
@@ -650,7 +656,7 @@ export const NodeCard = memo(function NodeCard({
   return (
     <div
       className={`${classes} ${flying ? "animate-weapon-fly-in" : ""}`}
-      style={{ ...style, ...flightStyle, ...chaosCss }}
+      style={{ ...style, ...flightStyle, ...chaosCss, ...(chomping ? { opacity: 0.2 } : null) }}
       // The sentiment show (see applyRevealFrame) moves this node through
       // the individual CSS `translate` property, which composes with the
       // `transform` the centering and the chaos-drift/fly-in keyframes own.
@@ -706,11 +712,16 @@ export const NodeCard = memo(function NodeCard({
       <div
         className={`pointer-events-auto relative ${puzzle || showPictureCard ? "" : "h-[48px] w-[48px]"}`}
         onPointerEnter={(e) => {
-          if (!hoverLabel || e.pointerType === "touch") return;
+          if (e.pointerType === "touch") return;
+          onIconHover?.(true);
+          if (!hoverLabel) return;
           setHovered(true);
           requestText();
         }}
-        onPointerLeave={() => setHovered(false)}
+        onPointerLeave={() => {
+          setHovered(false);
+          onIconHover?.(false);
+        }}
       >
         {hoverLabel && hovered && captionLabel && (
           <div className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-[6] max-w-[220px] -translate-x-1/2 truncate rounded-md border border-line bg-surface px-2 py-[0.15rem] text-[0.75rem] font-semibold whitespace-nowrap text-ink shadow-card">
