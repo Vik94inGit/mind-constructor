@@ -30,6 +30,7 @@ import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
+import { chompsOnHover } from "../utils/pacman";
 import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } from "../utils/nodePriority";
 import type { CaptionSpec } from "../utils/nodePriority";
 import { useAuth } from "../context/AuthContext";
@@ -277,6 +278,8 @@ export function MapPage() {
   const [extractClusterRootId, setExtractClusterRootId] = useState<string | null>(null);
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
   const { shotState, triggerWeaponShot } = useWeaponReplay();
+  // The strong attack the pointer rests on, off on its Pac-Man run (utils/pacman.ts).
+  const [chompId, setChompId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
   // Right-click on *empty* canvas (as opposed to a node — see contextMenu
   // above) — opens a small type-picker for creating a new, parent-less
@@ -1941,6 +1944,7 @@ export function MapPage() {
     connectStart: (node, e) => startPuzzleConnect(node, e),
     addBranch: (node) => addBranchFromCard(node),
     hoverText: (nodeId) => void ensureNodeText([nodeId]),
+    iconHover: (nodeId, on) => setChompId((cur) => (on ? nodeId : cur === nodeId ? null : cur)),
   });
 
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
@@ -2495,6 +2499,8 @@ export function MapPage() {
                     !pendingCreate &&
                     !inlineEditId
                   }
+                  canChomp={chompsOnHover(node)}
+                  chomping={chompId === node.nodeId && !dotZoom}
                 />
               );
             })}
@@ -2515,6 +2521,10 @@ export function MapPage() {
                 posFor={posFor}
                 celebrateIds={celebrateIds}
                 shotState={shotState}
+                chompId={chompId}
+                iconRadius={(n) =>
+                  (24 * nodeSizeMultiplier(n, circleRootSentimentByNode.has(n.nodeId), compactView)) / zoom
+                }
               />
             )}
 

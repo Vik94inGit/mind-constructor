@@ -31,6 +31,7 @@ function actions(): CanvasNodeActions {
     connectStart: vi.fn(),
     addBranch: vi.fn(),
     hoverText: vi.fn(),
+    iconHover: vi.fn(),
   };
 }
 

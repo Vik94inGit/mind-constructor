@@ -1,7 +1,8 @@
 import { CANVAS_W, CANVAS_H } from "../utils/canvasLayout";
-import { nodeRefId } from "../utils/nodeType";
+import { NODE_TYPE_COLORS, nodeRefId } from "../utils/nodeType";
 import { ringKindFor } from "./OutcomeBadge";
 import { WeaponMark } from "./WeaponMark";
+import { PacmanChomp } from "./PacmanChomp";
 import type { NodeDoc } from "../types";
 
 interface Props {
@@ -10,6 +11,10 @@ interface Props {
   celebrateIds: Set<string>;
   /** Which weapon just had its arrows re-fired (see MapPage's triggerWeaponShot). */
   shotState: { id: string; nonce: number } | null;
+  /** The strong attack the pointer rests on, which plays its Pac-Man run (see PacmanChomp). */
+  chompId?: string | null;
+  /** A node's icon radius in canvas units, as drawn at the current zoom. */
+  iconRadius?: (node: NodeDoc) => number;
 }
 
 // Weapon marks get their own SVG layer, painted after every NodeCard rather
@@ -23,7 +28,7 @@ interface Props {
 // this is the permanent bow facing whatever it targeted, plus the volley of
 // transient arrows (see WeaponMark) that fires when the attack lands and
 // again on demand when either end gets clicked.
-export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: Props) {
+export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState, chompId, iconRadius = () => 24 }: Props) {
   return (
     <svg
       className="pointer-events-none absolute inset-0 z-[34] h-full w-full"
@@ -75,6 +80,16 @@ export function WeaponLayer({ visibleNodes, posFor, celebrateIds, shotState }: P
               celebrate={celebrateIds.has(weaponNode.nodeId)}
               replayNonce={shotState?.id === weaponNode.nodeId ? shotState.nonce : 0}
             />
+            {/* Bites whatever the arrows reach: the target, or its shield. */}
+            {chompId === weaponNode.nodeId && (
+              <PacmanChomp
+                from={a}
+                to={b}
+                radius={iconRadius(weaponNode) * 1.08}
+                targetRadius={iconRadius(aimedAt)}
+                color={NODE_TYPE_COLORS[weaponNode.type]}
+              />
+            )}
             </g>
           );
         })}

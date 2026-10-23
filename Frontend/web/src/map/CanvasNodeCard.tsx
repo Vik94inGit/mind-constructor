@@ -16,6 +16,7 @@ export type CanvasNodeActions = {
   connectStart: (node: NodeDoc, e: ReactPointerEvent) => void;
   addBranch: (node: NodeDoc) => void;
   hoverText: (nodeId: string) => void;
+  iconHover: (nodeId: string, hovered: boolean) => void;
 };
 
 type CardProps = ComponentProps<typeof NodeCard>;
@@ -30,7 +31,8 @@ type Callback =
   | "onToggleBlockLock"
   | "onConnectStart"
   | "onAddBranch"
-  | "onHoverText";
+  | "onHoverText"
+  | "onIconHover";
 
 interface Props extends Omit<CardProps, Callback | "flightVector"> {
   actions: CanvasNodeActions;
@@ -42,6 +44,8 @@ interface Props extends Omit<CardProps, Callback | "flightVector"> {
   canConnect: boolean;
   /** This card's + button adds a branch. */
   canAddBranch: boolean;
+  /** A strong attack: hovering its icon starts its Pac-Man run (utils/pacman.ts). */
+  canChomp?: boolean;
   /** Weapon nodes only: NodeCard's flightVector, as plain numbers so an unchanged one doesn't look new. */
   flightX?: number;
   flightY?: number;
@@ -57,6 +61,7 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
   canToggleLock,
   canConnect,
   canAddBranch,
+  canChomp = false,
   flightX,
   flightY,
   ...card
@@ -81,6 +86,7 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
       onConnectStart={canConnect ? (e) => actions.connectStart(node, e) : undefined}
       onAddBranch={canAddBranch ? () => actions.addBranch(node) : undefined}
       onHoverText={() => actions.hoverText(node.nodeId)}
+      onIconHover={canChomp ? (hovered) => actions.iconHover(node.nodeId, hovered) : undefined}
     />
   );
 });

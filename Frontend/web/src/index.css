@@ -419,3 +419,41 @@
     display: none;
   }
 }
+
+/* A strong attack's Pac-Man run on hover (map/PacmanChomp.tsx): out to the
+   target with its mouth open, one small nudge into it, back home, on a loop.
+   Everything moves along the group's own x axis, which PacmanChomp already
+   turned toward the target. The jaws stay open the whole way. */
+.pacman-run {
+  animation: pacman-run 2.4s ease-in-out infinite;
+}
+.pacman-jaw-top {
+  transform: rotate(-38deg);
+}
+.pacman-jaw-bottom {
+  transform: rotate(38deg);
+}
+@keyframes pacman-run {
+  0%,
+  8% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(var(--chomp-reach));
+  }
+  50% {
+    transform: translateX(calc(var(--chomp-reach) + var(--chomp-lunge)));
+  }
+  60% {
+    transform: translateX(var(--chomp-reach));
+  }
+  92%,
+  100% {
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pacman-run {
+    animation: none;
+  }
+}
