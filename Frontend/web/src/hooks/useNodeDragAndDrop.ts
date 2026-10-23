@@ -287,10 +287,7 @@ export function useNodeDragAndDrop({
     // (Node.locked — its circle is the currently-chosen one, see
     // handleCircleBackdropClick): a chosen cluster holds its position for
     // good, so falls through to the ordinary long-press/tap paths below.
-    // A finger only moves the selection in move mode: swiping across the map
-    // to look around must never carry nodes along.
-    const touch = e.pointerType === "touch";
-    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !held(node) && (moveMode || !touch)) {
+    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !held(node)) {
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       dragMoved.current = false;
@@ -418,17 +415,17 @@ export function useNodeDragAndDrop({
       return;
     }
 
-    // A single node only drags in explicit move mode (the ✥ button), with a
-    // mouse or a finger, so a click never relocates one by accident and a
-    // finger panning the map that happens to start on a node pans instead of
-    // dragging it. In move mode a finger drags once it really travels (past
-    // TOUCH_DRAG_SLOP), and a tap or a graze below that stays a tap. A mouse
-    // still drags a group selection outside move mode (see above). A node held
+    // A mouse only drags a single node in explicit move mode, so a click
+    // never relocates one by accident. A finger drags one whenever it really
+    // travels (past TOUCH_DRAG_SLOP): on a phone there is no other way to move
+    // a node, and a tap or a graze below that distance stays a tap. This does
+    // not apply to the group drag above, which works either way. A node held
     // in place (node.locked, a locked block) never drags; a long press still
     // works on one, since picking it into a selection doesn't move anything.
     // Puzzle pieces clicked together drag as one (see clusterFor below), so a
     // puzzle with any piece held in place is held as a whole.
-    const canDrag = moveMode;
+    const touch = e.pointerType === "touch";
+    const canDrag = moveMode || touch;
     const clusterIds = canDrag && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];
     const clusterHeld = clusterIds.some((id) => {
       const n = nodes.find((nn) => nn.nodeId === id);
@@ -451,20 +448,13 @@ export function useNodeDragAndDrop({
         }
       }
       function onIdleUp() {
-        onIdleCancel();
-        if (heldLong && !wandered) finishHold(node, touchStartX, touchStartY);
-      }
-      // The browser took the finger over to pan the map (NodeCard lets it
-      // when the node can't drag): neither a tap nor a hold.
-      function onIdleCancel() {
         clearTimeout(longPressTimer);
         window.removeEventListener("pointermove", onIdleMove);
         window.removeEventListener("pointerup", onIdleUp);
-        window.removeEventListener("pointercancel", onIdleCancel);
+        if (heldLong && !wandered) finishHold(node, touchStartX, touchStartY);
       }
       window.addEventListener("pointermove", onIdleMove);
       window.addEventListener("pointerup", onIdleUp);
-      window.addEventListener("pointercancel", onIdleCancel);
       return;
     }
 
