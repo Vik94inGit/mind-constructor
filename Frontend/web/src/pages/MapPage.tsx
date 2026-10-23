@@ -76,7 +76,7 @@ import { GestureHint } from "../map/GestureHint";
 import type { ZoneStylePatch } from "../map/ZoneMenuBody";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
-import { idOf, nodeRefId, sentimentOf, ZONE_COLORS } from "../utils/nodeType";
+import { idOf, nodeRefId, sentimentOf, ZONE_COLORS, zoneParentId } from "../utils/nodeType";
 import { useRadialBlend } from "../hooks/useRadialBlend";
 import { useSentimentShow } from "../hooks/useSentimentShow";
 import { useCanvasFraming } from "../hooks/useCanvasFraming";
@@ -1078,7 +1078,7 @@ export function MapPage() {
     errorMessage: t.ui.errors.moveNodes,
     keysEnabled: !presenting && !drawMode,
   });
-  const { onNodePointerDown, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
+  const { onNodePointerDown, magnetize, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
     nodes,
     positions,
     nodeGroups,
@@ -2823,6 +2823,12 @@ export function MapPage() {
                 autoFocusText={focusTextNodeId === selectedNode.nodeId}
                 onAutoFocused={() => setFocusTextNodeId(null)}
                 onToggleLock={isOwnNode(selectedNode) ? () => toggleBlockLock(selectedNode.nodeId) : undefined}
+                // The parent's magnet: calls its own far nodes back in (utils/parentMagnet.ts).
+                onMagnet={
+                  nodes.some((n) => !n.isWeapon && zoneParentId(n) === selectedNode.nodeId && isOwnNode(n))
+                    ? () => magnetize(selectedNode)
+                    : undefined
+                }
                 cardFill={(() => {
                   const mode = modeOf(selectedNode.nodeId);
                   const isCard =

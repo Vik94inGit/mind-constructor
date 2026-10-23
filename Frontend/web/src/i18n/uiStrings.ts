@@ -257,7 +257,7 @@ export interface UiStrings {
   };
   loadingMap: string;
   /** Showing the chosen nodes in their own reading mode, zooming in when their text would overlap. */
-  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; resizeCard: string; cardText: string; cardShape: string; cardShapeRounded: string; cardShapeSquare: string; cardShapeRound: string; cardFitText: string; cardLookFailed: string; dots: string; zoneView: (zone: string) => string; lockBlock: string; unlockBlock: string; blockLocked: string; detachPiece: string; takePuzzleApart: string; attachPiece: string; zonesInView: string; mapZones: string; zoneLayoutZones: string; zoneLayoutNested: string; zoneLayoutNone: string };
+  display: { header: string; followMap: string; zoomedToFit: string; stillOverlap: string; cardColor: string; cardColorReset: string; resizeCard: string; cardText: string; cardShape: string; cardShapeRounded: string; cardShapeSquare: string; cardShapeRound: string; cardFitText: string; cardLookFailed: string; dots: string; zoneView: (zone: string) => string; lockBlock: string; unlockBlock: string; blockLocked: string; magnet: string; magnetHint: string; magnetNone: string; detachPiece: string; takePuzzleApart: string; attachPiece: string; zonesInView: string; mapZones: string; zoneLayoutZones: string; zoneLayoutNested: string; zoneLayoutNone: string };
   /** Separator lines drawn between groups of nodes. */
   lines: {
     toolbar: string;
@@ -813,6 +813,9 @@ const en: UiStrings = {
     takePuzzleApart: "Unglue all its cards",
     attachPiece: "Glue back",
     blockLocked: "Locked — unlock to move or edit it",
+    magnet: "Call its nodes back",
+    magnetHint: "Pulls this node's own nodes that sit outside its zone back next to it",
+    magnetNone: "They're all close already",
     zonesInView: "Zones in view",
     mapZones: "Zones on this map",
     zoneLayoutZones: "Separate zones",
@@ -1345,6 +1348,9 @@ const cs: UiStrings = {
     takePuzzleApart: "Odlepit všechny jeho karty",
     attachPiece: "Přilepit zpět",
     blockLocked: "Zamčeno — odemkněte pro přesun nebo úpravy",
+    magnet: "Přitáhnout jeho uzly",
+    magnetHint: "Přitáhne vlastní uzly tohoto uzlu, které jsou mimo jeho zónu, zpět k němu",
+    magnetNone: "Všechny už jsou blízko",
     zonesInView: "Zóny v zobrazení",
     mapZones: "Zóny na této mapě",
     zoneLayoutZones: "Samostatné zóny",
@@ -1876,6 +1882,9 @@ const uk: UiStrings = {
     takePuzzleApart: "Відклеїти всі її картки",
     attachPiece: "Приклеїти назад",
     blockLocked: "Заблоковано — розблокуйте, щоб рухати чи редагувати",
+    magnet: "Притягнути його вузли",
+    magnetHint: "Притягує власні вузли цього вузла, що стоять поза його зоною, назад до нього",
+    magnetNone: "Усі вже поруч",
     zonesInView: "Зони в полі зору",
     mapZones: "Зони на цій мапі",
     zoneLayoutZones: "Окремі зони",
@@ -2410,6 +2419,9 @@ const ru: UiStrings = {
     takePuzzleApart: "Отклеить все её карточки",
     attachPiece: "Приклеить обратно",
     blockLocked: "Заблокировано — разблокируйте, чтобы двигать или править",
+    magnet: "Притянуть его узлы",
+    magnetHint: "Притягивает собственные узлы этого узла, стоящие вне его зоны, обратно к нему",
+    magnetNone: "Все уже рядом",
     zonesInView: "Зоны в поле зрения",
     mapZones: "Зоны на этой карте",
     zoneLayoutZones: "Отдельные зоны",

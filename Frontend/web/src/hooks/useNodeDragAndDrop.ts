@@ -21,7 +21,7 @@ import type { Translation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 import type { Snap } from "../utils/cardGlue";
 import { startTrail } from "../utils/followTrail";
-import { magnetPulls } from "../utils/parentMagnet";
+import { MAGNET_BUTTON_FAR_FACTOR, MAGNET_FAR_FACTOR, magnetPulls } from "../utils/parentMagnet";
 import type { Trail } from "../utils/followTrail";
 
 type Pt = { x: number; y: number };
@@ -195,12 +195,12 @@ export function useNodeDragAndDrop({
   // A parent pulls its own nodes left too far back in once it has moved
   // (utils/parentMagnet.ts): the children that will move when `moved` lands
   // at its new spots, and where to. Cards on the board keep their own spots.
-  function pullsFor(moved: Map<string, Pt>): { pulls: Map<string, Pt>; pulled: NodeDoc[] } {
+  function pullsFor(moved: Map<string, Pt>, farFactor = MAGNET_FAR_FACTOR): { pulls: Map<string, Pt>; pulled: NodeDoc[] } {
     const canPull = (n: NodeDoc) => {
       const p = positions.get(n.nodeId);
       return isOwnNode(n) && !n.isWeapon && !held(n) && !!p && !clearSpotFor?.(n, p.x, p.y);
     };
-    const pulls = magnetPulls(moved, nodes, positions, canPull, obstaclePoints, viewportBounds(), undefined, footprintScale);
+    const pulls = magnetPulls(moved, nodes, positions, canPull, obstaclePoints, viewportBounds(), undefined, footprintScale, farFactor);
     return { pulls, pulled: nodes.filter((n) => pulls.has(n.nodeId)) };
   }
 
@@ -224,6 +224,19 @@ export function useNodeDragAndDrop({
       setNodes((prev) => prev.map((n) => (failed.includes(n.nodeId) ? { ...n, ...before.get(n.nodeId)! } : n)));
       setActionError(t.ui.errors.moveNodes);
     }
+  }
+
+  // The parent's magnet button: calls every one of its own nodes outside the
+  // zone back in, where it stands. How many it pulled; undo puts them back.
+  async function magnetize(parent: NodeDoc): Promise<number> {
+    const at = positions.get(parent.nodeId);
+    if (!at) return 0;
+    const { pulls, pulled } = pullsFor(new Map([[parent.nodeId, at]]), MAGNET_BUTTON_FAR_FACTOR);
+    if (pulled.length === 0) return 0;
+    setActionError(null);
+    recordMove?.(pulled);
+    await savePulls(pulls, pulled);
+    return pulled.length;
   }
 
   // A finger held still on a node (touch's shift+click): toggles it in or out
@@ -274,7 +287,10 @@ export function useNodeDragAndDrop({
     // (Node.locked — its circle is the currently-chosen one, see
     // handleCircleBackdropClick): a chosen cluster holds its position for
     // good, so falls through to the ordinary long-press/tap paths below.
-    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !held(node)) {
+    // A finger only moves the selection in move mode: swiping across the map
+    // to look around must never carry nodes along.
+    const touch = e.pointerType === "touch";
+    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !held(node) && (moveMode || !touch)) {
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       dragMoved.current = false;
@@ -402,17 +418,17 @@ export function useNodeDragAndDrop({
       return;
     }
 
-    // A mouse only drags a single node in explicit move mode, so a click
-    // never relocates one by accident. A finger drags one whenever it really
-    // travels (past TOUCH_DRAG_SLOP): on a phone there is no other way to move
-    // a node, and a tap or a graze below that distance stays a tap. This does
-    // not apply to the group drag above, which works either way. A node held
+    // A single node only drags in explicit move mode (the ✥ button), with a
+    // mouse or a finger, so a click never relocates one by accident and a
+    // finger panning the map that happens to start on a node pans instead of
+    // dragging it. In move mode a finger drags once it really travels (past
+    // TOUCH_DRAG_SLOP), and a tap or a graze below that stays a tap. A mouse
+    // still drags a group selection outside move mode (see above). A node held
     // in place (node.locked, a locked block) never drags; a long press still
     // works on one, since picking it into a selection doesn't move anything.
     // Puzzle pieces clicked together drag as one (see clusterFor below), so a
     // puzzle with any piece held in place is held as a whole.
-    const touch = e.pointerType === "touch";
-    const canDrag = moveMode || touch;
+    const canDrag = moveMode;
     const clusterIds = canDrag && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];
     const clusterHeld = clusterIds.some((id) => {
       const n = nodes.find((nn) => nn.nodeId === id);
@@ -435,13 +451,20 @@ export function useNodeDragAndDrop({
         }
       }
       function onIdleUp() {
+        onIdleCancel();
+        if (heldLong && !wandered) finishHold(node, touchStartX, touchStartY);
+      }
+      // The browser took the finger over to pan the map (NodeCard lets it
+      // when the node can't drag): neither a tap nor a hold.
+      function onIdleCancel() {
         clearTimeout(longPressTimer);
         window.removeEventListener("pointermove", onIdleMove);
         window.removeEventListener("pointerup", onIdleUp);
-        if (heldLong && !wandered) finishHold(node, touchStartX, touchStartY);
+        window.removeEventListener("pointercancel", onIdleCancel);
       }
       window.addEventListener("pointermove", onIdleMove);
       window.addEventListener("pointerup", onIdleUp);
+      window.addEventListener("pointercancel", onIdleCancel);
       return;
     }
 
@@ -770,6 +793,7 @@ export function useNodeDragAndDrop({
 
   return {
     onNodePointerDown,
+    magnetize,
     dragState: dragUI.drag,
     groupDragState: dragUI.group,
     dropTarget: dragUI.dropTarget,

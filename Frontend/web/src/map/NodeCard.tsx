@@ -423,6 +423,9 @@ export const NodeCard = memo(function NodeCard({
     // scroll the canvas out from under your finger instead. touch-none
     // opts this element out of that native gesture so the pointermove
     // handler in MapPage's onNodePointerDown gets every event instead.
+    // Only while the node can actually drag (move mode): otherwise a finger
+    // that lands on a node while panning the map keeps panning it
+    // (touch-manipulation), instead of the node stealing the gesture.
     // pointer-events-none: this box is 74px wide and as tall as icon +
     // caption. If it took every click inside it, with nodes (and their wide
     // captions) packed around a circle's parent, the zone drawn *underneath*
@@ -430,10 +433,11 @@ export const NodeCard = memo(function NodeCard({
     // Only the icon circle takes the pointer (pointer-events-auto on it
     // below); the handlers stay on this div and still fire, by bubbling up
     // from that circle.
-    "group pointer-events-none absolute flex w-[74px] touch-none [transform:translate(-50%,-50%)] select-none [-webkit-touch-callout:none] flex-col items-center",
+    "group pointer-events-none absolute flex w-[74px] [transform:translate(-50%,-50%)] select-none [-webkit-touch-callout:none] flex-col items-center",
     zIndexClass,
     transitionClass,
     cursorClass,
+    canDrag ? "touch-none" : "touch-manipulation",
     opacityClass,
     filterClass,
     chaotic && "animate-node-chaos-drift",

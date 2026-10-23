@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeNode } from "../test/fixtures";
 import { FULL_CANVAS_BOUNDS, NODE_FOOTPRINT } from "./canvasLayout";
-import { MAGNET_PULL_FACTOR, magnetPulls } from "./parentMagnet";
+import { MAGNET_BUTTON_FAR_FACTOR, MAGNET_PULL_FACTOR, magnetPulls } from "./parentMagnet";
 import type { NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
@@ -32,6 +32,17 @@ describe("magnetPulls", () => {
     const nodes = [makeNode({ nodeId: "p", parentId: null }), makeNode({ nodeId: "c", parentId: "p" })];
     const positions = new Map<string, Pt>([["p", { x: 400, y: 800 }], ["c", { x: 700, y: 800 }]]);
     expect(pullsFor(nodes, positions, new Map([["p", { x: 500, y: 800 }]])).size).toBe(0);
+  });
+
+  it("the magnet button's closer threshold pulls a child that is just outside the zone", () => {
+    const nodes = [makeNode({ nodeId: "p", parentId: null }), makeNode({ nodeId: "c", parentId: "p" })];
+    const positions = new Map<string, Pt>([["p", { x: 400, y: 800 }], ["c", { x: 400 + REACH * 1.2, y: 800 }]]);
+    const obstaclePoints = (exclude: Set<string>) =>
+      Array.from(positions).filter(([id]) => !exclude.has(id)).map(([, p]) => p);
+    const at = new Map([["p", positions.get("p")!]]);
+    expect(magnetPulls(at, nodes, positions, () => true, obstaclePoints, FULL_CANVAS_BOUNDS, REACH).size).toBe(0);
+    const pulls = magnetPulls(at, nodes, positions, () => true, obstaclePoints, FULL_CANVAS_BOUNDS, REACH, 1, MAGNET_BUTTON_FAR_FACTOR);
+    expect(pulls.get("c")!.x).toBeCloseTo(400 + REACH * MAGNET_PULL_FACTOR);
   });
 
   it("moves on to a free spot when the pulled-to spot is taken, still within reach", () => {

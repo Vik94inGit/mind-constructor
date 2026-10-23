@@ -14,9 +14,13 @@ type Pt = { x: number; y: number };
 // ends up on top of another. A pulled child is a parent too: its own far
 // children follow it the same way. The map glides every node to its new spot
 // (see usePositionGlide), so the pull reads as the children being drawn in.
+// The parent's magnet button calls them in on demand, everything outside the
+// zone's reach (MAGNET_BUTTON_FAR_FACTOR) and not just the ones left far.
 
 /** Past this many zone reaches from its parent a child counts as too far. Same distance a dragged member leaves its zone at. */
 export const MAGNET_FAR_FACTOR = 1.5;
+/** The magnet button pulls in every child past this many zone reaches: anything outside the zone. */
+export const MAGNET_BUTTON_FAR_FACTOR = 1;
 /** How far out, in zone reaches, a pulled child lands. */
 export const MAGNET_PULL_FACTOR = 0.6;
 
@@ -35,6 +39,7 @@ export function magnetPulls(
   bounds: ViewportBounds,
   reach: number = getZoneReach(),
   footprintScale = 1,
+  farFactor = MAGNET_FAR_FACTOR,
 ): Map<string, Pt> {
   const childrenOf = new Map<string, NodeDoc[]>();
   for (const n of nodes) {
@@ -60,7 +65,7 @@ export function magnetPulls(
       const dx = pos.x - parentPos.x;
       const dy = pos.y - parentPos.y;
       const dist = Math.hypot(dx, dy);
-      if (dist <= reach * MAGNET_FAR_FACTOR) continue;
+      if (dist <= reach * farFactor) continue;
       const desired = {
         x: parentPos.x + (dx / dist) * reach * MAGNET_PULL_FACTOR,
         y: parentPos.y + (dy / dist) * reach * MAGNET_PULL_FACTOR,
