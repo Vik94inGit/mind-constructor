@@ -89,12 +89,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
-- **Node panel on top** — the node panel (and the pack picker) is a top sheet, half the screen, with
-  the node's text first and a type picker in its header; the chosen node is centered in the half
-  below it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
+- **Node panel under the node** — the node panel (and the pack picker and new-node panel) is a bottom
+  sheet, half the screen, with the node's text first and a type picker in its header; the chosen node
+  is centered in the half above it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
   node (any way) opens `map/NewNodePanel.tsx` with its text field focused — with the feelings offered
   as a ring around the new node, optional — and editing opens the node's panel on its text.
-  Big round ← / → arrows at either end of the sheet's bottom edge step to the previous or next
+  Big round ← / → arrows at either end of the sheet's top edge step to the previous or next
   node, with the resize handle between them.
 - **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
@@ -207,6 +207,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   one of your nodes lands on its Attack tab, ready to strike back (each hit on it heals your node by
   10); the opponent's-turn panel offers the same right after its move.
 - A strong attack (a Counterpoint, which takes a fresh node to 75%, or a Fatal flaw, which takes it to
-  50%) plays Pac-Man while the mouse rests on it: its icon fades, a round pie in its colour runs, mouth open,
+  50%) plays Pac-Man while the mouse rests on it: its icon fades, a round pie in its colour runs, mouth open
+  and always the right way up,
   to the node it hit (or that node's shield), nudges into it once and runs back, until the pointer leaves
   (`utils/pacman.ts`, `map/PacmanChomp.tsx`). A Nitpick stays still, and a finger never starts it.

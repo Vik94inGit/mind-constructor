@@ -54,7 +54,8 @@ export const DOT_ZOOM = 0.5;
 // visible top arc" — a row, not a ring. 1/2 doesn't eliminate the
 // clamp in every case, but it gives the ring meaningfully more room to
 // actually close underneath the node before hitting that edge.
-// The node panel is a top sheet now, half the screen on every size.
+// The node panel is a bottom sheet, half the screen on every size, so it
+// opens under the chosen node.
 export function panelReserveFrac(_isMobile: boolean) {
   return 1 / 2;
 }

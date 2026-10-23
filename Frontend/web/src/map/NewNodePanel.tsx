@@ -21,7 +21,7 @@ interface Props {
   onCancel: () => void;
 }
 
-// Where a new node is written before it exists: the same top sheet NodePanel
+// Where a new node is written before it exists: the same bottom sheet NodePanel
 // uses, opened with its text field focused. Type, emoji and pictures can be
 // set here too; nothing is sent until Create (or Enter). The emoji is
 // optional — writing straight away makes the node without one.
@@ -76,7 +76,7 @@ export function NewNodePanel({ type, emoji, prompt = "", onTypeChange, onClearEm
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-[46] flex h-[50dvh] w-full flex-col overflow-y-auto rounded-b-2xl border-b border-line bg-surface px-5 pt-3 pb-4 shadow-[var(--shadow-card)]"
+      className="fixed inset-x-0 bottom-0 z-[46] flex h-[50dvh] w-full flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface px-5 pt-3 pb-4 shadow-[var(--shadow-card)]"
       data-testid="new-node-panel"
       onPaste={(e) => {
         const files = imageFilesFrom(e.clipboardData);
