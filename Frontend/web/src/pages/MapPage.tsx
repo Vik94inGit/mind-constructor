@@ -1930,7 +1930,12 @@ export function MapPage() {
   });
 
   const chompSpots = useMemo(() => chompTargets(visibleNodes), [visibleNodes]);
-  const chompIds = useMemo(() => chompersFor(chompHoverId, visibleNodes), [chompHoverId, visibleNodes]);
+  // A phone has no hover, so the selected node plays it too: tapping a strong
+  // attack, or the node it hit, starts Pac-Man; the mouse's hover wins.
+  const chompIds = useMemo(
+    () => chompersFor(chompHoverId ?? selectedId, visibleNodes),
+    [chompHoverId, selectedId, visibleNodes],
+  );
 
   // What a card on the canvas does when used: one stable object for every
   // card, so CanvasNodeCard only re-renders when its own node changed.
