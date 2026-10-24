@@ -207,7 +207,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   one of your nodes lands on its Attack tab, ready to strike back (each hit on it heals your node by
   10); the opponent's-turn panel offers the same right after its move.
 - A strong attack (a Counterpoint, which takes a fresh node to 75%, or a Fatal flaw, which takes it to
-  50%) plays Pac-Man while the mouse rests on it: its icon fades, a round pie in its colour runs, mouth open
+  50%) plays Pac-Man while the mouse rests on it, or on the node it hit (then every strong attack on
+  that node runs at once): its icon fades, a round pie in its colour runs, mouth open
   and always the right way up,
   to the node it hit (or that node's shield), nudges into it once and runs back, until the pointer leaves
   (`utils/pacman.ts`, `map/PacmanChomp.tsx`). A Nitpick stays still, and a finger never starts it.

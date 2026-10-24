@@ -23,7 +23,7 @@ const layer = (chompId: string | null) => (
     posFor={(n) => ({ x: n.x ?? 0, y: n.y ?? 0 })}
     celebrateIds={new Set()}
     shotState={null}
-    chompId={chompId}
+    chompIds={new Set(chompId ? [chompId] : [])}
   />
 );
 
@@ -42,7 +42,7 @@ describe("WeaponLayer's Pac-Man run", () => {
         posFor={(n) => ({ x: n.x ?? 0, y: n.y ?? 0 })}
         celebrateIds={new Set()}
         shotState={null}
-        chompId="attack"
+        chompIds={new Set(["attack"])}
       />,
     );
     expect(screen.getByTestId("pacman-chomp").getAttribute("transform")).toBe("translate(100 100) rotate(180) scale(1 -1)");

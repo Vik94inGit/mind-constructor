@@ -30,7 +30,7 @@ import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
-import { chompsOnHover } from "../utils/pacman";
+import { chompersFor, chompTargets } from "../utils/pacman";
 import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } from "../utils/nodePriority";
 import type { CaptionSpec } from "../utils/nodePriority";
 import { useAuth } from "../context/AuthContext";
@@ -278,8 +278,9 @@ export function MapPage() {
   const [extractClusterRootId, setExtractClusterRootId] = useState<string | null>(null);
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
   const { shotState, triggerWeaponShot } = useWeaponReplay();
-  // The strong attack the pointer rests on, off on its Pac-Man run (utils/pacman.ts).
-  const [chompId, setChompId] = useState<string | null>(null);
+  // The node the pointer rests on, when it starts a Pac-Man run: a strong
+  // attack, or a node a strong attack hit (utils/pacman.ts).
+  const [chompHoverId, setChompHoverId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
   // Right-click on *empty* canvas (as opposed to a node — see contextMenu
   // above) — opens a small type-picker for creating a new, parent-less
@@ -1924,6 +1925,9 @@ export function MapPage() {
     stepReading: (dir) => stepReading(dir, false),
   });
 
+  const chompSpots = useMemo(() => chompTargets(visibleNodes), [visibleNodes]);
+  const chompIds = useMemo(() => chompersFor(chompHoverId, visibleNodes), [chompHoverId, visibleNodes]);
+
   // What a card on the canvas does when used: one stable object for every
   // card, so CanvasNodeCard only re-renders when its own node changed.
   const nodeActions = useStableActions<CanvasNodeActions>({
@@ -1944,7 +1948,7 @@ export function MapPage() {
     connectStart: (node, e) => startPuzzleConnect(node, e),
     addBranch: (node) => addBranchFromCard(node),
     hoverText: (nodeId) => void ensureNodeText([nodeId]),
-    iconHover: (nodeId, on) => setChompId((cur) => (on ? nodeId : cur === nodeId ? null : cur)),
+    iconHover: (nodeId, on) => setChompHoverId((cur) => (on ? nodeId : cur === nodeId ? null : cur)),
   });
 
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
@@ -2499,8 +2503,8 @@ export function MapPage() {
                     !pendingCreate &&
                     !inlineEditId
                   }
-                  canChomp={chompsOnHover(node)}
-                  chomping={chompId === node.nodeId && !dotZoom}
+                  canChomp={chompSpots.has(node.nodeId)}
+                  chomping={chompIds.has(node.nodeId) && !dotZoom}
                 />
               );
             })}
@@ -2521,7 +2525,7 @@ export function MapPage() {
                 posFor={posFor}
                 celebrateIds={celebrateIds}
                 shotState={shotState}
-                chompId={chompId}
+                chompIds={chompIds}
                 iconRadius={(n) =>
                   (24 * nodeSizeMultiplier(n, circleRootSentimentByNode.has(n.nodeId), compactView)) / zoom
                 }
