@@ -10,6 +10,11 @@ import { NodeSearch } from "./NodeSearch";
 import type { MapBackground, NodeDoc, NodeType } from "../types";
 import type { ZoneLayout } from "../utils/zoneLayout";
 
+// Which commit this build is (Vercel fills VITE_VERCEL_GIT_COMMIT_SHA in on
+// every deploy), shown small under the theme toggle so it's easy to tell
+// whether a deploy has reached the browser. Empty in local builds.
+const BUILD = (import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7);
+
 interface Props {
   /** A demo session has exactly the one map it was seeded with — no way back to a dashboard. */
   isDemo: boolean;
@@ -303,6 +308,7 @@ export function MapToolbar({
           >
             <LanguageSwitcher />
             <ThemeToggle />
+            {BUILD && <span className="text-[0.6rem] text-ink-soft select-all">{BUILD}</span>}
           </div>
         </>
       ) : (
