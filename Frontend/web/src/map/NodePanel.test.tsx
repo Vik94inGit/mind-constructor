@@ -98,6 +98,21 @@ describe("NodePanel", () => {
     expect(await screen.findByText("-7")).toBeInTheDocument();
   });
 
+  it("opens an attack on your node on its Attack tab", () => {
+    const attack = makeNode({ nodeId: "w", text: "Their objection", type: "Problem", userId: "u2", isWeapon: true, weaponIcon: "spear", targetNodeId: "b", parentId: "b" });
+    const nodes = [makeNode({ nodeId: "b", text: "Mine" }), attack];
+    renderPanel({ node: attack, nodes, edges: [] });
+    expect(document.querySelector("#attack-text")).not.toBeNull();
+  });
+
+  it("opens an attack reached with the arrows on Info", () => {
+    const attack = makeNode({ nodeId: "w", text: "Their objection", type: "Problem", userId: "u2", isWeapon: true, weaponIcon: "spear", targetNodeId: "b", parentId: "b" });
+    const nodes = [makeNode({ nodeId: "b", text: "Mine" }), attack];
+    renderPanel({ node: attack, nodes, edges: [], stepped: true });
+    expect(document.querySelector("#attack-text")).toBeNull();
+    expect(screen.getByText("Their objection")).toBeInTheDocument();
+  });
+
   it("hides Protect in Personal mode", () => {
     renderPanel({ discussionMode: false });
     expect(screen.queryByRole("button", { name: en.map.panelTabs.protect })).toBeNull();

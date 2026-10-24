@@ -1309,6 +1309,7 @@ export function MapPage() {
     const next = selectedId ? stepNode(visibleNodes, selectedId, dir) : (dir === 1 ? order[0] : order[order.length - 1])?.nodeId;
     if (!next) return;
     setPictureView(null);
+    setSteppedToId(next);
     setSelectedId(next);
     centerOnNode(next);
     if (focusText) setFocusTextNodeId(next);
@@ -1842,6 +1843,9 @@ export function MapPage() {
   // A node just made through the inline input: its panel opens focused on
   // the text (see NodePanel's autoFocusText) — cleared once that's done.
   const [focusTextNodeId, setFocusTextNodeId] = useState<string | null>(null);
+  // The node the ← / → arrows last stepped to: its panel opens on Info, even
+  // for an attack on your own node (which otherwise opens on Attack).
+  const [steppedToId, setSteppedToId] = useState<string | null>(null);
   // A node being made is brought to the middle of the screen below its panel,
   // with the emoji ring around it.
   useEffect(() => {
@@ -2866,6 +2870,7 @@ export function MapPage() {
                 onApplyTemplate={(kind) => applyTemplate(kind, selectedNode)}
                 onClose={() => setSelectedId(null)}
                 onStepNode={stepReading}
+                stepped={steppedToId === selectedNode.nodeId}
                 onSelectNode={(id) => {
                   setSelectedId(id);
                   // Same "chosen node is always centered" rule handleNodeClick

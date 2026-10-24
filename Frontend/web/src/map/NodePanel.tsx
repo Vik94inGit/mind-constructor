@@ -153,10 +153,13 @@ interface Props {
   /** Opens the previous (-1) or next (1) node in reading order (utils/nodeOrder.ts) — the text's arrow keys. */
   /** Read the previous / next node; `focusText: false` keeps focus where it is (the header's buttons). */
   onStepNode?: (dir: -1 | 1, focusText?: boolean) => void;
+  /** This node was reached with the ← / → arrows: it opens on Info, even an attack you could strike back at. */
+  stepped?: boolean;
 }
 
 export function NodePanel({
   onStepNode,
+  stepped = false,
   node,
   nodes,
   edges,
@@ -390,7 +393,7 @@ export function NodePanel({
     setExpanded(false);
     setDragOffset({ x: 0, y: 0 });
     setPanelHeight(null);
-    setTab(strikeBack ? "attack" : "info");
+    setTab(strikeBack && !stepped ? "attack" : "info");
     nodesApi
       .getAttackHistory(node.nodeId)
       .then(setHistory)

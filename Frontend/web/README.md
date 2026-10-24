@@ -95,7 +95,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node (any way) opens `map/NewNodePanel.tsx` with its text field focused — with the feelings offered
   as a ring around the new node, optional — and editing opens the node's panel on its text.
   Big round ← / → arrows at either end of the sheet's top edge step to the previous or next
-  node, with the resize handle between them.
+  node, with the resize handle between them. The steps include every attack, right after the node it
+  hit, and each node they reach opens on its Info tab (an attack on your own node otherwise opens on
+  Attack, ready to strike back).
 - **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
