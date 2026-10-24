@@ -70,6 +70,7 @@ import { MAP_ZONE_KEY } from "../utils/zoneLayout";
 import type { ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
+import { useTapChomp } from "../hooks/useTapChomp";
 import { MapToolbar } from "../map/MapToolbar";
 import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
@@ -1930,11 +1931,15 @@ export function MapPage() {
   });
 
   const chompSpots = useMemo(() => chompTargets(visibleNodes), [visibleNodes]);
-  // A phone has no hover, so the selected node plays it too: tapping a strong
-  // attack, or the node it hit, starts Pac-Man; the mouse's hover wins.
+  // The mouse's hover wins; on a phone, a tap on a strong attack runs it once.
+  const tapChompId = useTapChomp(selectedId, steppedToId, visibleNodes);
+  // Selecting any other node, by a tap, ends the arrows' step.
+  useEffect(() => {
+    if (steppedToId && selectedId !== steppedToId) setSteppedToId(null);
+  }, [selectedId, steppedToId]);
   const chompIds = useMemo(
-    () => chompersFor(chompHoverId ?? selectedId, visibleNodes),
-    [chompHoverId, selectedId, visibleNodes],
+    () => chompersFor(chompHoverId ?? tapChompId, visibleNodes),
+    [chompHoverId, tapChompId, visibleNodes],
   );
 
   // What a card on the canvas does when used: one stable object for every
