@@ -21,6 +21,14 @@ function assetList(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), assetList()],
+  // The commit Vercel builds, for the small build code on the map's toolbar.
+  // Vercel only hands Vite its VITE_-prefixed copy when system variables are
+  // exposed, so read the plain one here.
+  define: {
+    "import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA": JSON.stringify(
+      process.env.VITE_VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || "",
+    ),
+  },
   server: {
     // 5173 for a plain `npm run dev`, but the launch harness assigns a free
     // port via PORT when 5173 is already taken by something else (see

@@ -29,3 +29,15 @@ describe("nodeOrder", () => {
     expect(stepNode(nodes, "lone", 1)).toBeNull();
   });
 });
+
+describe("readingOrder with attacks", () => {
+  it("steps through every attack right after the node it hit", () => {
+    const nodes = [
+      makeNode({ nodeId: "claim", createdAt: "1" }),
+      makeNode({ nodeId: "next", createdAt: "2" }),
+      makeNode({ nodeId: "hit", createdAt: "3", isWeapon: true, targetNodeId: "claim", parentId: { nodeId: "claim", text: "", type: "Problem" } }),
+    ];
+    expect(readingOrder(nodes).map((n) => n.nodeId)).toEqual(["claim", "hit", "next"]);
+    expect(stepNode(nodes, "claim", 1)).toBe("hit");
+  });
+});

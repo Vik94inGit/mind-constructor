@@ -95,7 +95,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node (any way) opens `map/NewNodePanel.tsx` with its text field focused — with the feelings offered
   as a ring around the new node, optional — and editing opens the node's panel on its text.
   Big round ← / → arrows at either end of the sheet's top edge step to the previous or next
-  node, with the resize handle between them.
+  node, with the resize handle between them. The steps include every attack, right after the node it
+  hit, and each node they reach opens on its Info tab (an attack on your own node otherwise opens on
+  Attack, ready to strike back).
 - **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
@@ -208,7 +210,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   10); the opponent's-turn panel offers the same right after its move.
 - A strong attack (a Counterpoint, which takes a fresh node to 75%, or a Fatal flaw, which takes it to
   50%) plays Pac-Man while the mouse rests on it, or on the node it hit (then every strong attack on
-  that node runs at once): its icon fades, a round pie in its colour runs, mouth open
+  that node runs at once), and also while either one is selected, so a tap starts it on a phone: its icon fades, a round pie in its colour runs, mouth open
   and always the right way up,
   to the node it hit (or that node's shield), nudges into it once and runs back, until the pointer leaves
-  (`utils/pacman.ts`, `map/PacmanChomp.tsx`). A Nitpick stays still, and a finger never starts it.
+  or the node is deselected (`utils/pacman.ts`, `map/PacmanChomp.tsx`). A Nitpick stays still.
