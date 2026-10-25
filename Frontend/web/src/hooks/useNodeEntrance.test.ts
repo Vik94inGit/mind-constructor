@@ -5,11 +5,11 @@ import { APPEAR_MS, SKIP_MS } from "../utils/nodeEntrance";
 import { makeNode } from "../test/fixtures";
 import type { NodeDoc } from "../types";
 
-function setup(nodes: NodeDoc[], enabled?: boolean) {
+function setup(nodes: NodeDoc[]) {
   const root = document.createElement("div");
   root.innerHTML = nodes.map((n) => `<div data-reveal-node="${n.nodeId}"></div>`).join("");
   document.body.appendChild(root);
-  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, canvasRef: { current: root }, enabled }));
+  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, canvasRef: { current: root } }));
   const opacity = (id: string) => (root.querySelector(`[data-reveal-node="${id}"]`) as HTMLElement).style.opacity;
   return { ...hook, opacity };
 }
@@ -27,13 +27,6 @@ describe("useNodeEntrance", () => {
   afterEach(() => {
     vi.useRealTimers();
     document.body.innerHTML = "";
-  });
-
-  it("opens a Personal map already laid out", () => {
-    const { result, opacity } = setup(mapNodes(), false);
-    expect(result.current.active).toBe(false);
-    expect(opacity("a")).toBe("");
-    expect(opacity("c")).toBe("");
   });
 
   it("brings the nodes in one after another, in the order they were made, and then gets out of the way", () => {

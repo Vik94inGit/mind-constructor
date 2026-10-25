@@ -252,6 +252,78 @@ describe("useNodeDragAndDrop", () => {
       expect(recordMove).toHaveBeenCalledWith([nodes[1]]);
     });
 
+    it("redirecting a branch keeps a child its new zone can reach where it is", async () => {
+      const nodes = [
+        makeNode({ nodeId: "a", x: 1000, y: 800 }),
+        makeNode({ nodeId: "b", x: 1300, y: 800 }),
+        makeNode({ nodeId: "c", x: 1100, y: 900, parentId: "a" }),
+      ];
+      const positions = new Map<string, Pt>(nodes.map((n) => [n.nodeId, { x: n.x!, y: n.y! }]));
+      const placeNode = vi.fn((p: Pt) => p);
+      const recordMove = vi.fn();
+      const { result } = setup({ nodes, positions, placeNode, recordMove });
+      vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, updates) => ({
+        ...nodes.find((n) => n.nodeId === nodeId)!,
+        ...updates,
+      }));
+
+      await act(async () => {
+        await result.current.redirectParent(nodes[2], nodes[1]);
+      });
+
+      expect(placeNode).toHaveBeenCalledWith({ x: 1100, y: 900 }, [{ nodeId: "c", parentId: "b" }]);
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("c", { parentId: "b" });
+      expect(recordMove).toHaveBeenCalledWith([nodes[2]]);
+    });
+
+    it("redirecting a branch brings a far child in next to its new parent, under the zone rules", async () => {
+      const nodes = [
+        makeNode({ nodeId: "a", x: 300, y: 800 }),
+        makeNode({ nodeId: "b", x: 2000, y: 800 }),
+        makeNode({ nodeId: "c", x: 400, y: 800, parentId: "a" }),
+      ];
+      const positions = new Map<string, Pt>(nodes.map((n) => [n.nodeId, { x: n.x!, y: n.y! }]));
+      const placeNode = vi.fn((p: Pt) => p);
+      const { result } = setup({ nodes, positions, placeNode });
+      vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, updates) => ({
+        ...nodes.find((n) => n.nodeId === nodeId)!,
+        ...updates,
+      }));
+
+      await act(async () => {
+        await result.current.redirectParent(nodes[2], nodes[1]);
+      });
+
+      const [sent] = vi.mocked(nodesApi.updateNode).mock.calls.filter(([id]) => id === "c");
+      expect(sent[1].parentId).toBe("b");
+      expect(sent[1].x!).toBeLessThan(2000);
+      expect(sent[1].x!).toBeGreaterThan(1500);
+      expect(sent[1].y).toBe(800);
+    });
+
+    it("puts the old parent back when the redirect doesn't save", async () => {
+      const nodes = [
+        makeNode({ nodeId: "a", x: 1000, y: 800 }),
+        makeNode({ nodeId: "b", x: 1300, y: 800 }),
+        makeNode({ nodeId: "c", x: 1100, y: 900, parentId: "a" }),
+      ];
+      const positions = new Map<string, Pt>(nodes.map((n) => [n.nodeId, { x: n.x!, y: n.y! }]));
+      const { result, setNodes, setActionError } = setup({
+        nodes,
+        positions,
+        t: { ui: { errors: { changeParent: "PARENT_ERROR" } } } as unknown as Translation,
+      });
+      vi.mocked(nodesApi.updateNode).mockRejectedValue(new Error("down"));
+
+      await act(async () => {
+        await result.current.redirectParent(nodes[2], nodes[1]);
+      });
+
+      const applied = setNodes.mock.calls.reduce((list, [fn]) => fn(list), nodes as NodeDoc[]);
+      expect(applied.find((n: NodeDoc) => n.nodeId === "c")!.parentId).toBe("a");
+      expect(setActionError).toHaveBeenLastCalledWith("PARENT_ERROR");
+    });
+
     it("joins the target's circle when dropped anywhere on its card, landing in free mode", async () => {
       const dragged = makeNode({ nodeId: "a", x: 0, y: 0 });
       const target = makeNode({ nodeId: "b", x: 500, y: 500 });

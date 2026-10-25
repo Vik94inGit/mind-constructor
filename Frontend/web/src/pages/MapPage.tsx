@@ -13,6 +13,7 @@ import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
 import { useZoneFocus } from "../hooks/useZoneFocus";
 import { usePresentation } from "../hooks/usePresentation";
 import { usePuzzleConnect } from "../hooks/usePuzzleConnect";
+import { useEdgeRedirect } from "../hooks/useEdgeRedirect";
 import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
@@ -1014,8 +1015,9 @@ export function MapPage() {
   // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
   // appear one after another in the order they were made, drawn straight onto
   // the canvas DOM (posFor never sees it); skip is wired to any pointer-down
-  // on the canvas. A Personal map stays calm and opens already laid out.
-  const entrance = useNodeEntrance({ enabled: discussionOn, visibleNodes, canvasRef });
+  // on the canvas. Every map opens this way, Personal and Discussion alike,
+  // the way a template branch fills in node by node.
+  const entrance = useNodeEntrance({ visibleNodes, canvasRef });
 
   // Whether a node is drawn as a puzzle card right now — the only nodes that
   // snap together (see usePuzzleConnect).
@@ -1072,7 +1074,7 @@ export function MapPage() {
     errorMessage: t.ui.errors.moveNodes,
     keysEnabled: !presenting && !drawMode,
   });
-  const { onNodePointerDown, magnetize, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
+  const { onNodePointerDown, magnetize, redirectParent, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
     nodes,
     positions,
     nodeGroups,
@@ -1116,6 +1118,27 @@ export function MapPage() {
     },
     isBlockLocked: (id) => !!blockLocks[id],
     recordMove,
+  });
+
+  // A branch arrow's knob dragged onto another node changes the child's
+  // parent, and the zones reshape to fit (hooks/useEdgeRedirect.ts).
+  const { edgeRedirect, startEdgeRedirect } = useEdgeRedirect({
+    nodes,
+    isOwnNode,
+    screenToCanvas,
+    onRedirect: (child, parent) => {
+      void redirectParent(child, parent).then(() => {
+        if (mapId) refreshInsights(mapId);
+      });
+    },
+    onRefused: (reason) =>
+      setActionError(
+        reason === "ownBranch"
+          ? t.ui.errors.dropOnOwnBranch
+          : reason === "attack"
+            ? t.ui.errors.attackParent
+            : t.ui.errors.parentNotOwn,
+      ),
   });
 
   // Same condition that gates the quick-add ghost ring below — reused
@@ -2373,6 +2396,9 @@ export function MapPage() {
               linkCycles={linkCycles}
               chosenNodeIds={chosenNodeIds}
               pendingLink={pendingLink}
+              canRedirect={(child) => isOwnNode(child) && !chooseMode && !packMode && !presenting}
+              onRedirectStart={startEdgeRedirect}
+              edgeRedirect={edgeRedirect}
               onCircleClick={(rootId) => {
                 // A zone's own polygon stops the click from ever reaching the
                 // canvas div's onClick (see its own chooseMode branch above)
