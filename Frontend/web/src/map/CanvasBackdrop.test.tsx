@@ -113,26 +113,6 @@ describe("CanvasBackdrop branch redirect", () => {
     posFor: (n: { nodeId: string }) => spots[n.nodeId],
   };
 
-  it("puts a knob on the chosen node's own branches and hands its grab over", () => {
-    const onRedirectStart = vi.fn();
-    renderBackdrop({ ...base, chosenNodeIds: new Set(["c"]), canRedirect: () => true, onRedirectStart });
-    const knob = document.querySelector('[data-redirect-knob="c"]');
-    expect(knob).not.toBeNull();
-    expect(knob!.getAttribute("cx")).toBe("40");
-    fireEvent.pointerDown(knob!);
-    expect(onRedirectStart).toHaveBeenCalledWith(child, expect.anything());
-  });
-
-  it("shows no knob with nothing chosen", () => {
-    renderBackdrop({ ...base, canRedirect: () => true, onRedirectStart: vi.fn() });
-    expect(document.querySelector("[data-redirect-knob]")).toBeNull();
-  });
-
-  it("shows no knob on a branch that isn't yours", () => {
-    renderBackdrop({ ...base, chosenNodeIds: new Set(["c"]), canRedirect: () => false, onRedirectStart: vi.fn() });
-    expect(document.querySelector("[data-redirect-knob]")).toBeNull();
-  });
-
   it("draws the redirected arrow from the pointer and rings the node under it", () => {
     renderBackdrop({
       ...base,

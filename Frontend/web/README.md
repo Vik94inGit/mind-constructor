@@ -106,9 +106,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   in the panel; the inline inputs grow taller with the text, never wider.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
-- **Changing a parent** — the branch arrows of the node you've opened carry a small round knob
-  (`map/CanvasBackdrop.tsx`). Grab it and drag: the arrow's parent end leaves its parent and follows the
-  pointer, green over a node that can take it, red over one that can't. Let go over another of your
+- **Changing a parent** — the branch arrows of the node you've opened carry a round knob
+  (`map/RedirectKnobs.tsx`), drawn above the ring of ghosts and just past it, one size on screen at any
+  zoom and finger-sized on a phone. Grab it and drag (grabbing it never pans the map): the ghosts step
+  aside, and the arrow's parent end leaves its parent and follows the pointer, green over a node that can
+  take it, red over one that can't. Holding the pointer near an edge of the visible map (on a phone, the
+  top of the node panel counts as its bottom edge) pans the map that way, so a parent off screen can be
+  reached, and a drop within a finger's width of a node counts as on it. Let go over another of your
   nodes and the child hangs from that one instead (`hooks/useEdgeRedirect.ts`, `utils/edgeRedirect.ts`);
   let go anywhere else and nothing changes. Not onto its own branch (that would close a loop), not onto
   someone else's node, and an attack only onto another attack. The zones reshape to fit: the old parent's

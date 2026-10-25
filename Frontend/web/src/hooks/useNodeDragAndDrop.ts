@@ -253,9 +253,12 @@ export function useNodeDragAndDrop({
     const from = positions.get(child.nodeId) ?? posFor(child);
     const to = positions.get(parent.nodeId) ?? posFor(parent);
     const card = !!clearSpotFor?.(child, from.x, from.y);
-    const placed = card || held(child)
-      ? from
-      : placeNode(redirectSpot(from, to, getZoneReach()), [{ nodeId: child.nodeId, parentId: parent.nodeId }]);
+    // Close enough already: it stays exactly where it is. (Settling it anyway
+    // would keep it inside the part of the map on screen, and on a phone,
+    // panned over to the new parent, that yanked it across the map.)
+    const want = redirectSpot(from, to, getZoneReach());
+    const stays = card || held(child) || (want.x === from.x && want.y === from.y);
+    const placed = stays ? from : placeNode(want, [{ nodeId: child.nodeId, parentId: parent.nodeId }]);
     const moved = placed.x !== from.x || placed.y !== from.y;
     const { pulls, pulled } = moved ? pullsFor(new Map([[child.nodeId, placed]])) : { pulls: new Map<string, Pt>(), pulled: [] };
     recordMove?.([child, ...pulled]);
