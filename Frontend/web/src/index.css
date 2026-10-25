@@ -420,40 +420,58 @@
   }
 }
 
-/* A strong attack's Pac-Man run on hover (map/PacmanChomp.tsx): out to the
-   target with its mouth open, one small nudge into it, back home, on a loop.
-   Everything moves along the group's own x axis, which PacmanChomp already
-   turned toward the target. The jaws stay open the whole way. */
-.pacman-run {
-  animation: pacman-run 2.4s ease-in-out infinite;
+/* A strong attack's Pac-Man run (NodeCard's chomp): the node itself slides
+   out to its target (--chomp-dx/dy), nudges in once (--chomp-lx/ly) and comes
+   back, while a wedge facing the target (--chomp-angle) cut out of its round
+   icon opens from the empty part of its health ring (--mouth-base) wider and
+   back. `translate` composes with the transform that centres the node. */
+@property --mouth {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }
-.pacman-jaw-top {
-  transform: rotate(-38deg);
+.pacman-node-run {
+  animation: pacman-node-run 2.4s ease-in-out infinite;
 }
-.pacman-jaw-bottom {
-  transform: rotate(38deg);
+.pacman-mouth {
+  --mouth: var(--mouth-base);
+  animation: pacman-mouth 2.4s ease-in-out infinite;
 }
-@keyframes pacman-run {
+@keyframes pacman-node-run {
   0%,
   8% {
-    transform: translateX(0);
+    translate: 0 0;
   }
-  40% {
-    transform: translateX(var(--chomp-reach));
+  40%,
+  60% {
+    translate: var(--chomp-dx) var(--chomp-dy);
   }
   50% {
-    transform: translateX(calc(var(--chomp-reach) + var(--chomp-lunge)));
-  }
-  60% {
-    transform: translateX(var(--chomp-reach));
+    translate: var(--chomp-lx) var(--chomp-ly);
   }
   92%,
   100% {
-    transform: translateX(0);
+    translate: 0 0;
+  }
+}
+@keyframes pacman-mouth {
+  0%,
+  8%,
+  92%,
+  100% {
+    --mouth: var(--mouth-base);
+  }
+  40%,
+  60% {
+    --mouth: calc(var(--mouth-base) + 50deg);
+  }
+  50% {
+    --mouth: calc(var(--mouth-base) + 90deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pacman-run {
+  .pacman-node-run,
+  .pacman-mouth {
     animation: none;
   }
 }

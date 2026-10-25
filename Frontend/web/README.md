@@ -221,7 +221,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - A strong attack (a Counterpoint, which takes a fresh node to 75%, or a Fatal flaw, which takes it to
   50%) plays Pac-Man while the mouse rests on it, or on the node it hit (then every strong attack on
   that node runs at once), or once when you tap the attack itself on a phone (stepping onto it with the
-  panel's arrows, or tapping the node it hit, leaves it still): its icon fades, a round pie in its colour runs, mouth open
-  and always the right way up,
-  to the node it hit (or that node's shield), nudges into it once and runs back, until the pointer leaves
-  (`utils/pacman.ts`, `hooks/useTapChomp.ts`, `map/PacmanChomp.tsx`). A Nitpick stays still.
+  panel's arrows, or tapping the node it hit, leaves it still): the attack node itself, its icon unchanged,
+  runs to the node it hit (or that node's shield), nudges into it once and runs back, while a wedge facing
+  the target opens in its round icon like a mouth, starting as the empty part of its health ring and
+  widening on the way in (`utils/pacman.ts`, `hooks/useTapChomp.ts`, `NodeCard`'s `chomp`). A Nitpick stays still.

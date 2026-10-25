@@ -31,7 +31,8 @@ import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
-import { chompersFor, chompTargets } from "../utils/pacman";
+import { chompAim, chompersFor, chompMove, chompTargets } from "../utils/pacman";
+import type { ChompMove } from "../utils/pacman";
 import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } from "../utils/nodePriority";
 import type { CaptionSpec } from "../utils/nodePriority";
 import { useAuth } from "../context/AuthContext";
@@ -1964,6 +1965,25 @@ export function MapPage() {
     () => chompersFor(chompHoverId ?? tapChompId, visibleNodes),
     [chompHoverId, tapChompId, visibleNodes],
   );
+  // Each running attack's way out to what it hit, from where both are drawn
+  // now. Sizes are icon radii in canvas units at this zoom. A run whose
+  // numbers didn't change keeps its object, so its card isn't redrawn.
+  const chompMoveCache = useRef(new Map<string, ChompMove>());
+  const chompMoves = new Map<string, ChompMove>();
+  if (!dotZoom) {
+    const radius = (n: NodeDoc) =>
+      (24 * nodeSizeMultiplier(n, circleRootSentimentByNode.has(n.nodeId), compactView)) / zoom;
+    for (const id of chompIds) {
+      const attack = visibleNodes.find((n) => n.nodeId === id);
+      const aim = attack && chompAim(attack, visibleNodes);
+      if (!attack || !aim) continue;
+      const move = chompMove(posFor(attack), posFor(aim), radius(attack), radius(aim));
+      const prev = chompMoveCache.current.get(id);
+      const same = prev && (Object.keys(move) as (keyof ChompMove)[]).every((k) => prev[k] === move[k]);
+      chompMoves.set(id, same ? prev : move);
+    }
+  }
+  chompMoveCache.current = chompMoves;
 
   // What a card on the canvas does when used: one stable object for every
   // card, so CanvasNodeCard only re-renders when its own node changed.
@@ -2544,7 +2564,7 @@ export function MapPage() {
                     !inlineEditId
                   }
                   canChomp={chompSpots.has(node.nodeId)}
-                  chomping={chompIds.has(node.nodeId) && !dotZoom}
+                  chomp={chompMoves.get(node.nodeId)}
                 />
               );
             })}
@@ -2565,10 +2585,6 @@ export function MapPage() {
                 posFor={posFor}
                 celebrateIds={celebrateIds}
                 shotState={shotState}
-                chompIds={chompIds}
-                iconRadius={(n) =>
-                  (24 * nodeSizeMultiplier(n, circleRootSentimentByNode.has(n.nodeId), compactView)) / zoom
-                }
               />
             )}
 
