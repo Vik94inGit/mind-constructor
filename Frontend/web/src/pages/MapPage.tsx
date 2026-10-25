@@ -1013,8 +1013,9 @@ export function MapPage() {
   // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
   // appear one after another in the order they were made, drawn straight onto
   // the canvas DOM (posFor never sees it); skip is wired to any pointer-down
-  // on the canvas. A Personal map stays calm and opens already laid out.
-  const entrance = useNodeEntrance({ enabled: discussionOn, visibleNodes, canvasRef });
+  // on the canvas. Every map opens this way, Personal and Discussion alike,
+  // the way a template branch fills in node by node.
+  const entrance = useNodeEntrance({ visibleNodes, canvasRef });
 
   // Whether a node is drawn as a puzzle card right now — the only nodes that
   // snap together (see usePuzzleConnect).

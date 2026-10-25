@@ -14,8 +14,6 @@ interface Params {
   visibleNodes: NodeDoc[];
   /** The canvas element every node/zone/link is rendered inside. */
   canvasRef: RefObject<HTMLElement | null>;
-  /** Off on a Personal map: it opens already laid out. Defaults to on. */
-  enabled?: boolean;
 }
 
 interface Running {
@@ -35,7 +33,7 @@ interface Running {
  * the canvas DOM (applyEntranceFrame), never through React state, so there
  * are no whole-map re-renders.
  */
-export function useNodeEntrance({ visibleNodes, canvasRef, enabled = true }: Params) {
+export function useNodeEntrance({ visibleNodes, canvasRef }: Params) {
   const [active, setActive] = useState(false);
   const running = useRef<Running | null>(null);
   const raf = useRef(0);
@@ -92,7 +90,6 @@ export function useNodeEntrance({ visibleNodes, canvasRef, enabled = true }: Par
     const root = canvasRef.current;
     if (!running.current && loaded && !opened.current && root) {
       opened.current = true;
-      if (!enabled) return;
       const delays = computeEntranceDelays(visibleNodes);
       if (delays.size < 2) return;
       running.current = { delays, startedAt: performance.now(), skip: null };
