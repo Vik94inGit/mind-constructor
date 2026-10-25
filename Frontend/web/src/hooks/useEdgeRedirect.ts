@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { redirectRefusal } from "../utils/edgeRedirect";
 import type { RedirectRefusal } from "../utils/edgeRedirect";
@@ -15,6 +15,23 @@ export interface EdgeRedirect {
   valid: boolean;
 }
 
+// How close (screen px) to the edge of the visible map the pointer has to
+// come for the map to pan under it, and how fast it pans right at the edge.
+// NEAR_PX: a finger covers more than its point, so a drop this close (screen
+// px) to a node's center counts as on it.
+export const EDGE_PAN_PX = 56;
+export const EDGE_PAN_SPEED = 10;
+export const NEAR_PX = 44;
+
+/** How far to pan this frame for a pointer at (x, y) in `area`: toward whichever edges it's near, faster the closer. */
+export function edgePan(x: number, y: number, area: { left: number; top: number; right: number; bottom: number }): Pt {
+  const push = (into: number) => (into < EDGE_PAN_PX ? Math.round(EDGE_PAN_SPEED * (1 - Math.max(0, into) / EDGE_PAN_PX)) : 0);
+  return {
+    x: push(area.right - x) - push(x - area.left),
+    y: push(area.bottom - y) - push(y - area.top),
+  };
+}
+
 interface Params {
   nodes: NodeDoc[];
   isOwnNode: (node: NodeDoc) => boolean;
@@ -23,17 +40,52 @@ interface Params {
   onRedirect: (child: NodeDoc, parent: NodeDoc) => void;
   /** Let go over a node that can't, with why (nothing for letting go over its own parent or nowhere). */
   onRefused: (reason: Exclude<RedirectRefusal, "same">) => void;
+  /** The map's scrolling area: held near its edge, the pointer pans it, so a parent off screen can be reached. */
+  scrollArea?: () => HTMLElement | null;
+  /** The nodes on the map and where they're drawn: one near the pointer counts as under it. */
+  visibleNodes?: NodeDoc[];
+  posFor?: (node: NodeDoc) => Pt;
+  zoom?: number;
 }
 
-// Grabbing a branch arrow's knob (CanvasBackdrop) and dragging it: the arrow
-// leaves its parent and follows the pointer; let go over another node and
-// that node becomes the parent (MapPage hands it to redirectParent, which
-// settles the zones). Let go anywhere else and nothing changes.
-export function useEdgeRedirect({ nodes, isOwnNode, screenToCanvas, onRedirect, onRefused }: Params) {
+// Grabbing a branch arrow's knob (map/RedirectKnobs.tsx) and dragging it: the
+// arrow leaves its parent and follows the pointer; let go over another node
+// and that node becomes the parent (MapPage hands it to redirectParent, which
+// settles the zones). Let go anywhere else and nothing changes. On a phone
+// most of the map is off screen, so holding the finger near an edge of the
+// visible map (above the node panel) pans it that way.
+export function useEdgeRedirect({
+  nodes,
+  isOwnNode,
+  screenToCanvas,
+  onRedirect,
+  onRefused,
+  scrollArea,
+  visibleNodes = [],
+  posFor,
+  zoom = 1,
+}: Params) {
   const [edgeRedirect, setEdgeRedirect] = useState<EdgeRedirect | null>(null);
-  function nodeIdAt(clientX: number, clientY: number): string | null {
+  const stopRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopRef.current?.(), []);
+  // The node under the pointer, else the nearest one within a finger's reach.
+  function nodeIdAt(clientX: number, clientY: number, skipId: string): string | null {
     const el = document.elementFromPoint(clientX, clientY);
-    return el?.closest("[data-reveal-node]")?.getAttribute("data-reveal-node") ?? null;
+    const hit = el?.closest("[data-reveal-node]")?.getAttribute("data-reveal-node");
+    if (hit || !posFor) return hit ?? null;
+    const p = screenToCanvas(clientX, clientY);
+    let best: string | null = null;
+    let bestDist = NEAR_PX / zoom;
+    for (const n of visibleNodes) {
+      if (n.nodeId === skipId) continue;
+      const q = posFor(n);
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < bestDist) {
+        best = n.nodeId;
+        bestDist = d;
+      }
+    }
+    return best;
   }
   const byId = (id: string | null) => (id ? nodes.find((n) => n.nodeId === id) : undefined);
 
@@ -41,8 +93,10 @@ export function useEdgeRedirect({ nodes, isOwnNode, screenToCanvas, onRedirect, 
     if (!isOwnNode(child)) return;
     e.stopPropagation();
     e.preventDefault();
+    let last = { x: e.clientX, y: e.clientY };
     const track = (clientX: number, clientY: number) => {
-      const overId = nodeIdAt(clientX, clientY);
+      last = { x: clientX, y: clientY };
+      const overId = nodeIdAt(clientX, clientY, child.nodeId);
       const over = byId(overId);
       setEdgeRedirect({
         childId: child.nodeId,
@@ -51,11 +105,36 @@ export function useEdgeRedirect({ nodes, isOwnNode, screenToCanvas, onRedirect, 
         valid: !!over && redirectRefusal(child, over, nodes, isOwnNode) === null,
       });
     };
+    // Each frame: pan when the pointer is held near an edge of what's visible
+    // of the map, and keep the arrow under the pointer as the map moves.
+    let frame = 0;
+    const panStep = () => {
+      frame = requestAnimationFrame(panStep);
+      const wrap = scrollArea?.();
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const panel = document.querySelector("[data-node-panel]")?.getBoundingClientRect();
+      // A bottom sheet (the phone's node panel) covers the lower map: its top is the edge.
+      const bottom = panel && panel.top > rect.top + EDGE_PAN_PX * 2 ? Math.min(rect.bottom, panel.top) : rect.bottom;
+      const d = edgePan(last.x, last.y, { left: rect.left, top: rect.top, right: rect.right, bottom });
+      if (d.x === 0 && d.y === 0) return;
+      const before = { left: wrap.scrollLeft, top: wrap.scrollTop };
+      wrap.scrollLeft += d.x;
+      wrap.scrollTop += d.y;
+      if (wrap.scrollLeft !== before.left || wrap.scrollTop !== before.top) track(last.x, last.y);
+    };
+    if (typeof requestAnimationFrame === "function") frame = requestAnimationFrame(panStep);
     const onMove = (ev: PointerEvent) => track(ev.clientX, ev.clientY);
-    const finish = (ev: PointerEvent, drop: boolean) => {
+    const stop = () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
+      stopRef.current = null;
+    };
+    stopRef.current = stop;
+    const finish = (ev: PointerEvent, drop: boolean) => {
+      stop();
       setEdgeRedirect(null);
       // The release lands on whatever is under the pointer, which would
       // otherwise read as a click there (selecting a node, or closing the
@@ -64,7 +143,7 @@ export function useEdgeRedirect({ nodes, isOwnNode, screenToCanvas, onRedirect, 
       window.addEventListener("click", swallow, { capture: true, once: true });
       setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
       if (!drop) return;
-      const target = byId(nodeIdAt(ev.clientX, ev.clientY));
+      const target = byId(nodeIdAt(ev.clientX, ev.clientY, child.nodeId));
       if (!target) return;
       const refusal = redirectRefusal(child, target, nodes, isOwnNode);
       if (refusal === null) onRedirect(child, target);

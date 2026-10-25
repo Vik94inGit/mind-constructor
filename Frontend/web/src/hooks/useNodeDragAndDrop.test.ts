@@ -252,7 +252,7 @@ describe("useNodeDragAndDrop", () => {
       expect(recordMove).toHaveBeenCalledWith([nodes[1]]);
     });
 
-    it("redirecting a branch keeps a child its new zone can reach where it is", async () => {
+    it("redirecting a branch keeps a child its new zone can reach exactly where it is", async () => {
       const nodes = [
         makeNode({ nodeId: "a", x: 1000, y: 800 }),
         makeNode({ nodeId: "b", x: 1300, y: 800 }),
@@ -271,7 +271,7 @@ describe("useNodeDragAndDrop", () => {
         await result.current.redirectParent(nodes[2], nodes[1]);
       });
 
-      expect(placeNode).toHaveBeenCalledWith({ x: 1100, y: 900 }, [{ nodeId: "c", parentId: "b" }]);
+      expect(placeNode).not.toHaveBeenCalled();
       expect(nodesApi.updateNode).toHaveBeenCalledWith("c", { parentId: "b" });
       expect(recordMove).toHaveBeenCalledWith([nodes[2]]);
     });

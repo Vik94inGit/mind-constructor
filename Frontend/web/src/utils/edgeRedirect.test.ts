@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeNode } from "../test/fixtures";
-import { REDIRECT_BRING_FACTOR, REDIRECT_KEEP_FACTOR, redirectRefusal, redirectSpot } from "./edgeRedirect";
+import { REDIRECT_BRING_FACTOR, REDIRECT_KEEP_FACTOR, knobSpot, redirectRefusal, redirectSpot } from "./edgeRedirect";
 import type { NodeDoc } from "../types";
 
 const own = (_n: NodeDoc) => true;
@@ -51,5 +51,15 @@ describe("redirectSpot", () => {
     const at = redirectSpot({ x: 400, y: 2500 }, { x: 400, y: 500 }, REACH);
     expect(at.x).toBeCloseTo(400);
     expect(at.y).toBeCloseTo(500 + REACH * REDIRECT_BRING_FACTOR);
+  });
+});
+
+describe("knobSpot", () => {
+  it("sits just past the ring round the opened node", () => {
+    expect(knobSpot({ x: 0, y: 0 }, { x: 1000, y: 0 }, 160)).toEqual({ x: 160, y: 0 });
+  });
+
+  it("goes halfway on a branch too short for that", () => {
+    expect(knobSpot({ x: 0, y: 0 }, { x: 200, y: 0 }, 160)).toEqual({ x: 100, y: 0 });
   });
 });

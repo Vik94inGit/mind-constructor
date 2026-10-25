@@ -45,6 +45,7 @@ import { findFreeSpots } from "../utils/freeSpots";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
+import { RedirectKnobs } from "../map/RedirectKnobs";
 import { NewNodePanel } from "../map/NewNodePanel";
 import { useFlipSequence } from "../hooks/useFlipSequence";
 import { NodeContextMenu } from "../map/NodeContextMenu";
@@ -1125,6 +1126,10 @@ export function MapPage() {
     nodes,
     isOwnNode,
     screenToCanvas,
+    scrollArea: () => wrapRef.current,
+    visibleNodes,
+    posFor,
+    zoom,
     onRedirect: (child, parent) => {
       void redirectParent(child, parent).then(() => {
         if (mapId) refreshInsights(mapId);
@@ -2391,8 +2396,6 @@ export function MapPage() {
               linkCycles={linkCycles}
               chosenNodeIds={chosenNodeIds}
               pendingLink={pendingLink}
-              canRedirect={(child) => isOwnNode(child) && !chooseMode && !packMode && !presenting}
-              onRedirectStart={startEdgeRedirect}
               edgeRedirect={edgeRedirect}
               onCircleClick={(rootId) => {
                 // A zone's own polygon stops the click from ever reaching the
@@ -2576,7 +2579,9 @@ export function MapPage() {
                 clutter. NodeCard's own small 🛡️ badge is still the one
                 thing marking a node as a protector, active attacker or not. */}
 
-            {quickAddActive && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
+            {/* Hidden while a branch is being redirected: the finger is
+                looking for a node, and a ghost under it would catch the drop. */}
+            {quickAddActive && !edgeRedirect && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
                 // A fresh round of ghosts for each node, and when the emoji-first order changes.
                 key={`${selectedNode.nodeId}:${emojiFirst}`}
@@ -2587,6 +2592,19 @@ export function MapPage() {
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
                 onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
+              />
+            )}
+
+            {/* The knobs that change a parent, above the ghosts so a finger reaches them. */}
+            {selectedNode && !dotZoom && !pendingCreate && !inlineEditId && !drawMode && (
+              <RedirectKnobs
+                selected={selectedNode}
+                hidden={!!edgeRedirect}
+                visibleNodes={visibleNodes}
+                posFor={posFor}
+                zoom={zoom}
+                canRedirect={(child) => isOwnNode(child) && !chooseMode && !packMode && !presenting && !onCardBoard(child)}
+                onStart={startEdgeRedirect}
               />
             )}
 

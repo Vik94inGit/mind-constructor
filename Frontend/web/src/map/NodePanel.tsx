@@ -863,6 +863,8 @@ export function NodePanel({
     <div
       ref={panelRef}
       className={PANEL_CLASS}
+      // Read by a branch being redirected (hooks/useEdgeRedirect.ts): the map pans before the finger reaches the panel.
+      data-node-panel
       // A screenshot pasted anywhere in the panel (the text field included)
       // lands on the node as a picture; pasting plain text is left alone.
       onPaste={(e) => {
