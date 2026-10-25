@@ -23,6 +23,7 @@ import type { Snap } from "../utils/cardGlue";
 import { startTrail } from "../utils/followTrail";
 import { MAGNET_BUTTON_FAR_FACTOR, MAGNET_FAR_FACTOR, magnetPulls } from "../utils/parentMagnet";
 import type { Trail } from "../utils/followTrail";
+import { redirectSpot } from "../utils/edgeRedirect";
 
 type Pt = { x: number; y: number };
 
@@ -239,6 +240,37 @@ export function useNodeDragAndDrop({
     recordMove?.(pulled);
     await savePulls(pulls, pulled);
     return pulled.length;
+  }
+
+  // A branch arrow's parent end let go over another node (hooks/useEdgeRedirect.ts):
+  // `child` now hangs from `parent`, and the zones redraw to fit. The child
+  // stays put when its new zone can take it in where it is; sitting far out,
+  // it comes in next to its new parent (utils/edgeRedirect.ts). Either way the
+  // zone rules settle it — out of any zone it no longer belongs to, zones not
+  // crossing — and its own nodes left too far follow it. A card on the board
+  // keeps its spot. One undo step puts the parent and the spots back.
+  async function redirectParent(child: NodeDoc, parent: NodeDoc) {
+    const from = positions.get(child.nodeId) ?? posFor(child);
+    const to = positions.get(parent.nodeId) ?? posFor(parent);
+    const card = !!clearSpotFor?.(child, from.x, from.y);
+    const placed = card || held(child)
+      ? from
+      : placeNode(redirectSpot(from, to, getZoneReach()), [{ nodeId: child.nodeId, parentId: parent.nodeId }]);
+    const moved = placed.x !== from.x || placed.y !== from.y;
+    const { pulls, pulled } = moved ? pullsFor(new Map([[child.nodeId, placed]])) : { pulls: new Map<string, Pt>(), pulled: [] };
+    recordMove?.([child, ...pulled]);
+    setActionError(null);
+    const before = { ...storedSpots(child), parentId: child.parentId };
+    const spot = moved ? spotFor(child, placed) : {};
+    setNodes((prev) => prev.map((n) => (n.nodeId === child.nodeId ? { ...n, ...spot, parentId: parent.nodeId } : n)));
+    const pulling = savePulls(pulls, pulled);
+    try {
+      upsertNode(await nodesApi.updateNode(child.nodeId, { ...spot, parentId: parent.nodeId }));
+    } catch (err) {
+      setNodes((prev) => prev.map((n) => (n.nodeId === child.nodeId ? { ...n, ...before } : n)));
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.changeParent);
+    }
+    await pulling;
   }
 
   // A finger held still on a node (touch's shift+click): toggles it in or out
@@ -773,6 +805,7 @@ export function useNodeDragAndDrop({
   return {
     onNodePointerDown,
     magnetize,
+    redirectParent,
     dragState: dragUI.drag,
     groupDragState: dragUI.group,
     dropTarget: dragUI.dropTarget,

@@ -236,6 +236,9 @@ export interface UiStrings {
     joinCircle: string;
     leaveCircle: string;
     dropOnOwnBranch: string;
+    changeParent: string;
+    parentNotOwn: string;
+    attackParent: string;
     cannotJoin: string;
     pullOut: string;
     chooseOwn: string;
@@ -306,6 +309,7 @@ export interface UiStrings {
     stabilizeCircle: string;
     newCircleText: string;
     newNodeText: string;
+    redirectBranch: string;
   };
   minimapTitle: string;
   abstraction: {
@@ -770,6 +774,9 @@ const en: UiStrings = {
     joinCircle: "Failed to join circle",
     leaveCircle: "Failed to leave circle",
     dropOnOwnBranch: "Can't drop a node onto its own branch.",
+    changeParent: "Failed to change the parent",
+    parentNotOwn: "The new parent has to be one of your own nodes.",
+    attackParent: "An attack can only hang from another attack.",
     cannotJoin: "Can't join that circle.",
     pullOut: "Can't pull it out — the remaining circle would get a corner under 30°.",
     chooseOwn: "You can only choose nodes you created.",
@@ -870,6 +877,7 @@ const en: UiStrings = {
     stabilizeCircle: "Click to stabilize this circle and let every other circle drift",
     newCircleText: "New circle",
     newNodeText: "New node",
+    redirectBranch: "Drag onto another node to make that node the parent",
   },
   minimapTitle: "Minimap — click or drag to jump around the map",
   abstraction: {
@@ -1303,6 +1311,9 @@ const cs: UiStrings = {
     joinCircle: "Do kruhu se nepodařilo vstoupit",
     leaveCircle: "Kruh se nepodařilo opustit",
     dropOnOwnBranch: "Uzel nelze pustit na jeho vlastní větev.",
+    changeParent: "Rodiče se nepodařilo změnit",
+    parentNotOwn: "Novým rodičem může být jen váš vlastní uzel.",
+    attackParent: "Útok může viset jen z jiného útoku.",
     cannotJoin: "K tomuto kruhu se nelze připojit.",
     pullOut: "Nelze vytáhnout — zbylý kruh by měl roh pod 30°.",
     chooseOwn: "Vybírat můžete jen uzly, které jste vytvořili.",
@@ -1403,6 +1414,7 @@ const cs: UiStrings = {
     stabilizeCircle: "Kliknutím tento kruh stabilizujete a všechny ostatní kruhy necháte driftovat",
     newCircleText: "Nový kruh",
     newNodeText: "Nový uzel",
+    redirectBranch: "Přetáhněte na jiný uzel a ten se stane rodičem",
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
   abstraction: {
@@ -1835,6 +1847,9 @@ const uk: UiStrings = {
     joinCircle: "Не вдалося приєднатися до кола",
     leaveCircle: "Не вдалося вийти з кола",
     dropOnOwnBranch: "Не можна кинути вузол на його власну гілку.",
+    changeParent: "Не вдалося змінити батьківський вузол",
+    parentNotOwn: "Новим батьківським може бути лише ваш власний вузол.",
+    attackParent: "Атака може висіти лише на іншій атаці.",
     cannotJoin: "Не можна приєднатися до цього кола.",
     pullOut: "Не можна витягти — у решти кола з’явиться кут менше 30°.",
     chooseOwn: "Обирати можна лише вузли, які створили ви.",
@@ -1935,6 +1950,7 @@ const uk: UiStrings = {
     stabilizeCircle: "Клацніть, щоб стабілізувати це коло й дозволити всім іншим колам дрейфувати",
     newCircleText: "Нове коло",
     newNodeText: "Новий вузол",
+    redirectBranch: "Перетягніть на інший вузол, щоб він став батьківським",
   },
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
   abstraction: {
@@ -2370,6 +2386,9 @@ const ru: UiStrings = {
     joinCircle: "Не удалось присоединиться к кругу",
     leaveCircle: "Не удалось выйти из круга",
     dropOnOwnBranch: "Нельзя бросить узел на его собственную ветку.",
+    changeParent: "Не удалось сменить родителя",
+    parentNotOwn: "Новым родителем может быть только ваш собственный узел.",
+    attackParent: "Атака может висеть только на другой атаке.",
     cannotJoin: "Нельзя присоединиться к этому кругу.",
     pullOut: "Нельзя вытащить — у оставшегося круга появится угол меньше 30°.",
     chooseOwn: "Выбирать можно только узлы, созданные вами.",
@@ -2470,6 +2489,7 @@ const ru: UiStrings = {
     stabilizeCircle: "Щёлкните, чтобы стабилизировать этот круг и позволить всем остальным кругам дрейфовать",
     newCircleText: "Новый круг",
     newNodeText: "Новый узел",
+    redirectBranch: "Перетащите на другой узел, чтобы он стал родителем",
   },
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
   abstraction: {

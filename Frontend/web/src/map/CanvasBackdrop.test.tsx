@@ -101,3 +101,45 @@ describe("CanvasBackdrop zone menu", () => {
     expect(props.onCircleClick).toHaveBeenCalledWith("root");
   });
 });
+
+describe("CanvasBackdrop branch redirect", () => {
+  const parent = { nodeId: "p", parentId: null } as never;
+  const child = { nodeId: "c", parentId: "p" } as never;
+  const other = { nodeId: "o", parentId: null } as never;
+  const spots: Record<string, { x: number; y: number }> = { p: { x: 0, y: 0 }, c: { x: 100, y: 0 }, o: { x: 300, y: 300 } };
+  const base = {
+    nodeGroups: [],
+    visibleNodes: [parent, child, other],
+    posFor: (n: { nodeId: string }) => spots[n.nodeId],
+  };
+
+  it("puts a knob on the chosen node's own branches and hands its grab over", () => {
+    const onRedirectStart = vi.fn();
+    renderBackdrop({ ...base, chosenNodeIds: new Set(["c"]), canRedirect: () => true, onRedirectStart });
+    const knob = document.querySelector('[data-redirect-knob="c"]');
+    expect(knob).not.toBeNull();
+    expect(knob!.getAttribute("cx")).toBe("40");
+    fireEvent.pointerDown(knob!);
+    expect(onRedirectStart).toHaveBeenCalledWith(child, expect.anything());
+  });
+
+  it("shows no knob with nothing chosen", () => {
+    renderBackdrop({ ...base, canRedirect: () => true, onRedirectStart: vi.fn() });
+    expect(document.querySelector("[data-redirect-knob]")).toBeNull();
+  });
+
+  it("shows no knob on a branch that isn't yours", () => {
+    renderBackdrop({ ...base, chosenNodeIds: new Set(["c"]), canRedirect: () => false, onRedirectStart: vi.fn() });
+    expect(document.querySelector("[data-redirect-knob]")).toBeNull();
+  });
+
+  it("draws the redirected arrow from the pointer and rings the node under it", () => {
+    renderBackdrop({
+      ...base,
+      edgeRedirect: { childId: "c", to: { x: 250, y: 260 }, overId: "o", valid: true },
+    });
+    const line = document.querySelector("line")!;
+    expect(line.getAttribute("x1")).toBe("250");
+    expect(document.querySelector('[data-redirect-target="o"]')).not.toBeNull();
+  });
+});

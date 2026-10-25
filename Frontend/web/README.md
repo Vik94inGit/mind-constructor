@@ -106,6 +106,16 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   in the panel; the inline inputs grow taller with the text, never wider.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
+- **Changing a parent** — the branch arrows of the node you've opened carry a small round knob
+  (`map/CanvasBackdrop.tsx`). Grab it and drag: the arrow's parent end leaves its parent and follows the
+  pointer, green over a node that can take it, red over one that can't. Let go over another of your
+  nodes and the child hangs from that one instead (`hooks/useEdgeRedirect.ts`, `utils/edgeRedirect.ts`);
+  let go anywhere else and nothing changes. Not onto its own branch (that would close a loop), not onto
+  someone else's node, and an attack only onto another attack. The zones reshape to fit: the old parent's
+  zone loses the child (and disappears when it's down to one), the new parent's grows to take it in or
+  appears. A child already within one and a half zone reaches of its new parent stays where it is;
+  one farther out comes in next to it on the side it sat, settled by the zone rules, and its own far
+  children follow like a magnet. One undo puts the old parent and the spots back.
 - **Moving nodes** — a dragged node (or group) lands where it was let go, nudged only so it doesn't
   cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes, except
   a type dragged out of a node's ring, which lands where it was let go too. Dropping a node anywhere on
