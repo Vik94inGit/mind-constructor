@@ -2,17 +2,21 @@ import type { NodeDoc } from "../types";
 
 // Timeline, in ms from the entrance's start. Each node fades and grows in
 // over APPEAR_MS, starting at its own delay, so the map builds itself up one
-// node after another. However many nodes there are, the last one starts by
-// MAX_SPREAD_MS, so a big map never keeps the user waiting.
-export const APPEAR_MS = 450;
+// node after another at an unhurried pace, the way the thoughts came. The
+// first one waits LEAD_MS, so the camera has settled on it before it shows.
+// However many nodes there are, the last one starts by MAX_SPREAD_MS, and a
+// click skips the rest, so a big map never keeps the user waiting.
+export const APPEAR_MS = 900;
 export const SKIP_MS = 250;
-const MAX_STAGGER_MS = 180;
-const MAX_SPREAD_MS = 2200;
+export const LEAD_MS = 350;
+export const STAGGER_MS = 700;
+const MAX_SPREAD_MS = 20000;
 // How small a node starts before it grows to its full size.
 const START_SCALE = 0.6;
 
 /**
- * When each node starts to appear, in ms after the entrance starts: in the
+ * When each node starts to appear, in ms after the entrance starts, listed
+ * earliest first: in the
  * order the nodes were made (createdAt, oldest first), so the map is told the
  * way it was written — a problem before its options, a node before the
  * objection against it. Nodes without a createdAt keep their place in the
@@ -22,8 +26,8 @@ export function computeEntranceDelays(nodes: NodeDoc[]): Map<string, number> {
   const ordered = nodes
     .map((n, i) => ({ id: n.nodeId, at: n.createdAt ?? "", i }))
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.i - b.i));
-  const stagger = ordered.length > 1 ? Math.min(MAX_STAGGER_MS, MAX_SPREAD_MS / (ordered.length - 1)) : 0;
-  return new Map(ordered.map((o, i) => [o.id, Math.round(i * stagger)]));
+  const stagger = ordered.length > 1 ? Math.min(STAGGER_MS, MAX_SPREAD_MS / (ordered.length - 1)) : 0;
+  return new Map(ordered.map((o, i) => [o.id, Math.round(LEAD_MS + i * stagger)]));
 }
 
 export function easeOutCubic(t: number) {

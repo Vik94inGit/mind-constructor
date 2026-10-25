@@ -14,27 +14,39 @@ interface Params {
   visibleNodes: NodeDoc[];
   /** The canvas element every node/zone/link is rendered inside. */
   canvasRef: RefObject<HTMLElement | null>;
+  /** The camera's cue: this node's turn to appear has come. */
+  onNodeAppear?: (nodeId: string) => void;
+  /** Every node is in, without the user cutting it short. */
+  onFinish?: () => void;
 }
 
 interface Running {
   delays: Map<string, number>;
   startedAt: number;
+  /** How many nodes, in delay order, have had their turn announced. */
+  announced: number;
   skip: { at: number; from: Map<string, number> } | null;
 }
 
 /**
  * The map's entrance: when a map opens, its nodes appear one after another in
- * the order they were made, each fading and growing in where it already sits,
- * with its zones, links and weapon bows filling in as their nodes arrive.
- * Nothing moves and nothing is persisted; a node made after the map opened is
- * simply there.
+ * the order they were made, slowly enough to retrace how the thinking went.
+ * Each fades and grows in where it already sits, with its zones, links and
+ * weapon bows filling in as their nodes arrive; the camera follows each one
+ * (onNodeAppear) and steps back to the whole map at the end (onFinish).
+ * No node moves and nothing is persisted; a node made after the map opened
+ * is simply there.
  *
  * Driven by a requestAnimationFrame loop that writes each frame straight onto
  * the canvas DOM (applyEntranceFrame), never through React state, so there
  * are no whole-map re-renders.
  */
-export function useNodeEntrance({ visibleNodes, canvasRef }: Params) {
+export function useNodeEntrance({ visibleNodes, canvasRef, onNodeAppear, onFinish }: Params) {
   const [active, setActive] = useState(false);
+  // The rAF loop keeps the closure it started with, so it reads the latest
+  // callbacks (and the positions they see) through a ref.
+  const callbacks = useRef({ onNodeAppear, onFinish });
+  callbacks.current = { onNodeAppear, onFinish };
   const running = useRef<Running | null>(null);
   const raf = useRef(0);
   const opened = useRef(false);
@@ -67,9 +79,21 @@ export function useNodeEntrance({ visibleNodes, canvasRef }: Params) {
     if (!r || !root) return;
     const now = performance.now();
     paint(r, root, now);
+    if (!r.skip) {
+      const order = Array.from(r.delays.entries());
+      while (r.announced < order.length && now - r.startedAt >= order[r.announced][1]) {
+        callbacks.current.onNodeAppear?.(order[r.announced][0]);
+        r.announced++;
+      }
+    }
     const done = r.skip ? now - r.skip.at >= SKIP_MS : now - r.startedAt >= entranceEndMs(r.delays);
-    if (done) stop();
-    else raf.current = requestAnimationFrame(tick);
+    if (!done) {
+      raf.current = requestAnimationFrame(tick);
+      return;
+    }
+    const finished = !r.skip;
+    stop();
+    if (finished) callbacks.current.onFinish?.();
   }
 
   /** Cut the entrance short: every node not yet there comes in quickly. */
@@ -92,7 +116,7 @@ export function useNodeEntrance({ visibleNodes, canvasRef }: Params) {
       opened.current = true;
       const delays = computeEntranceDelays(visibleNodes);
       if (delays.size < 2) return;
-      running.current = { delays, startedAt: performance.now(), skip: null };
+      running.current = { delays, startedAt: performance.now(), announced: 0, skip: null };
       setActive(true);
       raf.current = requestAnimationFrame(tick);
     }

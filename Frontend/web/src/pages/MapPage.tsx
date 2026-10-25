@@ -1014,9 +1014,26 @@ export function MapPage() {
   // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
   // appear one after another in the order they were made, drawn straight onto
   // the canvas DOM (posFor never sees it); skip is wired to any pointer-down
-  // on the canvas. Every map opens this way, Personal and Discussion alike,
-  // the way a template branch fills in node by node.
-  const entrance = useNodeEntrance({ visibleNodes, canvasRef });
+  // or wheel on the canvas. Every map opens this way, Personal and Discussion
+  // alike, the way a template branch fills in node by node. The camera comes
+  // in to native size and follows each node as it appears, then steps back to
+  // the whole map once they're all in (not after a skip: the user has the
+  // camera then).
+  const entrance = useNodeEntrance({
+    visibleNodes,
+    canvasRef,
+    onNodeAppear: (id) => {
+      const p = positions.get(id);
+      if (!p) return;
+      if (zoom < 0.995) {
+        zoomFromCenter(0, 1);
+        setTimeout(() => centerOnPoint(p.x, p.y, { aboveSheet: false }), 260);
+      } else {
+        centerOnPoint(p.x, p.y, { aboveSheet: false });
+      }
+    },
+    onFinish: fitAll,
+  });
 
   // Whether a node is drawn as a puzzle card right now — the only nodes that
   // snap together (see usePuzzleConnect).
@@ -2344,8 +2361,10 @@ export function MapPage() {
             }}
             // Capture phase, so any press anywhere on the canvas — empty
             // space, a node, a zone, a link — cuts the entrance short,
-            // even when that element stops the event from bubbling.
+            // even when that element stops the event from bubbling; so does
+            // scrolling or zooming with the wheel.
             onPointerDownCapture={entrance.skip}
+            onWheelCapture={entrance.skip}
             onClick={(e) => {
               // See onCanvasPointerDown's own onUp comment — the trailing
               // native click a completed marquee drag leaves behind on this

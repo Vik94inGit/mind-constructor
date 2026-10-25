@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APPEAR_MS, appearAmount, applyEntranceFrame, computeEntranceDelays, entranceEndMs } from "./nodeEntrance";
+import { APPEAR_MS, appearAmount, LEAD_MS, STAGGER_MS, applyEntranceFrame, computeEntranceDelays, entranceEndMs } from "./nodeEntrance";
 import { makeNode } from "../test/fixtures";
 
 describe("computeEntranceDelays", () => {
@@ -9,8 +9,9 @@ describe("computeEntranceDelays", () => {
       makeNode({ nodeId: "early", createdAt: "2026-01-01T00:00:00Z" }),
       makeNode({ nodeId: "mid", createdAt: "2026-02-01T00:00:00Z" }),
     ]);
-    expect(delays.get("early")).toBe(0);
-    expect(delays.get("mid")!).toBeGreaterThan(0);
+    expect(delays.get("early")).toBe(LEAD_MS);
+    // Unhurried: one thought at a time, like the map was written.
+    expect(delays.get("mid")).toBe(LEAD_MS + STAGGER_MS);
     expect(delays.get("late")!).toBeGreaterThan(delays.get("mid")!);
   });
 
@@ -21,7 +22,7 @@ describe("computeEntranceDelays", () => {
 
   it("starts the last node within a bounded time however big the map is", () => {
     const many = Array.from({ length: 500 }, (_, i) => makeNode({ nodeId: `n${i}` }));
-    expect(entranceEndMs(computeEntranceDelays(many))).toBeLessThanOrEqual(2200 + APPEAR_MS);
+    expect(entranceEndMs(computeEntranceDelays(many))).toBeLessThanOrEqual(LEAD_MS + 20000 + APPEAR_MS);
   });
 });
 
