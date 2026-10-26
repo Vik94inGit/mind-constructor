@@ -47,6 +47,8 @@ interface Props {
   drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
   /** The branch arrow being redirected right now (map/RedirectKnobs.tsx), its parent end at the pointer. */
   edgeRedirect?: EdgeRedirect | null;
+  /** The nodes laid out as cards on the board (the cards view): nothing links them — no branch arrows, links or zones between two of them. */
+  cardBoard?: Set<string>;
 }
 
 const REDIRECT_OK = "#16a34a";
@@ -61,7 +63,7 @@ export const ZONE_HOLD_MS = 500;
 // SVG in canvas coordinates; pointer-events-none throughout, with only the
 // zone shapes and grouped branches opting back in (they stabilize a circle).
 export function CanvasBackdrop({
-  nodeGroups,
+  nodeGroups: allGroups,
   selectedCircle,
   focusedZones = null,
   visibleNodes,
@@ -83,8 +85,16 @@ export function CanvasBackdrop({
   realmBorders = false,
   onZoneMenu,
   edgeRedirect = null,
+  cardBoard,
 }: Props) {
   const { t } = useI18n();
+  // The cards view draws no links: cards lie side by side to be compared, so
+  // a zone made only of cards, and an arrow or link between two cards, is
+  // left out.
+  const onBoard = (id: string | undefined) => !!id && !!cardBoard?.has(id);
+  const nodeGroups = cardBoard?.size
+    ? allGroups.filter((g) => !(onBoard(g.rootId) && g.members.every((m) => onBoard(m.nodeId))))
+    : allGroups;
   // A finger held still on a zone opens its menu (touch has no right-click).
   // The click that follows lifting the finger is swallowed, so the hold
   // doesn't also stabilize the zone.
@@ -355,7 +365,7 @@ export function CanvasBackdrop({
       */}
       {!compact &&
         visibleNodes
-        .filter((n) => circleRootSentimentByNode.has(n.nodeId))
+        .filter((n) => circleRootSentimentByNode.has(n.nodeId) && !onBoard(n.nodeId))
         .map((n) => {
           const p = posFor(n);
           const color = zoneColorFor(n, circleRootSentimentByNode.get(n.nodeId)!);
@@ -422,6 +432,7 @@ export function CanvasBackdrop({
         // was moved into another attack's zone.
         const parentId = zoneParentId(node);
         if (!parentId) return null;
+        if (onBoard(parentId) && onBoard(node.nodeId) && edgeRedirect?.childId !== node.nodeId) return null;
         const parentNode = visibleNodes.find((n) => n.nodeId === parentId);
         if (!parentNode) return null;
         const b = posFor(node);
@@ -539,6 +550,7 @@ export function CanvasBackdrop({
         const fromId = nodeRefId(edge.fromNodeId);
         const toId = nodeRefId(edge.toNodeId);
         if (!fromId || !toId) return null;
+        if (onBoard(fromId) && onBoard(toId)) return null;
         // visibleNodes, not nodes — a packed-away endpoint hides
         // this edge along with it (same relationship as a branch
         // arrow into a packed node, which already goes through

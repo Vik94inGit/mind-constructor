@@ -69,4 +69,23 @@ describe("ViewCorner", () => {
     await userEvent.click(button);
     expect(button.parentElement!.className).toContain("z-[49]");
   });
+
+  it("switches between the whole map, the overview and the cards", async () => {
+    const onViewChange = vi.fn();
+    const onLayCardsClose = vi.fn();
+    renderCorner({ view: "cards", onViewChange, onLayCardsClose });
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    const a = TRANSLATIONS.en.ui.autoPack;
+    expect(screen.getByRole("button", { name: a.views.cards })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: a.views.overview }));
+    expect(onViewChange).toHaveBeenCalledWith("overview");
+    await userEvent.click(screen.getByRole("button", { name: /Lay the cards close/ }));
+    expect(onLayCardsClose).toHaveBeenCalled();
+  });
+
+  it("offers to lay the cards close only in the cards view", async () => {
+    renderCorner({ view: "map", onViewChange: vi.fn(), onLayCardsClose: vi.fn() });
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    expect(screen.queryByRole("button", { name: /Lay the cards close/ })).not.toBeInTheDocument();
+  });
 });

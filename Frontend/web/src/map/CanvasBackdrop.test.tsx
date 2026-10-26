@@ -123,3 +123,35 @@ describe("CanvasBackdrop branch redirect", () => {
     expect(document.querySelector('[data-redirect-target="o"]')).not.toBeNull();
   });
 });
+
+describe("CanvasBackdrop cards view", () => {
+  const nodes = [
+    { nodeId: "p", text: "", type: "Problem", x: 100, y: 100 },
+    { nodeId: "a", text: "", type: "Option", x: 200, y: 100, parentId: "p" },
+    { nodeId: "b", text: "", type: "Option", x: 300, y: 100, parentId: "p" },
+  ] as React.ComponentProps<typeof CanvasBackdrop>["visibleNodes"];
+  const zone: NodeGroup = { ...group, rootId: "p", members: nodes };
+  const edges = [{ edgeId: "e", fromNodeId: "a", toNodeId: "b", sentiment: "neutral" }] as React.ComponentProps<
+    typeof CanvasBackdrop
+  >["edges"];
+  const posFor = (n: { x?: number; y?: number }) => ({ x: n.x ?? 0, y: n.y ?? 0 });
+
+  it("draws the arrows, link and zone between nodes on the map", () => {
+    renderBackdrop({ nodeGroups: [zone], visibleNodes: nodes, edges, posFor });
+    expect(document.querySelectorAll("line")).toHaveLength(3);
+    expect(document.querySelector("polygon")).not.toBeNull();
+  });
+
+  it("draws nothing between cards on the board", () => {
+    renderBackdrop({ nodeGroups: [zone], visibleNodes: nodes, edges, posFor, cardBoard: new Set(["p", "a", "b"]) });
+    expect(document.querySelectorAll("line")).toHaveLength(0);
+    expect(document.querySelector("polygon")).toBeNull();
+  });
+
+  it("keeps what links a card to a node that isn't one", () => {
+    renderBackdrop({ nodeGroups: [zone], visibleNodes: nodes, edges, posFor, cardBoard: new Set(["a", "b"]) });
+    // The two arrows from p stay; the a–b link goes.
+    expect(document.querySelectorAll("line")).toHaveLength(2);
+    expect(document.querySelector("polygon")).not.toBeNull();
+  });
+});

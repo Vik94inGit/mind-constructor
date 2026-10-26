@@ -18,14 +18,25 @@ export function cardSpaceIds(nodes: NodeDoc[], modeOf: (nodeId: string) => Readi
   return new Set(nodes.filter((n) => modeOf(n.nodeId) === "puzzle").map((n) => n.nodeId));
 }
 
-/** `nodes` with each card-space node's x/y swapped for its card spot, where it has one. */
-export function withCardSpots(nodes: NodeDoc[], cardSpace: Set<string>): NodeDoc[] {
+/** Whether a node has a card spot of its own yet. */
+export function hasCardSpot(n: NodeDoc): boolean {
+  return typeof n.cardX === "number" && typeof n.cardY === "number";
+}
+
+/**
+ * `nodes` with each card-space node's x/y swapped for the spot the cards view
+ * packed it into for this viewer (`packed`, see utils/cardPack.ts: someone
+ * else's card, which the viewer can't save a spot for), else for its own card
+ * spot where it has one.
+ */
+export function withCardSpots(nodes: NodeDoc[], cardSpace: Set<string>, packed?: Map<string, Pt>): NodeDoc[] {
   if (cardSpace.size === 0) return nodes;
-  return nodes.map((n) =>
-    cardSpace.has(n.nodeId) && typeof n.cardX === "number" && typeof n.cardY === "number"
-      ? { ...n, x: n.cardX, y: n.cardY }
-      : n,
-  );
+  return nodes.map((n) => {
+    if (!cardSpace.has(n.nodeId)) return n;
+    const p = packed?.get(n.nodeId);
+    if (p) return { ...n, x: p.x, y: p.y };
+    return hasCardSpot(n) ? { ...n, x: n.cardX!, y: n.cardY! } : n;
+  });
 }
 
 /** The fields that put a node at `pt` in the space it's drawn in. */

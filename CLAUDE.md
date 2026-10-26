@@ -71,7 +71,7 @@ npm run build        # tsc -b && vite build
   `useMapSocket`), viewport/framing, drag and drop, marquee select, node creation, pack mode, line
   drawing, `useEdgeRedirect` (a branch's knob tapped opens the change-parent mode, `reparent` in `useCanvasMode`, or dragged onto the new parent, or onto its own parent to make the child the zone's head; the zones reshape; the knob shows once the 👻 on the node's panel hides the ghosts), presentation, undo of moves, position glide, `useWeaponReplay` (weapon marks in the
   time-lapse replay; `MapPage` loads `GET /api/:mapId/attacks` so the replay shows health as it was).
-- **`map/`** — canvas components: `NodeCard` (drawn on the canvas through the memoized `CanvasNodeCard`, which takes one stable `actions` object from `hooks/useStableActions` so a drag or pan doesn't redraw every card), `StickerCard` (a node in the cards view), `CanvasBackdrop` (zones, walls, realm
+- **`map/`** — canvas components: `NodeCard` (drawn on the canvas through the memoized `CanvasNodeCard`, which takes one stable `actions` object from `hooks/useStableActions` so a drag or pan doesn't redraw every card), `StickerCard` (a node in the cards view, which draws no links and lays its cards close: `utils/cardPack.ts`, `hooks/useCardPacking.ts`), `ViewPrompt` (whole map, overview or cards, asked once the map has built itself up; the overview auto-packs parents, `utils/autoPack.ts`), `CanvasBackdrop` (zones, walls, realm
   border), `MiniMap`, `ViewCorner` (eye menu, zoom, minimap in the bottom-right corner),
   `QuickAddGhosts` (type and emoji rings), `NodePanel` + `nodePanel/` tabs (Info, Modify, Attack,
   Protect, Packed, History), `SiegePanel` (the imitated opponent's turn), `HistoryPanel` (the map's
