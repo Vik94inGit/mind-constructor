@@ -210,8 +210,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Entrance** — every map, Personal or Discussion, builds itself up as it opens, the way a template
   branch fills in: its nodes appear one after another in the order they were made, one thought about
   every 1.8 s, slow enough to read each one, so the map retraces how the thinking went. Each fades
-  and grows in where it already sits, with zones, links and weapon bows filling in as their nodes arrive. The camera comes in to
-  native size, follows each node as it appears, and steps back to the whole map at the end. A big map
+  and grows in where it already sits. Zones come one by one too: each zone, with its wall and the
+  realm border round a kingdom, appears whole in its parent node's turn and its members then fill it
+  in; links and weapon bows show once both their nodes are there. The camera comes in to native size, follows each node as it appears, and steps back to the whole map at the end. A big map
   never takes more than about a minute, and a click or a wheel scroll anywhere on the canvas brings
   everything in at once and leaves the camera where it is (`src/hooks/useNodeEntrance.ts`,
   `src/utils/nodeEntrance.ts`).

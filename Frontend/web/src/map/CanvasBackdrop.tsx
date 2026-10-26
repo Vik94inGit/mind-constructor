@@ -161,7 +161,7 @@ export function CanvasBackdrop({
           if (outline.length < 3) return null;
           const d = `M${outline.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(" L")} Z`;
           return (
-            <g key={`realm-${g.rootId}`} data-testid="realm-border" opacity={walls ? 0.5 : 0.3}>
+            <g key={`realm-${g.rootId}`} data-testid="realm-border" data-reveal-zone={g.rootId} opacity={walls ? 0.5 : 0.3}>
               {walls && <path d={d} fill="none" stroke="var(--color-ink-soft)" strokeWidth={12} strokeOpacity={0.2} strokeLinejoin="round" />}
               <path
                 d={d}
@@ -191,8 +191,9 @@ export function CanvasBackdrop({
             <polygon
               points={zonePoints}
               // Tagged for the map's entrance (see applyEntranceFrame): the
-              // zone fills in as the nodes it's drawn through appear.
-              data-reveal-points={g.outlineIds?.join(" ")}
+              // whole zone appears in its own turn, with its parent node,
+              // and its members fill it in after.
+              data-reveal-zone={g.rootId}
               fill={color}
               fillOpacity={dimmed ? 0.06 : 0.14}
               stroke={color}
@@ -245,7 +246,7 @@ export function CanvasBackdrop({
                 </defs>
                 <polygon
                   points={zonePoints}
-                  data-reveal-points={g.outlineIds?.join(" ")}
+                  data-reveal-zone={g.rootId}
                   fill={`url(#${patternId})`}
                   opacity={dimmed ? 0.4 : 1}
                 />
@@ -267,7 +268,7 @@ export function CanvasBackdrop({
             <polygon
               key={`solved-${g.rootId}`}
               points={zonePoints}
-              data-reveal-points={g.outlineIds?.join(" ")}
+              data-reveal-zone={g.rootId}
               fill="none"
               stroke={SOLVED_GOLD}
               strokeWidth={2.5}
@@ -295,7 +296,7 @@ export function CanvasBackdrop({
               {kingdom && (
                 <polygon
                   points={zonePoints}
-                  data-reveal-points={g.outlineIds?.join(" ")}
+                  data-reveal-zone={g.rootId}
                   fill="none"
                   stroke={color}
                   strokeWidth={14}
@@ -305,7 +306,7 @@ export function CanvasBackdrop({
               )}
               <polygon
                 points={zonePoints}
-                data-reveal-points={g.outlineIds?.join(" ")}
+                data-reveal-zone={g.rootId}
                 fill="none"
                 stroke={color}
                 strokeWidth={kingdom ? 8 : 6}
