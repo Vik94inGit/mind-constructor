@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useNodeEntrance } from "./useNodeEntrance";
-import { APPEAR_MS, SKIP_MS } from "../utils/nodeEntrance";
+import { APPEAR_MS, LEAD_MS, SKIP_MS, STAGGER_MS } from "../utils/nodeEntrance";
 import { makeNode } from "../test/fixtures";
 import type { NodeDoc } from "../types";
 
 function setup(nodes: NodeDoc[]) {
+  const onNodeAppear = vi.fn();
+  const onFinish = vi.fn();
   const root = document.createElement("div");
   root.innerHTML = nodes.map((n) => `<div data-reveal-node="${n.nodeId}"></div>`).join("");
   document.body.appendChild(root);
-  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, canvasRef: { current: root } }));
+  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, canvasRef: { current: root }, onNodeAppear, onFinish }));
   const opacity = (id: string) => (root.querySelector(`[data-reveal-node="${id}"]`) as HTMLElement).style.opacity;
-  return { ...hook, opacity };
+  return { ...hook, opacity, onNodeAppear, onFinish };
 }
 
 const mapNodes = () => [
@@ -29,29 +31,39 @@ describe("useNodeEntrance", () => {
     document.body.innerHTML = "";
   });
 
-  it("brings the nodes in one after another, in the order they were made, and then gets out of the way", () => {
-    const { result, opacity } = setup(mapNodes());
+  it("brings the nodes in one after another, in the order they were made, with the camera following, then steps back", () => {
+    const { result, opacity, onNodeAppear, onFinish } = setup(mapNodes());
     expect(result.current.active).toBe(true);
     // Hidden from the very first frame, so nothing flashes in and out.
+    expect(opacity("a")).toBe("0");
     expect(opacity("c")).toBe("0");
 
-    act(() => vi.advanceTimersByTime(100));
+    act(() => vi.advanceTimersByTime(LEAD_MS + 100));
     expect(Number(opacity("a"))).toBeGreaterThan(0);
     expect(opacity("c")).toBe("0");
+    expect(onNodeAppear.mock.calls.map((c) => c[0])).toEqual(["a"]);
 
-    act(() => vi.advanceTimersByTime(2 * 180 + APPEAR_MS));
+    act(() => vi.advanceTimersByTime(STAGGER_MS));
+    expect(onNodeAppear.mock.calls.map((c) => c[0])).toEqual(["a", "b"]);
+    expect(onFinish).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(STAGGER_MS + APPEAR_MS));
     expect(result.current.active).toBe(false);
     expect(opacity("a")).toBe("");
     expect(opacity("c")).toBe("");
+    expect(onNodeAppear.mock.calls.map((c) => c[0])).toEqual(["a", "b", "c"]);
+    expect(onFinish).toHaveBeenCalledTimes(1);
   });
 
-  it("a click mid-entrance brings everything in fast, and it never plays again", () => {
-    const { result, opacity, rerender } = setup(mapNodes());
-    act(() => vi.advanceTimersByTime(50));
+  it("a click mid-entrance brings everything in fast, leaves the camera be, and it never plays again", () => {
+    const { result, opacity, rerender, onNodeAppear, onFinish } = setup(mapNodes());
+    act(() => vi.advanceTimersByTime(LEAD_MS + 50));
     act(() => result.current.skip());
     act(() => vi.advanceTimersByTime(SKIP_MS + 20));
     expect(result.current.active).toBe(false);
     expect(opacity("c")).toBe("");
+    expect(onNodeAppear).toHaveBeenCalledTimes(1);
+    expect(onFinish).not.toHaveBeenCalled();
 
     rerender();
     expect(result.current.active).toBe(false);
