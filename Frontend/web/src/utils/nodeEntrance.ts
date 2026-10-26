@@ -2,15 +2,16 @@ import type { NodeDoc } from "../types";
 
 // Timeline, in ms from the entrance's start. Each node fades and grows in
 // over APPEAR_MS, starting at its own delay, so the map builds itself up one
-// node after another at an unhurried pace, the way the thoughts came. The
+// node after another, slowly enough to read each one before the next comes,
+// the way the thoughts came. The
 // first one waits LEAD_MS, so the camera has settled on it before it shows.
 // However many nodes there are, the last one starts by MAX_SPREAD_MS, and a
 // click skips the rest, so a big map never keeps the user waiting.
-export const APPEAR_MS = 900;
+export const APPEAR_MS = 1000;
 export const SKIP_MS = 250;
 export const LEAD_MS = 350;
-export const STAGGER_MS = 700;
-const MAX_SPREAD_MS = 20000;
+export const STAGGER_MS = 1800;
+export const MAX_SPREAD_MS = 60000;
 // How small a node starts before it grows to its full size.
 const START_SCALE = 0.6;
 

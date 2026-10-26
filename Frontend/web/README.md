@@ -196,10 +196,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   menu item (switch to Discussion for those).
 - **Entrance** — every map, Personal or Discussion, builds itself up as it opens, the way a template
   branch fills in: its nodes appear one after another in the order they were made, one thought about
-  every 0.7 s so the map retraces how the thinking went, each fading and growing in where it already
-  sits, with zones, links and weapon bows filling in as their nodes arrive. The camera comes in to
+  every 1.8 s, slow enough to read each one, so the map retraces how the thinking went. Each fades
+  and grows in where it already sits, with zones, links and weapon bows filling in as their nodes arrive. The camera comes in to
   native size, follows each node as it appears, and steps back to the whole map at the end. A big map
-  never takes more than about 20 s, and a click or a wheel scroll anywhere on the canvas brings
+  never takes more than about a minute, and a click or a wheel scroll anywhere on the canvas brings
   everything in at once and leaves the camera where it is (`src/hooks/useNodeEntrance.ts`,
   `src/utils/nodeEntrance.ts`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
