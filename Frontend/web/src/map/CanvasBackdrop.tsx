@@ -45,19 +45,12 @@ interface Props {
   compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
   drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
-  /** Whether this child's branch arrow can be redirected to another parent — its knob shows while the branch touches the chosen node. */
-  canRedirect?: (child: NodeDoc) => boolean;
-  /** The knob on a branch arrow grabbed: start redirecting that child's parent end (hooks/useEdgeRedirect.ts). */
-  onRedirectStart?: (child: NodeDoc, e: ReactPointerEvent) => void;
-  /** The branch arrow being redirected right now, its parent end at the pointer. */
+  /** The branch arrow being redirected right now (map/RedirectKnobs.tsx), its parent end at the pointer. */
   edgeRedirect?: EdgeRedirect | null;
 }
 
 const REDIRECT_OK = "#16a34a";
 const REDIRECT_NO = "#dc2626";
-// Where along a branch arrow its knob sits, from the parent end — clear of
-// both cards on all but the shortest arrows.
-const KNOB_AT = 0.4;
 
 const SOLVED_GOLD = "#f5b301";
 /** How long a finger rests on a zone before its menu opens. */
@@ -89,8 +82,6 @@ export function CanvasBackdrop({
   walls = false,
   realmBorders = false,
   onZoneMenu,
-  canRedirect,
-  onRedirectStart,
   edgeRedirect = null,
 }: Props) {
   const { t } = useI18n();
@@ -494,7 +485,7 @@ export function CanvasBackdrop({
         // against the dimmed rest instead of only avoiding the fade.
         const chosenHighlighted =
           !!chosenNodeIds && (chosenNodeIds.has(parentId) || chosenNodeIds.has(node.nodeId));
-        const line = (
+        return (
           <line
             key={`branch-${node.nodeId}`}
             x1={a.x}
@@ -532,33 +523,6 @@ export function CanvasBackdrop({
               </title>
             )}
           </line>
-        );
-        // The chosen node's own branches carry a knob: grab it and drag it
-        // onto another node to hang the child from that one instead.
-        const knob =
-          !edgeRedirect && chosenHighlighted && interactive && onRedirectStart && canRedirect?.(node) ? (
-            <circle
-              cx={a.x + (b.x - a.x) * KNOB_AT}
-              cy={a.y + (b.y - a.y) * KNOB_AT}
-              r={9}
-              fill="var(--color-surface, #fff)"
-              stroke={color}
-              strokeWidth={2.5}
-              data-redirect-knob={node.nodeId}
-              style={{ cursor: "grab", pointerEvents: "auto", touchAction: "none" }}
-              onPointerDown={(e) => onRedirectStart(node, e)}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <title>{t.ui.canvas.redirectBranch}</title>
-            </circle>
-          ) : null;
-        return knob ? (
-          <g key={`branch-${node.nodeId}`}>
-            {line}
-            {knob}
-          </g>
-        ) : (
-          line
         );
       })}
       {/* Plain lines, no arrowhead — Edges are an undirected "these

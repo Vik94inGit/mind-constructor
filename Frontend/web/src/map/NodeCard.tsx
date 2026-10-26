@@ -28,6 +28,8 @@ import { useInlineEditDraft } from "./useInlineEditDraft";
 import type { AttackIndicator, NodeDoc, NodeType } from "../types";
 import { nodeSizeMultiplier } from "../utils/nodePriority";
 import { imageSrc } from "../utils/images";
+import { chompMouth } from "../utils/pacman";
+import type { ChompMove } from "../utils/pacman";
 import type { ReadingMode } from "../utils/readingMode";
 
 
@@ -148,8 +150,8 @@ interface Props {
   onHoverText?: () => void;
   /** The pointer (not a finger) came onto or left this node's icon — a strong attack's Pac-Man run listens (see utils/pacman.ts). */
   onIconHover?: (hovered: boolean) => void;
-  /** This attack is off on its Pac-Man run, so its own icon fades to a faint spot the pie runs back to. */
-  chomping?: boolean;
+  /** This strong attack is off on its Pac-Man run: the node itself runs this far toward what it hit, the empty part of its health ring opening as a mouth, and comes back (utils/pacman.ts). */
+  chomp?: ChompMove;
 }
 
 export const NodeCard = memo(function NodeCard({
@@ -199,7 +201,7 @@ export const NodeCard = memo(function NodeCard({
   onToggleBlockLock,
   onHoverText,
   onIconHover,
-  chomping = false,
+  chomp,
 }: Props) {
   const { t } = useI18n();
   const particlesRef = useRef<HTMLDivElement | null>(null);
@@ -579,6 +581,30 @@ export const NodeCard = memo(function NodeCard({
 
   const chaosCss = chaotic ? chaosStyle(node.nodeId) : undefined;
 
+  // A strong attack's Pac-Man run (index.css's pacman-node-run and
+  // pacman-mouth): the whole node slides out and back, and its own round
+  // icon, ring and all, loses a wedge facing the target that starts as the
+  // empty part of its health ring and opens wider on the way in.
+  const chompRunStyle = chomp
+    ? ({
+        "--chomp-dx": `${chomp.dx}px`,
+        "--chomp-dy": `${chomp.dy}px`,
+        "--chomp-lx": `${chomp.lx}px`,
+        "--chomp-ly": `${chomp.ly}px`,
+      } as CSSProperties)
+    : undefined;
+  const chompMask = "conic-gradient(from calc(var(--chomp-angle) + 90deg + var(--mouth) / 2), #000 calc(360deg - var(--mouth)), transparent 0)";
+  const chompMouthStyle = chomp
+    ? ({
+        "--chomp-angle": `${chomp.angle}deg`,
+        "--mouth-base": `${chompMouth(node.health)}deg`,
+        // The whole ring shows while it runs; the mouth is its empty part.
+        background: "var(--ring-color, var(--success))",
+        maskImage: chompMask,
+        WebkitMaskImage: chompMask,
+      } as CSSProperties)
+    : undefined;
+
   // One glow effect wins when more than one could apply at once — same
   // precedence a stylesheet would give them by declaration order: a
   // drag-drop highlight (valid/invalid) beats the plain inline-editing glow,
@@ -655,8 +681,8 @@ export const NodeCard = memo(function NodeCard({
 
   return (
     <div
-      className={`${classes} ${flying ? "animate-weapon-fly-in" : ""}`}
-      style={{ ...style, ...flightStyle, ...chaosCss, ...(chomping ? { opacity: 0.2 } : null) }}
+      className={`${classes} ${flying ? "animate-weapon-fly-in" : ""} ${chomp ? "pacman-node-run" : ""}`}
+      style={{ ...style, ...flightStyle, ...chaosCss, ...chompRunStyle }}
       // The map's entrance (see applyEntranceFrame) grows this node in
       // through the individual CSS `scale` property, which composes with the
       // `transform` the centering and the chaos-drift/fly-in keyframes own.
@@ -927,8 +953,8 @@ export const NodeCard = memo(function NodeCard({
           </div>
         ) : (
         <div
-          className={`flex h-full w-full items-center justify-center ${shapeRoundClass(node.shape)} p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass}`}
-          style={ringStyle}
+          className={`flex h-full w-full items-center justify-center ${shapeRoundClass(node.shape)} p-[3px] transition-transform duration-150 ease-[ease] group-hover:scale-[1.06] ${healthVisibilityClass} ${ringStateClass} ${chomp ? "pacman-mouth" : ""}`}
+          style={chompMouthStyle ? { ...ringStyle, ...chompMouthStyle } : ringStyle}
           title={showHealth || hoverLabel ? undefined : t.ui.node.selectToSeeHealth}
         >
           {inlineEditing ? (

@@ -48,3 +48,19 @@ export function redirectSpot(child: Pt, parent: Pt, reach: number): Pt {
   const k = (reach * REDIRECT_BRING_FACTOR) / dist;
   return { x: parent.x + dx * k, y: parent.y + dy * k };
 }
+
+/**
+ * Where a branch's knob sits: on the branch from the opened node `from`
+ * toward the node at its other end `to`, `clear` away from `from` (past the
+ * ring of ghosts around it), so the ghosts never cover it. A branch too short
+ * for that gets it halfway, and the knob, drawn above the ghosts, still takes
+ * the touch.
+ */
+export function knobSpot(from: Pt, to: Pt, clear: number): Pt {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy);
+  // Leave room for the far node's own icon (about half a ring) past the knob.
+  const at = len > clear * 1.5 ? clear / len : 0.5;
+  return { x: from.x + dx * at, y: from.y + dy * at };
+}

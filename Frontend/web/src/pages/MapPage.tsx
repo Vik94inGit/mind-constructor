@@ -31,7 +31,8 @@ import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
-import { chompersFor, chompTargets } from "../utils/pacman";
+import { chompAim, chompersFor, chompMove, chompTargets } from "../utils/pacman";
+import type { ChompMove } from "../utils/pacman";
 import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } from "../utils/nodePriority";
 import type { CaptionSpec } from "../utils/nodePriority";
 import { useAuth } from "../context/AuthContext";
@@ -45,6 +46,7 @@ import { findFreeSpots } from "../utils/freeSpots";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
+import { RedirectKnobs } from "../map/RedirectKnobs";
 import { NewNodePanel } from "../map/NewNodePanel";
 import { useFlipSequence } from "../hooks/useFlipSequence";
 import { NodeContextMenu } from "../map/NodeContextMenu";
@@ -71,6 +73,7 @@ import { MAP_ZONE_KEY } from "../utils/zoneLayout";
 import type { ZoneMode } from "../utils/zoneDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import { WeaponLayer } from "../map/WeaponLayer";
+import { useTapChomp } from "../hooks/useTapChomp";
 import { MapToolbar } from "../map/MapToolbar";
 import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
@@ -1142,6 +1145,10 @@ export function MapPage() {
     nodes,
     isOwnNode,
     screenToCanvas,
+    scrollArea: () => wrapRef.current,
+    visibleNodes,
+    posFor,
+    zoom,
     onRedirect: (child, parent) => {
       void redirectParent(child, parent).then(() => {
         if (mapId) refreshInsights(mapId);
@@ -1970,12 +1977,35 @@ export function MapPage() {
   });
 
   const chompSpots = useMemo(() => chompTargets(visibleNodes), [visibleNodes]);
-  // A phone has no hover, so the selected node plays it too: tapping a strong
-  // attack, or the node it hit, starts Pac-Man; the mouse's hover wins.
+  // The mouse's hover wins; on a phone, a tap on a strong attack runs it once.
+  const tapChompId = useTapChomp(selectedId, steppedToId, visibleNodes);
+  // Selecting any other node, by a tap, ends the arrows' step.
+  useEffect(() => {
+    if (steppedToId && selectedId !== steppedToId) setSteppedToId(null);
+  }, [selectedId, steppedToId]);
   const chompIds = useMemo(
-    () => chompersFor(chompHoverId ?? selectedId, visibleNodes),
-    [chompHoverId, selectedId, visibleNodes],
+    () => chompersFor(chompHoverId ?? tapChompId, visibleNodes),
+    [chompHoverId, tapChompId, visibleNodes],
   );
+  // Each running attack's way out to what it hit, from where both are drawn
+  // now. Sizes are icon radii in canvas units at this zoom. A run whose
+  // numbers didn't change keeps its object, so its card isn't redrawn.
+  const chompMoveCache = useRef(new Map<string, ChompMove>());
+  const chompMoves = new Map<string, ChompMove>();
+  if (!dotZoom) {
+    const radius = (n: NodeDoc) =>
+      (24 * nodeSizeMultiplier(n, circleRootSentimentByNode.has(n.nodeId), compactView)) / zoom;
+    for (const id of chompIds) {
+      const attack = visibleNodes.find((n) => n.nodeId === id);
+      const aim = attack && chompAim(attack, visibleNodes);
+      if (!attack || !aim) continue;
+      const move = chompMove(posFor(attack), posFor(aim), radius(attack), radius(aim));
+      const prev = chompMoveCache.current.get(id);
+      const same = prev && (Object.keys(move) as (keyof ChompMove)[]).every((k) => prev[k] === move[k]);
+      chompMoves.set(id, same ? prev : move);
+    }
+  }
+  chompMoveCache.current = chompMoves;
 
   // What a card on the canvas does when used: one stable object for every
   // card, so CanvasNodeCard only re-renders when its own node changed.
@@ -2410,8 +2440,6 @@ export function MapPage() {
               linkCycles={linkCycles}
               chosenNodeIds={chosenNodeIds}
               pendingLink={pendingLink}
-              canRedirect={(child) => isOwnNode(child) && !chooseMode && !packMode && !presenting}
-              onRedirectStart={startEdgeRedirect}
               edgeRedirect={edgeRedirect}
               onCircleClick={(rootId) => {
                 // A zone's own polygon stops the click from ever reaching the
@@ -2558,7 +2586,7 @@ export function MapPage() {
                     !inlineEditId
                   }
                   canChomp={chompSpots.has(node.nodeId)}
-                  chomping={chompIds.has(node.nodeId) && !dotZoom}
+                  chomp={chompMoves.get(node.nodeId)}
                 />
               );
             })}
@@ -2579,10 +2607,6 @@ export function MapPage() {
                 posFor={posFor}
                 celebrateIds={celebrateIds}
                 shotState={shotState}
-                chompIds={chompIds}
-                iconRadius={(n) =>
-                  (24 * nodeSizeMultiplier(n, circleRootSentimentByNode.has(n.nodeId), compactView)) / zoom
-                }
               />
             )}
 
@@ -2595,7 +2619,9 @@ export function MapPage() {
                 clutter. NodeCard's own small 🛡️ badge is still the one
                 thing marking a node as a protector, active attacker or not. */}
 
-            {quickAddActive && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
+            {/* Hidden while a branch is being redirected: the finger is
+                looking for a node, and a ghost under it would catch the drop. */}
+            {quickAddActive && !edgeRedirect && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
                 // A fresh round of ghosts for each node, and when the emoji-first order changes.
                 key={`${selectedNode.nodeId}:${emojiFirst}`}
@@ -2606,6 +2632,19 @@ export function MapPage() {
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
                 onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
+              />
+            )}
+
+            {/* The knobs that change a parent, above the ghosts so a finger reaches them. */}
+            {selectedNode && !dotZoom && !pendingCreate && !inlineEditId && !drawMode && (
+              <RedirectKnobs
+                selected={selectedNode}
+                hidden={!!edgeRedirect}
+                visibleNodes={visibleNodes}
+                posFor={posFor}
+                zoom={zoom}
+                canRedirect={(child) => isOwnNode(child) && !chooseMode && !packMode && !presenting && !onCardBoard(child)}
+                onStart={startEdgeRedirect}
               />
             )}
 
