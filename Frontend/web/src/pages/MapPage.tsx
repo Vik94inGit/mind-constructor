@@ -1022,15 +1022,16 @@ export function MapPage() {
   );
 
   // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
-  // appear one after another in the order they were made, drawn straight onto
-  // the canvas DOM (posFor never sees it); skip is wired to any pointer-down
-  // or wheel on the canvas. Every map opens this way, Personal and Discussion
-  // alike, the way a template branch fills in node by node. The camera comes
-  // in to native size and follows each node as it appears, then steps back to
-  // the whole map once they're all in (not after a skip: the user has the
-  // camera then).
+  // appear one after another in the order they were made, then the zones are
+  // drawn round them one by one, all straight onto the canvas DOM (posFor
+  // never sees it); skip is wired to any pointer-down or wheel on the canvas.
+  // Every map opens this way, Personal and Discussion alike, the way a
+  // template branch fills in node by node. The camera comes in to native size
+  // and follows each node as it appears, then steps back to the whole map for
+  // the zones (not after a skip: the user has the camera then).
   const entrance = useNodeEntrance({
     visibleNodes,
+    zoneRootIds: nodeGroups.map((g) => g.rootId),
     canvasRef,
     onNodeAppear: (id) => {
       const p = positions.get(id);
@@ -1042,6 +1043,7 @@ export function MapPage() {
         centerOnPoint(p.x, p.y, { aboveSheet: false });
       }
     },
+    onZonesStart: fitAll,
     onFinish: fitAll,
   });
 

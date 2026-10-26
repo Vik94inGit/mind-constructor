@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APPEAR_MS, appearAmount, LEAD_MS, MAX_SPREAD_MS, STAGGER_MS, applyEntranceFrame, computeEntranceDelays, entranceEndMs } from "./nodeEntrance";
+import { APPEAR_MS, appearAmount, LEAD_MS, MAX_SPREAD_MS, STAGGER_MS, ZONE_STAGGER_MS, zoneKey, applyEntranceFrame, computeEntranceDelays, entranceEndMs } from "./nodeEntrance";
 import { makeNode } from "../test/fixtures";
 
 describe("computeEntranceDelays", () => {
@@ -13,6 +13,20 @@ describe("computeEntranceDelays", () => {
     // Unhurried: one thought at a time, like the map was written.
     expect(delays.get("mid")).toBe(LEAD_MS + STAGGER_MS);
     expect(delays.get("late")!).toBeGreaterThan(delays.get("mid")!);
+  });
+
+  it("brings every node in first, then draws the zones one by one in their parent's order", () => {
+    const nodes = [
+      makeNode({ nodeId: "kid", createdAt: "2026-01-03T00:00:00Z" }),
+      makeNode({ nodeId: "castle", createdAt: "2026-01-02T00:00:00Z" }),
+      makeNode({ nodeId: "king", createdAt: "2026-01-01T00:00:00Z" }),
+    ];
+    const delays = computeEntranceDelays(nodes, ["castle", "king"]);
+    expect(Array.from(delays.keys())).toEqual(["king", "castle", "kid", zoneKey("king"), zoneKey("castle")]);
+    expect(delays.get("king")).toBe(LEAD_MS);
+    // The first zone waits for the last node to be fully in.
+    expect(delays.get(zoneKey("king"))).toBe(delays.get("kid")! + APPEAR_MS);
+    expect(delays.get(zoneKey("castle"))).toBe(delays.get("kid")! + APPEAR_MS + ZONE_STAGGER_MS);
   });
 
   it("keeps list order for nodes made at the same time or with no date", () => {
@@ -63,12 +77,12 @@ describe("applyEntranceFrame", () => {
     expect(opacity(root, "circle")).toBe("");
   });
 
-  it("brings a whole zone in at once, in its parent's turn, before its members", () => {
+  it("brings a whole zone in at once, in its own turn, apart from its parent node", () => {
     const root = document.createElement("div");
     root.innerHTML =
       `<svg><g data-reveal-zone="p" opacity="0.5"><polygon></polygon></g>` +
       `<polygon data-reveal-zone="p"></polygon></svg><div data-reveal-node="kid"></div>`;
-    applyEntranceFrame(root, (id) => (id === "p" ? 0.5 : id === "kid" ? 0 : null));
+    applyEntranceFrame(root, (id) => (id === zoneKey("p") ? 0.5 : id === "kid" ? 0 : null));
     expect((root.querySelector("g") as SVGElement).style.opacity).toBe("0.25");
     expect((root.querySelector("svg > polygon") as SVGElement).style.opacity).toBe("0.5");
     expect((root.querySelector('[data-reveal-node="kid"]') as HTMLElement).style.opacity).toBe("0");

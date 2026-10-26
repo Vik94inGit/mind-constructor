@@ -204,14 +204,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, and no Attack tab or
   menu item (switch to Discussion for those).
 - **Entrance** — every map, Personal or Discussion, builds itself up as it opens, the way a template
-  branch fills in: its nodes appear one after another in the order they were made, one thought about
-  every 1.8 s, slow enough to read each one, so the map retraces how the thinking went. Each fades
-  and grows in where it already sits. Zones come one by one too: each zone, with its wall and the
-  realm border round a kingdom, appears whole in its parent node's turn and its members then fill it
-  in; links and weapon bows show once both their nodes are there. The camera comes in to native size, follows each node as it appears, and steps back to the whole map at the end. A big map
-  never takes more than about a minute, and a click or a wheel scroll anywhere on the canvas brings
-  everything in at once and leaves the camera where it is (`src/hooks/useNodeEntrance.ts`,
-  `src/utils/nodeEntrance.ts`).
+  branch fills in. Nodes come first: they appear one after another in the order they were made, one
+  thought about every 1.8 s, slow enough to read each one, each fading and growing in where it
+  already sits, with the camera in at native size following each one; links and weapon bows show
+  once both their nodes are there. Then the zones: the camera steps back to the whole map and each
+  zone, with its wall and the realm border round a kingdom, is drawn whole round its nodes, one
+  after another (about 0.7 s apart). A big map never takes much more than a minute, and a click or
+  a wheel scroll anywhere on the canvas brings everything in at once and leaves the camera where it
+  is (`src/hooks/useNodeEntrance.ts`, `src/utils/nodeEntrance.ts`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
   matches stay lit while everything else dims, and a result takes you to that node.
 - **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden
