@@ -9,7 +9,6 @@ import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
 import { ZONE_EDGE_DEFAULT, zoneColorFor } from "../utils/zoneStyle";
 import { ZonePatternDef } from "./ZonePattern";
-import type { EdgeRedirect } from "../hooks/useEdgeRedirect";
 
 interface Props {
   nodeGroups: NodeGroup[];
@@ -45,12 +44,7 @@ interface Props {
   compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
   drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
-  /** The branch arrow being redirected right now (map/RedirectKnobs.tsx), its parent end at the pointer. */
-  edgeRedirect?: EdgeRedirect | null;
 }
-
-const REDIRECT_OK = "#16a34a";
-const REDIRECT_NO = "#dc2626";
 
 const SOLVED_GOLD = "#f5b301";
 /** How long a finger rests on a zone before its menu opens. */
@@ -82,7 +76,6 @@ export function CanvasBackdrop({
   walls = false,
   realmBorders = false,
   onZoneMenu,
-  edgeRedirect = null,
 }: Props) {
   const { t } = useI18n();
   // A finger held still on a zone opens its menu (touch has no right-click).
@@ -425,40 +418,6 @@ export function CanvasBackdrop({
         const parentNode = visibleNodes.find((n) => n.nodeId === parentId);
         if (!parentNode) return null;
         const b = posFor(node);
-        // Being redirected: the arrow's parent end follows the pointer, green
-        // over a node that can take it, red over one that can't.
-        const redirecting = edgeRedirect?.childId === node.nodeId ? edgeRedirect : null;
-        if (redirecting) {
-          const over = redirecting.overId ? visibleNodes.find((n) => n.nodeId === redirecting.overId) : undefined;
-          const color = over ? (redirecting.valid ? REDIRECT_OK : REDIRECT_NO) : "var(--accent)";
-          return (
-            <g key={`branch-${node.nodeId}`}>
-              <line
-                x1={redirecting.to.x}
-                y1={redirecting.to.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={color}
-                strokeOpacity={0.9}
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                markerEnd="url(#branch-arrow)"
-              />
-              {over && (
-                <circle
-                  cx={posFor(over).x}
-                  cy={posFor(over).y}
-                  r={34}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={3}
-                  strokeOpacity={0.8}
-                  data-redirect-target={over.nodeId}
-                />
-              )}
-            </g>
-          );
-        }
         const a = posFor(parentNode);
         const group = nodeGroups.find((g) => g.rootId === parentId);
         const color = group ? zoneColorFor(parentNode, group.sentiment) : "var(--accent)";

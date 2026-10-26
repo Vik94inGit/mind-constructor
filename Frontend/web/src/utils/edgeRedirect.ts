@@ -4,14 +4,13 @@ import type { EdgeDoc, NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
 
-// Changing a node's parent by redirecting its branch arrow: the arrow's
-// parent end is dragged off its parent and let go over another node, which
+// Changing a node's parent (MapPage's change-parent mode): the node tapped
 // becomes the parent. The child keeps its own branch; the zones it leaves and
 // joins redraw from the new parentId (computeNodeGroups), and the child moves
 // in next to its new parent when it sits too far out for the zone to reach it
 // without stretching across the map (see redirectSpot).
 
-/** Why the arrow can't be redirected onto `target`, or null when it can. */
+/** Why `target` can't become the child's parent, or null when it can. */
 export type RedirectRefusal = "same" | "ownBranch" | "notOwn" | "attack";
 
 export function redirectRefusal(
@@ -47,22 +46,6 @@ export function redirectSpot(child: Pt, parent: Pt, reach: number): Pt {
   if (dist === 0) return { x: parent.x + reach * REDIRECT_BRING_FACTOR, y: parent.y };
   const k = (reach * REDIRECT_BRING_FACTOR) / dist;
   return { x: parent.x + dx * k, y: parent.y + dy * k };
-}
-
-/**
- * Where a branch's knob sits: on the branch from the opened node `from`
- * toward the node at its other end `to`, `clear` away from `from` (past the
- * ring of ghosts around it), so the ghosts never cover it. A branch too short
- * for that gets it halfway, and the knob, drawn above the ghosts, still takes
- * the touch.
- */
-export function knobSpot(from: Pt, to: Pt, clear: number): Pt {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy);
-  // Leave room for the far node's own icon (about half a ring) past the knob.
-  const at = len > clear * 1.5 ? clear / len : 0.5;
-  return { x: from.x + dx * at, y: from.y + dy * at };
 }
 
 /**
@@ -115,7 +98,7 @@ export interface HeadPlan {
 }
 
 /**
- * A child's knob pulled onto its own parent: the child becomes the head of
+ * A child swapped with its parent (Swap with parent): the child becomes the head of
  * the zone. It takes the parent's place (spot and parent, so it hangs where
  * the zone hung from another zone), every other node of the zone hangs from
  * it, and so does the old parent, which takes the child's spot. The old

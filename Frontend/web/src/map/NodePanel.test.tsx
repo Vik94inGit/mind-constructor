@@ -123,4 +123,16 @@ describe("NodePanel", () => {
     expect(screen.queryByRole("button", { name: en.map.panelTabs.attack })).toBeNull();
     expect(screen.getByRole("button", { name: en.map.panelTabs.info })).toBeInTheDocument();
   });
+
+  it("offers Swap with parent on the Info tab, and swaps when pressed", async () => {
+    const onSwapWithParent = vi.fn();
+    renderPanel({ onSwapWithParent });
+    await userEvent.click(screen.getByRole("button", { name: new RegExp(en.ui.canvas.swapWithParent) }));
+    expect(onSwapWithParent).toHaveBeenCalled();
+  });
+
+  it("has no Swap with parent without a parent to swap with", () => {
+    renderPanel();
+    expect(document.querySelector("[data-swap-parent]")).toBeNull();
+  });
 });

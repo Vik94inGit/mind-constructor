@@ -13,7 +13,6 @@ import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
 import { useZoneFocus } from "../hooks/useZoneFocus";
 import { usePresentation } from "../hooks/usePresentation";
 import { usePuzzleConnect } from "../hooks/usePuzzleConnect";
-import { useEdgeRedirect } from "../hooks/useEdgeRedirect";
 import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
@@ -46,7 +45,6 @@ import { findFreeSpots } from "../utils/freeSpots";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
-import { RedirectKnobs } from "../map/RedirectKnobs";
 import { ReparentBar } from "../map/ReparentBar";
 import { linksToMove, redirectRefusal, takeParentPlace } from "../utils/edgeRedirect";
 import type { RedirectRefusal } from "../utils/edgeRedirect";
@@ -173,8 +171,7 @@ export function MapPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The ring of ghosts is up around each node opened; the 👻 on its panel
-  // hides it for that node, and the circle that changes its parent shows
-  // instead (map/RedirectKnobs.tsx). Opening another node brings them back.
+  // hides it for that node. Opening another node brings them back.
   const [ghostsHiddenFor, setGhostsHiddenFor] = useState<string | null>(null);
   const ghostsHidden = !!selectedId && ghostsHiddenFor === selectedId;
   // A node's pictures, open full size before its panel (see handleNodeClick).
@@ -1150,24 +1147,7 @@ export function MapPage() {
     recordMove,
   });
 
-  // A branch arrow's knob dragged onto another node changes the child's
-  // parent, and the zones reshape to fit (hooks/useEdgeRedirect.ts).
-  const { edgeRedirect, startEdgeRedirect } = useEdgeRedirect({
-    nodes,
-    isOwnNode,
-    screenToCanvas,
-    scrollArea: () => wrapRef.current,
-    visibleNodes,
-    posFor,
-    zoom,
-    onRedirect: (child, parent) => void reparentTo(child, parent),
-    onRefused: (reason) => setActionError(refusalMessage(reason)),
-    onTakeParentPlace: (child) => void headZone(child),
-    onTap: (child) => startReparent(child),
-  });
-
-  // Changing a parent as its own mode: the knob tapped (or Change parent on
-  // the node's panel) puts the panel and the ghosts away, and the next node
+  // Changing a parent as its own mode: Change parent on the node's panel puts the panel and the ghosts away, and the next node
   // tapped becomes the parent. The child's branch moves to it, and so does
   // its link to the old parent (utils/edgeRedirect.ts linksToMove).
   const reparentChild = mode.kind === "reparent" ? (nodes.find((n) => n.nodeId === mode.childId) ?? null) : null;
@@ -1217,8 +1197,8 @@ export function MapPage() {
     dispatchMode({ type: "reset" });
     void reparentTo(reparentChild, node);
   }
-  // A child made the head of its zone (its knob pulled onto its own parent,
-  // or the parent tapped in reparent mode): it takes the parent's place, the
+  // A child swapped with its parent (Swap with parent on its panel, or the
+  // parent tapped in reparent mode): it takes the parent's place, the
   // zone's nodes and the old parent hang from it, and the old parent's links
   // move to it (utils/edgeRedirect.ts takeParentPlace).
   async function headZone(child: NodeDoc) {
@@ -2535,7 +2515,6 @@ export function MapPage() {
               chosenNodeIds={chosenNodeIds}
               // The node whose parent is changing stays ringed while the new one is picked.
               pendingLink={reparentChild ? [reparentChild] : pendingLink}
-              edgeRedirect={edgeRedirect}
               onCircleClick={(rootId) => {
                 // A zone's own polygon stops the click from ever reaching the
                 // canvas div's onClick (see its own chooseMode branch above)
@@ -2716,7 +2695,7 @@ export function MapPage() {
 
             {/* Hidden while a branch is being redirected: the finger is
                 looking for a node, and a ghost under it would catch the drop. */}
-            {quickAddActive && !edgeRedirect && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
+            {quickAddActive && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
                 // A fresh round of ghosts for each node, and when the emoji-first order changes.
                 key={`${selectedNode.nodeId}:${emojiFirst}`}
@@ -2727,20 +2706,6 @@ export function MapPage() {
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
                 onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
-              />
-            )}
-
-            {/* The circle that changes a parent: shown once the ghosts are hidden. */}
-            {selectedNode && ghostsHidden && !pendingCreate && !inlineEditId && !drawMode && (
-              <RedirectKnobs
-                selected={selectedNode}
-                ghosts={false}
-                hidden={!!edgeRedirect}
-                visibleNodes={visibleNodes}
-                posFor={posFor}
-                zoom={zoom}
-                canRedirect={(child) => isOwnNode(child) && !chooseMode && !packMode && !presenting && !onCardBoard(child)}
-                onStart={startEdgeRedirect}
               />
             )}
 
@@ -3029,6 +2994,10 @@ export function MapPage() {
                 // The parent's magnet: calls its own far nodes back in (utils/parentMagnet.ts).
                 // Change parent: pick the node to hang this one from (reparent mode).
                 onChangeParent={isOwnNode(selectedNode) ? () => startReparent(selectedNode) : undefined}
+                // Swap with parent: the child takes its parent's place as head of the zone.
+                onSwapWithParent={
+                  isOwnNode(selectedNode) && zoneParentId(selectedNode) ? () => void headZone(selectedNode) : undefined
+                }
                 ghostsHidden={ghostsHidden}
                 onToggleGhosts={
                   isOwnNode(selectedNode) && !onCardBoard(selectedNode)
