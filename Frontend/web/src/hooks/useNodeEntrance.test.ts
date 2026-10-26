@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useNodeEntrance } from "./useNodeEntrance";
-import { APPEAR_MS, LEAD_MS, SKIP_MS, STAGGER_MS } from "../utils/nodeEntrance";
+import { APPEAR_MS, LEAD_MS, SKIP_MS, STAGGER_MS, ZONE_STAGGER_MS } from "../utils/nodeEntrance";
 import { makeNode } from "../test/fixtures";
 import type { NodeDoc } from "../types";
 
-function setup(nodes: NodeDoc[]) {
+function setup(nodes: NodeDoc[], zoneRootIds?: string[]) {
   const onNodeAppear = vi.fn();
   const onFinish = vi.fn();
   const root = document.createElement("div");
   root.innerHTML = nodes.map((n) => `<div data-reveal-node="${n.nodeId}"></div>`).join("");
   document.body.appendChild(root);
-  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, canvasRef: { current: root }, onNodeAppear, onFinish }));
+  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, zoneRootIds, canvasRef: { current: root }, onNodeAppear, onFinish }));
   const opacity = (id: string) => (root.querySelector(`[data-reveal-node="${id}"]`) as HTMLElement).style.opacity;
   return { ...hook, opacity, onNodeAppear, onFinish };
 }
@@ -67,5 +67,14 @@ describe("useNodeEntrance", () => {
 
     rerender();
     expect(result.current.active).toBe(false);
+  });
+
+  it("draws the zones first, keeping the camera on the whole map until the first node", () => {
+    const { opacity, onNodeAppear } = setup(mapNodes(), ["a", "b"]);
+    act(() => vi.advanceTimersByTime(ZONE_STAGGER_MS + APPEAR_MS));
+    expect(opacity("a")).toBe("0");
+    expect(onNodeAppear).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(LEAD_MS + 50));
+    expect(onNodeAppear.mock.calls.map((c) => c[0])).toEqual(["a"]);
   });
 });

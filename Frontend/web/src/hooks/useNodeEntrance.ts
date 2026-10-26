@@ -4,6 +4,7 @@ import {
   appearAmount,
   applyEntranceFrame,
   computeEntranceDelays,
+  isZoneKey,
   easeOutCubic,
   entranceEndMs,
   SKIP_MS,
@@ -12,6 +13,8 @@ import type { NodeDoc } from "../types";
 
 interface Params {
   visibleNodes: NodeDoc[];
+  /** Every zone's parent: the zones are drawn, one by one, before any node. */
+  zoneRootIds?: string[];
   /** The canvas element every node/zone/link is rendered inside. */
   canvasRef: RefObject<HTMLElement | null>;
   /** The camera's cue: this node's turn to appear has come. */
@@ -29,8 +32,9 @@ interface Running {
 }
 
 /**
- * The map's entrance: when a map opens, its nodes appear one after another in
- * the order they were made, slowly enough to retrace how the thinking went.
+ * The map's entrance: when a map opens, its zones are drawn one by one first,
+ * then its nodes appear one after another in the order they were made, slowly
+ * enough to retrace how the thinking went.
  * Each fades and grows in where it already sits, with its zones, links and
  * weapon bows filling in as their nodes arrive; the camera follows each one
  * (onNodeAppear) and steps back to the whole map at the end (onFinish).
@@ -41,7 +45,7 @@ interface Running {
  * the canvas DOM (applyEntranceFrame), never through React state, so there
  * are no whole-map re-renders.
  */
-export function useNodeEntrance({ visibleNodes, canvasRef, onNodeAppear, onFinish }: Params) {
+export function useNodeEntrance({ visibleNodes, zoneRootIds, canvasRef, onNodeAppear, onFinish }: Params) {
   const [active, setActive] = useState(false);
   // The rAF loop keeps the closure it started with, so it reads the latest
   // callbacks (and the positions they see) through a ref.
@@ -82,7 +86,8 @@ export function useNodeEntrance({ visibleNodes, canvasRef, onNodeAppear, onFinis
     if (!r.skip) {
       const order = Array.from(r.delays.entries());
       while (r.announced < order.length && now - r.startedAt >= order[r.announced][1]) {
-        callbacks.current.onNodeAppear?.(order[r.announced][0]);
+        const id = order[r.announced][0];
+        if (!isZoneKey(id)) callbacks.current.onNodeAppear?.(id);
         r.announced++;
       }
     }
@@ -114,7 +119,7 @@ export function useNodeEntrance({ visibleNodes, canvasRef, onNodeAppear, onFinis
     const root = canvasRef.current;
     if (!running.current && loaded && !opened.current && root) {
       opened.current = true;
-      const delays = computeEntranceDelays(visibleNodes);
+      const delays = computeEntranceDelays(visibleNodes, zoneRootIds);
       if (delays.size < 2) return;
       running.current = { delays, startedAt: performance.now(), announced: 0, skip: null };
       setActive(true);

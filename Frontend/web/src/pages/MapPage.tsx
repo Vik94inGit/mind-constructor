@@ -1021,8 +1021,8 @@ export function MapPage() {
     [nodeGroups, solved],
   );
 
-  // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
-  // appear one after another in the order they were made, drawn straight onto
+  // The map's entrance (see hooks/useNodeEntrance.ts): on open, the zones are
+  // drawn one by one, then the nodes appear one after another in the order they were made, drawn straight onto
   // the canvas DOM (posFor never sees it); skip is wired to any pointer-down
   // or wheel on the canvas. Every map opens this way, Personal and Discussion
   // alike, the way a template branch fills in node by node. The camera comes
@@ -1031,6 +1031,7 @@ export function MapPage() {
   // camera then).
   const entrance = useNodeEntrance({
     visibleNodes,
+    zoneRootIds: nodeGroups.map((g) => g.rootId),
     canvasRef,
     onNodeAppear: (id) => {
       const p = positions.get(id);
