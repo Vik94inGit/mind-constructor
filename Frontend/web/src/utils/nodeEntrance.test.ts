@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APPEAR_MS, appearAmount, LEAD_MS, STAGGER_MS, applyEntranceFrame, computeEntranceDelays, entranceEndMs } from "./nodeEntrance";
+import { APPEAR_MS, appearAmount, LEAD_MS, MAX_SPREAD_MS, STAGGER_MS, applyEntranceFrame, computeEntranceDelays, entranceEndMs } from "./nodeEntrance";
 import { makeNode } from "../test/fixtures";
 
 describe("computeEntranceDelays", () => {
@@ -22,7 +22,7 @@ describe("computeEntranceDelays", () => {
 
   it("starts the last node within a bounded time however big the map is", () => {
     const many = Array.from({ length: 500 }, (_, i) => makeNode({ nodeId: `n${i}` }));
-    expect(entranceEndMs(computeEntranceDelays(many))).toBeLessThanOrEqual(LEAD_MS + 20000 + APPEAR_MS);
+    expect(entranceEndMs(computeEntranceDelays(many))).toBeLessThanOrEqual(LEAD_MS + MAX_SPREAD_MS + APPEAR_MS);
   });
 });
 
