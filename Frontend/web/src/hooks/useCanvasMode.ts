@@ -22,7 +22,9 @@ export type CanvasMode =
   | { kind: "none" }
   | { kind: "choose" }
   | { kind: "pack"; containerId: string; picks: Set<string>; error: string | null }
-  | { kind: "draw"; points: Pt[]; hover: Pt | null; blocked: DrawBlockReason | null; saving: boolean };
+  | { kind: "draw"; points: Pt[]; hover: Pt | null; blocked: DrawBlockReason | null; saving: boolean }
+  // Changing a node's parent: the next node tapped becomes `childId`'s parent.
+  | { kind: "reparent"; childId: string; error: string | null };
 
 export type CanvasModeAction =
   | { type: "reset" }
@@ -38,7 +40,9 @@ export type CanvasModeAction =
   | { type: "drawClearPoints" }
   | { type: "drawSetHover"; hover: Pt | null }
   | { type: "drawSetBlocked"; blocked: DrawBlockReason | null }
-  | { type: "drawSetSaving"; saving: boolean };
+  | { type: "drawSetSaving"; saving: boolean }
+  | { type: "reparentStart"; childId: string }
+  | { type: "reparentSetError"; error: string | null };
 
 const NONE: CanvasMode = { kind: "none" };
 
@@ -83,6 +87,10 @@ export function reducer(state: CanvasMode, action: CanvasModeAction): CanvasMode
       return state.kind === "draw" ? { ...state, blocked: action.blocked } : state;
     case "drawSetSaving":
       return state.kind === "draw" ? { ...state, saving: action.saving } : state;
+    case "reparentStart":
+      return { kind: "reparent", childId: action.childId, error: null };
+    case "reparentSetError":
+      return state.kind === "reparent" ? { ...state, error: action.error } : state;
     default:
       return state;
   }

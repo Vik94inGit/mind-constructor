@@ -22,6 +22,8 @@ export interface EdgeRedirect {
 export const EDGE_PAN_PX = 56;
 export const EDGE_PAN_SPEED = 10;
 export const NEAR_PX = 44;
+// Less travel than this (screen px) between grabbing the knob and letting go is a tap.
+export const TAP_SLOP_PX = 8;
 
 /** How far to pan this frame for a pointer at (x, y) in `area`: toward whichever edges it's near, faster the closer. */
 export function edgePan(x: number, y: number, area: { left: number; top: number; right: number; bottom: number }): Pt {
@@ -40,6 +42,8 @@ interface Params {
   onRedirect: (child: NodeDoc, parent: NodeDoc) => void;
   /** Let go over a node that can't, with why (nothing for letting go over its own parent or nowhere). */
   onRefused: (reason: Exclude<RedirectRefusal, "same">) => void;
+  /** The knob tapped rather than dragged: change the parent by tapping it instead (MapPage's reparent mode). */
+  onTap?: (child: NodeDoc) => void;
   /** The map's scrolling area: held near its edge, the pointer pans it, so a parent off screen can be reached. */
   scrollArea?: () => HTMLElement | null;
   /** The nodes on the map and where they're drawn: one near the pointer counts as under it. */
@@ -60,6 +64,7 @@ export function useEdgeRedirect({
   screenToCanvas,
   onRedirect,
   onRefused,
+  onTap,
   scrollArea,
   visibleNodes = [],
   posFor,
@@ -93,9 +98,12 @@ export function useEdgeRedirect({
     if (!isOwnNode(child)) return;
     e.stopPropagation();
     e.preventDefault();
-    let last = { x: e.clientX, y: e.clientY };
+    const start = { x: e.clientX, y: e.clientY };
+    let last = start;
+    let moved = false;
     const track = (clientX: number, clientY: number) => {
       last = { x: clientX, y: clientY };
+      if (Math.hypot(clientX - start.x, clientY - start.y) >= TAP_SLOP_PX) moved = true;
       const overId = nodeIdAt(clientX, clientY, child.nodeId);
       const over = byId(overId);
       setEdgeRedirect({
@@ -111,7 +119,8 @@ export function useEdgeRedirect({
     const panStep = () => {
       frame = requestAnimationFrame(panStep);
       const wrap = scrollArea?.();
-      if (!wrap) return;
+      // A knob held still (about to be a tap) never pans the map.
+      if (!wrap || !moved) return;
       const rect = wrap.getBoundingClientRect();
       const panel = document.querySelector("[data-node-panel]")?.getBoundingClientRect();
       // A bottom sheet (the phone's node panel) covers the lower map: its top is the edge.
@@ -143,6 +152,10 @@ export function useEdgeRedirect({
       window.addEventListener("click", swallow, { capture: true, once: true });
       setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
       if (!drop) return;
+      if (!moved && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < TAP_SLOP_PX) {
+        onTap?.(child);
+        return;
+      }
       const target = byId(nodeIdAt(ev.clientX, ev.clientY, child.nodeId));
       if (!target) return;
       const refusal = redirectRefusal(child, target, nodes, isOwnNode);

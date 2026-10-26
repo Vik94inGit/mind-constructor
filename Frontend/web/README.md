@@ -106,20 +106,24 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   in the panel; the inline inputs grow taller with the text, never wider.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
-- **Changing a parent** — the branch arrows of the node you've opened carry a round knob
-  (`map/RedirectKnobs.tsx`), drawn above the ring of ghosts and just past it, one size on screen at any
-  zoom and finger-sized on a phone. Grab it and drag (grabbing it never pans the map): the ghosts step
-  aside, and the arrow's parent end leaves its parent and follows the pointer, green over a node that can
-  take it, red over one that can't. Holding the pointer near an edge of the visible map (on a phone, the
-  top of the node panel counts as its bottom edge) pans the map that way, so a parent off screen can be
-  reached, and a drop within a finger's width of a node counts as on it. Let go over another of your
-  nodes and the child hangs from that one instead (`hooks/useEdgeRedirect.ts`, `utils/edgeRedirect.ts`);
-  let go anywhere else and nothing changes. Not onto its own branch (that would close a loop), not onto
-  someone else's node, and an attack only onto another attack. The zones reshape to fit: the old parent's
+- **Changing a parent** — its own mode. Open the child and tap the round knob on its branch to its
+  parent (`map/RedirectKnobs.tsx`; drawn above the ring of ghosts and just past it, finger-sized on a
+  phone, also at the dot zoom), or press ↪ *Change parent* on its Info tab (the way in for a card, or a
+  node with no parent yet). The panel and the ghosts go away, the child stays ringed, and a short bar
+  (`map/ReparentBar.tsx`) says to tap the new parent; nodes don't drag meanwhile, so a swipe pans the
+  map. Tap a node and the child hangs from it instead, and its link to the old parent, if it had one,
+  moves to the new parent too, same direction and feeling (`utils/edgeRedirect.ts` `linksToMove`). A
+  node that can't take it (the child's own branch, which would close a loop; someone else's node; a
+  non-attack for an attack; its current parent) says why in the bar and the mode stays. Cancel or Escape
+  leaves. On a desktop the knob can also be dragged straight onto the new parent
+  (`hooks/useEdgeRedirect.ts`): the arrow follows the pointer, green over a node that can take it, red
+  over one that can't, the map pans when the pointer is held near its edge, and a drop within a finger's
+  width of a node counts as on it. The zones reshape to fit: the old parent's
   zone loses the child (and disappears when it's down to one), the new parent's grows to take it in or
   appears. A child already within one and a half zone reaches of its new parent stays where it is;
   one farther out comes in next to it on the side it sat, settled by the zone rules, and its own far
-  children follow like a magnet. One undo puts the old parent and the spots back.
+  children follow like a magnet. One undo puts the old parent and the spots back (a moved link stays
+  where it went).
 - **Moving nodes** — a dragged node (or group) lands where it was let go, nudged only so it doesn't
   cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes, except
   a type dragged out of a node's ring, which lands where it was let go too. Dropping a node anywhere on

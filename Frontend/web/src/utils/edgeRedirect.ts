@@ -1,6 +1,6 @@
 import { isDescendant } from "./canvasLayout";
 import { nodeRefId } from "./nodeType";
-import type { NodeDoc } from "../types";
+import type { EdgeDoc, NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
 
@@ -63,4 +63,38 @@ export function knobSpot(from: Pt, to: Pt, clear: number): Pt {
   // Leave room for the far node's own icon (about half a ring) past the knob.
   const at = len > clear * 1.5 ? clear / len : 0.5;
   return { x: from.x + dx * at, y: from.y + dy * at };
+}
+
+/**
+ * The links (Edge documents) tying `childId` to its old parent, which move
+ * with it to the new one: each is taken off and put back to the new parent,
+ * same direction and feeling, unless the child is already linked to it.
+ */
+export function linksToMove(
+  childId: string,
+  oldParentId: string | null,
+  newParentId: string,
+  edges: EdgeDoc[],
+): { remove: EdgeDoc[]; create: { fromNodeId: string; toNodeId: string; sentiment: EdgeDoc["sentiment"] }[] } {
+  if (!oldParentId) return { remove: [], create: [] };
+  const joins = (e: EdgeDoc, a: string, b: string) => {
+    const x = nodeRefId(e.fromNodeId);
+    const y = nodeRefId(e.toNodeId);
+    return (x === a && y === b) || (x === b && y === a);
+  };
+  const remove = edges.filter((e) => joins(e, childId, oldParentId));
+  // One link between two nodes is all there can be (Backend's createEdgeAbl).
+  if (remove.length === 0 || edges.some((e) => joins(e, childId, newParentId))) return { remove, create: [] };
+  const first = remove[0];
+  const childFirst = nodeRefId(first.fromNodeId) === childId;
+  return {
+    remove,
+    create: [
+      {
+        fromNodeId: childFirst ? childId : newParentId,
+        toNodeId: childFirst ? newParentId : childId,
+        sentiment: first.sentiment,
+      },
+    ],
+  };
 }

@@ -248,8 +248,9 @@ export function useNodeDragAndDrop({
   // it comes in next to its new parent (utils/edgeRedirect.ts). Either way the
   // zone rules settle it — out of any zone it no longer belongs to, zones not
   // crossing — and its own nodes left too far follow it. A card on the board
-  // keeps its spot. One undo step puts the parent and the spots back.
-  async function redirectParent(child: NodeDoc, parent: NodeDoc) {
+  // keeps its spot. One undo step puts the parent and the spots back. Says
+  // whether the new parent saved.
+  async function redirectParent(child: NodeDoc, parent: NodeDoc): Promise<boolean> {
     const from = positions.get(child.nodeId) ?? posFor(child);
     const to = positions.get(parent.nodeId) ?? posFor(parent);
     const card = !!clearSpotFor?.(child, from.x, from.y);
@@ -272,8 +273,11 @@ export function useNodeDragAndDrop({
     } catch (err) {
       setNodes((prev) => prev.map((n) => (n.nodeId === child.nodeId ? { ...n, ...before } : n)));
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.changeParent);
+      await pulling;
+      return false;
     }
     await pulling;
+    return true;
   }
 
   // A finger held still on a node (touch's shift+click): toggles it in or out

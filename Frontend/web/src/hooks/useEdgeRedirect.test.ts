@@ -37,7 +37,7 @@ function grab(overrides: Partial<Parameters<typeof useEdgeRedirect>[0]> = {}) {
   return { ...hook, onRedirect, onRefused };
 }
 
-const release = (x = 10, y = 10) => act(() => void window.dispatchEvent(new MouseEvent("pointerup", { clientX: x, clientY: y })));
+const release = (x = 60, y = 60) => act(() => void window.dispatchEvent(new MouseEvent("pointerup", { clientX: x, clientY: y })));
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -67,6 +67,15 @@ describe("useEdgeRedirect", () => {
     release();
     expect(onRedirect).not.toHaveBeenCalled();
     expect(onRefused).toHaveBeenCalledWith("ownBranch");
+  });
+
+  it("a tap on the knob (no drag) asks to pick the new parent by tapping instead", () => {
+    const onTap = vi.fn();
+    const { onRedirect } = grab({ onTap });
+    pointAt("b");
+    release(5, 6);
+    expect(onTap).toHaveBeenCalledWith(a);
+    expect(onRedirect).not.toHaveBeenCalled();
   });
 
   it("let go over empty canvas or its own parent, quietly does nothing", () => {

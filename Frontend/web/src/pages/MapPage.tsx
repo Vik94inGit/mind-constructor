@@ -47,6 +47,9 @@ import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
 import { RedirectKnobs } from "../map/RedirectKnobs";
+import { ReparentBar } from "../map/ReparentBar";
+import { linksToMove, redirectRefusal } from "../utils/edgeRedirect";
+import type { RedirectRefusal } from "../utils/edgeRedirect";
 import { NewNodePanel } from "../map/NewNodePanel";
 import { useFlipSequence } from "../hooks/useFlipSequence";
 import { NodeContextMenu } from "../map/NodeContextMenu";
@@ -165,6 +168,8 @@ export function MapPage() {
   const drawHover = mode.kind === "draw" ? mode.hover : null;
   const drawBlocked = mode.kind === "draw" ? mode.blocked : null;
   const drawSaving = mode.kind === "draw" ? mode.saving : false;
+  const reparentMode = mode.kind === "reparent";
+  const reparentError = mode.kind === "reparent" ? mode.error : null;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // A node's pictures, open full size before its panel (see handleNodeClick).
@@ -455,7 +460,7 @@ export function MapPage() {
   // third (half on mobile) of the screen while it's open. Skipped for the
   // group-selection footer (multiSelectIds), which is a slim bar, not a tall
   // sheet.
-  const sheetOpen = chooseMode || packMode || !!pendingCreate || (!!selectedNode && multiSelectIds.size === 0);
+  const sheetOpen = chooseMode || packMode || reparentMode || !!pendingCreate || (!!selectedNode && multiSelectIds.size === 0);
   const {
     canvasRef,
     wrapRef,
@@ -1098,7 +1103,8 @@ export function MapPage() {
     positions,
     nodeGroups,
     chooseMode,
-    packMode,
+    // Changing a parent takes taps, like packing: no node drags meanwhile.
+    packMode: packMode || reparentMode,
     drawMode,
     multiSelectIds,
     moveMode,
@@ -1149,20 +1155,67 @@ export function MapPage() {
     visibleNodes,
     posFor,
     zoom,
-    onRedirect: (child, parent) => {
-      void redirectParent(child, parent).then(() => {
-        if (mapId) refreshInsights(mapId);
-      });
-    },
-    onRefused: (reason) =>
-      setActionError(
-        reason === "ownBranch"
-          ? t.ui.errors.dropOnOwnBranch
-          : reason === "attack"
-            ? t.ui.errors.attackParent
-            : t.ui.errors.parentNotOwn,
-      ),
+    onRedirect: (child, parent) => void reparentTo(child, parent),
+    onRefused: (reason) => setActionError(refusalMessage(reason)),
+    onTap: (child) => startReparent(child),
   });
+
+  // Changing a parent as its own mode: the knob tapped (or Change parent on
+  // the node's panel) puts the panel and the ghosts away, and the next node
+  // tapped becomes the parent. The child's branch moves to it, and so does
+  // its link to the old parent (utils/edgeRedirect.ts linksToMove).
+  const reparentChild = mode.kind === "reparent" ? (nodes.find((n) => n.nodeId === mode.childId) ?? null) : null;
+  useEffect(() => {
+    if (reparentMode && !reparentChild) dispatchMode({ type: "reset" });
+  }, [reparentMode, reparentChild, dispatchMode]);
+  // Escape leaves it, like Cancel.
+  useEffect(() => {
+    if (!reparentMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") dispatchMode({ type: "reset" });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [reparentMode, dispatchMode]);
+  function refusalMessage(reason: RedirectRefusal): string {
+    if (reason === "same") return t.ui.canvas.reparentSame;
+    if (reason === "ownBranch") return t.ui.errors.dropOnOwnBranch;
+    if (reason === "attack") return t.ui.errors.attackParent;
+    return t.ui.errors.parentNotOwn;
+  }
+  function startReparent(child: NodeDoc) {
+    setContextMenu(null);
+    setActionError(null);
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    dispatchMode({ type: "reparentStart", childId: child.nodeId });
+  }
+  function pickNewParent(node: NodeDoc) {
+    if (!reparentChild || node.nodeId === reparentChild.nodeId) return;
+    const refusal = redirectRefusal(reparentChild, node, nodes, isOwnNode);
+    if (refusal) {
+      dispatchMode({ type: "reparentSetError", error: refusalMessage(refusal) });
+      return;
+    }
+    dispatchMode({ type: "reset" });
+    void reparentTo(reparentChild, node);
+  }
+  async function reparentTo(child: NodeDoc, parent: NodeDoc) {
+    if (!mapId) return;
+    const links = linksToMove(child.nodeId, nodeRefId(child.parentId) ?? null, parent.nodeId, edges);
+    if (!(await redirectParent(child, parent))) return;
+    try {
+      for (const e of links.remove) {
+        await edgesApi.deleteEdge(e.edgeId);
+        setEdges((prev) => prev.filter((x) => x.edgeId !== e.edgeId));
+      }
+      for (const link of links.create) upsertEdge(await edgesApi.createEdge(mapId, link));
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.removeLink);
+    } finally {
+      refreshInsights(mapId);
+    }
+  }
 
   // Same condition that gates the quick-add ghost ring below — reused
   // higher up (chosenNodeIds' own muted computation) so every other node
@@ -1237,6 +1290,10 @@ export function MapPage() {
     // While drawing a line a node is just something in the way (a click on it
     // can't place a point) — it isn't selected.
     if (drawMode) return;
+    if (reparentMode) {
+      pickNewParent(node);
+      return;
+    }
     if (packMode) {
       // Same toggle-in/out-freely behavior link mode's own picking uses —
       // clicking an already-picked node just removes that one pick.
@@ -2368,7 +2425,7 @@ export function MapPage() {
             // event stream. NodeCard's own outer div already opts out the
             // same way for the same reason (see its own select-none).
             // The map's own background (Map.background — utils/mapBackground.ts).
-            className={`absolute select-none ${canvasBackground.className}${chooseMode || packMode ? " cursor-crosshair" : ""}`}
+            className={`absolute select-none ${canvasBackground.className}${chooseMode || packMode || reparentMode ? " cursor-crosshair" : ""}`}
             // width/height stay the canvas's own native 2400x1600 — every
             // node/ghost/SVG position below is still expressed in that
             // native 0..2400 coordinate space, unaffected by this div now
@@ -2415,7 +2472,7 @@ export function MapPage() {
                 exitChooseMode();
                 return;
               }
-              if (packMode) return;
+              if (packMode || reparentMode) return;
               setSelectedId(null);
               setMultiSelectIds(new Set());
               releaseChosenCircleIfOutside();
@@ -2439,7 +2496,8 @@ export function MapPage() {
               circleRootSentimentByNode={circleRootSentimentByNode}
               linkCycles={linkCycles}
               chosenNodeIds={chosenNodeIds}
-              pendingLink={pendingLink}
+              // The node whose parent is changing stays ringed while the new one is picked.
+              pendingLink={reparentChild ? [reparentChild] : pendingLink}
               edgeRedirect={edgeRedirect}
               onCircleClick={(rootId) => {
                 // A zone's own polygon stops the click from ever reaching the
@@ -2636,7 +2694,7 @@ export function MapPage() {
             )}
 
             {/* The knobs that change a parent, above the ghosts so a finger reaches them. */}
-            {selectedNode && !dotZoom && !pendingCreate && !inlineEditId && !drawMode && (
+            {selectedNode && !pendingCreate && !inlineEditId && !drawMode && (
               <RedirectKnobs
                 selected={selectedNode}
                 hidden={!!edgeRedirect}
@@ -2863,6 +2921,12 @@ export function MapPage() {
             onFinish={finishLine}
             onExit={exitDrawMode}
           />
+        ) : reparentChild ? (
+          <ReparentBar
+            childName={linkLabel(reparentChild.nodeId)}
+            error={reparentError}
+            onCancel={() => dispatchMode({ type: "reset" })}
+          />
         ) : packMode && packContainer ? (
           <PackPickerPanel
             containerText={packContainer.text}
@@ -2925,6 +2989,8 @@ export function MapPage() {
                 onAutoFocused={() => setFocusTextNodeId(null)}
                 onToggleLock={isOwnNode(selectedNode) ? () => toggleBlockLock(selectedNode.nodeId) : undefined}
                 // The parent's magnet: calls its own far nodes back in (utils/parentMagnet.ts).
+                // Change parent: pick the node to hang this one from (reparent mode).
+                onChangeParent={isOwnNode(selectedNode) ? () => startReparent(selectedNode) : undefined}
                 onMagnet={
                   nodes.some((n) => !n.isWeapon && zoneParentId(n) === selectedNode.nodeId && isOwnNode(n))
                     ? () => magnetize(selectedNode)
