@@ -48,7 +48,7 @@ import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
 import { RedirectKnobs } from "../map/RedirectKnobs";
 import { ReparentBar } from "../map/ReparentBar";
-import { linksToMove, redirectRefusal } from "../utils/edgeRedirect";
+import { linksToMove, redirectRefusal, takeParentPlace } from "../utils/edgeRedirect";
 import type { RedirectRefusal } from "../utils/edgeRedirect";
 import { NewNodePanel } from "../map/NewNodePanel";
 import { useFlipSequence } from "../hooks/useFlipSequence";
@@ -123,7 +123,7 @@ import type { Obstacle } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID, makeZoneRule, othersTerritory, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import type { ReadingMode } from "../utils/readingMode";
-import type { AttackIndicator, MapAttack, MapBackground, NodeDoc, NodeShape, NodeType, ZonePaletteColor } from "../types";
+import type { AttackIndicator, EdgeDoc, MapAttack, MapBackground, NodeDoc, NodeShape, NodeType, ZonePaletteColor } from "../types";
 import { battleTally, finishState, healthAt } from "../utils/finish";
 import { FinishedBanner } from "../map/FinishedBanner";
 import { HistoryPanel } from "../map/HistoryPanel";
@@ -172,6 +172,11 @@ export function MapPage() {
   const reparentError = mode.kind === "reparent" ? mode.error : null;
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The ring of ghosts is up around each node opened; the 👻 on its panel
+  // hides it for that node, and the circle that changes its parent shows
+  // instead (map/RedirectKnobs.tsx). Opening another node brings them back.
+  const [ghostsHiddenFor, setGhostsHiddenFor] = useState<string | null>(null);
+  const ghostsHidden = !!selectedId && ghostsHiddenFor === selectedId;
   // A node's pictures, open full size before its panel (see handleNodeClick).
   // The time-lapse (TimeLapseBar): how many nodes, oldest first, are shown,
   // and whether it's playing. `null` when it's off.
@@ -1098,7 +1103,7 @@ export function MapPage() {
     errorMessage: t.ui.errors.moveNodes,
     keysEnabled: !presenting && !drawMode,
   });
-  const { onNodePointerDown, magnetize, redirectParent, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
+  const { onNodePointerDown, magnetize, redirectParent, saveHeadPlan, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
     nodes,
     positions,
     nodeGroups,
@@ -1157,6 +1162,7 @@ export function MapPage() {
     zoom,
     onRedirect: (child, parent) => void reparentTo(child, parent),
     onRefused: (reason) => setActionError(refusalMessage(reason)),
+    onTakeParentPlace: (child) => void headZone(child),
     onTap: (child) => startReparent(child),
   });
 
@@ -1192,6 +1198,17 @@ export function MapPage() {
   }
   function pickNewParent(node: NodeDoc) {
     if (!reparentChild || node.nodeId === reparentChild.nodeId) return;
+    // Its own parent tapped: it takes that parent's place instead.
+    if (node.nodeId === zoneParentId(reparentChild)) {
+      const plan = takeParentPlace(reparentChild, nodes, edges, isOwnNode, posFor);
+      if (typeof plan === "string") {
+        dispatchMode({ type: "reparentSetError", error: refusalMessage(plan) });
+        return;
+      }
+      dispatchMode({ type: "reset" });
+      void headZone(reparentChild);
+      return;
+    }
     const refusal = redirectRefusal(reparentChild, node, nodes, isOwnNode);
     if (refusal) {
       dispatchMode({ type: "reparentSetError", error: refusalMessage(refusal) });
@@ -1200,10 +1217,23 @@ export function MapPage() {
     dispatchMode({ type: "reset" });
     void reparentTo(reparentChild, node);
   }
-  async function reparentTo(child: NodeDoc, parent: NodeDoc) {
+  // A child made the head of its zone (its knob pulled onto its own parent,
+  // or the parent tapped in reparent mode): it takes the parent's place, the
+  // zone's nodes and the old parent hang from it, and the old parent's links
+  // move to it (utils/edgeRedirect.ts takeParentPlace).
+  async function headZone(child: NodeDoc) {
     if (!mapId) return;
-    const links = linksToMove(child.nodeId, nodeRefId(child.parentId) ?? null, parent.nodeId, edges);
-    if (!(await redirectParent(child, parent))) return;
+    const plan = takeParentPlace(child, nodes, edges, isOwnNode, posFor);
+    if (!plan) return;
+    if (typeof plan === "string") {
+      setActionError(refusalMessage(plan));
+      return;
+    }
+    if (!(await saveHeadPlan(plan.patches))) return;
+    await moveLinks(plan);
+  }
+  async function moveLinks(links: { remove: EdgeDoc[]; create: Parameters<typeof edgesApi.createEdge>[1][] }) {
+    if (!mapId) return;
     try {
       for (const e of links.remove) {
         await edgesApi.deleteEdge(e.edgeId);
@@ -1215,6 +1245,12 @@ export function MapPage() {
     } finally {
       refreshInsights(mapId);
     }
+  }
+  async function reparentTo(child: NodeDoc, parent: NodeDoc) {
+    if (!mapId) return;
+    const links = linksToMove(child.nodeId, nodeRefId(child.parentId) ?? null, parent.nodeId, edges);
+    if (!(await redirectParent(child, parent))) return;
+    await moveLinks(links);
   }
 
   // Same condition that gates the quick-add ghost ring below — reused
@@ -1228,7 +1264,8 @@ export function MapPage() {
   // other cards, and the ghost ring would only sit on top of them.
   const quickAddActive =
     !!(selectedNode && isOwnNode(selectedNode) && !chooseMode && !packMode && !dragState && !onCardBoard(selectedNode)) &&
-    selectionSettled;
+    selectionSettled &&
+    !ghostsHidden;
 
   // See forceShowToolbar's own doc comment — every fresh quick-add starts
   // collapsed again, regardless of whether a previous one was manually
@@ -2693,10 +2730,11 @@ export function MapPage() {
               />
             )}
 
-            {/* The knobs that change a parent, above the ghosts so a finger reaches them. */}
-            {selectedNode && !pendingCreate && !inlineEditId && !drawMode && (
+            {/* The circle that changes a parent: shown once the ghosts are hidden. */}
+            {selectedNode && ghostsHidden && !pendingCreate && !inlineEditId && !drawMode && (
               <RedirectKnobs
                 selected={selectedNode}
+                ghosts={false}
                 hidden={!!edgeRedirect}
                 visibleNodes={visibleNodes}
                 posFor={posFor}
@@ -2991,6 +3029,12 @@ export function MapPage() {
                 // The parent's magnet: calls its own far nodes back in (utils/parentMagnet.ts).
                 // Change parent: pick the node to hang this one from (reparent mode).
                 onChangeParent={isOwnNode(selectedNode) ? () => startReparent(selectedNode) : undefined}
+                ghostsHidden={ghostsHidden}
+                onToggleGhosts={
+                  isOwnNode(selectedNode) && !onCardBoard(selectedNode)
+                    ? () => setGhostsHiddenFor(ghostsHidden ? null : selectedNode.nodeId)
+                    : undefined
+                }
                 onMagnet={
                   nodes.some((n) => !n.isWeapon && zoneParentId(n) === selectedNode.nodeId && isOwnNode(n))
                     ? () => magnetize(selectedNode)

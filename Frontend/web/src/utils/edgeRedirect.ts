@@ -1,5 +1,5 @@
 import { isDescendant } from "./canvasLayout";
-import { nodeRefId } from "./nodeType";
+import { nodeRefId, zoneParentId } from "./nodeType";
 import type { EdgeDoc, NodeDoc } from "../types";
 
 type Pt = { x: number; y: number };
@@ -97,4 +97,77 @@ export function linksToMove(
       },
     ],
   };
+}
+
+/** A node's spot and parent after it, or its old parent, changes places (see takeParentPlace). */
+export interface HeadPatch {
+  nodeId: string;
+  parentId: string | null;
+  x: number;
+  y: number;
+}
+
+export interface HeadPlan {
+  /** In the order to save them: the child first (so the others never hang from a node under them), the old parent last. */
+  patches: HeadPatch[];
+  remove: EdgeDoc[];
+  create: { fromNodeId: string; toNodeId: string; sentiment: EdgeDoc["sentiment"] }[];
+}
+
+/**
+ * A child's knob pulled onto its own parent: the child becomes the head of
+ * the zone. It takes the parent's place (spot and parent, so it hangs where
+ * the zone hung from another zone), every other node of the zone hangs from
+ * it, and so does the old parent, which takes the child's spot. The old
+ * parent's links go with the place — to the zone's nodes and to nodes in other
+ * zones alike — except the one between the two of them, and any the child
+ * already has. Refused (with the same reasons as redirectRefusal) when a node
+ * that would change isn't yours, or an attack would head or lose its zone.
+ */
+export function takeParentPlace(
+  child: NodeDoc,
+  nodes: NodeDoc[],
+  edges: EdgeDoc[],
+  isOwnNode: (node: NodeDoc) => boolean,
+  posFor: (node: NodeDoc) => Pt,
+): HeadPlan | Exclude<RedirectRefusal, "same" | "ownBranch"> | null {
+  const parentId = zoneParentId(child);
+  const parent = parentId ? nodes.find((n) => n.nodeId === parentId) : undefined;
+  if (!parent) return null;
+  if (child.isWeapon || parent.isWeapon) return "attack";
+  const zone = nodes.filter((n) => n.nodeId !== child.nodeId && zoneParentId(n) === parent.nodeId);
+  const grandId = nodeRefId(parent.parentId) ?? null;
+  const grand = grandId ? nodes.find((n) => n.nodeId === grandId) : undefined;
+  // The backend takes only a parent of the caller's own, and changes only the caller's nodes.
+  if (![child, parent, ...zone].every(isOwnNode) || (grand && !isOwnNode(grand))) return "notOwn";
+  const at = posFor(child);
+  const was = posFor(parent);
+  const patches: HeadPatch[] = [
+    { nodeId: child.nodeId, parentId: grandId, x: was.x, y: was.y },
+    ...zone.map((n) => ({ nodeId: n.nodeId, parentId: child.nodeId, ...posFor(n) })),
+    { nodeId: parent.nodeId, parentId: child.nodeId, x: at.x, y: at.y },
+  ];
+  const other = (e: EdgeDoc, id: string) => {
+    const a = nodeRefId(e.fromNodeId);
+    const b = nodeRefId(e.toNodeId);
+    return a === id ? b : b === id ? a : null;
+  };
+  const childLinked = new Set(edges.map((e) => other(e, child.nodeId)).filter((id): id is string => !!id));
+  const remove: EdgeDoc[] = [];
+  const create: HeadPlan["create"] = [];
+  for (const e of edges) {
+    const far = other(e, parent.nodeId);
+    if (!far || far === child.nodeId) continue;
+    remove.push(e);
+    // One link between two nodes is all there can be (Backend's createEdgeAbl).
+    if (childLinked.has(far)) continue;
+    childLinked.add(far);
+    const parentFirst = nodeRefId(e.fromNodeId) === parent.nodeId;
+    create.push({
+      fromNodeId: parentFirst ? child.nodeId : far,
+      toNodeId: parentFirst ? far : child.nodeId,
+      sentiment: e.sentiment,
+    });
+  }
+  return { patches, remove, create };
 }

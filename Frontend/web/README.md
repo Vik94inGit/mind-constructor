@@ -106,15 +106,16 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   in the panel; the inline inputs grow taller with the text, never wider.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
-- **Changing a parent** — its own mode. Open the child and tap the round knob on its branch to its
-  parent (`map/RedirectKnobs.tsx`; drawn above the ring of ghosts and just past it, finger-sized on a
-  phone, also at the dot zoom), or press ↪ *Change parent* on its Info tab (the way in for a card, or a
+- **Changing a parent** — its own mode. Open the child; the ring of ghosts comes up as always, and
+  the 👻 at the top of its panel hides it (for that node; opening another brings the ghosts back). With
+  the ghosts hidden, a round knob shows on its branch to its parent, just past the node
+  (`map/RedirectKnobs.tsx`, finger-sized on a phone); tap it, or press ↪ *Change parent* on its Info tab (the way in for a card, or a
   node with no parent yet). The panel and the ghosts go away, the child stays ringed, and a short bar
   (`map/ReparentBar.tsx`) says to tap the new parent; nodes don't drag meanwhile, so a swipe pans the
   map. Tap a node and the child hangs from it instead, and its link to the old parent, if it had one,
   moves to the new parent too, same direction and feeling (`utils/edgeRedirect.ts` `linksToMove`). A
   node that can't take it (the child's own branch, which would close a loop; someone else's node; a
-  non-attack for an attack; its current parent) says why in the bar and the mode stays. Cancel or Escape
+  non-attack for an attack) says why in the bar and the mode stays. Cancel or Escape
   leaves. On a desktop the knob can also be dragged straight onto the new parent
   (`hooks/useEdgeRedirect.ts`): the arrow follows the pointer, green over a node that can take it, red
   over one that can't, the map pans when the pointer is held near its edge, and a drop within a finger's
@@ -124,6 +125,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   one farther out comes in next to it on the side it sat, settled by the zone rules, and its own far
   children follow like a magnet. One undo puts the old parent and the spots back (a moved link stays
   where it went).
+- **Making a child the head of its zone** — pull a child's knob onto its own parent (or, in the
+  change-parent mode, tap its own parent). The child takes the parent's place: its spot, and the
+  parent it hung from, so the zone still hangs where it did from the zone above. Every other node of
+  the zone hangs from it now, and so does the old parent, which moves to the child's old spot. The old
+  parent's links, to the zone's nodes and to nodes in other zones, move over to the child, same
+  direction and feeling (`utils/edgeRedirect.ts` `takeParentPlace`); the one between the two stays.
+  Refused, with why, when a node that would change isn't yours or the child is an attack. One undo
+  puts the parents and spots back; a save that fails puts everything back at once.
 - **Moving nodes** — a dragged node (or group) lands where it was let go, nudged only so it doesn't
   cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes, except
   a type dragged out of a node's ring, which lands where it was let go too. Dropping a node anywhere on

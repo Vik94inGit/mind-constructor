@@ -23,19 +23,25 @@ interface Props {
    * touch whose element is removed mid-drag can stop reporting its moves.
    */
   hidden?: boolean;
+  /** Whether the ring of ghosts is up around the node: the knob sits past it, else just past the node. */
+  ghosts?: boolean;
 }
 
 // The knob that changes a parent, on the opened node's branch to its parent.
-// Drawn above the nodes and the ring of ghosts (an HTML layer, not the
-// backdrop SVG underneath everything), placed on the branch just past the
-// ring, and kept one size on screen at any zoom — finger-sized on a phone.
+// MapPage shows it once the 👻 on the node's panel has hidden the ring of
+// ghosts. Drawn above the nodes (an HTML layer, not the backdrop SVG
+// underneath everything), placed on the branch just past the node (or past
+// the ring, with the ghosts up), and kept one size on screen at any zoom —
+// finger-sized on a phone. Pulled onto its own parent, the child becomes the
+// head of the zone (utils/edgeRedirect.ts takeParentPlace).
 // Grabbing one never pans the map (touch-action: none).
-export function RedirectKnobs({ selected, visibleNodes, posFor, zoom, canRedirect, onStart, hidden = false }: Props) {
+export function RedirectKnobs({ selected, visibleNodes, posFor, zoom, canRedirect, onStart, hidden = false, ghosts = true }: Props) {
   const { t } = useI18n();
   const mobile = isMobileViewport();
   const k = 1 / zoom;
-  // Just past the quick-add ring (QuickAddGhosts' RADIUS) plus a ghost's half-width.
-  const clear = ((mobile ? 104 : 126) + 36) * k;
+  // Just past the quick-add ring (QuickAddGhosts' RADIUS) plus a ghost's
+  // half-width, or with the ghosts hidden, just past the node itself.
+  const clear = (ghosts ? (mobile ? 104 : 126) + 36 : 64) * k;
   const size = mobile ? 30 : 22;
   const hit = mobile ? 48 : 30;
   const byId = new Map(visibleNodes.map((n) => [n.nodeId, n]));

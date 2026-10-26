@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { redirectRefusal } from "../utils/edgeRedirect";
 import type { RedirectRefusal } from "../utils/edgeRedirect";
+import { zoneParentId } from "../utils/nodeType";
 import type { Pt } from "./useCanvasMode";
 import type { NodeDoc } from "../types";
 
@@ -42,6 +43,8 @@ interface Params {
   onRedirect: (child: NodeDoc, parent: NodeDoc) => void;
   /** Let go over a node that can't, with why (nothing for letting go over its own parent or nowhere). */
   onRefused: (reason: Exclude<RedirectRefusal, "same">) => void;
+  /** Let go over its own parent: the child takes the parent's place as head of the zone (MapPage, utils/edgeRedirect.ts takeParentPlace). */
+  onTakeParentPlace?: (child: NodeDoc, parent: NodeDoc) => void;
   /** The knob tapped rather than dragged: change the parent by tapping it instead (MapPage's reparent mode). */
   onTap?: (child: NodeDoc) => void;
   /** The map's scrolling area: held near its edge, the pointer pans it, so a parent off screen can be reached. */
@@ -55,7 +58,8 @@ interface Params {
 // Grabbing a branch arrow's knob (map/RedirectKnobs.tsx) and dragging it: the
 // arrow leaves its parent and follows the pointer; let go over another node
 // and that node becomes the parent (MapPage hands it to redirectParent, which
-// settles the zones). Let go anywhere else and nothing changes. On a phone
+// settles the zones); let go over its own parent and the child takes that
+// parent's place as head of the zone. Let go anywhere else and nothing changes. On a phone
 // most of the map is off screen, so holding the finger near an edge of the
 // visible map (above the node panel) pans it that way.
 export function useEdgeRedirect({
@@ -64,6 +68,7 @@ export function useEdgeRedirect({
   screenToCanvas,
   onRedirect,
   onRefused,
+  onTakeParentPlace,
   onTap,
   scrollArea,
   visibleNodes = [],
@@ -93,6 +98,7 @@ export function useEdgeRedirect({
     return best;
   }
   const byId = (id: string | null) => (id ? nodes.find((n) => n.nodeId === id) : undefined);
+  const isParentOf = (child: NodeDoc, node: NodeDoc) => !!onTakeParentPlace && node.nodeId === zoneParentId(child);
 
   function startEdgeRedirect(child: NodeDoc, e: ReactPointerEvent) {
     if (!isOwnNode(child)) return;
@@ -110,7 +116,7 @@ export function useEdgeRedirect({
         childId: child.nodeId,
         to: screenToCanvas(clientX, clientY),
         overId: over && over.nodeId !== child.nodeId ? over.nodeId : null,
-        valid: !!over && redirectRefusal(child, over, nodes, isOwnNode) === null,
+        valid: !!over && (isParentOf(child, over) || redirectRefusal(child, over, nodes, isOwnNode) === null),
       });
     };
     // Each frame: pan when the pointer is held near an edge of what's visible
@@ -158,6 +164,10 @@ export function useEdgeRedirect({
       }
       const target = byId(nodeIdAt(ev.clientX, ev.clientY, child.nodeId));
       if (!target) return;
+      if (isParentOf(child, target)) {
+        onTakeParentPlace!(child, target);
+        return;
+      }
       const refusal = redirectRefusal(child, target, nodes, isOwnNode);
       if (refusal === null) onRedirect(child, target);
       else if (refusal !== "same") onRefused(refusal);

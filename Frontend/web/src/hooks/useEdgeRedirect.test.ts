@@ -69,6 +69,18 @@ describe("useEdgeRedirect", () => {
     expect(onRefused).toHaveBeenCalledWith("ownBranch");
   });
 
+  it("let go over its own parent, makes the child the head of the zone", () => {
+    const onTakeParentPlace = vi.fn();
+    const { result, onRedirect, onRefused } = grab({ onTakeParentPlace });
+    pointAt("root");
+    act(() => void window.dispatchEvent(new MouseEvent("pointermove", { clientX: 40, clientY: 50 })));
+    expect(result.current.edgeRedirect!.valid).toBe(true);
+    release();
+    expect(onTakeParentPlace).toHaveBeenCalledWith(a, root);
+    expect(onRedirect).not.toHaveBeenCalled();
+    expect(onRefused).not.toHaveBeenCalled();
+  });
+
   it("a tap on the knob (no drag) asks to pick the new parent by tapping instead", () => {
     const onTap = vi.fn();
     const { onRedirect } = grab({ onTap });
