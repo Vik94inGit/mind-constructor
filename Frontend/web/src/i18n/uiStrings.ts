@@ -315,6 +315,9 @@ export interface UiStrings {
     reparentPick: (name: string) => string;
     reparentHint: string;
     reparentSame: string;
+    hideGhosts: string;
+    showGhosts: string;
+    takeParentPlace: string;
   };
   minimapTitle: string;
   abstraction: {
@@ -882,12 +885,15 @@ const en: UiStrings = {
     stabilizeCircle: "Click to stabilize this circle and let every other circle drift",
     newCircleText: "New circle",
     newNodeText: "New node",
-    redirectBranch: "Tap to pick a new parent, or drag onto one",
+    redirectBranch: "Tap to pick a new parent, or drag onto one. Drag onto its own parent to make it the head of the zone",
     changeParent: "Change parent",
     changeParentHint: "Pick another node to hang this one from",
     reparentPick: (name) => `Tap the new parent for “${name}”`,
-    reparentHint: "Its branch and its link to the old parent move to the node you tap.",
+    reparentHint: "Its branch and its link to the old parent move to the node you tap. Tap its own parent to make it the head of the zone.",
     reparentSame: "That is already its parent.",
+    hideGhosts: "Hide the ghosts and show the circle that changes the parent",
+    showGhosts: "Show the ghosts again",
+    takeParentPlace: "Couldn't make it the head of the zone.",
   },
   minimapTitle: "Minimap — click or drag to jump around the map",
   abstraction: {
@@ -1424,12 +1430,15 @@ const cs: UiStrings = {
     stabilizeCircle: "Kliknutím tento kruh stabilizujete a všechny ostatní kruhy necháte driftovat",
     newCircleText: "Nový kruh",
     newNodeText: "Nový uzel",
-    redirectBranch: "Klepněte a vyberte nového rodiče, nebo přetáhněte na něj",
+    redirectBranch: "Klepněte a vyberte nového rodiče, nebo přetáhněte na něj. Přetažením na vlastního rodiče se stane hlavou zóny",
     changeParent: "Změnit rodiče",
     changeParentHint: "Vyberte jiný uzel, ze kterého bude tento viset",
     reparentPick: (name) => `Klepněte na nového rodiče pro „${name}“`,
-    reparentHint: "Jeho větev i spojení se starým rodičem přejdou na uzel, na který klepnete.",
+    reparentHint: "Jeho větev i spojení se starým rodičem přejdou na uzel, na který klepnete. Klepnutím na jeho rodiče se stane hlavou zóny.",
     reparentSame: "To už je jeho rodič.",
+    hideGhosts: "Skrýt duchy a ukázat kroužek pro změnu rodiče",
+    showGhosts: "Znovu ukázat duchy",
+    takeParentPlace: "Nepodařilo se z něj udělat hlavu zóny.",
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
   abstraction: {
@@ -1965,12 +1974,15 @@ const uk: UiStrings = {
     stabilizeCircle: "Клацніть, щоб стабілізувати це коло й дозволити всім іншим колам дрейфувати",
     newCircleText: "Нове коло",
     newNodeText: "Новий вузол",
-    redirectBranch: "Торкніться, щоб обрати нового батьківського, або перетягніть на нього",
+    redirectBranch: "Торкніться, щоб обрати нового батьківського, або перетягніть на нього. Перетягніть на його батьківський, щоб зробити його головою зони",
     changeParent: "Змінити батьківський",
     changeParentHint: "Оберіть інший вузол, на якому висітиме цей",
     reparentPick: (name) => `Торкніться нового батьківського для «${name}»`,
-    reparentHint: "Його гілка і зв’язок зі старим батьківським перейдуть на вузол, якого ви торкнетеся.",
+    reparentHint: "Його гілка і зв’язок зі старим батьківським перейдуть на вузол, якого ви торкнетеся. Торкніться його батьківського, щоб зробити його головою зони.",
     reparentSame: "Це вже його батьківський вузол.",
+    hideGhosts: "Сховати привидів і показати кружок зміни батьківського",
+    showGhosts: "Знову показати привидів",
+    takeParentPlace: "Не вдалося зробити його головою зони.",
   },
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
   abstraction: {
@@ -2509,12 +2521,15 @@ const ru: UiStrings = {
     stabilizeCircle: "Щёлкните, чтобы стабилизировать этот круг и позволить всем остальным кругам дрейфовать",
     newCircleText: "Новый круг",
     newNodeText: "Новый узел",
-    redirectBranch: "Нажмите, чтобы выбрать нового родителя, или перетащите на него",
+    redirectBranch: "Нажмите, чтобы выбрать нового родителя, или перетащите на него. Перетащите на его родителя, чтобы сделать его главой зоны",
     changeParent: "Сменить родителя",
     changeParentHint: "Выберите другой узел, на котором будет висеть этот",
     reparentPick: (name) => `Нажмите на нового родителя для «${name}»`,
-    reparentHint: "Его ветка и связь со старым родителем перейдут на узел, который вы нажмёте.",
+    reparentHint: "Его ветка и связь со старым родителем перейдут на узел, который вы нажмёте. Нажмите его родителя, чтобы сделать его главой зоны.",
     reparentSame: "Это уже его родитель.",
+    hideGhosts: "Скрыть призраков и показать кружок смены родителя",
+    showGhosts: "Снова показать призраков",
+    takeParentPlace: "Не удалось сделать его главой зоны.",
   },
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
   abstraction: {

@@ -36,6 +36,7 @@ const t = {
       joinCircle: "JOIN_ERROR",
       leaveCircle: "LEAVE_ERROR",
     },
+    canvas: { takeParentPlace: "HEAD_ERROR" },
   },
 } as unknown as Translation;
 
@@ -250,6 +251,61 @@ describe("useNodeDragAndDrop", () => {
       expect(movedSpot("p")).toBeUndefined();
       expect(nodesApi.moveNodes).toHaveBeenCalledTimes(1);
       expect(recordMove).toHaveBeenCalledWith([nodes[1]]);
+    });
+
+    it("a child taking its parent's place saves every node in the plan's order, and undoes the old parent first", async () => {
+      const nodes = [
+        makeNode({ nodeId: "p", x: 100, y: 0, parentId: "g" }),
+        makeNode({ nodeId: "c", x: 200, y: 0, parentId: "p" }),
+        makeNode({ nodeId: "s", x: 150, y: 50, parentId: "p" }),
+      ];
+      const recordMove = vi.fn();
+      const { result } = setup({ nodes, recordMove });
+      vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, updates) => ({
+        ...nodes.find((n) => n.nodeId === nodeId)!,
+        ...updates,
+      }));
+
+      let saved = false;
+      await act(async () => {
+        saved = await result.current.saveHeadPlan([
+          { nodeId: "c", parentId: "g", x: 100, y: 0 },
+          { nodeId: "s", parentId: "c", x: 150, y: 50 },
+          { nodeId: "p", parentId: "c", x: 200, y: 0 },
+        ]);
+      });
+
+      expect(saved).toBe(true);
+      expect(vi.mocked(nodesApi.updateNode).mock.calls).toEqual([
+        ["c", { x: 100, y: 0, parentId: "g" }],
+        ["s", { parentId: "c" }],
+        ["p", { x: 200, y: 0, parentId: "c" }],
+      ]);
+      expect(recordMove).toHaveBeenCalledWith([nodes[0], nodes[1], nodes[2]]);
+    });
+
+    it("a child taking its parent's place puts every node back when a save fails", async () => {
+      const nodes = [
+        makeNode({ nodeId: "p", x: 100, y: 0, parentId: null }),
+        makeNode({ nodeId: "c", x: 200, y: 0, parentId: "p" }),
+      ];
+      const { result, setActionError } = setup({ nodes });
+      vi.mocked(nodesApi.updateNode)
+        .mockResolvedValueOnce({ ...nodes[1], parentId: null })
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValue(nodes[0]);
+
+      let saved = true;
+      await act(async () => {
+        saved = await result.current.saveHeadPlan([
+          { nodeId: "c", parentId: null, x: 100, y: 0 },
+          { nodeId: "p", parentId: "c", x: 200, y: 0 },
+        ]);
+      });
+
+      expect(saved).toBe(false);
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("c", expect.objectContaining({ x: 200, y: 0, parentId: "p" }));
+      expect(setActionError).toHaveBeenLastCalledWith("HEAD_ERROR");
     });
 
     it("redirecting a branch keeps a child its new zone can reach exactly where it is", async () => {

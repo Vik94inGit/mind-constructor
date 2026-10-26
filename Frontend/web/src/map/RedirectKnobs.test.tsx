@@ -44,6 +44,17 @@ describe("RedirectKnobs", () => {
     expect(knob("o")).toBeNull();
   });
 
+  it("with the ghosts hidden, sits just past the node instead of past their ring", () => {
+    renderKnobs();
+    const past = parseFloat(knob("c")!.style.left);
+    document.body.innerHTML = "";
+    renderKnobs({ ghosts: false });
+    const near = parseFloat(knob("c")!.style.left);
+    // The opened node sits at x 1000, its parent at 0: nearer the node is further right.
+    expect(near).toBeGreaterThan(past);
+    expect(near).toBeLessThan(1000);
+  });
+
   it("puts none on a node with no parent", () => {
     renderKnobs({ selected: parent });
     expect(document.querySelector("[data-redirect-knob]")).toBeNull();

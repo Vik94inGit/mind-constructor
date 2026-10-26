@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeNode } from "../test/fixtures";
-import { REDIRECT_BRING_FACTOR, REDIRECT_KEEP_FACTOR, knobSpot, linksToMove, redirectRefusal, redirectSpot } from "./edgeRedirect";
+import { REDIRECT_BRING_FACTOR, REDIRECT_KEEP_FACTOR, knobSpot, linksToMove, redirectRefusal, redirectSpot, takeParentPlace } from "./edgeRedirect";
 import type { EdgeDoc, NodeDoc } from "../types";
 
 const own = (_n: NodeDoc) => true;
@@ -83,5 +83,75 @@ describe("linksToMove", () => {
   it("has nothing to move without an old parent or a link to it", () => {
     expect(linksToMove("c", null, "new", [edge("e1", "c", "x")])).toEqual({ remove: [], create: [] });
     expect(linksToMove("c", "old", "new", [edge("e1", "c", "x")])).toEqual({ remove: [], create: [] });
+  });
+});
+
+describe("takeParentPlace", () => {
+  // g's zone holds p; p's zone holds c, s1 and s2; x sits in another zone.
+  const g = makeNode({ nodeId: "g", parentId: null, x: 0, y: 0 });
+  const p = makeNode({ nodeId: "p", parentId: "g", x: 100, y: 0 });
+  const c = makeNode({ nodeId: "c", parentId: "p", x: 200, y: 0 });
+  const s1 = makeNode({ nodeId: "s1", parentId: "p", x: 150, y: 50 });
+  const s2 = makeNode({ nodeId: "s2", parentId: "p", x: 150, y: -50 });
+  const x = makeNode({ nodeId: "x", parentId: null, x: 900, y: 0 });
+  const nodes = [g, p, c, s1, s2, x];
+  const at = (n: NodeDoc) => ({ x: n.x!, y: n.y! });
+  const edge = (edgeId: string, from: string, to: string, sentiment: EdgeDoc["sentiment"] = "neutral") =>
+    ({ edgeId, fromNodeId: from, toNodeId: to, sentiment }) as EdgeDoc;
+
+  it("puts the child in its parent's place and hangs the whole zone, old parent too, from it", () => {
+    const plan = takeParentPlace(c, nodes, [], own, at);
+    if (!plan || typeof plan === "string") throw new Error("no plan");
+    expect(plan.patches).toEqual([
+      { nodeId: "c", parentId: "g", x: 100, y: 0 },
+      { nodeId: "s1", parentId: "c", x: 150, y: 50 },
+      { nodeId: "s2", parentId: "c", x: 150, y: -50 },
+      { nodeId: "p", parentId: "c", x: 200, y: 0 },
+    ]);
+  });
+
+  it("moves the old parent's links, to its zone and to other zones, over to the child", () => {
+    const edges = [edge("pc", "p", "c"), edge("gp", "g", "p", "positive"), edge("px", "p", "x", "negative"), edge("ps1", "s1", "p")];
+    const plan = takeParentPlace(c, nodes, edges, own, at);
+    if (!plan || typeof plan === "string") throw new Error("no plan");
+    expect(plan.remove.map((e) => e.edgeId)).toEqual(["gp", "px", "ps1"]);
+    expect(plan.create).toEqual([
+      { fromNodeId: "g", toNodeId: "c", sentiment: "positive" },
+      { fromNodeId: "c", toNodeId: "x", sentiment: "negative" },
+      { fromNodeId: "s1", toNodeId: "c", sentiment: "neutral" },
+    ]);
+  });
+
+  it("doesn't link the child twice to a node it is already linked to", () => {
+    const edges = [edge("px", "p", "x"), edge("cx", "x", "c")];
+    const plan = takeParentPlace(c, nodes, edges, own, at);
+    if (!plan || typeof plan === "string") throw new Error("no plan");
+    expect(plan.remove.map((e) => e.edgeId)).toEqual(["px"]);
+    expect(plan.create).toEqual([]);
+  });
+
+  it("makes the child a root when its parent was one", () => {
+    const plan = takeParentPlace(p, nodes, [], own, at);
+    if (!plan || typeof plan === "string") throw new Error("no plan");
+    expect(plan.patches[0]).toEqual({ nodeId: "p", parentId: null, x: 0, y: 0 });
+    expect(plan.patches[plan.patches.length - 1]).toEqual({ nodeId: "g", parentId: "p", x: 100, y: 0 });
+  });
+
+  it("refuses when a node that would change, or the new parent above, isn't yours", () => {
+    expect(takeParentPlace(c, nodes, [], (n) => n.nodeId !== "s2", at)).toBe("notOwn");
+    expect(takeParentPlace(c, nodes, [], (n) => n.nodeId !== "g", at)).toBe("notOwn");
+  });
+
+  it("refuses an attack, and leaves attacks on the old parent where they are", () => {
+    const w = makeNode({ nodeId: "w", parentId: "p", targetNodeId: "p", isWeapon: true });
+    const w2 = makeNode({ nodeId: "w2", parentId: "w", targetNodeId: "p", isWeapon: true });
+    expect(takeParentPlace(w2, [...nodes, w, w2], [], own, at)).toBe("attack");
+    const plan = takeParentPlace(c, [...nodes, w], [], own, at);
+    if (!plan || typeof plan === "string") throw new Error("no plan");
+    expect(plan.patches.map((q) => q.nodeId)).not.toContain("w");
+  });
+
+  it("has nothing to do for a node with no parent", () => {
+    expect(takeParentPlace(g, nodes, [], own, at)).toBeNull();
   });
 });

@@ -24,6 +24,7 @@ import { startTrail } from "../utils/followTrail";
 import { MAGNET_BUTTON_FAR_FACTOR, MAGNET_FAR_FACTOR, magnetPulls } from "../utils/parentMagnet";
 import type { Trail } from "../utils/followTrail";
 import { redirectSpot } from "../utils/edgeRedirect";
+import type { HeadPatch } from "../utils/edgeRedirect";
 
 type Pt = { x: number; y: number };
 
@@ -277,6 +278,36 @@ export function useNodeDragAndDrop({
       return false;
     }
     await pulling;
+    return true;
+  }
+
+  // A child taking its parent's place as the head of the zone
+  // (utils/edgeRedirect.ts takeParentPlace): every changed node is drawn
+  // there at once, then saved in the plan's order. A save that fails puts
+  // them all back as they were. Resolves true when everything saved.
+  async function saveHeadPlan(plan: HeadPatch[]): Promise<boolean> {
+    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+    const changed = plan.map((p) => byId.get(p.nodeId)).filter((n): n is NodeDoc => !!n);
+    // The old parent first, so an undo never hangs it, even for a moment, from its own child.
+    recordMove?.([changed[changed.length - 1], ...changed.slice(0, -1)]);
+    setActionError(null);
+    const before = new Map(changed.map((n) => [n.nodeId, { ...storedSpots(n), parentId: n.parentId }]));
+    const after = new Map(plan.map((p) => {
+      const node = byId.get(p.nodeId)!;
+      const from = posFor(node);
+      const spot = from.x === p.x && from.y === p.y ? {} : spotFor(node, p);
+      return [p.nodeId, { ...spot, parentId: p.parentId }];
+    }));
+    setNodes((prev) => prev.map((n) => (after.has(n.nodeId) ? { ...n, ...after.get(n.nodeId)! } : n)));
+    try {
+      for (const p of plan) upsertNode(await nodesApi.updateNode(p.nodeId, after.get(p.nodeId)!));
+    } catch (err) {
+      setNodes((prev) => prev.map((n) => (before.has(n.nodeId) ? { ...n, ...before.get(n.nodeId)! } : n)));
+      // What did save is put back too, so the zone isn't left half turned.
+      await Promise.allSettled(changed.map((n) => nodesApi.updateNode(n.nodeId, { ...storedSpots(n), parentId: nodeRefId(n.parentId) ?? null })));
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.canvas.takeParentPlace);
+      return false;
+    }
     return true;
   }
 
@@ -813,6 +844,7 @@ export function useNodeDragAndDrop({
     onNodePointerDown,
     magnetize,
     redirectParent,
+    saveHeadPlan,
     dragState: dragUI.drag,
     groupDragState: dragUI.group,
     dropTarget: dragUI.dropTarget,

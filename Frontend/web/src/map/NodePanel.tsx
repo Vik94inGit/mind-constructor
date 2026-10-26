@@ -149,6 +149,9 @@ interface Props {
   onMagnet?: () => Promise<number>;
   /** Change parent: pick another node to hang this one from (MapPage's reparent mode). */
   onChangeParent?: () => void;
+  /** The ring of ghosts around the opened node: hidden, the circle that changes its parent shows instead. */
+  ghostsHidden?: boolean;
+  onToggleGhosts?: () => void;
   /** Set right after this node was created: open on its text, focused, ready to write more. Fired back through onAutoFocused once done. */
   autoFocusText?: boolean;
   onAutoFocused?: () => void;
@@ -188,6 +191,8 @@ export function NodePanel({
   onToggleLock,
   onMagnet,
   onChangeParent,
+  ghostsHidden = false,
+  onToggleGhosts,
   autoFocusText = false,
   onAutoFocused,
 }: Props) {
@@ -978,9 +983,24 @@ export function NodePanel({
             </div>
           )}
         </div>
-        <button className={closeBtn} onClick={onClose}>
-          ✕
-        </button>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          {onToggleGhosts && (
+            <button
+              type="button"
+              data-toggle-ghosts
+              aria-pressed={ghostsHidden}
+              className={`${closeBtn}${ghostsHidden ? " bg-surface-2" : ""}`}
+              title={ghostsHidden ? t.ui.canvas.showGhosts : t.ui.canvas.hideGhosts}
+              aria-label={ghostsHidden ? t.ui.canvas.showGhosts : t.ui.canvas.hideGhosts}
+              onClick={onToggleGhosts}
+            >
+              <span className={ghostsHidden ? "opacity-40 grayscale" : ""}>👻</span>
+            </button>
+          )}
+          <button className={closeBtn} onClick={onClose}>
+            ✕
+          </button>
+        </div>
       </div>
 
       {error && (
