@@ -147,6 +147,8 @@ interface Props {
   onToggleLock?: () => void;
   /** Set on a parent with nodes of yours: pulls those outside its zone back in (utils/parentMagnet.ts), resolving to how many moved. */
   onMagnet?: () => Promise<number>;
+  /** Change parent: pick another node to hang this one from (MapPage's reparent mode). */
+  onChangeParent?: () => void;
   /** Set right after this node was created: open on its text, focused, ready to write more. Fired back through onAutoFocused once done. */
   autoFocusText?: boolean;
   onAutoFocused?: () => void;
@@ -185,6 +187,7 @@ export function NodePanel({
   textLocked = false,
   onToggleLock,
   onMagnet,
+  onChangeParent,
   autoFocusText = false,
   onAutoFocused,
 }: Props) {
@@ -994,6 +997,7 @@ export function NodePanel({
           textLocked={textLocked}
           onToggleLock={onToggleLock}
           onMagnet={onMagnet}
+          onChangeParent={onChangeParent}
           textareaRef={textareaRef}
           readonlyTextRef={readonlyTextRef}
           textDraft={textDraft}

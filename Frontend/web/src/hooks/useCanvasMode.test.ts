@@ -16,6 +16,18 @@ describe("useCanvasMode reducer", () => {
     expect(reducer(pack, { type: "reset" })).toEqual({ kind: "none" });
   });
 
+  describe("reparent mode", () => {
+    it("reparentStart holds the child whose parent is changing, with no error", () => {
+      expect(reducer({ kind: "none" }, { type: "reparentStart", childId: "c" })).toEqual({ kind: "reparent", childId: "c", error: null });
+    });
+
+    it("reparentSetError only applies while changing a parent", () => {
+      const on = reducer({ kind: "none" }, { type: "reparentStart", childId: "c" });
+      expect(reducer(on, { type: "reparentSetError", error: "no" })).toEqual({ kind: "reparent", childId: "c", error: "no" });
+      expect(reducer({ kind: "none" }, { type: "reparentSetError", error: "no" })).toEqual({ kind: "none" });
+    });
+  });
+
   describe("pack mode", () => {
     it("packStart opens with an empty pick set and no error", () => {
       const state = reducer({ kind: "none" }, { type: "packStart", containerId: "c1" });

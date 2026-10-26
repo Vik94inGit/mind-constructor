@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeNode } from "../test/fixtures";
-import { REDIRECT_BRING_FACTOR, REDIRECT_KEEP_FACTOR, knobSpot, redirectRefusal, redirectSpot } from "./edgeRedirect";
-import type { NodeDoc } from "../types";
+import { REDIRECT_BRING_FACTOR, REDIRECT_KEEP_FACTOR, knobSpot, linksToMove, redirectRefusal, redirectSpot } from "./edgeRedirect";
+import type { EdgeDoc, NodeDoc } from "../types";
 
 const own = (_n: NodeDoc) => true;
 
@@ -61,5 +61,27 @@ describe("knobSpot", () => {
 
   it("goes halfway on a branch too short for that", () => {
     expect(knobSpot({ x: 0, y: 0 }, { x: 200, y: 0 }, 160)).toEqual({ x: 100, y: 0 });
+  });
+});
+
+describe("linksToMove", () => {
+  const edge = (edgeId: string, fromNodeId: string, toNodeId: string, sentiment: "positive" | "negative" | "neutral" = "positive") =>
+    ({ edgeId, mapId: "m", fromNodeId, toNodeId, sentiment, userId: "u" }) as EdgeDoc;
+
+  it("moves the child's link to its old parent over to the new one, same direction and feeling", () => {
+    const out = linksToMove("c", "old", "new", [edge("e1", "old", "c", "negative"), edge("e2", "c", "x")]);
+    expect(out.remove.map((e) => e.edgeId)).toEqual(["e1"]);
+    expect(out.create).toEqual([{ fromNodeId: "new", toNodeId: "c", sentiment: "negative" }]);
+  });
+
+  it("only takes the old link off when the child is already linked to the new parent", () => {
+    const out = linksToMove("c", "old", "new", [edge("e1", "c", "old"), edge("e2", "new", "c")]);
+    expect(out.remove.map((e) => e.edgeId)).toEqual(["e1"]);
+    expect(out.create).toEqual([]);
+  });
+
+  it("has nothing to move without an old parent or a link to it", () => {
+    expect(linksToMove("c", null, "new", [edge("e1", "c", "x")])).toEqual({ remove: [], create: [] });
+    expect(linksToMove("c", "old", "new", [edge("e1", "c", "x")])).toEqual({ remove: [], create: [] });
   });
 });

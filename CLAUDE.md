@@ -69,7 +69,7 @@ npm run build        # tsc -b && vite build
   Safari won't send the session cookie there (see `Backend/src/realtime/socketToken.ts`).
 - **`hooks/`** — canvas behavior as testable hooks: `useMapData` (loading + realtime merge via
   `useMapSocket`), viewport/framing, drag and drop, marquee select, node creation, pack mode, line
-  drawing, `useEdgeRedirect` (drag a branch arrow's knob onto another node to change the child's parent; the zones reshape), presentation, undo of moves, position glide, `useWeaponReplay` (weapon marks in the
+  drawing, `useEdgeRedirect` (a branch's knob tapped opens the change-parent mode, `reparent` in `useCanvasMode`, or dragged onto the new parent; the zones reshape), presentation, undo of moves, position glide, `useWeaponReplay` (weapon marks in the
   time-lapse replay; `MapPage` loads `GET /api/:mapId/attacks` so the replay shows health as it was).
 - **`map/`** — canvas components: `NodeCard` (drawn on the canvas through the memoized `CanvasNodeCard`, which takes one stable `actions` object from `hooks/useStableActions` so a drag or pan doesn't redraw every card), `StickerCard` (a node in the cards view), `CanvasBackdrop` (zones, walls, realm
   border), `MiniMap`, `ViewCorner` (eye menu, zoom, minimap in the bottom-right corner),

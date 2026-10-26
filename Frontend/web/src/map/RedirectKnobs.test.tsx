@@ -37,11 +37,16 @@ function renderKnobs(overrides: Partial<React.ComponentProps<typeof RedirectKnob
 const knob = (id: string) => document.querySelector<HTMLElement>(`[data-redirect-knob="${id}"]`);
 
 describe("RedirectKnobs", () => {
-  it("puts a knob on the opened node's branch to its parent and on each of its children's", () => {
+  it("puts a knob on the opened node's own branch to its parent, and none on its children's", () => {
     renderKnobs();
     expect(knob("c")).not.toBeNull();
-    expect(knob("g")).not.toBeNull();
+    expect(knob("g")).toBeNull();
     expect(knob("o")).toBeNull();
+  });
+
+  it("puts none on a node with no parent", () => {
+    renderKnobs({ selected: parent });
+    expect(document.querySelector("[data-redirect-knob]")).toBeNull();
   });
 
   it("sits past the ring of ghosts round the opened node, not under it", () => {
@@ -53,15 +58,14 @@ describe("RedirectKnobs", () => {
 
   it("hands the grab over, without panning the map", () => {
     const { onStart } = renderKnobs();
-    expect(knob("g")!.style.touchAction).toBe("none");
-    fireEvent.pointerDown(knob("g")!);
-    expect(onStart).toHaveBeenCalledWith(grandchild, expect.anything());
+    expect(knob("c")!.style.touchAction).toBe("none");
+    fireEvent.pointerDown(knob("c")!);
+    expect(onStart).toHaveBeenCalledWith(child, expect.anything());
   });
 
   it("leaves out branches that can't be redirected", () => {
-    renderKnobs({ canRedirect: (n) => n.nodeId !== "g" });
-    expect(knob("g")).toBeNull();
-    expect(knob("c")).not.toBeNull();
+    renderKnobs({ canRedirect: (n) => n.nodeId !== "c" });
+    expect(knob("c")).toBeNull();
   });
 
   it("steps out of the finger's way while a branch is being redirected, still mounted", () => {

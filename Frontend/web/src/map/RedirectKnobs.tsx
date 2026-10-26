@@ -8,7 +8,7 @@ import type { NodeDoc } from "../types";
 type Pt = { x: number; y: number };
 
 interface Props {
-  /** The opened node: its own branch to its parent and its children's branches get a knob. */
+  /** The opened node: its own branch to its parent gets the knob. */
   selected: NodeDoc;
   visibleNodes: NodeDoc[];
   posFor: (node: NodeDoc) => Pt;
@@ -25,7 +25,7 @@ interface Props {
   hidden?: boolean;
 }
 
-// The knobs that change a parent: one on each branch of the opened node.
+// The knob that changes a parent, on the opened node's branch to its parent.
 // Drawn above the nodes and the ring of ghosts (an HTML layer, not the
 // backdrop SVG underneath everything), placed on the branch just past the
 // ring, and kept one size on screen at any zoom — finger-sized on a phone.
@@ -40,15 +40,15 @@ export function RedirectKnobs({ selected, visibleNodes, posFor, zoom, canRedirec
   const hit = mobile ? 48 : 30;
   const byId = new Map(visibleNodes.map((n) => [n.nodeId, n]));
   const from = posFor(selected);
-  const branches: NodeDoc[] = [];
+  // Only the opened node's own branch to its parent: tap the knob to pick a
+  // new parent (or drag it onto one). Its children's branches get none — each
+  // child is opened to change its own.
   const parentId = zoneParentId(selected);
-  if (parentId && byId.has(parentId)) branches.push(selected);
-  for (const n of visibleNodes) if (zoneParentId(n) === selected.nodeId) branches.push(n);
+  const branches = parentId && byId.has(parentId) ? [selected] : [];
   return (
     <>
       {branches.filter(canRedirect).map((child) => {
-        const other = child.nodeId === selected.nodeId ? byId.get(parentId!)! : child;
-        const at = knobSpot(from, posFor(other), clear);
+        const at = knobSpot(from, posFor(byId.get(parentId!)!), clear);
         return (
           <button
             key={child.nodeId}

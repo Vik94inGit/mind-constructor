@@ -27,6 +27,8 @@ interface Props {
   onToggleLock?: () => void;
   /** Calls this parent's far nodes back in — see NodePanel's own prop. */
   onMagnet?: () => Promise<number>;
+  /** Change parent: pick another node to hang this one from. */
+  onChangeParent?: () => void;
   textareaRef: RefObject<HTMLTextAreaElement>;
   readonlyTextRef: RefObject<HTMLDivElement>;
   textDraft: string;
@@ -53,7 +55,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked, onToggleLock, onMagnet, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   return (
@@ -173,6 +175,19 @@ export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked,
         )}
       </div>
     <div className="mt-3">
+      {onChangeParent && (
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-change-parent
+            className="cursor-pointer rounded-md border border-line px-2 py-[0.2rem] text-[0.75rem] font-semibold text-ink hover:bg-surface-2"
+            title={t.ui.canvas.changeParentHint}
+            onClick={onChangeParent}
+          >
+            ↪ {t.ui.canvas.changeParent}
+          </button>
+        </div>
+      )}
       {onMagnet && <MagnetButton onMagnet={onMagnet} />}
       {isCreator && onToggleLock && (
         // Lock/unlock: a locked block can't be moved, clicked into

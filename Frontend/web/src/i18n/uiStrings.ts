@@ -310,6 +310,11 @@ export interface UiStrings {
     newCircleText: string;
     newNodeText: string;
     redirectBranch: string;
+    changeParent: string;
+    changeParentHint: string;
+    reparentPick: (name: string) => string;
+    reparentHint: string;
+    reparentSame: string;
   };
   minimapTitle: string;
   abstraction: {
@@ -877,7 +882,12 @@ const en: UiStrings = {
     stabilizeCircle: "Click to stabilize this circle and let every other circle drift",
     newCircleText: "New circle",
     newNodeText: "New node",
-    redirectBranch: "Drag onto another node to make that node the parent",
+    redirectBranch: "Tap to pick a new parent, or drag onto one",
+    changeParent: "Change parent",
+    changeParentHint: "Pick another node to hang this one from",
+    reparentPick: (name) => `Tap the new parent for “${name}”`,
+    reparentHint: "Its branch and its link to the old parent move to the node you tap.",
+    reparentSame: "That is already its parent.",
   },
   minimapTitle: "Minimap — click or drag to jump around the map",
   abstraction: {
@@ -1414,7 +1424,12 @@ const cs: UiStrings = {
     stabilizeCircle: "Kliknutím tento kruh stabilizujete a všechny ostatní kruhy necháte driftovat",
     newCircleText: "Nový kruh",
     newNodeText: "Nový uzel",
-    redirectBranch: "Přetáhněte na jiný uzel a ten se stane rodičem",
+    redirectBranch: "Klepněte a vyberte nového rodiče, nebo přetáhněte na něj",
+    changeParent: "Změnit rodiče",
+    changeParentHint: "Vyberte jiný uzel, ze kterého bude tento viset",
+    reparentPick: (name) => `Klepněte na nového rodiče pro „${name}“`,
+    reparentHint: "Jeho větev i spojení se starým rodičem přejdou na uzel, na který klepnete.",
+    reparentSame: "To už je jeho rodič.",
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
   abstraction: {
@@ -1950,7 +1965,12 @@ const uk: UiStrings = {
     stabilizeCircle: "Клацніть, щоб стабілізувати це коло й дозволити всім іншим колам дрейфувати",
     newCircleText: "Нове коло",
     newNodeText: "Новий вузол",
-    redirectBranch: "Перетягніть на інший вузол, щоб він став батьківським",
+    redirectBranch: "Торкніться, щоб обрати нового батьківського, або перетягніть на нього",
+    changeParent: "Змінити батьківський",
+    changeParentHint: "Оберіть інший вузол, на якому висітиме цей",
+    reparentPick: (name) => `Торкніться нового батьківського для «${name}»`,
+    reparentHint: "Його гілка і зв’язок зі старим батьківським перейдуть на вузол, якого ви торкнетеся.",
+    reparentSame: "Це вже його батьківський вузол.",
   },
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
   abstraction: {
@@ -2489,7 +2509,12 @@ const ru: UiStrings = {
     stabilizeCircle: "Щёлкните, чтобы стабилизировать этот круг и позволить всем остальным кругам дрейфовать",
     newCircleText: "Новый круг",
     newNodeText: "Новый узел",
-    redirectBranch: "Перетащите на другой узел, чтобы он стал родителем",
+    redirectBranch: "Нажмите, чтобы выбрать нового родителя, или перетащите на него",
+    changeParent: "Сменить родителя",
+    changeParentHint: "Выберите другой узел, на котором будет висеть этот",
+    reparentPick: (name) => `Нажмите на нового родителя для «${name}»`,
+    reparentHint: "Его ветка и связь со старым родителем перейдут на узел, который вы нажмёте.",
+    reparentSame: "Это уже его родитель.",
   },
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
   abstraction: {
