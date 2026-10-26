@@ -74,7 +74,9 @@ function setAmount(el: HTMLElement | SVGElement, a: number | null) {
  * render. Everything node-attached on the canvas is tagged with data-reveal
  * attributes naming the node(s) it belongs to: a node card fades and grows
  * in, a mark on one node fades in with it, a link or weapon bow once both its
- * ends are there, and a zone as its members arrive. `amount` gives null for a
+ * ends are there, a zone (its fill, its wall, the realm border) whole in its
+ * own turn, with its parent node, so the map fills zone by zone, and a figure
+ * drawn through several nodes as they arrive. `amount` gives null for a
  * node that isn't part of the entrance; called with null for every node, it
  * clears every inline style it set — the entrance's clean-up.
  */
@@ -92,6 +94,7 @@ export function applyEntranceFrame(root: ParentNode, amount: (nodeId: string) =>
     el.style.scale = a === null || a >= 1 ? "" : String(Math.round((START_SCALE + (1 - START_SCALE) * a) * 1000) / 1000);
   });
   root.querySelectorAll<SVGElement>("[data-reveal-at]").forEach((el) => setAmount(el, amount(el.dataset.revealAt!)));
+  root.querySelectorAll<SVGElement>("[data-reveal-zone]").forEach((el) => setAmount(el, amount(el.dataset.revealZone!)));
   root
     .querySelectorAll<SVGElement>("[data-reveal-line]")
     .forEach((el) => setAmount(el, of(el.dataset.revealLine!.split(" "), min)));

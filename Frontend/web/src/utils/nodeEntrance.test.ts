@@ -63,6 +63,19 @@ describe("applyEntranceFrame", () => {
     expect(opacity(root, "circle")).toBe("");
   });
 
+  it("brings a whole zone in at once, in its parent's turn, before its members", () => {
+    const root = document.createElement("div");
+    root.innerHTML =
+      `<svg><g data-reveal-zone="p" opacity="0.5"><polygon></polygon></g>` +
+      `<polygon data-reveal-zone="p"></polygon></svg><div data-reveal-node="kid"></div>`;
+    applyEntranceFrame(root, (id) => (id === "p" ? 0.5 : id === "kid" ? 0 : null));
+    expect((root.querySelector("g") as SVGElement).style.opacity).toBe("0.25");
+    expect((root.querySelector("svg > polygon") as SVGElement).style.opacity).toBe("0.5");
+    expect((root.querySelector('[data-reveal-node="kid"]') as HTMLElement).style.opacity).toBe("0");
+    applyEntranceFrame(root, () => null);
+    expect((root.querySelector("g") as SVGElement).style.opacity).toBe("");
+  });
+
   it("clears everything it set once called with no amounts", () => {
     const root = canvas();
     applyEntranceFrame(root, (id) => (id === "a" ? 0.5 : 0));
