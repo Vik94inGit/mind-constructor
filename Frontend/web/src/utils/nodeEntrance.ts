@@ -1,15 +1,15 @@
 import type { NodeDoc } from "../types";
 
-// Timeline, in ms from the entrance's start. Zones come first: each zone
-// (its fill, its wall, the realm border round a kingdom) fades in whole,
-// ZONE_STAGGER_MS after the one before, so the realm's layout is drawn before
-// any thought is put in it. Then the nodes: each fades and grows in over
-// APPEAR_MS, one after another, slowly enough to read each one before the next
-// comes, the way the thoughts came. The first node waits LEAD_MS after the
-// last zone, so the camera has settled on it before it shows. However many
-// zones and nodes there are, the last of each starts within MAX_ZONE_SPREAD_MS
-// and MAX_SPREAD_MS, and a click skips the rest, so a big map never keeps the
-// user waiting.
+// Timeline, in ms from the entrance's start. Nodes come first: each fades
+// and grows in over APPEAR_MS, one after another, slowly enough to read each
+// one before the next comes, the way the thoughts came. The first one waits
+// LEAD_MS, so the camera has settled on it before it shows. Then the zones:
+// once the last node is in, each zone (its fill, its wall, the realm border
+// round a kingdom) fades in whole, ZONE_STAGGER_MS after the one before, so
+// the thoughts gather into their zones at the end. However many nodes and
+// zones there are, the last of each starts within MAX_SPREAD_MS and
+// MAX_ZONE_SPREAD_MS of its first, and a click skips the rest, so a big map
+// never keeps the user waiting.
 export const APPEAR_MS = 1000;
 export const SKIP_MS = 250;
 export const LEAD_MS = 350;
@@ -25,8 +25,8 @@ export const zoneKey = (rootId: string) => `zone:${rootId}`;
 export const isZoneKey = (key: string) => key.startsWith("zone:");
 
 /**
- * When each zone and node starts to appear, in ms after the entrance starts,
- * listed earliest first: every zone (under zoneKey), then every node. Both in
+ * When each node and zone starts to appear, in ms after the entrance starts,
+ * listed earliest first: every node, then every zone (under zoneKey). Both in
  * the order the nodes were made (createdAt, oldest first; a zone by its
  * parent's), so the map is told the way it was written — a problem before its
  * options, a node before the objection against it. Nodes without a createdAt
@@ -37,14 +37,14 @@ export function computeEntranceDelays(nodes: NodeDoc[], zoneRootIds: string[] = 
   const ordered = nodes
     .map((n, i) => ({ id: n.nodeId, at: n.createdAt ?? "", i }))
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.i - b.i));
+  const delays = new Map<string, number>();
+  const stagger = ordered.length > 1 ? Math.min(STAGGER_MS, MAX_SPREAD_MS / (ordered.length - 1)) : 0;
+  ordered.forEach((o, i) => delays.set(o.id, Math.round(LEAD_MS + i * stagger)));
   const roots = new Set(zoneRootIds);
   const zones = ordered.filter((o) => roots.has(o.id));
-  const delays = new Map<string, number>();
+  const zonesFrom = Math.round(LEAD_MS + Math.max(0, ordered.length - 1) * stagger) + APPEAR_MS;
   const zoneStagger = zones.length > 1 ? Math.min(ZONE_STAGGER_MS, MAX_ZONE_SPREAD_MS / (zones.length - 1)) : 0;
-  zones.forEach((z, i) => delays.set(zoneKey(z.id), Math.round(i * zoneStagger)));
-  const nodesFrom = zones.length > 0 ? Math.round((zones.length - 1) * zoneStagger) + APPEAR_MS + LEAD_MS : LEAD_MS;
-  const stagger = ordered.length > 1 ? Math.min(STAGGER_MS, MAX_SPREAD_MS / (ordered.length - 1)) : 0;
-  ordered.forEach((o, i) => delays.set(o.id, Math.round(nodesFrom + i * stagger)));
+  zones.forEach((z, i) => delays.set(zoneKey(z.id), Math.round(zonesFrom + i * zoneStagger)));
   return delays;
 }
 

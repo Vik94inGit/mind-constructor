@@ -15,18 +15,18 @@ describe("computeEntranceDelays", () => {
     expect(delays.get("late")!).toBeGreaterThan(delays.get("mid")!);
   });
 
-  it("draws every zone first, one by one in its parent's order, then the nodes", () => {
+  it("brings every node in first, then draws the zones one by one in their parent's order", () => {
     const nodes = [
       makeNode({ nodeId: "kid", createdAt: "2026-01-03T00:00:00Z" }),
       makeNode({ nodeId: "castle", createdAt: "2026-01-02T00:00:00Z" }),
       makeNode({ nodeId: "king", createdAt: "2026-01-01T00:00:00Z" }),
     ];
     const delays = computeEntranceDelays(nodes, ["castle", "king"]);
-    expect(Array.from(delays.keys())).toEqual([zoneKey("king"), zoneKey("castle"), "king", "castle", "kid"]);
-    expect(delays.get(zoneKey("king"))).toBe(0);
-    expect(delays.get(zoneKey("castle"))).toBe(ZONE_STAGGER_MS);
-    // The first node waits for the last zone to be fully drawn.
-    expect(delays.get("king")).toBe(ZONE_STAGGER_MS + APPEAR_MS + LEAD_MS);
+    expect(Array.from(delays.keys())).toEqual(["king", "castle", "kid", zoneKey("king"), zoneKey("castle")]);
+    expect(delays.get("king")).toBe(LEAD_MS);
+    // The first zone waits for the last node to be fully in.
+    expect(delays.get(zoneKey("king"))).toBe(delays.get("kid")! + APPEAR_MS);
+    expect(delays.get(zoneKey("castle"))).toBe(delays.get("kid")! + APPEAR_MS + ZONE_STAGGER_MS);
   });
 
   it("keeps list order for nodes made at the same time or with no date", () => {
