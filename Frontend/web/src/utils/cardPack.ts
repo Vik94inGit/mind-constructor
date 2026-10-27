@@ -98,3 +98,28 @@ export function packNewCards(
   if (!box) return packCardsAround(fresh, center, gap, aspect);
   return packCards(fresh, { x: box.minX, y: box.maxY + gap * 3 }, gap, aspect);
 }
+
+/**
+ * Whether any two of the cards at `at` (by center) cover each other by more
+ * than `slack` on both axes. Cards glued side by side only touch, so they
+ * don't count.
+ */
+export function cardsOverlap(items: PackItem[], at: Map<string, Pt>, slack = 4): boolean {
+  for (let i = 0; i < items.length; i++) {
+    const a = items[i];
+    const pa = at.get(a.id);
+    if (!pa) continue;
+    for (let j = i + 1; j < items.length; j++) {
+      const b = items[j];
+      const pb = at.get(b.id);
+      if (!pb) continue;
+      if (
+        (a.w + b.w) / 2 - Math.abs(pa.x - pb.x) > slack &&
+        (a.h + b.h) / 2 - Math.abs(pa.y - pb.y) > slack
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}

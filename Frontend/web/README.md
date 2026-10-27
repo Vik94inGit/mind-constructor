@@ -62,8 +62,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   card let go on top of others is moved just clear of them, and one dragged close to another (with
   Move on) glues flush against its side — two of your cards glued together get linked and then drag
   as one (`utils/cardGlue.ts`); drag from a card's side handle onto another of your cards to link
-  them. The cards view draws no links: no branch arrows, links, zones or parent rings between two
-  cards, so they read as notes spread on a desk. Cards that have no spot of their own yet are laid
+  them. A card on the board is only ever moved clear of the others: dropped on another card it never
+  joins that card's zone or changes its parent. The cards view is a board of its own: it draws no
+  branch arrows, links, zones, parent rings, separator lines, realm border or zone list, so the cards
+  read as notes spread on a desk. Each card shows its type as a small icon on its top-left corner (or
+  its emoji, when emoji come first). Opening the cards view on a map whose saved card spots lie on
+  each other lays every card close again, once. Cards that have no spot of their own yet are laid
   close together in reading order (each top idea, then its branch), in a block shaped like the
   screen, under the cards already placed; your own cards' spots are saved, someone else's are laid
   out just for you (`utils/cardPack.ts`, `hooks/useCardPacking.ts`). Drag any two side by side to

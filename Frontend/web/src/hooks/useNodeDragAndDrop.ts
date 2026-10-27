@@ -172,6 +172,10 @@ export function useNodeDragAndDrop({
     x: number,
     y: number,
   ): { target: NodeDoc; valid: boolean; reason?: string } | null {
+    // A card on the board (the cards view, which shows no zones) is only
+    // laid somewhere else: let go over another card it moves clear of it
+    // (clearSpotFor), never joins that card's zone or is refused for it.
+    if (clearSpotFor?.(dragged, x, y)) return null;
     // An attack stays tied to what it hit: it can only join another attack,
     // making a zone of attacks. Anything else can join an attack's zone too.
     let closest: NodeDoc | null = null;
@@ -784,10 +788,11 @@ export function useNodeDragAndDrop({
         const dropDist = rootPos ? Math.hypot(x - rootPos.x, y - rootPos.y) : 0;
         const startDist = rootPos ? Math.hypot(start.x - rootPos.x, start.y - rootPos.y) : 0;
         const staysMember = !!ownCircle && (dropDist <= getZoneReach() * MEMBER_REACH_FACTOR || dropDist <= startDist);
-        const leftCircle = !!ownCircle && !staysMember;
         // A card on the board keeps clear of the other cards instead — in
-        // the board's own units, where the icon spacing means nothing.
+        // the board's own units, where the icon spacing means nothing — and
+        // never leaves its zone by being moved: the cards view shows no zones.
         const cardSpot = clearSpotFor?.(node, x, y);
+        const leftCircle = !cardSpot && !!ownCircle && !staysMember;
         const dropped =
           cardSpot ??
           placeNode({ x, y }, [{ nodeId: node.nodeId, ...(leftCircle ? { parentId: null } : {}) }], [], {

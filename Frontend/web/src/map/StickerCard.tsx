@@ -47,6 +47,10 @@ export interface StickerCardProps {
   lockLabel?: string;
   minWidth: number;
   maxWidth: number;
+  /** The node's type (or emoji) as a small icon on the card's top-left corner, so a card reads as its kind at a glance. */
+  typeIcon?: ReactNode;
+  /** The icon's name for a screen reader and its tooltip (the type's name). */
+  typeLabel?: string;
   children: ReactNode;
 }
 
@@ -70,6 +74,8 @@ export function StickerCard({
   lockLabel,
   minWidth,
   maxWidth,
+  typeIcon,
+  typeLabel,
   children,
 }: StickerCardProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -155,6 +161,18 @@ export function StickerCard({
       className={`relative box-border flex flex-col text-left ${halo?.pulse ? "animate-pulse" : ""}`}
       style={style}
     >
+      {typeIcon && (
+        <span
+          data-card-type
+          role="img"
+          aria-label={typeLabel}
+          title={typeLabel}
+          className="pointer-events-none absolute -top-[11px] -left-[11px] z-[2] flex h-[22px] w-[22px] items-center justify-center rounded-full bg-surface shadow-card"
+          style={{ border: `1.5px solid color-mix(in srgb, ${color} 70%, transparent)`, color }}
+        >
+          {typeIcon}
+        </span>
+      )}
       <div className={`relative flex min-h-0 flex-1 flex-col ${h ? "overflow-hidden" : ""}`}>{children}</div>
       {/* Link handle — the middle of the right edge. Dragging it onto
           another of your cards links the two (MapPage opens the link dialog). */}
