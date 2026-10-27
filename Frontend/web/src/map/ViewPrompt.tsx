@@ -6,18 +6,18 @@ import { ViewSwitch } from "./ViewCorner";
 interface Props {
   view: MapView;
   onChoose: (view: MapView) => void;
+  /** Closed without choosing (× or after a while): the view stays as it is. */
   onClose: () => void;
-  onNever: () => void;
 }
 
 /** How long the prompt waits before it leaves on its own. */
 export const VIEW_PROMPT_MS = 15000;
 
-// Asked once a map has built itself up (MapPage, after its entrance): look at
-// the whole map, an overview with each parent packed, or the cards. A small
-// card over the bottom of the canvas; it goes on its own after a while, and
-// "Don't ask again" stops it for good (per browser).
-export function ViewPrompt({ view, onChoose, onClose, onNever }: Props) {
+// Shown once a map has built itself up (MapPage): look at the whole map, an
+// overview with each parent packed, or the cards. A small card over the
+// bottom of the canvas, asked only once (utils/viewPrompt.ts); it goes on its
+// own after a while.
+export function ViewPrompt({ view, onChoose, onClose }: Props) {
   const { t } = useI18n();
   const a = t.ui.autoPack;
   useEffect(() => {
@@ -44,13 +44,6 @@ export function ViewPrompt({ view, onChoose, onClose, onNever }: Props) {
         </button>
       </div>
       <ViewSwitch view={view} onChange={onChoose} />
-      <button
-        type="button"
-        className="cursor-pointer self-start border-0 bg-transparent p-0 text-[0.72rem] text-ink-soft underline hover:text-ink"
-        onClick={onNever}
-      >
-        {a.promptNever}
-      </button>
     </div>
   );
 }

@@ -13,7 +13,6 @@ import { useMapViewerPrefs } from "../hooks/useMapViewerPrefs";
 import { useZoneFocus } from "../hooks/useZoneFocus";
 import { usePresentation } from "../hooks/usePresentation";
 import { usePuzzleConnect } from "../hooks/usePuzzleConnect";
-import { useEdgeRedirect } from "../hooks/useEdgeRedirect";
 import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
@@ -33,7 +32,7 @@ import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } fr
 import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
 import { foldAway, loadFolded, overviewFolds, branchParentIds, saveFolded } from "../utils/autoPack";
 import type { FoldedParents } from "../utils/autoPack";
-import { currentView, shouldAskView, stopAskingView, VIEW_PROMPT_MIN_NODES } from "../utils/viewPrompt";
+import { currentView, loadRememberedView, rememberView, VIEW_PROMPT_MIN_NODES } from "../utils/viewPrompt";
 import type { MapView } from "../utils/viewPrompt";
 import { chompAim, chompersFor, chompMove, chompTargets } from "../utils/pacman";
 import type { ChompMove } from "../utils/pacman";
@@ -50,7 +49,6 @@ import { findFreeSpots } from "../utils/freeSpots";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
 import { QuickAddGhosts } from "../map/QuickAddGhosts";
-import { RedirectKnobs } from "../map/RedirectKnobs";
 import { ReparentBar } from "../map/ReparentBar";
 import { linksToMove, redirectRefusal, takeParentPlace } from "../utils/edgeRedirect";
 import type { RedirectRefusal } from "../utils/edgeRedirect";
@@ -65,8 +63,6 @@ import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
-import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
-import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { readingOrder, stepNode } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
 import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
@@ -179,8 +175,7 @@ export function MapPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The ring of ghosts is up around each node opened; the 👻 on its panel
-  // hides it for that node, and the circle that changes its parent shows
-  // instead (map/RedirectKnobs.tsx). Opening another node brings them back.
+  // hides it for that node. Opening another node brings them back.
   const [ghostsHiddenFor, setGhostsHiddenFor] = useState<string | null>(null);
   const ghostsHidden = !!selectedId && ghostsHiddenFor === selectedId;
   // A node's pictures, open full size before its panel (see handleNodeClick).
@@ -402,22 +397,11 @@ export function MapPage() {
   // `nodes` (not this), since it has to show a packed member in its
   // container's own unpack list even though the canvas itself doesn't
   // render it.
-  //
-  // The level of abstraction (see utils/abstractionLevel.ts, set from the
-  // view corner's Detail slider) hides everything deeper than the chosen
-  // parentId level the same way — except the open node, so a child just
-  // added or picked from search doesn't vanish from under the viewer.
-  const [abstractionLevel, setAbstractionLevelState] = useState<AbstractionLevel>(() => loadAbstractionLevel(mapId));
-  useEffect(() => setAbstractionLevelState(loadAbstractionLevel(mapId)), [mapId]);
-  function setAbstractionLevel(level: AbstractionLevel) {
-    setAbstractionLevelState(level);
-    saveAbstractionLevel(mapId, level);
-  }
   const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
-  const depthByNode = useMemo(() => nodeDepths(unpackedNodes), [unpackedNodes]);
   // Auto-pack (utils/autoPack.ts): parents that tuck their branch in, for a
-  // glance at the map without its details — the viewer's own, per map. Like
-  // the level, it never hides the open node.
+  // glance at the map without its details — the viewer's own, per map. It
+  // never hides the open node, so a child just added or picked from search
+  // doesn't vanish from under the viewer.
   const [folded, setFoldedState] = useState<FoldedParents>(() => loadFolded(mapId));
   useEffect(() => setFoldedState(loadFolded(mapId)), [mapId]);
   function setFolded(next: FoldedParents) {
@@ -437,7 +421,6 @@ export function MapPage() {
   function setOverview(on: boolean) {
     setFolded(on ? overviewFolds(unpackedNodes) : new Set());
   }
-  const activeLevel = abstractionLevel;
   // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.
   const [minimapShown, setMinimapShown] = useState<boolean>(loadMinimapShown);
   function toggleMinimap() {
@@ -458,12 +441,10 @@ export function MapPage() {
         timeLapseNodes[timeLapseStep - 1]?.createdAt,
       );
     }
-    const unfolded =
-      fold.hidden.size === 0 ? unpackedNodes : unpackedNodes.filter((n) => n.nodeId === selectedId || !fold.hidden.has(n.nodeId));
-    return activeLevel === null
-      ? unfolded
-      : unfolded.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel));
-  }, [unpackedNodes, depthByNode, activeLevel, selectedId, timeLapseNodes, timeLapseStep, replayAttacks, fold]);
+    return fold.hidden.size === 0
+      ? unpackedNodes
+      : unpackedNodes.filter((n) => n.nodeId === selectedId || !fold.hidden.has(n.nodeId));
+  }, [unpackedNodes, selectedId, timeLapseNodes, timeLapseStep, replayAttacks, fold]);
   // A node drawn as a puzzle card sits at its own card spot, apart from the
   // icon's — see utils/cardSpace.ts. Worked out from the same display choices
   // modeOf reads below, with zones taken by membership alone (their outline
@@ -1062,15 +1043,16 @@ export function MapPage() {
   );
 
   // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
-  // appear one after another in the order they were made, drawn straight onto
-  // the canvas DOM (posFor never sees it); skip is wired to any pointer-down
-  // or wheel on the canvas. Every map opens this way, Personal and Discussion
-  // alike, the way a template branch fills in node by node. The camera comes
-  // in to native size and follows each node as it appears, then steps back to
-  // the whole map once they're all in (not after a skip: the user has the
-  // camera then).
+  // appear one after another in the order they were made, then the zones are
+  // drawn round them one by one, all straight onto the canvas DOM (posFor
+  // never sees it); skip is wired to any pointer-down or wheel on the canvas.
+  // Every map opens this way, Personal and Discussion alike, the way a
+  // template branch fills in node by node. The camera comes in to native size
+  // and follows each node as it appears, then steps back to the whole map for
+  // the zones (not after a skip: the user has the camera then).
   const entrance = useNodeEntrance({
     visibleNodes,
+    zoneRootIds: nodeGroups.map((g) => g.rootId),
     canvasRef,
     onNodeAppear: (id) => {
       const p = positions.get(id);
@@ -1082,6 +1064,7 @@ export function MapPage() {
         centerOnPoint(p.x, p.y, { aboveSheet: false });
       }
     },
+    onZonesStart: fitAll,
     onFinish: fitAll,
   });
 
@@ -1143,23 +1126,40 @@ export function MapPage() {
     // After the cards have glided in, from the newest render's positions.
     onLaidOut: () => setTimeout(() => fitAllLatest.current(), 450),
   });
-  // Once the map has built itself up, the viewer is asked once how to look
-  // at it: the whole map, an overview with each parent packed, or the cards.
-  // Only on a map with something to glance over, and never again once they
-  // say so (utils/viewPrompt.ts).
+  // Once a map has built itself up, it takes the view the viewer chose
+  // (utils/viewPrompt.ts): the whole map, an overview with each parent
+  // packed, or the cards. Until they've chosen one, a map with something to
+  // glance over asks them, once; the answer is kept from then on.
   const [viewPromptOpen, setViewPromptOpen] = useState(false);
-  const entranceWasActive = useRef(false);
+  const settledMap = useRef<string | null>(null);
   useEffect(() => {
-    if (entrance.active) entranceWasActive.current = true;
-    else if (entranceWasActive.current) {
-      entranceWasActive.current = false;
-      if (visibleNodes.length >= VIEW_PROMPT_MIN_NODES && shouldAskView()) setViewPromptOpen(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the entrance ending matters
-  }, [entrance.active]);
-  const closeViewPrompt = useCallback(() => setViewPromptOpen(false), []);
+    if (loading || entrance.active || !mapId || settledMap.current === mapId || unpackedNodes.length === 0) return;
+    // A beat later, so an entrance that's only starting doesn't count as over.
+    const timer = setTimeout(() => {
+      settledMap.current = mapId;
+      const remembered = loadRememberedView();
+      if (remembered === null) {
+        if (visibleNodes.length >= VIEW_PROMPT_MIN_NODES) setViewPromptOpen(true);
+      } else if (remembered !== currentView(readingMode, overviewOn)) {
+        showView(remembered);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the map settling matters
+  }, [loading, entrance.active, mapId, unpackedNodes.length]);
+  // Closing the prompt without choosing keeps the view as it is, as the answer.
+  const closeViewPrompt = useCallback(() => {
+    setViewPromptOpen(false);
+    rememberView(currentViewRef.current);
+  }, []);
+  const currentViewRef = useRef<MapView>("map");
+  currentViewRef.current = currentView(readingMode, overviewOn);
   function chooseView(view: MapView) {
     setViewPromptOpen(false);
+    rememberView(view);
+    showView(view);
+  }
+  function showView(view: MapView) {
     if (view === "cards") {
       setOverview(false);
       setReadingMode("puzzle");
@@ -1237,24 +1237,7 @@ export function MapPage() {
     recordMove,
   });
 
-  // A branch arrow's knob dragged onto another node changes the child's
-  // parent, and the zones reshape to fit (hooks/useEdgeRedirect.ts).
-  const { edgeRedirect, startEdgeRedirect } = useEdgeRedirect({
-    nodes,
-    isOwnNode,
-    screenToCanvas,
-    scrollArea: () => wrapRef.current,
-    visibleNodes,
-    posFor,
-    zoom,
-    onRedirect: (child, parent) => void reparentTo(child, parent),
-    onRefused: (reason) => setActionError(refusalMessage(reason)),
-    onTakeParentPlace: (child) => void headZone(child),
-    onTap: (child) => startReparent(child),
-  });
-
-  // Changing a parent as its own mode: the knob tapped (or Change parent on
-  // the node's panel) puts the panel and the ghosts away, and the next node
+  // Changing a parent as its own mode: Change parent on the node's panel puts the panel and the ghosts away, and the next node
   // tapped becomes the parent. The child's branch moves to it, and so does
   // its link to the old parent (utils/edgeRedirect.ts linksToMove).
   const reparentChild = mode.kind === "reparent" ? (nodes.find((n) => n.nodeId === mode.childId) ?? null) : null;
@@ -1304,8 +1287,8 @@ export function MapPage() {
     dispatchMode({ type: "reset" });
     void reparentTo(reparentChild, node);
   }
-  // A child made the head of its zone (its knob pulled onto its own parent,
-  // or the parent tapped in reparent mode): it takes the parent's place, the
+  // A child swapped with its parent (Swap with parent on its panel, or the
+  // parent tapped in reparent mode): it takes the parent's place, the
   // zone's nodes and the old parent hang from it, and the old parent's links
   // move to it (utils/edgeRedirect.ts takeParentPlace).
   async function headZone(child: NodeDoc) {
@@ -2623,7 +2606,6 @@ export function MapPage() {
               chosenNodeIds={chosenNodeIds}
               // The node whose parent is changing stays ringed while the new one is picked.
               pendingLink={reparentChild ? [reparentChild] : pendingLink}
-              edgeRedirect={edgeRedirect}
               onCircleClick={(rootId) => {
                 // A zone's own polygon stops the click from ever reaching the
                 // canvas div's onClick (see its own chooseMode branch above)
@@ -2810,7 +2792,7 @@ export function MapPage() {
 
             {/* Hidden while a branch is being redirected: the finger is
                 looking for a node, and a ghost under it would catch the drop. */}
-            {quickAddActive && !edgeRedirect && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
+            {quickAddActive && !dotZoom && selectedNode && !pendingCreate && !inlineEditId && (
               <QuickAddGhosts
                 // A fresh round of ghosts for each node, and when the emoji-first order changes.
                 key={`${selectedNode.nodeId}:${emojiFirst}`}
@@ -2821,20 +2803,6 @@ export function MapPage() {
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
                 onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
-              />
-            )}
-
-            {/* The circle that changes a parent: shown once the ghosts are hidden. */}
-            {selectedNode && ghostsHidden && !pendingCreate && !inlineEditId && !drawMode && (
-              <RedirectKnobs
-                selected={selectedNode}
-                ghosts={false}
-                hidden={!!edgeRedirect}
-                visibleNodes={visibleNodes}
-                posFor={posFor}
-                zoom={zoom}
-                canRedirect={(child) => isOwnNode(child) && !chooseMode && !packMode && !presenting && !onCardBoard(child)}
-                onStart={startEdgeRedirect}
               />
             )}
 
@@ -2904,12 +2872,6 @@ export function MapPage() {
             <>
               {!loading && <GestureHint />}
               <ViewCorner
-                level={abstractionLevel}
-                levels={levelCount(depthByNode)}
-                hiddenCount={unpackedNodes.length - visibleNodes.length}
-                onLevelChange={setAbstractionLevel}
-                readingMode={readingMode}
-                onReadingModeChange={setReadingMode}
                 minimapShown={minimapShown}
                 onToggleMinimap={toggleMinimap}
                 view={currentView(readingMode, overviewOn)}
@@ -2921,10 +2883,6 @@ export function MapPage() {
                   view={currentView(readingMode, overviewOn)}
                   onChoose={chooseView}
                   onClose={closeViewPrompt}
-                  onNever={() => {
-                    stopAskingView();
-                    closeViewPrompt();
-                  }}
                 />
               )}
               {minimapShown && (
@@ -3137,6 +3095,10 @@ export function MapPage() {
                 // The parent's magnet: calls its own far nodes back in (utils/parentMagnet.ts).
                 // Change parent: pick the node to hang this one from (reparent mode).
                 onChangeParent={isOwnNode(selectedNode) ? () => startReparent(selectedNode) : undefined}
+                // Swap with parent: the child takes its parent's place as head of the zone.
+                onSwapWithParent={
+                  isOwnNode(selectedNode) && zoneParentId(selectedNode) ? () => void headZone(selectedNode) : undefined
+                }
                 onAutoPack={mapParents.has(selectedNode.nodeId) ? () => toggleFold(selectedNode.nodeId) : undefined}
                 autoPacked={folded.has(selectedNode.nodeId)}
                 ghostsHidden={ghostsHidden}

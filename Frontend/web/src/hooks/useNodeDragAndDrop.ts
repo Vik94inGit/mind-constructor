@@ -243,7 +243,7 @@ export function useNodeDragAndDrop({
     return pulled.length;
   }
 
-  // A branch arrow's parent end let go over another node (hooks/useEdgeRedirect.ts):
+  // A new parent picked in the change-parent mode (MapPage's reparent mode):
   // `child` now hangs from `parent`, and the zones redraw to fit. The child
   // stays put when its new zone can take it in where it is; sitting far out,
   // it comes in next to its new parent (utils/edgeRedirect.ts). Either way the

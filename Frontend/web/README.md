@@ -62,14 +62,16 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   middle of the view stay at full strength while the rest are muted; selecting a node centers it on
   screen.
 - **Views and auto-pack** — the eye menu in the bottom-right corner switches between three ways to
-  look at a map: *Whole map*, *Overview* and *Cards* (`utils/viewPrompt.ts`). The overview
+  look at a map: *Whole map*, *Overview* and *Cards* (`utils/viewPrompt.ts`), which took the place
+  of the old "simpler ↔ more detail" equalizer. The overview
   auto-packs every parent whose children are all leaves, so the map keeps its shape and only its
   last details go. Any parent can also be packed or opened on its own from its panel's Info tab
   (*Pack its branch*); a packed parent shows a "+N" pill on its right that opens it again. Auto-pack
   is only a way of looking, per browser and per map, and changes nothing on the map
   (`utils/autoPack.ts`), unlike packing nodes into a container. Once a map of six or more nodes
-  has built itself up, a small card asks which of the three views to use, until the viewer picks
-  *Don't ask again* (`map/ViewPrompt.tsx`).
+  has built itself up, a small card asks once which of the three views to use (`map/ViewPrompt.tsx`);
+  the answer is kept (per browser, closing the card keeps the view as it is) and every map opens in
+  it from then on.
 - **Right-click on empty canvas** — a desktop-style menu at the click point: *Paste here*, *New node ▸*
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* (grows that map kind's starter structure right there, see `utils/templates.ts`),
@@ -120,26 +122,22 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   in the panel; the inline inputs grow taller with the text, never wider.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
-- **Changing a parent** — its own mode. Open the child; the ring of ghosts comes up as always, and
-  the 👻 at the top of its panel hides it (for that node; opening another brings the ghosts back). With
-  the ghosts hidden, a round knob shows on its branch to its parent, just past the node
-  (`map/RedirectKnobs.tsx`, finger-sized on a phone); tap it, or press ↪ *Change parent* on its Info tab (the way in for a card, or a
-  node with no parent yet). The panel and the ghosts go away, the child stays ringed, and a short bar
+- **Hiding the ghosts** — the ring of ghosts comes up round every node you open; the 👻 at the top of
+  its panel hides it for that node, and opening another brings the ghosts back.
+- **Changing a parent** — its own mode. Press ↪ *Change parent* on the child's Info tab. The panel and
+  the ghosts go away, the child stays ringed, and a short bar
   (`map/ReparentBar.tsx`) says to tap the new parent; nodes don't drag meanwhile, so a swipe pans the
   map. Tap a node and the child hangs from it instead, and its link to the old parent, if it had one,
   moves to the new parent too, same direction and feeling (`utils/edgeRedirect.ts` `linksToMove`). A
   node that can't take it (the child's own branch, which would close a loop; someone else's node; a
   non-attack for an attack) says why in the bar and the mode stays. Cancel or Escape
-  leaves. On a desktop the knob can also be dragged straight onto the new parent
-  (`hooks/useEdgeRedirect.ts`): the arrow follows the pointer, green over a node that can take it, red
-  over one that can't, the map pans when the pointer is held near its edge, and a drop within a finger's
-  width of a node counts as on it. The zones reshape to fit: the old parent's
+  leaves. The zones reshape to fit: the old parent's
   zone loses the child (and disappears when it's down to one), the new parent's grows to take it in or
   appears. A child already within one and a half zone reaches of its new parent stays where it is;
   one farther out comes in next to it on the side it sat, settled by the zone rules, and its own far
   children follow like a magnet. One undo puts the old parent and the spots back (a moved link stays
   where it went).
-- **Making a child the head of its zone** — pull a child's knob onto its own parent (or, in the
+- **Swapping a child with its parent** — ⇅ *Swap with parent* on the child's Info tab (or, in the
   change-parent mode, tap its own parent). The child takes the parent's place: its spot, and the
   parent it hung from, so the zone still hangs where it did from the zone above. Every other node of
   the zone hangs from it now, and so does the old parent, which moves to the child's old spot. The old
@@ -222,13 +220,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, and no Attack tab or
   menu item (switch to Discussion for those).
 - **Entrance** — every map, Personal or Discussion, builds itself up as it opens, the way a template
-  branch fills in: its nodes appear one after another in the order they were made, one thought about
-  every 1.8 s, slow enough to read each one, so the map retraces how the thinking went. Each fades
-  and grows in where it already sits, with zones, links and weapon bows filling in as their nodes arrive. The camera comes in to
-  native size, follows each node as it appears, and steps back to the whole map at the end. A big map
-  never takes more than about a minute, and a click or a wheel scroll anywhere on the canvas brings
-  everything in at once and leaves the camera where it is (`src/hooks/useNodeEntrance.ts`,
-  `src/utils/nodeEntrance.ts`).
+  branch fills in. Nodes come first: they appear one after another in the order they were made, one
+  thought about every 1.8 s, slow enough to read each one, each fading and growing in where it
+  already sits, with the camera in at native size following each one; links and weapon bows show
+  once both their nodes are there. Then the zones: the camera steps back to the whole map and each
+  zone, with its wall and the realm border round a kingdom, is drawn whole round its nodes, one
+  after another (about 0.7 s apart). A big map never takes much more than a minute, and a click or
+  a wheel scroll anywhere on the canvas brings everything in at once and leaves the camera where it
+  is (`src/hooks/useNodeEntrance.ts`, `src/utils/nodeEntrance.ts`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
   matches stay lit while everything else dims, and a result takes you to that node.
 - **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden

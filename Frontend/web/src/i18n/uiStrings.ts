@@ -309,7 +309,8 @@ export interface UiStrings {
     stabilizeCircle: string;
     newCircleText: string;
     newNodeText: string;
-    redirectBranch: string;
+    swapWithParent: string;
+    swapWithParentHint: string;
     changeParent: string;
     changeParentHint: string;
     reparentPick: (name: string) => string;
@@ -332,7 +333,6 @@ export interface UiStrings {
     layClose: string;
     layCloseHint: string;
     promptTitle: string;
-    promptNever: string;
     promptClose: string;
   };
   abstraction: {
@@ -900,13 +900,14 @@ const en: UiStrings = {
     stabilizeCircle: "Click to stabilize this circle and let every other circle drift",
     newCircleText: "New circle",
     newNodeText: "New node",
-    redirectBranch: "Tap to pick a new parent, or drag onto one. Drag onto its own parent to make it the head of the zone",
+    swapWithParent: "Swap with parent",
+    swapWithParentHint: "It takes its parent's place and heads the zone; the parent hangs from it",
     changeParent: "Change parent",
     changeParentHint: "Pick another node to hang this one from",
     reparentPick: (name) => `Tap the new parent for “${name}”`,
     reparentHint: "Its branch and its link to the old parent move to the node you tap. Tap its own parent to make it the head of the zone.",
     reparentSame: "That is already its parent.",
-    hideGhosts: "Hide the ghosts and show the circle that changes the parent",
+    hideGhosts: "Hide the ghosts",
     showGhosts: "Show the ghosts again",
     takeParentPlace: "Couldn't make it the head of the zone.",
   },
@@ -926,7 +927,6 @@ const en: UiStrings = {
     layClose: "Lay the cards close",
     layCloseHint: "Put every card back close together, in reading order",
     promptTitle: "How would you like to look at this map?",
-    promptNever: "Don't ask again",
     promptClose: "Close",
   },
   abstraction: {
@@ -941,7 +941,7 @@ const en: UiStrings = {
     moreText: "More text",
     lessText: "Less text",
     minimap: "Minimap",
-    menu: "View controls: detail, view and minimap",
+    menu: "View controls: view and minimap",
     simpler: "Simpler",
     richer: "More detail",
     levels: "Levels",
@@ -1463,13 +1463,14 @@ const cs: UiStrings = {
     stabilizeCircle: "Kliknutím tento kruh stabilizujete a všechny ostatní kruhy necháte driftovat",
     newCircleText: "Nový kruh",
     newNodeText: "Nový uzel",
-    redirectBranch: "Klepněte a vyberte nového rodiče, nebo přetáhněte na něj. Přetažením na vlastního rodiče se stane hlavou zóny",
+    swapWithParent: "Prohodit s rodičem",
+    swapWithParentHint: "Zaujme místo rodiče a povede zónu; rodič bude viset z něj",
     changeParent: "Změnit rodiče",
     changeParentHint: "Vyberte jiný uzel, ze kterého bude tento viset",
     reparentPick: (name) => `Klepněte na nového rodiče pro „${name}“`,
     reparentHint: "Jeho větev i spojení se starým rodičem přejdou na uzel, na který klepnete. Klepnutím na jeho rodiče se stane hlavou zóny.",
     reparentSame: "To už je jeho rodič.",
-    hideGhosts: "Skrýt duchy a ukázat kroužek pro změnu rodiče",
+    hideGhosts: "Skrýt duchy",
     showGhosts: "Znovu ukázat duchy",
     takeParentPlace: "Nepodařilo se z něj udělat hlavu zóny.",
   },
@@ -1489,7 +1490,6 @@ const cs: UiStrings = {
     layClose: "Srovnat karty k sobě",
     layCloseHint: "Položit všechny karty znovu těsně k sobě, v pořadí čtení",
     promptTitle: "Jak se chcete na tuto mapu dívat?",
-    promptNever: "Už se neptat",
     promptClose: "Zavřít",
   },
   abstraction: {
@@ -1504,7 +1504,7 @@ const cs: UiStrings = {
     moreText: "Více textu",
     lessText: "Méně textu",
     minimap: "Minimapa",
-    menu: "Ovládání zobrazení: detail, zobrazení a minimapa",
+    menu: "Ovládání zobrazení: zobrazení a minimapa",
     simpler: "Jednodušší",
     richer: "Více detailů",
     levels: "Úrovně",
@@ -2025,13 +2025,14 @@ const uk: UiStrings = {
     stabilizeCircle: "Клацніть, щоб стабілізувати це коло й дозволити всім іншим колам дрейфувати",
     newCircleText: "Нове коло",
     newNodeText: "Новий вузол",
-    redirectBranch: "Торкніться, щоб обрати нового батьківського, або перетягніть на нього. Перетягніть на його батьківський, щоб зробити його головою зони",
+    swapWithParent: "Поміняти з батьківським",
+    swapWithParentHint: "Він займе місце батьківського й очолить зону; батьківський висітиме на ньому",
     changeParent: "Змінити батьківський",
     changeParentHint: "Оберіть інший вузол, на якому висітиме цей",
     reparentPick: (name) => `Торкніться нового батьківського для «${name}»`,
     reparentHint: "Його гілка і зв’язок зі старим батьківським перейдуть на вузол, якого ви торкнетеся. Торкніться його батьківського, щоб зробити його головою зони.",
     reparentSame: "Це вже його батьківський вузол.",
-    hideGhosts: "Сховати привидів і показати кружок зміни батьківського",
+    hideGhosts: "Сховати привидів",
     showGhosts: "Знову показати привидів",
     takeParentPlace: "Не вдалося зробити його головою зони.",
   },
@@ -2051,7 +2052,6 @@ const uk: UiStrings = {
     layClose: "Скласти картки щільно",
     layCloseHint: "Знову покласти всі картки щільно поруч, у порядку читання",
     promptTitle: "Як ви хочете переглянути цю мапу?",
-    promptNever: "Більше не питати",
     promptClose: "Закрити",
   },
   abstraction: {
@@ -2066,7 +2066,7 @@ const uk: UiStrings = {
     moreText: "Більше тексту",
     lessText: "Менше тексту",
     minimap: "Мінімапа",
-    menu: "Керування виглядом: деталі, вигляд і мінімапа",
+    menu: "Керування виглядом: вигляд і мінімапа",
     simpler: "Простіше",
     richer: "Більше деталей",
     levels: "Рівні",
@@ -2590,13 +2590,14 @@ const ru: UiStrings = {
     stabilizeCircle: "Щёлкните, чтобы стабилизировать этот круг и позволить всем остальным кругам дрейфовать",
     newCircleText: "Новый круг",
     newNodeText: "Новый узел",
-    redirectBranch: "Нажмите, чтобы выбрать нового родителя, или перетащите на него. Перетащите на его родителя, чтобы сделать его главой зоны",
+    swapWithParent: "Поменять с родителем",
+    swapWithParentHint: "Он займёт место родителя и возглавит зону; родитель будет висеть на нём",
     changeParent: "Сменить родителя",
     changeParentHint: "Выберите другой узел, на котором будет висеть этот",
     reparentPick: (name) => `Нажмите на нового родителя для «${name}»`,
     reparentHint: "Его ветка и связь со старым родителем перейдут на узел, который вы нажмёте. Нажмите его родителя, чтобы сделать его главой зоны.",
     reparentSame: "Это уже его родитель.",
-    hideGhosts: "Скрыть призраков и показать кружок смены родителя",
+    hideGhosts: "Скрыть призраков",
     showGhosts: "Снова показать призраков",
     takeParentPlace: "Не удалось сделать его главой зоны.",
   },
@@ -2616,7 +2617,6 @@ const ru: UiStrings = {
     layClose: "Сложить карточки плотно",
     layCloseHint: "Снова положить все карточки плотно рядом, в порядке чтения",
     promptTitle: "Как вы хотите посмотреть эту карту?",
-    promptNever: "Больше не спрашивать",
     promptClose: "Закрыть",
   },
   abstraction: {
@@ -2631,7 +2631,7 @@ const ru: UiStrings = {
     moreText: "Больше текста",
     lessText: "Меньше текста",
     minimap: "Миникарта",
-    menu: "Управление видом: детали, вид и миникарта",
+    menu: "Управление видом: вид и миникарта",
     simpler: "Проще",
     richer: "Больше деталей",
     levels: "Уровни",

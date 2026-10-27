@@ -5,13 +5,13 @@ import { APPEAR_MS, LEAD_MS, SKIP_MS, STAGGER_MS } from "../utils/nodeEntrance";
 import { makeNode } from "../test/fixtures";
 import type { NodeDoc } from "../types";
 
-function setup(nodes: NodeDoc[]) {
+function setup(nodes: NodeDoc[], zoneRootIds?: string[]) {
   const onNodeAppear = vi.fn();
   const onFinish = vi.fn();
   const root = document.createElement("div");
   root.innerHTML = nodes.map((n) => `<div data-reveal-node="${n.nodeId}"></div>`).join("");
   document.body.appendChild(root);
-  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, canvasRef: { current: root }, onNodeAppear, onFinish }));
+  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, zoneRootIds, canvasRef: { current: root }, onNodeAppear, onFinish }));
   const opacity = (id: string) => (root.querySelector(`[data-reveal-node="${id}"]`) as HTMLElement).style.opacity;
   return { ...hook, opacity, onNodeAppear, onFinish };
 }
@@ -67,5 +67,25 @@ describe("useNodeEntrance", () => {
 
     rerender();
     expect(result.current.active).toBe(false);
+  });
+
+  it("brings the nodes in first, then steps the camera back while the zones are drawn", () => {
+    const onZonesStart = vi.fn();
+    const root = document.createElement("div");
+    root.innerHTML =
+      mapNodes().map((n) => `<div data-reveal-node="${n.nodeId}"></div>`).join("") + `<svg><polygon data-reveal-zone="a"></polygon></svg>`;
+    document.body.appendChild(root);
+    const onNodeAppear = vi.fn();
+    const zone = () => (root.querySelector("polygon") as SVGElement).style.opacity;
+    renderHook(() =>
+      useNodeEntrance({ visibleNodes: mapNodes(), zoneRootIds: ["a"], canvasRef: { current: root }, onNodeAppear, onZonesStart }),
+    );
+    act(() => vi.advanceTimersByTime(LEAD_MS + 2 * STAGGER_MS + 50));
+    expect(onNodeAppear.mock.calls.map((c) => c[0])).toEqual(["a", "b", "c"]);
+    expect(zone()).toBe("0");
+    expect(onZonesStart).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(APPEAR_MS + 50));
+    expect(onZonesStart).toHaveBeenCalledTimes(1);
+    expect(onNodeAppear).toHaveBeenCalledTimes(3);
   });
 });

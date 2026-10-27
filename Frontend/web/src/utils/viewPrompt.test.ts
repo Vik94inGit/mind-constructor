@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { currentView, shouldAskView, stopAskingView } from "./viewPrompt";
+import { currentView, loadRememberedView, rememberView } from "./viewPrompt";
 
 describe("viewPrompt", () => {
   beforeEach(() => localStorage.clear());
@@ -10,9 +10,9 @@ describe("viewPrompt", () => {
     expect(currentView("mixed", false)).toBe("map");
   });
 
-  it("asks until told not to", () => {
-    expect(shouldAskView()).toBe(true);
-    stopAskingView();
-    expect(shouldAskView()).toBe(false);
+  it("has no answer until one is kept, then keeps it", () => {
+    expect(loadRememberedView()).toBeNull();
+    rememberView("overview");
+    expect(loadRememberedView()).toBe("overview");
   });
 });

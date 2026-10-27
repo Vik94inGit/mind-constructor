@@ -1,9 +1,10 @@
 import type { ReadingMode } from "./readingMode";
 
-// The three ways to look at a map, offered once it has built itself up
-// (MapPage's view prompt) and in the view corner: the whole map, an overview
-// where each parent packs its details in (utils/autoPack.ts), or the cards
-// laid close together with no links drawn (utils/cardPack.ts).
+// The three ways to look at a map, offered in the view corner and asked once
+// a map has built itself up (MapPage's view prompt): the whole map, an
+// overview where each parent packs its details in (utils/autoPack.ts), or the
+// cards laid close together with no links drawn (utils/cardPack.ts). The
+// viewer's choice is kept (per browser) and every map opens in it.
 export type MapView = "map" | "overview" | "cards";
 
 export const MAP_VIEWS: MapView[] = ["map", "overview", "cards"];
@@ -11,7 +12,7 @@ export const MAP_VIEWS: MapView[] = ["map", "overview", "cards"];
 /** A map smaller than this is read at a glance anyway: no prompt. */
 export const VIEW_PROMPT_MIN_NODES = 6;
 
-const NEVER_KEY = "mc_view_prompt_off";
+const VIEW_KEY = "mc_map_view";
 
 /** Which of the views the canvas shows now. */
 export function currentView(readingMode: ReadingMode, overviewOn: boolean): MapView {
@@ -19,18 +20,19 @@ export function currentView(readingMode: ReadingMode, overviewOn: boolean): MapV
   return overviewOn ? "overview" : "map";
 }
 
-/** Whether the viewer still wants to be asked (per browser). */
-export function shouldAskView(): boolean {
+/** The view the viewer chose, or null while they haven't been asked yet. */
+export function loadRememberedView(): MapView | null {
   try {
-    return localStorage.getItem(NEVER_KEY) !== "1";
+    const v = localStorage.getItem(VIEW_KEY);
+    return v === "map" || v === "overview" || v === "cards" ? v : null;
   } catch {
-    return true;
+    return null;
   }
 }
 
-export function stopAskingView(): void {
+export function rememberView(view: MapView): void {
   try {
-    localStorage.setItem(NEVER_KEY, "1");
+    localStorage.setItem(VIEW_KEY, view);
   } catch {
     // best-effort — the prompt just comes back next time
   }

@@ -152,7 +152,9 @@ interface Props {
   /** Auto-pack: set on a parent — tucks its branch in for a glance, or opens it again (see InfoTab). */
   onAutoPack?: () => void;
   autoPacked?: boolean;
-  /** The ring of ghosts around the opened node: hidden, the circle that changes its parent shows instead. */
+  /** Swap with parent: this node takes its parent's place as head of the zone (utils/edgeRedirect.ts takeParentPlace). */
+  onSwapWithParent?: () => void;
+  /** The ring of ghosts around the opened node, and the 👻 that hides it. */
   ghostsHidden?: boolean;
   onToggleGhosts?: () => void;
   /** Set right after this node was created: open on its text, focused, ready to write more. Fired back through onAutoFocused once done. */
@@ -196,6 +198,7 @@ export function NodePanel({
   onChangeParent,
   onAutoPack,
   autoPacked,
+  onSwapWithParent,
   ghostsHidden = false,
   onToggleGhosts,
   autoFocusText = false,
@@ -876,7 +879,6 @@ export function NodePanel({
     <div
       ref={panelRef}
       className={PANEL_CLASS}
-      // Read by a branch being redirected (hooks/useEdgeRedirect.ts): the map pans before the finger reaches the panel.
       data-node-panel
       // A screenshot pasted anywhere in the panel (the text field included)
       // lands on the node as a picture; pasting plain text is left alone.
@@ -1025,6 +1027,7 @@ export function NodePanel({
           onChangeParent={onChangeParent}
           onAutoPack={onAutoPack}
           autoPacked={autoPacked}
+          onSwapWithParent={onSwapWithParent}
           textareaRef={textareaRef}
           readonlyTextRef={readonlyTextRef}
           textDraft={textDraft}

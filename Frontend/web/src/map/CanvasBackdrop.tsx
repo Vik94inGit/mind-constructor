@@ -9,7 +9,6 @@ import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc, SelectedCircle } from "../types";
 import { ZONE_EDGE_DEFAULT, zoneColorFor } from "../utils/zoneStyle";
 import { ZonePatternDef } from "./ZonePattern";
-import type { EdgeRedirect } from "../hooks/useEdgeRedirect";
 
 interface Props {
   nodeGroups: NodeGroup[];
@@ -45,14 +44,9 @@ interface Props {
   compact?: boolean;
   /** The line being drawn right now — placed points, the pointer position, and whether the pointer is over a free spot. */
   drawing: { points: { x: number; y: number }[]; hover: { x: number; y: number } | null; hoverFree: boolean } | null;
-  /** The branch arrow being redirected right now (map/RedirectKnobs.tsx), its parent end at the pointer. */
-  edgeRedirect?: EdgeRedirect | null;
   /** The nodes laid out as cards on the board (the cards view): nothing links them — no branch arrows, links or zones between two of them. */
   cardBoard?: Set<string>;
 }
-
-const REDIRECT_OK = "#16a34a";
-const REDIRECT_NO = "#dc2626";
 
 const SOLVED_GOLD = "#f5b301";
 /** How long a finger rests on a zone before its menu opens. */
@@ -84,7 +78,6 @@ export function CanvasBackdrop({
   walls = false,
   realmBorders = false,
   onZoneMenu,
-  edgeRedirect = null,
   cardBoard,
 }: Props) {
   const { t } = useI18n();
@@ -171,7 +164,7 @@ export function CanvasBackdrop({
           if (outline.length < 3) return null;
           const d = `M${outline.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join(" L")} Z`;
           return (
-            <g key={`realm-${g.rootId}`} data-testid="realm-border" opacity={walls ? 0.5 : 0.3}>
+            <g key={`realm-${g.rootId}`} data-testid="realm-border" data-reveal-zone={g.rootId} opacity={walls ? 0.5 : 0.3}>
               {walls && <path d={d} fill="none" stroke="var(--color-ink-soft)" strokeWidth={12} strokeOpacity={0.2} strokeLinejoin="round" />}
               <path
                 d={d}
@@ -201,8 +194,9 @@ export function CanvasBackdrop({
             <polygon
               points={zonePoints}
               // Tagged for the map's entrance (see applyEntranceFrame): the
-              // zone fills in as the nodes it's drawn through appear.
-              data-reveal-points={g.outlineIds?.join(" ")}
+              // whole zone appears in its own turn, with its parent node,
+              // and its members fill it in after.
+              data-reveal-zone={g.rootId}
               fill={color}
               fillOpacity={dimmed ? 0.06 : 0.14}
               stroke={color}
@@ -255,7 +249,7 @@ export function CanvasBackdrop({
                 </defs>
                 <polygon
                   points={zonePoints}
-                  data-reveal-points={g.outlineIds?.join(" ")}
+                  data-reveal-zone={g.rootId}
                   fill={`url(#${patternId})`}
                   opacity={dimmed ? 0.4 : 1}
                 />
@@ -277,7 +271,7 @@ export function CanvasBackdrop({
             <polygon
               key={`solved-${g.rootId}`}
               points={zonePoints}
-              data-reveal-points={g.outlineIds?.join(" ")}
+              data-reveal-zone={g.rootId}
               fill="none"
               stroke={SOLVED_GOLD}
               strokeWidth={2.5}
@@ -305,7 +299,7 @@ export function CanvasBackdrop({
               {kingdom && (
                 <polygon
                   points={zonePoints}
-                  data-reveal-points={g.outlineIds?.join(" ")}
+                  data-reveal-zone={g.rootId}
                   fill="none"
                   stroke={color}
                   strokeWidth={14}
@@ -315,7 +309,7 @@ export function CanvasBackdrop({
               )}
               <polygon
                 points={zonePoints}
-                data-reveal-points={g.outlineIds?.join(" ")}
+                data-reveal-zone={g.rootId}
                 fill="none"
                 stroke={color}
                 strokeWidth={kingdom ? 8 : 6}
@@ -432,44 +426,10 @@ export function CanvasBackdrop({
         // was moved into another attack's zone.
         const parentId = zoneParentId(node);
         if (!parentId) return null;
-        if (onBoard(parentId) && onBoard(node.nodeId) && edgeRedirect?.childId !== node.nodeId) return null;
+        if (onBoard(parentId) && onBoard(node.nodeId)) return null;
         const parentNode = visibleNodes.find((n) => n.nodeId === parentId);
         if (!parentNode) return null;
         const b = posFor(node);
-        // Being redirected: the arrow's parent end follows the pointer, green
-        // over a node that can take it, red over one that can't.
-        const redirecting = edgeRedirect?.childId === node.nodeId ? edgeRedirect : null;
-        if (redirecting) {
-          const over = redirecting.overId ? visibleNodes.find((n) => n.nodeId === redirecting.overId) : undefined;
-          const color = over ? (redirecting.valid ? REDIRECT_OK : REDIRECT_NO) : "var(--accent)";
-          return (
-            <g key={`branch-${node.nodeId}`}>
-              <line
-                x1={redirecting.to.x}
-                y1={redirecting.to.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={color}
-                strokeOpacity={0.9}
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                markerEnd="url(#branch-arrow)"
-              />
-              {over && (
-                <circle
-                  cx={posFor(over).x}
-                  cy={posFor(over).y}
-                  r={34}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={3}
-                  strokeOpacity={0.8}
-                  data-redirect-target={over.nodeId}
-                />
-              )}
-            </g>
-          );
-        }
         const a = posFor(parentNode);
         const group = nodeGroups.find((g) => g.rootId === parentId);
         const color = group ? zoneColorFor(parentNode, group.sentiment) : "var(--accent)";
