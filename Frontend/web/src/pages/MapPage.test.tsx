@@ -11,6 +11,7 @@ import { MapPage } from "./MapPage";
 import { I18nProvider } from "../i18n/I18nContext";
 import { ThemeProvider } from "../theme/ThemeContext";
 import { makeNode } from "../test/fixtures";
+import { markEntranceSeen } from "../utils/nodeEntrance";
 import type { MapDoc } from "../types";
 
 vi.mock("../context/AuthContext", () => ({
@@ -140,6 +141,38 @@ describe("MapPage", () => {
     await user.click(within(nodeEl("c")).getAllByText("Gamma")[0]);
     await user.keyboard("{/Shift}");
     expect(await screen.findByText("2 nodes selected")).toBeInTheDocument();
+  });
+
+  it("changes a node's parent by tapping the new one, and Escape leaves without changing it", async () => {
+    vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, patch) => makeNode({ nodeId, ...patch }));
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => nodeEl("b"));
+    await user.click(within(nodeEl("b")).getAllByText("Beta")[0]);
+    await user.click(await screen.findByText(/Change parent/));
+    expect(await screen.findByText("Tap the new parent for “Beta”")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByText("Tap the new parent for “Beta”")).toBeNull());
+    expect(nodesApi.updateNode).not.toHaveBeenCalled();
+
+    await user.click(within(nodeEl("b")).getAllByText("Beta")[0]);
+    await user.click(await screen.findByText(/Change parent/));
+    await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    await waitFor(() => expect(nodesApi.updateNode).toHaveBeenCalledWith("b", expect.objectContaining({ parentId: "a" })));
+    expect(screen.queryByText("Tap the new parent for “Beta”")).toBeNull();
+  });
+
+  it("asks once for a view after the map has opened, and keeps the answer", async () => {
+    markEntranceSeen("m1");
+    vi.mocked(nodesApi.listNodes).mockResolvedValue(
+      Array.from({ length: 6 }, (_, i) => makeNode({ nodeId: `n${i}`, title: `Node ${i}`, x: 700 + i * 150, y: 700 })),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    const prompt = await screen.findByTestId("view-prompt");
+    await user.click(within(prompt).getByText("Overview"));
+    await waitFor(() => expect(screen.queryByTestId("view-prompt")).toBeNull());
+    expect(localStorage.getItem("mc_map_view")).toBe("overview");
   });
 
   it("shows the error view when the map fails to load", async () => {

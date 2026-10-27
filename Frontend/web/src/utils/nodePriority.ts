@@ -1,5 +1,6 @@
 import { CAPTION_WIDTH } from "./canvasLayout";
 import { nodeRefId } from "./nodeType";
+import type { ReadingMode } from "./readingMode";
 import type { NodeDoc, SizeTier } from "../types";
 
 type Pt = { x: number; y: number };
@@ -92,4 +93,48 @@ export function childCaptionsCoveringParents(
     if (parentBoxes.some((p) => overlaps(box, p, pad))) hidden.add(id);
   }
   return hidden;
+}
+
+/** How the canvas draws each node right now — what hiddenChildCaptions reads. */
+export interface CaptionView {
+  posFor: (node: NodeDoc) => Pt;
+  isCircleParent: (nodeId: string) => boolean;
+  modeOf: (nodeId: string) => ReadingMode;
+  dottedByZone: (nodeId: string) => boolean;
+  compact: boolean;
+  zoom: number;
+  selectedId: string | null;
+  inlineEditId: string | null;
+}
+
+/**
+ * The children whose caption would lie over a shown parent's caption, so are
+ * left out. A parent's caption is up unless its card *is* the node (the cards
+ * and mixed reading modes), it's drawn as a dot, or it's selected/being
+ * edited (NodeCard drops it then).
+ */
+export function hiddenChildCaptions(visibleNodes: NodeDoc[], parentIds: Set<string>, view: CaptionView): Set<string> {
+  const captionSpec = (n: NodeDoc): CaptionSpec => {
+    const isCircleParent = view.isCircleParent(n.nodeId);
+    return {
+      pos: view.posFor(n),
+      sizeMultiplier: nodeSizeMultiplier(n, isCircleParent, view.compact),
+      lines: view.modeOf(n.nodeId) === "iconText" ? 4 : 2,
+      namedZone: isCircleParent && !!n.zoneName && !view.compact,
+    };
+  };
+  const shownParents = visibleNodes.filter(
+    (n) =>
+      parentIds.has(n.nodeId) &&
+      !["puzzle", "mixed"].includes(view.modeOf(n.nodeId)) &&
+      !view.dottedByZone(n.nodeId) &&
+      view.selectedId !== n.nodeId &&
+      view.inlineEditId !== n.nodeId,
+  );
+  if (shownParents.length === 0) return new Set<string>();
+  const children = new Map<string, CaptionSpec>();
+  for (const n of visibleNodes) {
+    if (!parentIds.has(n.nodeId)) children.set(n.nodeId, captionSpec(n));
+  }
+  return childCaptionsCoveringParents(children, shownParents.map(captionSpec), view.zoom);
 }
