@@ -4,7 +4,9 @@ import {
   appearAmount,
   applyEntranceFrame,
   computeEntranceDelays,
+  hasSeenEntrance,
   isZoneKey,
+  markEntranceSeen,
   easeOutCubic,
   entranceEndMs,
   SKIP_MS,
@@ -12,6 +14,8 @@ import {
 import type { NodeDoc } from "../types";
 
 interface Params {
+  /** The map being opened: its entrance plays only the first time it opens in this browser. */
+  mapId?: string;
   visibleNodes: NodeDoc[];
   /** Every zone's parent: the zones are drawn, one by one, once every node is in. */
   zoneRootIds?: string[];
@@ -34,21 +38,22 @@ interface Running {
 }
 
 /**
- * The map's entrance: when a map opens, its nodes appear one after another in
- * the order they were made, slowly enough to retrace how the thinking went,
- * and then its zones are drawn one by one round them.
+ * The map's entrance: the first time a map opens in this browser, its nodes
+ * appear one after another in the order they were made, and then its zones
+ * are drawn one by one round them, all within a couple of seconds
+ * (MAX_ENTRANCE_MS). Every later open shows the map at once.
  * Each fades and grows in where it already sits, with its links and weapon
- * bows showing once both their nodes are there; the camera follows each one
- * (onNodeAppear) and steps back to the whole map for the zones (onZonesStart)
+ * bows showing once both their nodes are there; a caller can have the camera
+ * follow each one (onNodeAppear) and step back for the zones (onZonesStart)
  * or at the end (onFinish).
- * No node moves and nothing is persisted; a node made after the map opened
+ * No node moves and only the "seen" mark is persisted; a node made after the map opened
  * is simply there.
  *
  * Driven by a requestAnimationFrame loop that writes each frame straight onto
  * the canvas DOM (applyEntranceFrame), never through React state, so there
  * are no whole-map re-renders.
  */
-export function useNodeEntrance({ visibleNodes, zoneRootIds, canvasRef, onNodeAppear, onZonesStart, onFinish }: Params) {
+export function useNodeEntrance({ mapId, visibleNodes, zoneRootIds, canvasRef, onNodeAppear, onZonesStart, onFinish }: Params) {
   const [active, setActive] = useState(false);
   // The rAF loop keeps the closure it started with, so it reads the latest
   // callbacks (and the positions they see) through a ref.
@@ -123,8 +128,10 @@ export function useNodeEntrance({ visibleNodes, zoneRootIds, canvasRef, onNodeAp
     const root = canvasRef.current;
     if (!running.current && loaded && !opened.current && root) {
       opened.current = true;
+      if (mapId && hasSeenEntrance(mapId)) return;
       const delays = computeEntranceDelays(visibleNodes, zoneRootIds);
       if (delays.size < 2) return;
+      if (mapId) markEntranceSeen(mapId);
       running.current = { delays, startedAt: performance.now(), announced: 0, skip: null };
       setActive(true);
       raf.current = requestAnimationFrame(tick);

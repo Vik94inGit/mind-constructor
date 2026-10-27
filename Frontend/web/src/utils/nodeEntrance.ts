@@ -1,22 +1,44 @@
 import type { NodeDoc } from "../types";
 
-// Timeline, in ms from the entrance's start. Nodes come first: each fades
-// and grows in over APPEAR_MS, one after another, slowly enough to read each
-// one before the next comes, the way the thoughts came. The first one waits
-// LEAD_MS, so the camera has settled on it before it shows. Then the zones:
-// once the last node is in, each zone (its fill, its wall, the realm border
-// round a kingdom) fades in whole, ZONE_STAGGER_MS after the one before, so
-// the thoughts gather into their zones at the end. However many nodes and
-// zones there are, the last of each starts within MAX_SPREAD_MS and
-// MAX_ZONE_SPREAD_MS of its first, and a click skips the rest, so a big map
-// never keeps the user waiting.
-export const APPEAR_MS = 1000;
+// Timeline, in ms from the entrance's start. A short welcome, not a replay
+// (the time-lapse tells the whole story, node by node): nodes come first,
+// each fading and growing in over APPEAR_MS, STAGGER_MS after the one before,
+// the first after LEAD_MS. Then the zones: once the last node is in, each
+// zone (its fill, its wall, the realm border round a kingdom) fades in whole,
+// ZONE_STAGGER_MS after the one before. However many nodes and zones there
+// are, the last of each starts within MAX_SPREAD_MS and MAX_ZONE_SPREAD_MS of
+// its first, so the whole entrance is over within MAX_ENTRANCE_MS, and a
+// click skips the rest.
+export const APPEAR_MS = 450;
 export const SKIP_MS = 250;
-export const LEAD_MS = 350;
-export const STAGGER_MS = 1800;
-export const MAX_SPREAD_MS = 60000;
-export const ZONE_STAGGER_MS = 700;
-export const MAX_ZONE_SPREAD_MS = 8000;
+export const LEAD_MS = 150;
+export const STAGGER_MS = 220;
+export const MAX_SPREAD_MS = 1100;
+export const ZONE_STAGGER_MS = 150;
+export const MAX_ZONE_SPREAD_MS = 350;
+export const MAX_ENTRANCE_MS = LEAD_MS + MAX_SPREAD_MS + APPEAR_MS + MAX_ZONE_SPREAD_MS + APPEAR_MS;
+
+// A map plays its entrance only the first time it opens in this browser;
+// after that it is simply there. Kept per browser and per map, like the
+// locked blocks (utils/blockLock.ts).
+const seenKey = (mapId: string) => `mc_entrance_seen:${mapId}`;
+
+export function hasSeenEntrance(mapId: string): boolean {
+  try {
+    return localStorage.getItem(seenKey(mapId)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+export function markEntranceSeen(mapId: string): void {
+  try {
+    localStorage.setItem(seenKey(mapId), "1");
+  } catch {
+    // best-effort — the entrance just plays again next time
+  }
+}
+
 // How small a node starts before it grows to its full size.
 const START_SCALE = 0.6;
 
