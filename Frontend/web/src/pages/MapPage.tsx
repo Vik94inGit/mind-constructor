@@ -844,7 +844,6 @@ export function MapPage() {
   );
   const { layCardsClose } = useCardPacking({
     visibleNodes,
-    zoom,
     onCardBoard,
     isOwnNode,
     restingSpot: (n) => positions.get(n.nodeId) ?? { x: n.x ?? CANVAS_W / 2, y: n.y ?? CANVAS_H / 2 },
@@ -1763,7 +1762,9 @@ export function MapPage() {
                 }
                 handleCircleBackdropClick(rootId);
               }}
-              lines={lines}
+              // The cards view is a board of its own: the mind map's
+              // separator lines and realm border stay with the map.
+              lines={view === "cards" ? [] : lines}
               canDeleteLine={canDeleteLine}
               // With a node's panel open, a tap on a separator line is a tap
               // outside the panel too: it closes it rather than offering to
@@ -1773,7 +1774,7 @@ export function MapPage() {
               compact={compactView || dotZoom}
               solvedZones={solvedZones}
               walls={isDiscussionMode}
-              realmBorders
+              realmBorders={view !== "cards"}
               cardBoard={cardBoard}
               drawing={
                 drawMode
@@ -2030,7 +2031,7 @@ export function MapPage() {
               />
               )}
 
-              <ZoneNames
+              {view !== "cards" && <ZoneNames
                 wrapRef={wrapRef}
                 zones={zoneNameChips()}
                 positions={positions}
@@ -2052,7 +2053,7 @@ export function MapPage() {
                     .filter((p): p is { x: number; y: number } => !!p);
                   showPoints(pts, { aboveSheet: false });
                 }}
-              />
+              />}
 
               {!desktopLayout && renderToolbar(false)}
 

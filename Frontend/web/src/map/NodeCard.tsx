@@ -10,6 +10,7 @@ import { NodeCrown } from "./NodeCrown";
 import { NodeWings } from "./NodeWings";
 import { KnightHelmet } from "./KnightHelmet";
 import { NodeTypeIcon } from "./NodeTypeIcon";
+import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { NodeFlipIcon } from "./NodeFlipIcon";
 import { nodeEmojiFace } from "../utils/emojiFace";
 import type { TypeEmoji } from "../utils/emojiFace";
@@ -904,6 +905,17 @@ export const NodeCard = memo(function NodeCard({
           // thin health bar shows for the selected node in place of the
           // round health ring.
           <StickerCard
+            // Its type at a glance, as the icon would show it: the emoji in
+            // emoji first (its own, else its type's), else the type's symbol.
+            typeIcon={(() => {
+              const face = nodeEmojiFace(node, emojiFirst, typeEmoji);
+              return face.emoji && face.emojiUp ? (
+                <span aria-hidden className="text-[13px] leading-none">{face.emoji}</span>
+              ) : (
+                <NodeTypeSymbol type={displayType} size={13} />
+              );
+            })()}
+            typeLabel={t.ui.types[displayType]}
             color={circleBorderColor}
             fill={cardFill}
             shape={node.cardShape}

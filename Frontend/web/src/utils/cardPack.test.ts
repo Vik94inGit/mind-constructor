@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundsOf, packCards, packCardsAround, packNewCards } from "./cardPack";
+import { boundsOf, cardsOverlap, packCards, packCardsAround, packNewCards } from "./cardPack";
 import type { PackItem } from "./cardPack";
 
 const card = (id: string, w = 100, h = 60): PackItem => ({ id, w, h });
@@ -74,5 +74,18 @@ describe("packCards on a phone", () => {
     const at = packCards(items, { x: 0, y: 0 }, 10, 0.5);
     const box = boundsOf(items, at)!;
     expect(box.maxY - box.minY).toBeGreaterThan(box.maxX - box.minX);
+  });
+});
+
+describe("cardsOverlap", () => {
+  it("finds cards lying on each other", () => {
+    const items = [card("a"), card("b")];
+    expect(cardsOverlap(items, new Map([["a", { x: 0, y: 0 }], ["b", { x: 30, y: 20 }]]))).toBe(true);
+  });
+
+  it("lets cards glued side by side touch", () => {
+    const items = [card("a"), card("b")];
+    expect(cardsOverlap(items, new Map([["a", { x: 0, y: 0 }], ["b", { x: 100, y: 0 }]]))).toBe(false);
+    expect(cardsOverlap(items, packCards(items, { x: 0, y: 0 }))).toBe(false);
   });
 });

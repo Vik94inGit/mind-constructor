@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
-import { DESKTOP_ASPECT, PACK_GAP, packCardsAround, packNewCards } from "../utils/cardPack";
+import { cardsOverlap, DESKTOP_ASPECT, PACK_GAP, packCardsAround, packNewCards } from "../utils/cardPack";
 import type { PackItem } from "../utils/cardPack";
 import { hasCardSpot, storedSpots } from "../utils/cardSpace";
 import { readingOrder } from "../utils/nodeOrder";
@@ -13,7 +13,6 @@ const MOVES_PER_REQUEST = 500;
 
 interface Params {
   visibleNodes: NodeDoc[];
-  zoom: number;
   /** Whether a node is a card on the board right now (the cards view). */
   onCardBoard: (node: NodeDoc) => boolean;
   isOwnNode: (node: NodeDoc) => boolean;
@@ -42,7 +41,6 @@ interface Params {
  */
 export function useCardPacking({
   visibleNodes,
-  zoom,
   onCardBoard,
   isOwnNode,
   restingSpot,
@@ -58,13 +56,16 @@ export function useCardPacking({
   // Cards whose save failed: laid out locally from then on, not tried again.
   const failed = useRef(new Set<string>());
 
-  // Measured off the cards as drawn, like the glue (usePuzzleConnect).
+  // Measured off the cards as laid out: a card on the board is drawn in the
+  // canvas's own units (NodeCard's canvasCard, no counter-scale), so its
+  // layout size is its size on the board. Not the on-screen box divided by
+  // the zoom: while the camera is still gliding (the entrance stepping back
+  // to the whole map) the two disagree, and cards measured too small were
+  // packed on top of each other.
   function measure(n: NodeDoc): PackItem | null {
-    const el = document.querySelector(`[data-reveal-node="${CSS.escape(n.nodeId)}"] [data-puzzle-card]`);
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) return null;
-    return { id: n.nodeId, w: r.width / zoom, h: r.height / zoom };
+    const el = document.querySelector<HTMLElement>(`[data-reveal-node="${CSS.escape(n.nodeId)}"] [data-puzzle-card]`);
+    if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) return null;
+    return { id: n.nodeId, w: el.offsetWidth, h: el.offsetHeight };
   }
 
   // The block takes the screen's shape: wide on a desktop, tall on a phone.
@@ -113,18 +114,38 @@ export function useCardPacking({
     }
   }
 
+  // Whether the board has been checked for cards lying on each other since
+  // the cards view opened (see below).
+  const overlapChecked = useRef(false);
+
   // New to the board: packed in once every card is drawn and measurable.
   // After each render, since a card's size is only known once it's drawn.
   useEffect(() => {
-    if (!ready) return;
     const board = visibleNodes.filter(onCardBoard);
+    if (board.length === 0) overlapChecked.current = false;
+    if (!ready || board.length === 0) return;
     const fresh = board.filter((n) => !hasCardSpot(n) && !packed.has(n.nodeId));
-    if (fresh.length === 0) return;
+    if (fresh.length === 0 && overlapChecked.current) return;
     const items = new Map<string, PackItem>();
     for (const n of board) {
       const box = measure(n);
       if (!box) return;
       items.set(n.nodeId, box);
+    }
+    // Opening the cards view: cards whose saved spots lie on each other
+    // (from before cards kept clear of each other, or moved by someone else
+    // meanwhile) are all laid close again, once.
+    if (!overlapChecked.current) {
+      overlapChecked.current = true;
+      const spotted = board.filter((n) => hasCardSpot(n) || packed.has(n.nodeId));
+      const at = new Map(spotted.map((n) => [n.nodeId, restingSpot(n)]));
+      if (cardsOverlap(spotted.map((n) => items.get(n.nodeId)!), at)) {
+        const all = readingOrder(board).map((n) => items.get(n.nodeId)!);
+        void place(board, packCardsAround(all, centroid(board), PACK_GAP, aspect()));
+        onLaidOut?.();
+        return;
+      }
+      if (fresh.length === 0) return;
     }
     const freshIds = new Set(fresh.map((n) => n.nodeId));
     const placed = board.filter((n) => !freshIds.has(n.nodeId));
