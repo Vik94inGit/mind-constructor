@@ -248,10 +248,15 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   itself up the way a template branch fills in: its nodes appear in the order they were made, each
   fading and growing in where it already sits, with links and weapon bows showing once both their
   nodes are there, and then each zone, with its wall and the realm border round a kingdom, is drawn
-  whole round its nodes. However big the map, it is all there within about 2.5 s, and a click or a
+  whole round its nodes, in the order the zones came to be (when each parent got its second child).
+  However big the map, it is all there within about 2.5 s, and a click or a
   wheel scroll anywhere on the canvas brings everything in at once. The camera stays on the opening
   framing. Later opens show the map at once; the slow node-by-node story is the **time-lapse**'s
   (`src/hooks/useNodeEntrance.ts`, `src/utils/nodeEntrance.ts`).
+- **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
+  slides, with the canvas tidied into an org chart: the parents in the order they were made, each
+  followed by its children left to right as they sit on the canvas, and a child's slide names the
+  parent it hangs from (`src/utils/presentation.ts`, `src/map/PresentationOverlay.tsx`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
   matches stay lit while everything else dims, and a result takes you to that node. Under the box,
   one chip per node type the map has (with its count) filters by type: pick one or more and only

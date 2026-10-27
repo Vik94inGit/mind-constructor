@@ -415,6 +415,8 @@ export interface UiStrings {
     prev: string;
     next: string;
     slideCount: (current: number, total: number) => string;
+    /** Above a child's slide: the parent it hangs from. */
+    under: (parent: string) => string;
     empty: string;
   };
   exportText: { title: (mapName: string) => string; download: string };
@@ -1027,6 +1029,7 @@ const en: UiStrings = {
     prev: "Prev",
     next: "Next",
     slideCount: (current, total) => `${current} / ${total}`,
+    under: (parent) => `Under: ${parent}`,
     empty: "Nothing to present yet — add a node first",
   },
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
@@ -1619,6 +1622,7 @@ const cs: UiStrings = {
     prev: "Předchozí",
     next: "Další",
     slideCount: (current, total) => `${current} / ${total}`,
+    under: (parent) => `Pod: ${parent}`,
     empty: "Zatím není co prezentovat — nejprve přidejte uzel",
   },
   exportText: { title: (name) => `Export textu — „${name}“`, download: "Stáhnout .md" },
@@ -2210,6 +2214,7 @@ const uk: UiStrings = {
     prev: "Назад",
     next: "Далі",
     slideCount: (current, total) => `${current} / ${total}`,
+    under: (parent) => `Під: ${parent}`,
     empty: "Поки нема чого презентувати — спершу додайте вузол",
   },
   exportText: { title: (name) => `Експорт тексту — «${name}»`, download: "Завантажити .md" },
@@ -2804,6 +2809,7 @@ const ru: UiStrings = {
     prev: "Назад",
     next: "Далее",
     slideCount: (current, total) => `${current} / ${total}`,
+    under: (parent) => `Под: ${parent}`,
     empty: "Пока нечего презентовать — сначала добавьте узел",
   },
   exportText: { title: (name) => `Экспорт текста — «${name}»`, download: "Скачать .md" },

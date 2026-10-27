@@ -1,3 +1,4 @@
+import { zoneParentId } from "./nodeType";
 import type { NodeDoc } from "../types";
 
 // Timeline, in ms from the entrance's start. A short welcome, not a replay
@@ -48,12 +49,14 @@ export const isZoneKey = (key: string) => key.startsWith("zone:");
 
 /**
  * When each node and zone starts to appear, in ms after the entrance starts,
- * listed earliest first: every node, then every zone (under zoneKey). Both in
- * the order the nodes were made (createdAt, oldest first; a zone by its
- * parent's), so the map is told the way it was written — a problem before its
- * options, a node before the objection against it. Nodes without a createdAt
- * keep their place in the list, ahead of dated ones. Pure: no React, no
- * timing, no DOM.
+ * listed earliest first: every node, then every zone (under zoneKey). Nodes in
+ * the order they were made (createdAt, oldest first), so the map is told the
+ * way it was written — a problem before its options, a node before the
+ * objection against it. Zones in the order they came to be: a zone is born
+ * when its parent gets its second child (computeNodeGroups draws none for
+ * fewer), so that child's createdAt dates it. Nodes without a createdAt keep
+ * their place in the list, ahead of dated ones. Pure: no React, no timing,
+ * no DOM.
  */
 export function computeEntranceDelays(nodes: NodeDoc[], zoneRootIds: string[] = []): Map<string, number> {
   const ordered = nodes
@@ -62,8 +65,23 @@ export function computeEntranceDelays(nodes: NodeDoc[], zoneRootIds: string[] = 
   const delays = new Map<string, number>();
   const stagger = ordered.length > 1 ? Math.min(STAGGER_MS, MAX_SPREAD_MS / (ordered.length - 1)) : 0;
   ordered.forEach((o, i) => delays.set(o.id, Math.round(LEAD_MS + i * stagger)));
-  const roots = new Set(zoneRootIds);
-  const zones = ordered.filter((o) => roots.has(o.id));
+  const rank = new Map(ordered.map((o, i) => [o.id, i]));
+  const kids = new Map<string, number[]>();
+  for (const n of nodes) {
+    const parentId = zoneParentId(n);
+    if (!parentId) continue;
+    if (!kids.has(parentId)) kids.set(parentId, []);
+    kids.get(parentId)!.push(rank.get(n.nodeId)!);
+  }
+  // Where in the node order a zone was born: its second child's turn.
+  const born = (rootId: string) => {
+    const k = (kids.get(rootId) ?? []).sort((a, b) => a - b);
+    return k.length >= 2 ? k[1] : (rank.get(rootId) ?? Infinity);
+  };
+  const zones = zoneRootIds
+    .filter((id) => rank.has(id))
+    .map((id, i) => ({ id, at: born(id), i }))
+    .sort((a, b) => a.at - b.at || a.i - b.i);
   const zonesFrom = Math.round(LEAD_MS + Math.max(0, ordered.length - 1) * stagger) + APPEAR_MS;
   const zoneStagger = zones.length > 1 ? Math.min(ZONE_STAGGER_MS, MAX_ZONE_SPREAD_MS / (zones.length - 1)) : 0;
   zones.forEach((z, i) => delays.set(zoneKey(z.id), Math.round(zonesFrom + i * zoneStagger)));
