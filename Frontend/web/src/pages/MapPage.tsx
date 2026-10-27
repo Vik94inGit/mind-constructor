@@ -1727,6 +1727,7 @@ export function MapPage() {
             onContextMenu={onCanvasContextMenu}
           >
             <CanvasBackdrop
+              replaying={!!timeLapse}
               onZoneMenu={(rootId, x, y) => {
                 setContextMenu(null);
                 setCanvasContextMenu(null);
@@ -2087,6 +2088,7 @@ export function MapPage() {
             step={timeLapseStep}
             total={timeLapseNodes.length}
             playing={timeLapse.playing && timeLapseStep < timeLapseNodes.length}
+            current={timeLapseNodes[timeLapseStep - 1]}
             at={timeLapseNodes[timeLapseStep - 1]?.createdAt}
             onStep={onTimeLapseStep}
             onTogglePlay={togglePlay}

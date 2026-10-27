@@ -153,6 +153,8 @@ export interface Translation {
       timeLapsePlay: string;
       timeLapsePause: string;
       timeLapseExit: string;
+      timeLapseSpeed: string;
+      timeLapseSpeeds: Record<"slow" | "normal" | "fast", string>;
       timeLapseStep: (shown: number, total: number) => string;
       readingPuzzle: string;
       readingMixed: string;
@@ -362,6 +364,8 @@ const en: Translation = {
       timeLapsePlay: "Play",
       timeLapsePause: "Pause",
       timeLapseExit: "Close",
+      timeLapseSpeed: "Replay speed",
+      timeLapseSpeeds: { slow: "Slow", normal: "Normal", fast: "Fast" },
       timeLapseStep: (n, total) => `${n} of ${total} nodes`,
       readingPuzzle: "Cards",
       readingMixed: "Mixed: zone cards + icons",
@@ -557,6 +561,8 @@ const cs: Translation = {
       timeLapsePlay: "Přehrát",
       timeLapsePause: "Pozastavit",
       timeLapseExit: "Zavřít",
+      timeLapseSpeed: "Rychlost přehrávání",
+      timeLapseSpeeds: { slow: "Pomalu", normal: "Normálně", fast: "Rychle" },
       timeLapseStep: (n, total) => `${n} z ${total} uzlů`,
       readingPuzzle: "Karty",
       readingMixed: "Smíšený: karty zón + ikony",
@@ -752,6 +758,8 @@ const uk: Translation = {
       timeLapsePlay: "Відтворити",
       timeLapsePause: "Пауза",
       timeLapseExit: "Закрити",
+      timeLapseSpeed: "Швидкість відтворення",
+      timeLapseSpeeds: { slow: "Повільно", normal: "Звичайно", fast: "Швидко" },
       timeLapseStep: (n, total) => `${n} з ${total} вузлів`,
       readingPuzzle: "Картки",
       readingMixed: "Змішаний: картки зон + іконки",
@@ -947,6 +955,8 @@ const ru: Translation = {
       timeLapsePlay: "Воспроизвести",
       timeLapsePause: "Пауза",
       timeLapseExit: "Закрыть",
+      timeLapseSpeed: "Скорость воспроизведения",
+      timeLapseSpeeds: { slow: "Медленно", normal: "Обычно", fast: "Быстро" },
       timeLapseStep: (n, total) => `${n} из ${total} узлов`,
       readingPuzzle: "Карточки",
       readingMixed: "Смешанный: карточки зон + иконки",

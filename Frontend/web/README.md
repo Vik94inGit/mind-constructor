@@ -257,6 +257,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   wheel scroll anywhere on the canvas brings everything in at once. The camera stays on the opening
   framing. Later opens show the map at once; the slow node-by-node story is the **time-lapse**'s
   (`src/hooks/useNodeEntrance.ts`, `src/utils/nodeEntrance.ts`).
+- **Time-lapse** — replays the map from its first node, one node at a time in the order they were
+  made, with the camera following. The replay stays on each node long enough to read it (longer for a
+  longer thought, about 2 to 5 s), and the bar offers three speeds, Slow, Normal and Fast, remembered in
+  this browser. A zone fades in just after the node that made it (its parent's second child), so the
+  nodes come first and the zones they form follow (`src/map/TimeLapseBar.tsx`, `src/hooks/useTimeLapse.ts`).
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
   slides, with the canvas tidied into an org chart: the parents in the order they were made, each
   followed by its children left to right as they sit on the canvas, and a child's slide names the

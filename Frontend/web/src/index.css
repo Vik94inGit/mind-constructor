@@ -232,6 +232,27 @@
   }
 }
 
+/* The time-lapse (TimeLapseBar): a zone comes into being when a node gives
+   its parent a second child, so it fades in just after that node shows,
+   nodes first and then the zone they made. Every zone part (fill, wall,
+   realm border) carries data-reveal-zone; one mounted later animates, the
+   ones already there don't. */
+@keyframes zone-replay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+svg[data-replay] [data-reveal-zone] {
+  animation: zone-replay-in 700ms ease-out 600ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  svg[data-replay] [data-reveal-zone] {
+    animation: none;
+  }
+}
+
 @keyframes node-chaos-drift {
   0%,
   100% {
