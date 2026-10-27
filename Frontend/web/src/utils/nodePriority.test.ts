@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captionBox, childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } from "./nodePriority";
+import { captionBox, childCaptionsCoveringParents, computeParentIds, hiddenChildCaptions, nodeSizeMultiplier } from "./nodePriority";
 import type { CaptionSpec } from "./nodePriority";
 import { makeNode } from "../test/fixtures";
 
@@ -59,5 +59,33 @@ describe("childCaptionsCoveringParents", () => {
     expect(plain.top).toBeGreaterThan(24);
     expect(named.bottom).toBeGreaterThan(plain.bottom);
     expect(plain.right - plain.left).toBe(148);
+  });
+});
+
+describe("hiddenChildCaptions", () => {
+  const nodes = [
+    makeNode({ nodeId: "p", x: 500, y: 500 }),
+    makeNode({ nodeId: "near", parentId: "p", x: 500, y: 510 }),
+    makeNode({ nodeId: "far", parentId: "p", x: 1200, y: 900 }),
+  ];
+  const view = {
+    posFor: (n: { x?: number; y?: number }) => ({ x: n.x ?? 0, y: n.y ?? 0 }),
+    isCircleParent: () => false,
+    modeOf: () => "actual" as const,
+    dottedByZone: () => false,
+    compact: false,
+    zoom: 1,
+    selectedId: null,
+    inlineEditId: null,
+  };
+  const parents = computeParentIds(nodes);
+
+  it("leaves out a child's caption that would lie over its parent's", () => {
+    expect([...hiddenChildCaptions(nodes, parents, view)]).toEqual(["near"]);
+  });
+
+  it("hides nothing while the parent's own caption is down", () => {
+    expect(hiddenChildCaptions(nodes, parents, { ...view, selectedId: "p" }).size).toBe(0);
+    expect(hiddenChildCaptions(nodes, parents, { ...view, modeOf: () => "puzzle" as const }).size).toBe(0);
   });
 });
