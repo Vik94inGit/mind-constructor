@@ -130,7 +130,7 @@ export interface SelectedCircle {
 export type MapTemplate = "blank" | "single-problem" | "decision-tree" | "pro-con";
 
 // What a map is for — see MAP_KINDS on the backend. Picked when the map is created.
-export const MAP_KINDS = ["problem", "decision", "goal", "retro"] as const;
+export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea"] as const;
 export type MapKind = (typeof MAP_KINDS)[number];
 
 export interface MapDoc {

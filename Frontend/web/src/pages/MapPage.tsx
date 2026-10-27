@@ -200,6 +200,8 @@ export function MapPage() {
   const [moveMode, setMoveMode] = useState(false);
   // The ids the node search currently matches (null = no search): everything else dims.
   const [searchMatches, setSearchMatches] = useState<Set<string> | null>(null);
+  // The node types picked in the search (empty = all): nodes of other types dim.
+  const [nodeTypeFilter, setNodeTypeFilter] = useState<NodeType[]>([]);
   // This viewer's own view of the map — reading mode, compact view,
   // per-node/per-zone display, block locks, card fills, and where they were on
   // it — kept on the server too, so it follows them to any device. See
@@ -2302,6 +2304,8 @@ export function MapPage() {
         await ensureNodeText(visibleNodes.map((n) => n.nodeId));
       }}
       onSearchMatches={setSearchMatches}
+      nodeTypeFilter={nodeTypeFilter}
+      onNodeTypeFilter={setNodeTypeFilter}
       onPickSearchResult={(id) => {
         setSelectedId(id);
         centerOnNode(id);
@@ -2626,7 +2630,8 @@ export function MapPage() {
                     ((quickAddActive && !dotZoom && node.nodeId !== selectedId) ||
                       (!!spotlightedSet && !spotlightedSet.has(node.nodeId)) ||
                       (!chooseMode && multiSelectIds.size > 0 && !multiSelectIds.has(node.nodeId)) ||
-                      (!!searchMatches && !searchMatches.has(node.nodeId))) &&
+                      (!!searchMatches && !searchMatches.has(node.nodeId)) ||
+                      (nodeTypeFilter.length > 0 && !nodeTypeFilter.includes(node.type))) &&
                     !unmutedAttackNodeIds?.has(node.nodeId)
                   }
                   isParent={parentIds.has(node.nodeId)}

@@ -58,7 +58,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   screen.
 - **Right-click on empty canvas** — a desktop-style menu at the click point: *Paste here*, *New node ▸*
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
-  (retrospective)* (grows that map kind's starter structure right there, see `utils/templates.ts`),
+  (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
 - **Text → nodes** — paste a text on the map itself, mark its pieces (by hand, or every line/sentence
   at once) and they become nodes around the click point, hanging from the whole text as a main node.
@@ -194,12 +194,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   messages (`src/i18n/`), node type names included (the stored value stays English).
 - **Templates** — the node panel's Info tab offers a ready branch on a node with no children yet:
   a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
-  breakdown, and a failed (Fail) node gets "Analyze and try again". A template's first level lands
+  breakdown, an Idea gets "Develop this idea" (the need it meets, how it would work with the smallest
+  way to try it, what would prove it, what could kill it, what is still unknown, and another idea for
+  the same need), and a failed (Fail) node gets "Analyze and try again". A template's first level lands
   on a shape round the node: three (or six) make an equilateral triangle, four a square, any other
   number a circle, and each deeper level fans a step further out (`src/utils/shapeLayout.ts`,
   `src/utils/templates.ts`).
-- **Map types** — creating a map asks for one of four kinds (Problem analysis, Decision, Goal planning,
-  Retrospective), each seeded with a starter structure in your language, and for a mode (Discussion or
+- **Map types** — creating a map asks for one of five kinds (Problem analysis, Decision, Goal planning,
+  Retrospective, Idea), each seeded with a starter structure in your language, and for a mode (Discussion or
   Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
   calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, and no Attack tab or
   menu item (switch to Discussion for those).
@@ -213,7 +215,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   a wheel scroll anywhere on the canvas brings everything in at once and leaves the camera where it
   is (`src/hooks/useNodeEntrance.ts`, `src/utils/nodeEntrance.ts`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
-  matches stay lit while everything else dims, and a result takes you to that node.
+  matches stay lit while everything else dims, and a result takes you to that node. Under the box,
+  one chip per node type the map has (with its count) filters by type: pick one or more and only
+  those nodes stay lit and are listed, combined with any typed words. The picked types stay in force
+  after the search closes (the magnifier shows a dot) until *All types* clears them
+  (`src/utils/nodeFilter.ts`, `src/map/NodeSearch.tsx`).
 - **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden
   nodes carry a crossed-eye badge for the owner. Enforced by the backend, not just the UI.
 - **Simplified view** — the toolbar's `Aa` menu has a switch that shrinks icons and drops halo/horns,

@@ -14,7 +14,7 @@ import { useI18n } from "../i18n/I18nContext";
 // createModal.templates) instead of a hardcoded English pair, so this list
 // only has to know the *order* and which value maps to which translation
 // key.
-const MAP_KIND_KEYS: MapKind[] = ["problem", "decision", "goal", "retro"];
+const MAP_KIND_KEYS: MapKind[] = ["problem", "decision", "goal", "retro", "idea"];
 
 export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated: (map: MapDoc) => void }) {
   const { t } = useI18n();

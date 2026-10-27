@@ -8,4 +8,4 @@ export const btnGhost =
 export const inputCls =
   "w-full rounded-lg border border-line bg-surface px-3 py-[0.6rem] text-[0.95rem] text-ink outline-none transition-[border-color,box-shadow] duration-[120ms] focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)]";
 
-export const KIND_ICON: Record<MapKind, NodeType> = { problem: "Problem", decision: "Option", goal: "Success", retro: "unknown" };
+export const KIND_ICON: Record<MapKind, NodeType> = { problem: "Problem", decision: "Option", goal: "Success", retro: "unknown", idea: "Idea" };

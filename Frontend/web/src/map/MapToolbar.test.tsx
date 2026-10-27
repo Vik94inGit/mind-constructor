@@ -6,6 +6,7 @@ import { MapToolbar } from "./MapToolbar";
 import { I18nProvider } from "../i18n/I18nContext";
 import { ThemeProvider } from "../theme/ThemeContext";
 import { TRANSLATIONS } from "../i18n/translations";
+import type { NodeType } from "../types";
 
 const t = TRANSLATIONS.en;
 
@@ -20,6 +21,8 @@ function renderToolbar(overrides: Partial<React.ComponentProps<typeof MapToolbar
     onLoadTexts: vi.fn().mockResolvedValue(undefined),
     onSearchMatches: vi.fn(),
     onPickSearchResult: vi.fn(),
+    nodeTypeFilter: [] as NodeType[],
+    onNodeTypeFilter: vi.fn(),
     onToggleMapMode: vi.fn(),
     onExitDemo: vi.fn(),
     onInvite: vi.fn(),

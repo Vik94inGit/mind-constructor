@@ -93,6 +93,7 @@ const en: ThinkStrings = {
       decision: { label: "I need to decide", placeholder: "e.g. Should I move to another city?" },
       goal: { label: "I want to get somewhere", placeholder: "e.g. Run a half marathon by spring" },
       retro: { label: "Something happened", placeholder: "e.g. How the product launch went" },
+      idea: { label: "I have an idea", placeholder: "e.g. A weekly swap market for kids' clothes" },
     },
   },
   write: {
@@ -138,6 +139,11 @@ const en: ThinkStrings = {
     wentBad: "What didn't go well?",
     whyHappened: "Why did it happen that way?",
     nextTime: "What will you try next time?",
+    ideaFor: "Who is it for, and what does it solve for them?",
+    ideaWorks: "How would it work?",
+    ideaTryFirst: "What is the smallest way to try it?",
+    ideaShows: "What would show that it works?",
+    ideaKill: "What could kill it?",
     anythingElse: "Anything else on your mind?",
   },
   shape: {
@@ -190,6 +196,7 @@ const cs: ThinkStrings = {
       decision: { label: "Potřebuji se rozhodnout", placeholder: "např. Mám se přestěhovat do jiného města?" },
       goal: { label: "Chci něčeho dosáhnout", placeholder: "např. Do jara uběhnout půlmaraton" },
       retro: { label: "Něco se stalo", placeholder: "např. Jak proběhlo spuštění produktu" },
+      idea: { label: "Mám nápad", placeholder: "např. Týdenní burza dětského oblečení" },
     },
   },
   write: {
@@ -235,6 +242,11 @@ const cs: ThinkStrings = {
     wentBad: "Co se nepovedlo?",
     whyHappened: "Proč to dopadlo právě takhle?",
     nextTime: "Co zkusíte příště?",
+    ideaFor: "Pro koho to je a co jim to vyřeší?",
+    ideaWorks: "Jak by to fungovalo?",
+    ideaTryFirst: "Jak to nejjednodušeji vyzkoušet?",
+    ideaShows: "Co by ukázalo, že to funguje?",
+    ideaKill: "Co by to mohlo zabít?",
     anythingElse: "Napadá vás ještě něco?",
   },
   shape: {
@@ -295,6 +307,7 @@ const uk: ThinkStrings = {
       decision: { label: "Мені треба вирішити", placeholder: "напр. Чи варто переїжджати в інше місто?" },
       goal: { label: "Я хочу чогось досягти", placeholder: "напр. Пробігти напівмарафон до весни" },
       retro: { label: "Щось сталося", placeholder: "напр. Як пройшов запуск продукту" },
+      idea: { label: "У мене є ідея", placeholder: "напр. Щотижневий обмін дитячим одягом" },
     },
   },
   write: {
@@ -340,6 +353,11 @@ const uk: ThinkStrings = {
     wentBad: "Що не вдалося?",
     whyHappened: "Чому сталося саме так?",
     nextTime: "Що спробуєте наступного разу?",
+    ideaFor: "Для кого це і що це для них вирішує?",
+    ideaWorks: "Як це працюватиме?",
+    ideaTryFirst: "Як найпростіше це спробувати?",
+    ideaShows: "Що покаже, що це працює?",
+    ideaKill: "Що може це вбити?",
     anythingElse: "Щось іще на думці?",
   },
   shape: {
@@ -400,6 +418,7 @@ const ru: ThinkStrings = {
       decision: { label: "Мне нужно решить", placeholder: "напр. Стоит ли переезжать в другой город?" },
       goal: { label: "Я хочу чего-то достичь", placeholder: "напр. Пробежать полумарафон к весне" },
       retro: { label: "Что-то произошло", placeholder: "напр. Как прошёл запуск продукта" },
+      idea: { label: "У меня есть идея", placeholder: "напр. Еженедельный обмен детской одеждой" },
     },
   },
   write: {
@@ -445,6 +464,11 @@ const ru: ThinkStrings = {
     wentBad: "Что не получилось?",
     whyHappened: "Почему всё вышло именно так?",
     nextTime: "Что попробуете в следующий раз?",
+    ideaFor: "Для кого это и что это для них решает?",
+    ideaWorks: "Как это будет работать?",
+    ideaTryFirst: "Как проще всего это попробовать?",
+    ideaShows: "Что покажет, что это работает?",
+    ideaKill: "Что может это убить?",
     anythingElse: "Что-то ещё на уме?",
   },
   shape: {
