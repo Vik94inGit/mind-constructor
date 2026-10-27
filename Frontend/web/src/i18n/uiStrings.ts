@@ -277,6 +277,24 @@ export interface UiStrings {
     deleteFailed: string;
   };
   /** Copy/paste of nodes — chosen ones, or a whole map — between maps. */
+  /** Sorting the Inbox's quick notes into maps (utils/inbox.ts, dashboard/InboxTray.tsx, dashboard/MoveNoteModal.tsx). */
+  inbox: {
+    unsorted: (count: number) => string;
+    sort: string;
+    hide: string;
+    open: string;
+    loading: string;
+    loadError: string;
+    moveToMap: string;
+    moveTitle: string;
+    noTargets: string;
+    moving: string;
+    moved: (mapName: string) => string;
+    openMap: (mapName: string) => string;
+    moveError: string;
+    cancel: string;
+    untitled: string;
+  };
   clipboard: {
     copyMap: string;
     copied: (count: number) => string;
@@ -853,6 +871,23 @@ const en: UiStrings = {
     createFailed: "Failed to draw the line",
     deleteFailed: "Failed to delete the line",
   },
+  inbox: {
+    unsorted: (n) => `${n} unsorted note${n === 1 ? "" : "s"}`,
+    sort: "Sort",
+    hide: "Hide",
+    open: "Open Inbox",
+    loading: "Loading notes…",
+    loadError: "Couldn't load the Inbox notes",
+    moveToMap: "Move to a map",
+    moveTitle: "Move this note to…",
+    noTargets: "No other map yet. Make one first.",
+    moving: "Moving…",
+    moved: (name) => `Moved to ${name}.`,
+    openMap: (name) => `Open ${name} →`,
+    moveError: "Couldn't move the note",
+    cancel: "Cancel",
+    untitled: "(empty note)",
+  },
   clipboard: {
     copyMap: "Copy map content",
     copied: (n) => `Copied ${n} node${n === 1 ? "" : "s"}. Open a map and paste with Ctrl+V, or + > Paste.`,
@@ -1399,6 +1434,23 @@ const cs: UiStrings = {
     createFailed: "Čáru se nepodařilo nakreslit",
     deleteFailed: "Čáru se nepodařilo smazat",
   },
+  inbox: {
+    unsorted: (n) => `${n} ${csPlural(n, "nezařazená poznámka", "nezařazené poznámky", "nezařazených poznámek")}`,
+    sort: "Roztřídit",
+    hide: "Skrýt",
+    open: "Otevřít Doručené",
+    loading: "Načítám poznámky…",
+    loadError: "Poznámky z Doručených se nepodařilo načíst",
+    moveToMap: "Přesunout do mapy",
+    moveTitle: "Přesunout poznámku do…",
+    noTargets: "Zatím nemáte jinou mapu. Nejdřív nějakou vytvořte.",
+    moving: "Přesouvám…",
+    moved: (name) => `Přesunuto do ${name}.`,
+    openMap: (name) => `Otevřít ${name} →`,
+    moveError: "Poznámku se nepodařilo přesunout",
+    cancel: "Zrušit",
+    untitled: "(prázdná poznámka)",
+  },
   clipboard: {
     copyMap: "Kopírovat obsah mapy",
     copied: (n) => `Zkopírováno: ${csNodes(n)}. Otevřete mapu a vložte přes Ctrl+V nebo + > Vložit.`,
@@ -1943,6 +1995,23 @@ const uk: UiStrings = {
     deleteConfirm: "Видалити цю лінію?",
     createFailed: "Не вдалося намалювати лінію",
     deleteFailed: "Не вдалося видалити лінію",
+  },
+  inbox: {
+    unsorted: (n) => `${n} ${slavicPlural(n, "нерозібрана нотатка", "нерозібрані нотатки", "нерозібраних нотаток")}`,
+    sort: "Розібрати",
+    hide: "Сховати",
+    open: "Відкрити «Вхідні»",
+    loading: "Завантажую нотатки…",
+    loadError: "Не вдалося завантажити нотатки з «Вхідних»",
+    moveToMap: "Перенести в мапу",
+    moveTitle: "Перенести нотатку в…",
+    noTargets: "Іншої мапи ще немає. Спершу створіть її.",
+    moving: "Переношу…",
+    moved: (name) => `Перенесено в ${name}.`,
+    openMap: (name) => `Відкрити ${name} →`,
+    moveError: "Не вдалося перенести нотатку",
+    cancel: "Скасувати",
+    untitled: "(порожня нотатка)",
   },
   clipboard: {
     copyMap: "Копіювати вміст мапи",
@@ -2491,6 +2560,23 @@ const ru: UiStrings = {
     deleteConfirm: "Удалить эту линию?",
     createFailed: "Не удалось нарисовать линию",
     deleteFailed: "Не удалось удалить линию",
+  },
+  inbox: {
+    unsorted: (n) => `${n} ${slavicPlural(n, "неразобранная заметка", "неразобранные заметки", "неразобранных заметок")}`,
+    sort: "Разобрать",
+    hide: "Скрыть",
+    open: "Открыть «Входящие»",
+    loading: "Загружаю заметки…",
+    loadError: "Не удалось загрузить заметки из «Входящих»",
+    moveToMap: "Перенести в карту",
+    moveTitle: "Перенести заметку в…",
+    noTargets: "Другой карты пока нет. Сначала создайте её.",
+    moving: "Переношу…",
+    moved: (name) => `Перенесено в ${name}.`,
+    openMap: (name) => `Открыть ${name} →`,
+    moveError: "Не удалось перенести заметку",
+    cancel: "Отмена",
+    untitled: "(пустая заметка)",
   },
   clipboard: {
     copyMap: "Копировать содержимое карты",

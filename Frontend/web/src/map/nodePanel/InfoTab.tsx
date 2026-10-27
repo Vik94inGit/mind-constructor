@@ -31,6 +31,8 @@ interface Props {
   onChangeParent?: () => void;
   /** Swap with parent: this node takes its parent's place as head of the zone. */
   onSwapWithParent?: () => void;
+  /** Move to a map: on an Inbox note, sends it (with its branch) to another map. */
+  onMoveToMap?: () => void;
   textareaRef: RefObject<HTMLTextAreaElement>;
   readonlyTextRef: RefObject<HTMLDivElement>;
   textDraft: string;
@@ -57,7 +59,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   return (
@@ -177,7 +179,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked,
         )}
       </div>
     <div className="mt-3">
-      {(onChangeParent || onSwapWithParent) && (
+      {(onChangeParent || onSwapWithParent || onMoveToMap) && (
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {onChangeParent && (
             <button
@@ -199,6 +201,16 @@ export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked,
               onClick={onSwapWithParent}
             >
               ⇅ {t.ui.canvas.swapWithParent}
+            </button>
+          )}
+          {onMoveToMap && (
+            <button
+              type="button"
+              data-move-to-map
+              className="cursor-pointer rounded-md border border-line px-2 py-[0.2rem] text-[0.75rem] font-semibold text-ink hover:bg-surface-2"
+              onClick={onMoveToMap}
+            >
+              ➜ {t.ui.inbox.moveToMap}
             </button>
           )}
         </div>

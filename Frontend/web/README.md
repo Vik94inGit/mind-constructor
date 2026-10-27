@@ -30,7 +30,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   only nudge what would cover another node or cross a castle wall. The draft is kept in the browser until then. See
   `src/pages/ThinkPage.tsx` and `src/utils/thoughtFlow.ts`.
 - **Dashboard** (`/`) — maps you own or were invited to; create/rename/delete, invite members, see
-  who's on a map and who owns it, copy a whole map's nodes to paste into another one.
+  who's on a map and who owns it, copy a whole map's nodes to paste into another one. A quick note
+  goes to the **Inbox** map; under the box the dashboard counts the Inbox's unsorted notes, and
+  **Sort** lists them, each with **Move to a map**: pick a map and the note (with anything hanging
+  from it and the links inside that branch) is made there on a free spot and taken off the Inbox.
+  The same **Move to a map** sits in a note's Info tab when the Inbox map is open
+  (`src/dashboard/InboxTray.tsx`, `src/dashboard/MoveNoteModal.tsx`, `src/utils/inbox.ts`).
 - **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
   with the quick-add ghosts or the toolbar, link nodes explicitly, draw separator lines, attack
   other members' nodes with the three combat weapons, shield your own, pack nodes into a

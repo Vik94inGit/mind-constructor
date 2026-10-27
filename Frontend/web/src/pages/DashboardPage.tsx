@@ -17,6 +17,8 @@ import type { FolderDoc, MapDoc } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { ThinkEntry } from "../dashboard/ThinkEntry";
 import { QuickNote } from "../dashboard/QuickNote";
+import { InboxTray } from "../dashboard/InboxTray";
+import { findInbox } from "../utils/inbox";
 import { CreateMapModal } from "../dashboard/CreateMapModal";
 import { EditMapModal } from "../dashboard/EditMapModal";
 import { FolderModal, primaryBtn, secondaryBtn } from "../dashboard/FolderModal";
@@ -110,6 +112,9 @@ export function DashboardPage() {
     resumeTried.current = true;
     if (lastMap) navigate(`/maps/${lastMap.mapId}`, { replace: true });
   }, [searchParams, loading, lastMapId, lastMap, navigate]);
+
+  // The Inbox quick notes land in, and how many of them still wait to be sorted (InboxTray).
+  const inbox = user ? findInbox(maps, user._id, t.dashboard.quickNote.inboxName) : null;
 
   const openFolder = folders.find((f) => f.folderId === openFolderId) ?? null;
   const items = useMemo(() => libraryItems(maps, folders, openFolderId, query), [maps, folders, openFolderId, query]);
@@ -255,9 +260,31 @@ export function DashboardPage() {
             maps={maps}
             autoFocus={searchParams.get("note") === "1"}
             onSaved={(map, created) => {
-              if (created) setMaps((prev) => [map, ...prev]);
+              setMaps((prev) =>
+                created
+                  ? [{ ...map, nodeCount: 1 }, ...prev]
+                  : prev.map((m) => (m.mapId === map.mapId ? { ...m, nodeCount: (m.nodeCount ?? 0) + 1 } : m)),
+              );
             }}
           />
+
+          {inbox && (
+            <InboxTray
+              inbox={inbox}
+              maps={maps}
+              onMoved={(target, count) =>
+                setMaps((prev) =>
+                  prev.map((m) =>
+                    m.mapId === inbox.mapId
+                      ? { ...m, nodeCount: Math.max(0, (m.nodeCount ?? 0) - count) }
+                      : m.mapId === target.mapId
+                        ? { ...m, nodeCount: (m.nodeCount ?? 0) + count }
+                        : m,
+                  ),
+                )
+              }
+            />
+          )}
 
           <ThinkEntry />
         </aside>
