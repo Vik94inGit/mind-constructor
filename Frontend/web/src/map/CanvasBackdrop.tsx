@@ -11,6 +11,8 @@ import { ZONE_EDGE_DEFAULT, zoneColorFor } from "../utils/zoneStyle";
 import { ZonePatternDef } from "./ZonePattern";
 
 interface Props {
+  /** The time-lapse is playing: a zone fades in just after the node that makes it (see index.css). */
+  replaying?: boolean;
   nodeGroups: NodeGroup[];
   /** The chosen (stabilized) circle, if any — every other zone/branch dims against it. */
   selectedCircle: SelectedCircle | null | undefined;
@@ -57,6 +59,7 @@ export const ZONE_HOLD_MS = 500;
 // SVG in canvas coordinates; pointer-events-none throughout, with only the
 // zone shapes and grouped branches opting back in (they stabilize a circle).
 export function CanvasBackdrop({
+  replaying = false,
   nodeGroups: allGroups,
   selectedCircle,
   focusedZones = null,
@@ -130,6 +133,7 @@ export function CanvasBackdrop({
       .join(" ");
   return (
     <svg
+      data-replay={replaying || undefined}
       className="pointer-events-none absolute inset-0 h-full w-full"
       viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
     >

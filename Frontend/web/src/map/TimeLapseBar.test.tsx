@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { TimeLapseBar, timeLapseOrder, timeLapseStepMs } from "./TimeLapseBar";
+import { loadTimeLapseSpeed, TimeLapseBar, timeLapseOrder, timeLapseStepMs } from "./TimeLapseBar";
 import { I18nProvider } from "../i18n/I18nContext";
 import { TRANSLATIONS } from "../i18n/translations";
 import type { NodeDoc } from "../types";
@@ -18,10 +18,19 @@ describe("timeLapseOrder", () => {
 });
 
 describe("timeLapseStepMs", () => {
-  it("spreads the replay over about fifteen seconds, within limits", () => {
-    expect(timeLapseStepMs(30)).toBe(500);
-    expect(timeLapseStepMs(2)).toBe(800);
-    expect(timeLapseStepMs(1000)).toBe(350);
+  const said = (text: string) => ({ ...node("n"), text });
+  it("stays on a node long enough to read it, longer for more words, within limits", () => {
+    expect(timeLapseStepMs(said("Hi"))).toBe(1800);
+    expect(timeLapseStepMs(said("x".repeat(40)))).toBe(2800);
+    expect(timeLapseStepMs(said("x".repeat(500)))).toBe(5000);
+    expect(timeLapseStepMs(undefined)).toBe(600);
+  });
+
+  it("offers three speeds", () => {
+    const n = said("x".repeat(40));
+    expect(timeLapseStepMs(n, "slow")).toBeGreaterThan(timeLapseStepMs(n, "normal"));
+    expect(timeLapseStepMs(n, "fast")).toBeLessThan(timeLapseStepMs(n, "normal"));
+    expect(timeLapseStepMs(n, "fast")).toBeGreaterThanOrEqual(900);
   });
 });
 
@@ -36,12 +45,24 @@ describe("TimeLapseBar", () => {
     return handlers;
   }
 
-  it("steps forward on its own while playing", () => {
+  it("steps forward on its own while playing, once the node has been read", () => {
     vi.useFakeTimers();
-    const { onStep } = renderBar({ playing: true });
-    act(() => void vi.advanceTimersByTime(timeLapseStepMs(3)));
+    const current = { ...node("a"), text: "Hi" };
+    const { onStep } = renderBar({ playing: true, current });
+    act(() => void vi.advanceTimersByTime(timeLapseStepMs(current) - 50));
+    expect(onStep).not.toHaveBeenCalled();
+    act(() => void vi.advanceTimersByTime(60));
     expect(onStep).toHaveBeenCalledWith(2);
     vi.useRealTimers();
+  });
+
+  it("plays slower or faster at the chosen speed, and remembers it", async () => {
+    localStorage.clear();
+    renderBar();
+    await userEvent.click(screen.getByRole("button", { name: t.map.toolbar.timeLapseSpeeds.slow }));
+    expect(screen.getByRole("button", { name: t.map.toolbar.timeLapseSpeeds.slow }).getAttribute("aria-pressed")).toBe("true");
+    expect(loadTimeLapseSpeed()).toBe("slow");
+    localStorage.clear();
   });
 
   it("stops at the last node", () => {
