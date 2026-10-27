@@ -1672,7 +1672,7 @@ export function MapPage() {
       {finish.isFinished && !timeLapse && (
         <FinishedBanner {...battleTally(nodes)} onReplay={startTimeLapse} onReopen={finish.reopen} busy={finish.busy} />
       )}
-      {mapId && !timeLapse && <CheckInPrompt key={mapId} mapId={mapId} checkIn={checkIn} finished={isFinished} onSave={setCheckIn} />}
+      {mapId && !timeLapse && <CheckInPrompt key={mapId} mapId={mapId} checkIn={checkIn} finished={finish.isFinished} onSave={setCheckIn} />}
 
       <div className="flex min-h-0 flex-1">
         {desktopLayout && !presenting && renderToolbar(true)}
