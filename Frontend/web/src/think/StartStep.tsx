@@ -4,6 +4,8 @@ import { MAP_KINDS } from "../types";
 import type { ThoughtDraft } from "../utils/thoughtFlow";
 import { btnPrimary, inputCls, KIND_ICON } from "./thinkStyles";
 import { StepHeader, StepNav } from "./StepChrome";
+import { CheckInForm } from "../components/CheckInForm";
+import { STRENGTH_DEFAULT, checkInEntry } from "../utils/feeling";
 
 export function StartStep({ draft, update, onNext }: { draft: ThoughtDraft; update: (p: Partial<ThoughtDraft>) => void; onNext: () => void }) {
   const { t } = useI18n();
@@ -55,6 +57,15 @@ export function StartStep({ draft, update, onNext }: { draft: ThoughtDraft; upda
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && ready) onNext();
         }}
       />
+      {/* The "before" of the check-in — optional; asked again once the map has been thought through. */}
+      <div className="mt-6 rounded-card border border-line bg-surface p-4">
+        <CheckInForm
+          question={t.ui.feelings.before}
+          hint={t.ui.feelings.beforeHint}
+          value={{ feeling: draft.checkIn?.feeling ?? null, strength: draft.checkIn?.strength ?? STRENGTH_DEFAULT }}
+          onChange={(v) => update({ checkIn: v.feeling ? checkInEntry(v.feeling, v.strength, draft.checkIn?.at) : null })}
+        />
+      </div>
       <StepNav
         next={
           <button type="button" className={btnPrimary} disabled={!ready} onClick={onNext}>

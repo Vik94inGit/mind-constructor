@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import {
   deleteDraftAbl,
+  getCheckInsAbl,
   getDraftAbl,
   getMapViewStateAbl,
   getUserStateAbl,
@@ -55,6 +56,17 @@ export const updateMapViewState = async (req: Request<{ mapId: string }>, res: R
     return res.status(200).json({ success: true, view });
   } catch (error) {
     return handleAblError(res, error, [mapNotFound], { message: "Failed to save the map view", logLabel: "updateMapViewState" });
+  }
+};
+
+export const getCheckIns = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const checkIns = await getCheckInsAbl(userId);
+    return res.status(200).json({ success: true, checkIns });
+  } catch (error) {
+    return handleAblError(res, error, [], { message: "Failed to load your check-ins", logLabel: "getCheckIns" });
   }
 };
 

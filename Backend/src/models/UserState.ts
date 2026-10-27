@@ -11,6 +11,11 @@ export const READING_MODES = ["puzzle", "mixed", "iconText", "actual"] as const;
 export const ZONE_MODES = [...READING_MODES, "dots"] as const;
 // How zones are drawn — per parent, and under "*" for the whole map (see the frontend's utils/zoneLayout.ts).
 export const ZONE_LAYOUTS = ["zones", "nested", "none"] as const;
+// How a thought feels to the one looking at it (MapViewState.feelings) and
+// how they felt about the map before and after thinking it through (checkIn).
+export const FEELINGS = ["worried", "sad", "angry", "confused", "hopeful", "excited", "calm", "relieved"] as const;
+export const CHECK_IN_STRENGTH_MIN = 1;
+export const CHECK_IN_STRENGTH_MAX = 5;
 export const DRAFT_KINDS = ["think", "textSplit"] as const;
 export type DraftKind = (typeof DRAFT_KINDS)[number];
 
@@ -46,6 +51,9 @@ const MapViewStateSchema = new mongoose.Schema(
     zoneDisplay: { type: mongoose.Schema.Types.Mixed, default: {} }, // zone root nodeId -> zone mode
     zoneLayout: { type: mongoose.Schema.Types.Mixed, default: {} }, // parent nodeId (or "*": the whole map) -> zone layout
     cardFills: { type: mongoose.Schema.Types.Mixed, default: {} }, // nodeId -> #rrggbb
+    feelings: { type: mongoose.Schema.Types.Mixed, default: {} }, // nodeId -> feeling, this viewer's own
+    // { before, after }: each { feeling, strength 1-5, at (ms) } or null
+    checkIn: { type: mongoose.Schema.Types.Mixed, default: null },
     blockLocks: { type: [String], default: [] }, // locked puzzle pieces' nodeIds
     detachedPieces: { type: [String], default: [] }, // puzzle pieces taken out of their puzzle
     center: { type: { _id: false, x: Number, y: Number }, default: null }, // canvas point in the middle of the screen

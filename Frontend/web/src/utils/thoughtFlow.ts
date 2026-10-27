@@ -1,5 +1,8 @@
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
+import * as stateApi from "../api/state";
+import { isFeeling, parseCheckIn, saveFeelings } from "./feeling";
+import type { CheckInEntry, Feeling, Feelings } from "./feeling";
 import { CANVAS_H, CANVAS_W, footprintObstacles, getCirclePackSpacing } from "./canvasLayout";
 import type { ViewportBounds } from "./canvasLayout";
 import { MIN_NODE_GAP, makeZoneRule, placeByZoneRules } from "./zoneRules";
@@ -115,6 +118,8 @@ export interface Thought {
   parentId: string;
   /** The question it was written under — just for grouping in the Write step. */
   prompt: PromptKey;
+  /** How it feels to the one writing it (utils/feeling.ts) — optional, asked once in the Write step. */
+  feeling?: Feeling;
 }
 
 export interface ThoughtDraft {
@@ -123,6 +128,8 @@ export interface ThoughtDraft {
   thoughts: Thought[];
   step: number;
   promptIndex: number;
+  /** "How do you feel about this right now?" from the Start step — the map's "before". */
+  checkIn?: CheckInEntry | null;
 }
 
 export function emptyDraft(kind: MapKind = "problem", center = ""): ThoughtDraft {
@@ -276,7 +283,34 @@ export async function buildMapFromDraft(
     nodeIds.set(t.id, node.nodeId);
     onProgress?.(++done, total);
   }
+  await saveFeelingsAndCheckIn(map.mapId, draft, thoughts, nodeIds);
   return map;
+}
+
+/**
+ * The thoughts' feelings and the "before" check-in go into the user's own view
+ * of the new map (never shared, see utils/feeling.ts). Best-effort: the map is
+ * there either way.
+ */
+async function saveFeelingsAndCheckIn(mapId: string, draft: ThoughtDraft, thoughts: Thought[], nodeIds: Map<string, string>) {
+  const feelings: Feelings = {};
+  for (const t of thoughts) {
+    const nodeId = nodeIds.get(t.id);
+    if (nodeId && isFeeling(t.feeling)) feelings[nodeId] = t.feeling;
+  }
+  // Stamped as of the map being built, so "And now?" waits a while from here (utils/feeling.ts ASK_AFTER_MS).
+  const picked = parseCheckIn({ before: draft.checkIn })?.before ?? null;
+  const before = picked ? { ...picked, at: Date.now() } : null;
+  if (Object.keys(feelings).length === 0 && !before) return;
+  saveFeelings(mapId, feelings);
+  try {
+    await stateApi.saveMapViewState(mapId, {
+      ...(Object.keys(feelings).length > 0 ? { feelings } : {}),
+      ...(before ? { checkIn: { before, after: null } } : {}),
+    });
+  } catch {
+    // offline or refused — the feelings are still on this device
+  }
 }
 
 // The draft lives in this browser until the map is built, so closing the tab

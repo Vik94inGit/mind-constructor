@@ -12,6 +12,7 @@ import { TypePicker } from "./TypePicker";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeShape, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { usePanelSheet } from "./nodePanel/usePanelSheet";
+import type { Feeling } from "../utils/feeling";
 import { InfoTab } from "./nodePanel/InfoTab";
 import type { CardLook } from "./nodePanel/InfoTab";
 import { ModifyTab } from "./nodePanel/ModifyTab";
@@ -140,6 +141,8 @@ interface Props {
   onExtractText: () => void;
   /** Set while this node is drawn as a puzzle card: its fill (the viewer's own, see utils/cardFill.ts) and how to change it. */
   cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
+  /** The viewer's own feeling about this thought (utils/feeling.ts) and how to change it — anyone may, it's only theirs. */
+  feeling?: { value: Feeling | undefined; onChange: (feeling: Feeling | null) => void } | null;
   /** Set while this node is drawn as a card and is the viewer's own: its text size and shape, whether it has its own size, and how to change them (Node.cardFont/cardShape/cardW/cardH). */
   cardLook?: CardLook;
   /** Its owner locked this text block (utils/blockLock.ts): the text reads as for anyone else's node until unlocked. */
@@ -194,6 +197,7 @@ export function NodePanel({
   isClusterParent,
   onExtractText,
   cardFill,
+  feeling,
   cardLook,
   textLocked = false,
   onToggleLock,
@@ -1016,6 +1020,7 @@ export function NodePanel({
           isCreator={isCreator}
           busy={busy}
           cardFill={cardFill}
+          feeling={feeling}
           cardLook={cardLook}
           textLocked={textLocked}
           onToggleLock={onToggleLock}

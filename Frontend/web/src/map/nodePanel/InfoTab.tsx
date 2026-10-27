@@ -5,6 +5,8 @@ import { MAX_NODE_TEXT } from "../../utils/nodeText";
 import { isMobileViewport } from "../../utils/canvasLayout";
 import type { NodeTemplateKind } from "../../utils/templates";
 import { CARD_FILL_COLORS } from "../../utils/cardFill";
+import type { Feeling } from "../../utils/feeling";
+import { FeelingPicker } from "../../components/FeelingPicker";
 import { CARD_FONT_DEFAULT } from "../StickerCard";
 import { CARD_FONT_MAX, CARD_FONT_MIN, CARD_SHAPES } from "../../types";
 import type { CardShape } from "../../types";
@@ -21,6 +23,8 @@ interface Props {
   busy: boolean;
   /** Set while this node is drawn as a puzzle card — see NodePanel's own prop. */
   cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
+  /** The viewer's own feeling about this thought — see NodePanel's own prop. */
+  feeling?: { value: Feeling | undefined; onChange: (feeling: Feeling | null) => void } | null;
   /** The card's own look, for its owner — see NodePanel's own prop. */
   cardLook?: CardLook;
   textLocked: boolean;
@@ -62,7 +66,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   return (
@@ -248,6 +252,15 @@ export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked,
             {textLocked ? `🔓 ${t.ui.display.unlockBlock}` : `🔒 ${t.ui.display.lockBlock}`}
           </button>
           {textLocked && <span className="text-[0.75rem] text-ink-soft">{t.ui.display.blockLocked}</span>}
+        </div>
+      )}
+      {feeling && (
+        // The viewer's own feeling — never shown to anyone else.
+        <div className="mb-3 flex flex-wrap items-center gap-[0.4rem]" data-testid="feeling-row">
+          <span className="mr-1 text-[0.75rem] font-semibold text-ink-soft" title={t.ui.feelings.privateHint}>
+            {t.ui.feelings.question}
+          </span>
+          <FeelingPicker size="sm" value={feeling.value} onChange={feeling.onChange} label={t.ui.feelings.question} noneLabel={t.ui.feelings.none} />
         </div>
       )}
       {cardFill && (

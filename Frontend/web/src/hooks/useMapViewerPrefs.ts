@@ -14,6 +14,8 @@ import { loadCardFills, saveCardFills } from "../utils/cardFill";
 import { loadDetachedPieces, saveDetachedPieces } from "../utils/pieceDetach";
 import type { DetachedPieces } from "../utils/pieceDetach";
 import type { CardFills } from "../utils/cardFill";
+import { loadFeelings, parseCheckIn, parseFeelings, saveFeelings, withFeeling } from "../utils/feeling";
+import type { CheckIn, Feeling, Feelings } from "../utils/feeling";
 import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } from "../utils/readingMode";
 import type { ReadingMode } from "../utils/readingMode";
 import { loadEmojiFirst, loadTypeEmoji, saveEmojiFirst, saveTypeEmoji } from "../utils/emojiFace";
@@ -130,6 +132,23 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     });
   }
 
+  // The viewer's own feeling per thought — see utils/feeling.ts.
+  const [feelings, setFeelings] = useState<Feelings>(() => loadFeelings(mapId));
+  function setFeeling(nodeId: string, feeling: Feeling | null) {
+    setFeelings((prev) => {
+      const next = withFeeling(prev, nodeId, feeling);
+      saveFeelings(mapId, next);
+      return next;
+    });
+  }
+  // How they felt about the map before and after thinking it through — only
+  // the server keeps it; undefined until it has answered.
+  const [checkIn, setCheckInState] = useState<CheckIn | null | undefined>(undefined);
+  function setCheckIn(next: CheckIn | null) {
+    setCheckInState(next);
+    saveView({ checkIn: next });
+  }
+
   // ---- The server's copy of this map's view ----
   // Changes wait a moment and go out together.
   const pendingRef = useRef<MapViewState | null>(null);
@@ -143,6 +162,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     zoneDisplay?: unknown;
     zoneLayouts?: unknown;
     cardFills?: unknown;
+    feelings?: unknown;
     blockLocks?: unknown;
     detachedPieces?: unknown;
   }>({});
@@ -168,6 +188,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   useEffect(() => {
     loadedRef.current = false;
     setSavedView(null);
+    setCheckInState(undefined);
     if (!enabled || !mapId) return;
     noteMapOpened(mapId);
     let cancelled = false;
@@ -180,9 +201,10 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
           const zd = view.zoneDisplay ?? {};
           const zl = parseZoneLayouts(view.zoneLayout);
           const cf = view.cardFills ?? {};
+          const fe = parseFeelings(view.feelings);
           const bl: BlockLocks = Object.fromEntries((view.blockLocks ?? []).map((id) => [id, true as const]));
           const dp: DetachedPieces = Object.fromEntries((view.detachedPieces ?? []).map((id) => [id, true as const]));
-          fromServerRef.current = { nodeDisplay: nd, zoneDisplay: zd, zoneLayouts: zl, cardFills: cf, blockLocks: bl, detachedPieces: dp };
+          fromServerRef.current = { nodeDisplay: nd, zoneDisplay: zd, zoneLayouts: zl, cardFills: cf, feelings: fe, blockLocks: bl, detachedPieces: dp };
           setNodeDisplay(nd);
           saveNodeDisplay(mapId, nd);
           setZoneDisplay(zd);
@@ -191,6 +213,9 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
           saveZoneLayouts(mapId, zl);
           setCardFills(cf);
           saveCardFills(mapId, cf);
+          setFeelings(fe);
+          saveFeelings(mapId, fe);
+          setCheckInState(parseCheckIn(view.checkIn));
           setBlockLocks(bl);
           saveBlockLocks(mapId, bl);
           setDetachedPiecesState(dp);
@@ -206,11 +231,13 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
               zoneDisplay: loadZoneDisplay(mapId),
               zoneLayout: loadZoneLayouts(mapId),
               cardFills: loadCardFills(mapId),
+              feelings: loadFeelings(mapId),
               blockLocks: Object.keys(loadBlockLocks(mapId)),
               detachedPieces: Object.keys(loadDetachedPieces(mapId)),
             })
             .catch(() => {});
           setSavedView({ center: null, selectedNodeId: null });
+          setCheckInState(null);
         }
       })
       .catch(() => {
@@ -235,6 +262,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   useEffect(() => sendIfChanged("zoneDisplay", zoneDisplay, { zoneDisplay }), [zoneDisplay]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("zoneLayouts", zoneLayouts, { zoneLayout: zoneLayouts }), [zoneLayouts]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("cardFills", cardFills, { cardFills }), [cardFills]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => sendIfChanged("feelings", feelings, { feelings }), [feelings]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("blockLocks", blockLocks, { blockLocks: Object.keys(blockLocks) }), [blockLocks]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(
     () => sendIfChanged("detachedPieces", detachedPieces, { detachedPieces: Object.keys(detachedPieces) }),
@@ -270,6 +298,10 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     toggleBlockLock,
     cardFills,
     setCardFill,
+    feelings,
+    setFeeling,
+    checkIn,
+    setCheckIn,
     detachedPieces,
     setPiecesDetached,
     savedView,

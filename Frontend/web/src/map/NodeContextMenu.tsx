@@ -8,6 +8,8 @@ import type { ZonePaletteColor, ZonePattern } from "../types";
 import { ZoneMenuBody } from "./ZoneMenuBody";
 import type { ZoneStylePatch } from "./ZoneMenuBody";
 import { ZONE_MODES } from "../utils/zoneDisplay";
+import { FEELINGS, FEELING_EMOJI } from "../utils/feeling";
+import type { Feeling } from "../utils/feeling";
 import type { ZoneMode } from "../utils/zoneDisplay";
 
 /** One of the node's links, as a row in the "Remove links" submenu. */
@@ -68,6 +70,8 @@ interface Props {
   };
   /** A zone's parent: how this viewer reads the zone — the same views as the zone's own menu. */
   zoneView?: { value: ZoneMode | null; onPick: (mode: ZoneMode | null) => void };
+  /** The viewer's own feeling about the node (utils/feeling.ts) — for anyone, owner or not. */
+  feeling?: { value: Feeling | undefined; onPick: (feeling: Feeling | null) => void };
   onClose: () => void;
 }
 
@@ -95,13 +99,14 @@ export function NodeContextMenu({
   zoneLayout,
   zoneStyle,
   zoneView,
+  feeling,
 }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   // A one-level drill-down (root actions <-> the type list) instead of a
   // native-style flyout submenu — simpler to keep on-screen at every click
   // position, and this menu only ever needs the one extra level.
-  const [mode, setMode] = useState<"root" | "type" | "links" | "zones">("root");
+  const [mode, setMode] = useState<"root" | "type" | "links" | "zones" | "feeling">("root");
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -133,18 +138,21 @@ export function NodeContextMenu({
   // NodeType) sizes itself independently.
   // Wider in type mode — some locales' longer type names (e.g. Czech
   // "Problematická varianta") wrap inside the root menu's normal 168px.
-  const MENU_W = mode === "type" ? 220 : mode === "links" || mode === "zones" ? 260 : 168;
+  const MENU_W = mode === "type" || mode === "feeling" ? 220 : mode === "links" || mode === "zones" ? 260 : 168;
   const ITEM_H = 34;
   const puzzleItemCount = !puzzle ? 0 : puzzle.detached ? 1 : puzzle.assembled ? 2 : 0;
   const showLinks = isOwner && links.length > 0;
   const rootItemCount =
     (isOwner ? 5 + (onToggleBlockLock ? 1 : 0) + puzzleItemCount + (showLinks ? 1 : 0) : 0) +
     (zoneLayout ? 1 : 0) +
+    (feeling ? 1 : 0) +
     (canAttack ? 1 : 0);
   const linkItemCount = links.length + (onRemoveAllLinks && links.length > 1 ? 1 : 0);
   const itemCount =
     mode === "type"
       ? NODE_TYPES.length + 1
+      : mode === "feeling"
+        ? FEELINGS.length + 2
       : mode === "links"
         ? linkItemCount + 1
         : mode === "zones"
@@ -235,6 +243,12 @@ export function NodeContextMenu({
           </button>
         </>
       )}
+      {mode === "root" && feeling && (
+        <button className={item} onClick={() => setMode("feeling")}>
+          {feeling.value ? `${FEELING_EMOJI[feeling.value]} ` : ""}
+          {t.ui.feelings.label} ›
+        </button>
+      )}
       {mode === "root" && zoneLayout && (
         <button className={item} onClick={() => setMode("zones")}>
           {t.ui.contextMenu.zones} ›
@@ -289,6 +303,37 @@ export function NodeContextMenu({
             style={zoneStyle}
             onPicked={onClose}
           />
+        </>
+      )}
+      {mode === "feeling" && feeling && (
+        <>
+          <button className={item} onClick={() => setMode("root")}>
+            ‹ {t.ui.contextMenu.back}
+          </button>
+          {FEELINGS.map((f) => (
+            <button
+              key={f}
+              className={f === feeling.value ? itemActive : item}
+              aria-pressed={f === feeling.value}
+              onClick={() => {
+                feeling.onPick(f === feeling.value ? null : f);
+                onClose();
+              }}
+            >
+              <span aria-hidden="true">{FEELING_EMOJI[f]}</span> {t.ui.feelings.names[f]}
+            </button>
+          ))}
+          {feeling.value && (
+            <button
+              className={item}
+              onClick={() => {
+                feeling.onPick(null);
+                onClose();
+              }}
+            >
+              {t.ui.feelings.none}
+            </button>
+          )}
         </>
       )}
       {mode === "type" && (

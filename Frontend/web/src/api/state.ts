@@ -6,6 +6,7 @@ import type { ZoneDisplay } from "../utils/zoneDisplay";
 import type { CardFills } from "../utils/cardFill";
 import type { ZoneLayouts } from "../utils/zoneLayout";
 import type { TypeEmoji } from "../utils/emojiFace";
+import type { CheckIn, CheckIns, Feelings } from "../utils/feeling";
 
 // The signed-in user's own state on the server (Backend: /api/state), so they
 // pick up on any device where they left off.
@@ -27,6 +28,10 @@ export interface MapViewState {
   /** How zones are drawn, per parent and ("*") for the whole map (see utils/zoneLayout.ts). */
   zoneLayout?: ZoneLayouts;
   cardFills?: CardFills;
+  /** The viewer's own feeling per node (utils/feeling.ts). */
+  feelings?: Feelings;
+  /** How the viewer felt about this map before and after thinking it through. */
+  checkIn?: CheckIn | null;
   /** Locked puzzle pieces' nodeIds. */
   blockLocks?: string[];
   /** Puzzle pieces taken out of their puzzle (see utils/pieceDetach.ts). */
@@ -83,10 +88,24 @@ export async function saveMapViewState(mapId: string, fields: MapViewState): Pro
           (prev) => ({ ...prev, view: { ...prev.view, ...fields } }),
         );
         await offline.patchCached<{ lastMapId?: string | null }>("/api/state", (prev) => ({ ...prev, lastMapId: mapId }));
+        if (fields.checkIn !== undefined) {
+          await offline.patchCached<{ checkIns?: CheckIns }>("/api/state/check-ins", (prev) => {
+            const checkIns = { ...prev.checkIns };
+            if (fields.checkIn) checkIns[mapId] = fields.checkIn;
+            else delete checkIns[mapId];
+            return { ...prev, checkIns };
+          });
+        }
         return undefined;
       },
     },
   });
+}
+
+/** The user's check-in on every map that has one, for the dashboard. */
+export async function getCheckIns(): Promise<CheckIns> {
+  const res = await apiRequest<{ success: boolean; checkIns: CheckIns }>("/api/state/check-ins");
+  return res.checkIns ?? {};
 }
 
 export async function getDraft(kind: DraftKind): Promise<{ data: unknown; clientUpdatedAt: number } | null> {

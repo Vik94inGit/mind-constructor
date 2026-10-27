@@ -11,7 +11,8 @@ Mind Constructor is "notes you can see". The main path is personal: jot a though
 quick note lands in the user's **Inbox** map, `Frontend/web/src/utils/inbox.ts`), lay thoughts out
 on a canvas as typed **nodes** (Problem / Problematic option / Solution / Option / Success / Fail /
 Idea / unknown) whose place, zone and links show how they relate, and find any of them again with search
-across all maps. Starter structures arrive as faded **ghost** nodes that carry only a question
+across all maps. A thought can also carry how it feels to the user (a private emoji badge), and *Think it through*
+asks how they feel before and, later, after, so the dashboard can show the shift. Starter structures arrive as faded **ghost** nodes that carry only a question
 (`Node.prompt`) and fill in as the user answers them.
 
 On top of that, maps can be shared and edited live, and a map in **discussion mode**
@@ -83,7 +84,8 @@ npm run build        # tsc -b && vite build
   `finishRule` so the Finish button can say why it waits; the server still decides), `nodeType.ts`
   (mirrors `allowedAttackTypes`), `seedMap.ts`/`templates.ts` (starter structures as ghosts, in the
   user's language), `shapeLayout.ts` (templates and the Think map laid out as a circle, square or triangle, shared with the preview), `textSplit.ts`, `cardGlue.ts` (cards glue side to side and never
-  overlap), `parentMagnet.ts` (a moved parent pulls its own far children back in), `emojiFace.ts` (emoji first, each type's emoji, a still emoji).
+  overlap), `parentMagnet.ts` (a moved parent pulls its own far children back in), `emojiFace.ts` (emoji first, each type's emoji, a still emoji), `feeling.ts` (a viewer's own
+  feeling per thought and the before/after check-in, private to them like the rest of their view of a map).
 - **`offline/`** — read cache of every GET plus an outbox of changes made offline, replayed in order
   once the server is back (temporary `local_…` ids swapped for real ones); `public/sw.js` caches the
   app shell.

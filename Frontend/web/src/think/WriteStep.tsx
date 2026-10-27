@@ -6,6 +6,8 @@ import { FLOW_PROMPTS, ROOT_ID, newThoughtId, removeThought } from "../utils/tho
 import type { Thought, ThoughtDraft } from "../utils/thoughtFlow";
 import { btnPrimary, btnGhost, inputCls } from "./thinkStyles";
 import { StepHeader, StepNav } from "./StepChrome";
+import { FeelingPicker } from "../components/FeelingPicker";
+import { FEELING_EMOJI } from "../utils/feeling";
 
 export function WriteStep({
   draft,
@@ -31,17 +33,23 @@ export function WriteStep({
   const here = draft.thoughts.filter((x) => x.prompt === prompt.key);
   const answered = useMemo(() => new Set(draft.thoughts.map((x) => x.prompt)), [draft.thoughts]);
   const isLast = index === prompts.length - 1;
+  // The thought just added, asked once how it feels — optional, gone on a pick, a skip or the next thought.
+  const [askFeelingId, setAskFeelingId] = useState<string | null>(null);
+  const askFeeling = draft.thoughts.find((x) => x.id === askFeelingId) ?? null;
 
   const goPrompt = (i: number) => {
     update({ promptIndex: Math.max(0, Math.min(prompts.length - 1, i)) });
     setText("");
+    setAskFeelingId(null);
     inputRef.current?.focus();
   };
 
   function add() {
     const value = text.trim();
     if (!value) return;
-    setThoughts((ts) => [...ts, { id: newThoughtId(), text: value, type: prompt.type, parentId: ROOT_ID, prompt: prompt.key }]);
+    const id = newThoughtId();
+    setThoughts((ts) => [...ts, { id, text: value, type: prompt.type, parentId: ROOT_ID, prompt: prompt.key }]);
+    setAskFeelingId(id);
     setText("");
     inputRef.current?.focus();
   }
@@ -113,6 +121,11 @@ export function WriteStep({
               >
                 <NodeTypeIcon type={x.type} size={13} />
                 <span className="min-w-0 break-words">{x.text}</span>
+                {x.feeling && (
+                  <span title={t.ui.feelings.names[x.feeling]} aria-label={t.ui.feelings.names[x.feeling]}>
+                    {FEELING_EMOJI[x.feeling]}
+                  </span>
+                )}
                 <button
                   type="button"
                   aria-label={`${tt.write.remove}: ${x.text}`}
@@ -125,6 +138,32 @@ export function WriteStep({
               </li>
             ))}
           </ul>
+        )}
+
+        {askFeeling && (
+          <div className="animate-thought-in mt-4 flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2" data-testid="thought-feeling">
+            <span className="min-w-0 text-[0.82rem] font-semibold text-ink-soft">{t.ui.feelings.thoughtQuestion(askFeeling.text)}</span>
+            <FeelingPicker
+              size="sm"
+              value={askFeeling.feeling}
+              label={t.ui.feelings.thoughtQuestion(askFeeling.text)}
+              onChange={(feeling) => {
+                setThoughts((ts) => ts.map((x) => (x.id === askFeeling.id ? { ...x, feeling: feeling ?? undefined } : x)));
+                setAskFeelingId(null);
+                inputRef.current?.focus();
+              }}
+            />
+            <button
+              type="button"
+              className="cursor-pointer border-0 bg-transparent p-0 text-[0.78rem] font-semibold text-ink-soft underline hover:text-ink"
+              onClick={() => {
+                setAskFeelingId(null);
+                inputRef.current?.focus();
+              }}
+            >
+              {t.ui.feelings.skip}
+            </button>
+          </div>
         )}
 
         <div className="mt-5 flex items-center justify-between gap-3">

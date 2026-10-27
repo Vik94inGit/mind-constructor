@@ -26,6 +26,10 @@ import { MoveToFolderModal } from "../dashboard/MoveToFolderModal";
 import { FolderIcon, LibraryTile, MapIcon } from "../dashboard/LibraryTile";
 import { libraryItems, paginate } from "../dashboard/library";
 import { useConfirm } from "../context/ConfirmContext";
+import * as stateApi from "../api/state";
+import { CheckInModal } from "../dashboard/CheckInModal";
+import { checkInShift } from "../utils/feeling";
+import type { CheckIns } from "../utils/feeling";
 
 type Filter = mapsApi.MapFilter;
 
@@ -59,6 +63,9 @@ export function DashboardPage() {
   // null: closed; {}: creating a folder; { folder }: renaming that one.
   const [folderModal, setFolderModal] = useState<{ folder?: FolderDoc } | null>(null);
   const [moveMap, setMoveMap] = useState<MapDoc | null>(null);
+  // How the user felt about each map before and after thinking it through (utils/feeling.ts) — only theirs.
+  const [checkIns, setCheckIns] = useState<CheckIns>({});
+  const [checkInMap, setCheckInMap] = useState<MapDoc | null>(null);
 
   async function load() {
     setLoading(true);
@@ -89,6 +96,15 @@ export function DashboardPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
+
+  // Check-ins are a nicety: a failure (or a demo account) just shows none.
+  useEffect(() => {
+    if (!user || user.isDemo) return;
+    stateApi
+      .getCheckIns()
+      .then(setCheckIns)
+      .catch(() => {});
+  }, [user]);
 
   // Folders are loaded once; a failure leaves the maps fully usable.
   useEffect(() => {
@@ -196,6 +212,7 @@ export function DashboardPage() {
       { label: t.dashboard.card.owner, onClick: () => setPeople({ map, view: "owner" }) },
       { label: t.dashboard.menu.moveToFolder, onClick: () => setMoveMap(map) },
       { label: t.ui.clipboard.copyMap, onClick: () => handleCopyMap(map) },
+      ...(checkIns[map.mapId]?.before ? [{ label: t.ui.feelings.checkInNow, onClick: () => setCheckInMap(map) }] : []),
       ...(isOwner
         ? [
             { label: t.dashboard.menu.edit, onClick: () => setEditMap(map) },
@@ -376,6 +393,7 @@ export function DashboardPage() {
                       key={`m:${item.map.mapId}`}
                       icon={<MapIcon color={item.map.color} shared={item.map.ownerId !== user?._id} />}
                       title={item.map.name}
+                      subtitle={checkInShift(checkIns[item.map.mapId]) ?? undefined}
                       onOpen={() => navigate(`/maps/${item.map.mapId}`)}
                       menu={mapMenu(item.map)}
                     />
@@ -473,6 +491,18 @@ export function DashboardPage() {
 
       {moveMap && (
         <MoveToFolderModal map={moveMap} folders={folders} onClose={() => setMoveMap(null)} onMoved={applyMove} />
+      )}
+
+      {checkInMap && checkIns[checkInMap.mapId]?.before && (
+        <CheckInModal
+          map={checkInMap}
+          before={checkIns[checkInMap.mapId].before!}
+          onClose={() => setCheckInMap(null)}
+          onSaved={(checkIn) => {
+            setCheckIns((prev) => ({ ...prev, [checkInMap.mapId]: checkIn }));
+            setCheckInMap(null);
+          }}
+        />
       )}
 
       {summaryMap && <MapSummaryModal map={summaryMap} onClose={() => setSummaryMap(null)} />}

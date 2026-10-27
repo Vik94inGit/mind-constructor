@@ -2,6 +2,8 @@ import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { NODE_TYPE_COLORS, ZONE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
+import { FEELING_COLOR, FEELING_EMOJI } from "../utils/feeling";
+import type { Feeling } from "../utils/feeling";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
 import { NodeCrown } from "./NodeCrown";
@@ -139,6 +141,8 @@ interface Props {
   onCardResize?: (size: { w: number; h: number }) => void;
   /** Cards only: the viewer's own fill for this card (utils/cardFill.ts). */
   cardFill?: string;
+  /** The viewer's own feeling about this thought (utils/feeling.ts): a small badge, the card stays where it is. */
+  feeling?: Feeling;
   /** Zoomed far out (MapPage's DOT_ZOOM): drawn as a small dot in its type's color, nothing else. */
   dotted?: boolean;
   /** Puzzle cards only: dragging out of one of this piece's tabs starts a connection to another piece (MapPage's startPuzzleConnect). Unset when this viewer can't link from this node. */
@@ -199,6 +203,7 @@ export const NodeCard = memo(function NodeCard({
   onContextMenu,
   onCardResize,
   cardFill,
+  feeling,
   dotted = false,
   onConnectStart,
   onAddBranch,
@@ -792,6 +797,19 @@ export const NodeCard = memo(function NodeCard({
             title={t.ui.node.orderBadge(node.order)}
           >
             {node.order}
+          </div>
+        )}
+        {/* The viewer's own feeling — the right middle (the left middle has
+            the step number), tinted in the feeling's color. */}
+        {feeling && (
+          <div
+            className="absolute top-1/2 -right-3 z-[6] flex h-[1.4rem] w-[1.4rem] -translate-y-1/2 items-center justify-center rounded-full border-2 text-[0.8rem] leading-none"
+            style={{ borderColor: FEELING_COLOR[feeling], background: `color-mix(in srgb, ${FEELING_COLOR[feeling]} 22%, var(--surface, #fff))` }}
+            title={t.ui.feelings.badge(t.ui.feelings.names[feeling])}
+            data-testid="feeling-badge"
+          >
+            <span aria-hidden="true">{FEELING_EMOJI[feeling]}</span>
+            <span className="sr-only">{t.ui.feelings.badge(t.ui.feelings.names[feeling])}</span>
           </div>
         )}
         {/* Packed-member count — bottom-right corner (the indicator badge
