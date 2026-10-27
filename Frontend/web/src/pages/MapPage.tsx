@@ -30,6 +30,10 @@ import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions, computeRadialPositions, RADIAL_MAX_NEIGHBORS } from "../utils/nodePositions";
 import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
+import { foldAway, loadFolded, overviewFolds, branchParentIds, saveFolded } from "../utils/autoPack";
+import type { FoldedParents } from "../utils/autoPack";
+import { currentView, loadRememberedView, rememberView, VIEW_PROMPT_MIN_NODES } from "../utils/viewPrompt";
+import type { MapView } from "../utils/viewPrompt";
 import { chompAim, chompersFor, chompMove, chompTargets } from "../utils/pacman";
 import type { ChompMove } from "../utils/pacman";
 import { childCaptionsCoveringParents, computeParentIds, nodeSizeMultiplier } from "../utils/nodePriority";
@@ -57,9 +61,8 @@ import { MiniMap } from "../map/MiniMap";
 import { PictureViewer } from "../map/PictureViewer";
 import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
+import { ViewPrompt } from "../map/ViewPrompt";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
-import { levelCount, loadAbstractionLevel, nodeDepths, saveAbstractionLevel, shownAtLevel } from "../utils/abstractionLevel";
-import type { AbstractionLevel } from "../utils/abstractionLevel";
 import { readingOrder, stepNode } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
 import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
@@ -87,6 +90,7 @@ import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId, sentimentOf, ZONE_COLORS, zoneParentId } from "../utils/nodeType";
 import { useRadialBlend } from "../hooks/useRadialBlend";
 import { useNodeEntrance } from "../hooks/useNodeEntrance";
+import { useCardPacking } from "../hooks/useCardPacking";
 import { useCanvasFraming } from "../hooks/useCanvasFraming";
 import { useClipboardActions } from "../hooks/useClipboardActions";
 import { useLineDrawing } from "../hooks/useLineDrawing";
@@ -397,20 +401,30 @@ export function MapPage() {
   // `nodes` (not this), since it has to show a packed member in its
   // container's own unpack list even though the canvas itself doesn't
   // render it.
-  //
-  // The level of abstraction (see utils/abstractionLevel.ts, set from the
-  // view corner's Detail slider) hides everything deeper than the chosen
-  // parentId level the same way — except the open node, so a child just
-  // added or picked from search doesn't vanish from under the viewer.
-  const [abstractionLevel, setAbstractionLevelState] = useState<AbstractionLevel>(() => loadAbstractionLevel(mapId));
-  useEffect(() => setAbstractionLevelState(loadAbstractionLevel(mapId)), [mapId]);
-  function setAbstractionLevel(level: AbstractionLevel) {
-    setAbstractionLevelState(level);
-    saveAbstractionLevel(mapId, level);
-  }
   const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
-  const depthByNode = useMemo(() => nodeDepths(unpackedNodes), [unpackedNodes]);
-  const activeLevel = abstractionLevel;
+  // Auto-pack (utils/autoPack.ts): parents that tuck their branch in, for a
+  // glance at the map without its details — the viewer's own, per map. It
+  // never hides the open node, so a child just added or picked from search
+  // doesn't vanish from under the viewer.
+  const [folded, setFoldedState] = useState<FoldedParents>(() => loadFolded(mapId));
+  useEffect(() => setFoldedState(loadFolded(mapId)), [mapId]);
+  function setFolded(next: FoldedParents) {
+    setFoldedState(next);
+    saveFolded(mapId, next);
+  }
+  const fold = useMemo(() => foldAway(unpackedNodes, folded), [unpackedNodes, folded]);
+  const mapParents = useMemo(() => branchParentIds(unpackedNodes), [unpackedNodes]);
+  function toggleFold(parentId: string) {
+    const next = new Set(folded);
+    if (next.has(parentId)) next.delete(parentId);
+    else next.add(parentId);
+    setFolded(next);
+  }
+  // The overview: every parent packs its last details in (overviewFolds).
+  const overviewOn = folded.size > 0;
+  function setOverview(on: boolean) {
+    setFolded(on ? overviewFolds(unpackedNodes) : new Set());
+  }
   // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.
   const [minimapShown, setMinimapShown] = useState<boolean>(loadMinimapShown);
   function toggleMinimap() {
@@ -431,10 +445,10 @@ export function MapPage() {
         timeLapseNodes[timeLapseStep - 1]?.createdAt,
       );
     }
-    return activeLevel === null
+    return fold.hidden.size === 0
       ? unpackedNodes
-      : unpackedNodes.filter((n) => n.nodeId === selectedId || shownAtLevel(depthByNode.get(n.nodeId), activeLevel));
-  }, [unpackedNodes, depthByNode, activeLevel, selectedId, timeLapseNodes, timeLapseStep, replayAttacks]);
+      : unpackedNodes.filter((n) => n.nodeId === selectedId || !fold.hidden.has(n.nodeId));
+  }, [unpackedNodes, selectedId, timeLapseNodes, timeLapseStep, replayAttacks, fold]);
   // A node drawn as a puzzle card sits at its own card spot, apart from the
   // icon's — see utils/cardSpace.ts. Worked out from the same display choices
   // modeOf reads below, with zones taken by membership alone (their outline
@@ -449,7 +463,14 @@ export function MapPage() {
       return nodeDisplay[id] ?? (zone ? (zone === "dots" ? "actual" : zone) : readingMode);
     });
   }, [nodes, visibleNodes, nodeDisplay, zoneDisplay, readingMode]);
-  const positions = useMemo(() => computeBasePositions(withCardSpots(nodes, cardSpace)), [nodes, cardSpace]);
+  // Someone else's cards, laid out close in the cards view for this viewer
+  // alone (hooks/useCardPacking.ts).
+  const [packedCards, setPackedCards] = useState<Map<string, { x: number; y: number }>>(() => new Map());
+  useEffect(() => setPackedCards(new Map()), [mapId]);
+  const positions = useMemo(
+    () => computeBasePositions(withCardSpots(nodes, cardSpace, packedCards)),
+    [nodes, cardSpace, packedCards],
+  );
   // What saves a move of `node` to `pt`: its card spot or its icon spot.
   function spotFor(node: NodeDoc, pt: { x: number; y: number }) {
     return spotFields(cardSpace.has(node.nodeId), pt);
@@ -1084,6 +1105,73 @@ export function MapPage() {
     linkFailedMessage: t.ui.link.failed,
     isDetached: (id) => !!detachedPieces[id],
   });
+  // The cards view lays its cards close together, linked by nothing drawn,
+  // so they can be read and dragged side by side (hooks/useCardPacking.ts).
+  const fitAllLatest = useRef(fitAll);
+  fitAllLatest.current = fitAll;
+  const cardBoard = useMemo(
+    () => new Set(visibleNodes.filter(onCardBoard).map((n) => n.nodeId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onCardBoard reads exactly these
+    [visibleNodes, dotZoom, nodeDisplay, zoneModes, readingMode],
+  );
+  const { layCardsClose } = useCardPacking({
+    visibleNodes,
+    zoom,
+    onCardBoard,
+    isOwnNode,
+    restingSpot: (n) => positions.get(n.nodeId) ?? { x: n.x ?? CANVAS_W / 2, y: n.y ?? CANVAS_H / 2 },
+    ready: !loading && !entrance.active && !timeLapse,
+    packed: packedCards,
+    setPacked: setPackedCards,
+    setNodes,
+    upsertNode,
+    setActionError,
+    moveFailedMessage: t.ui.errors.moveNodes,
+    // After the cards have glided in, from the newest render's positions.
+    onLaidOut: () => setTimeout(() => fitAllLatest.current(), 450),
+  });
+  // Once a map has built itself up, it takes the view the viewer chose
+  // (utils/viewPrompt.ts): the whole map, an overview with each parent
+  // packed, or the cards. Until they've chosen one, a map with something to
+  // glance over asks them, once; the answer is kept from then on.
+  const [viewPromptOpen, setViewPromptOpen] = useState(false);
+  const settledMap = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || entrance.active || !mapId || settledMap.current === mapId || unpackedNodes.length === 0) return;
+    // A beat later, so an entrance that's only starting doesn't count as over.
+    const timer = setTimeout(() => {
+      settledMap.current = mapId;
+      const remembered = loadRememberedView();
+      if (remembered === null) {
+        if (visibleNodes.length >= VIEW_PROMPT_MIN_NODES) setViewPromptOpen(true);
+      } else if (remembered !== currentView(readingMode, overviewOn)) {
+        showView(remembered);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the map settling matters
+  }, [loading, entrance.active, mapId, unpackedNodes.length]);
+  // Closing the prompt without choosing keeps the view as it is, as the answer.
+  const closeViewPrompt = useCallback(() => {
+    setViewPromptOpen(false);
+    rememberView(currentViewRef.current);
+  }, []);
+  const currentViewRef = useRef<MapView>("map");
+  currentViewRef.current = currentView(readingMode, overviewOn);
+  function chooseView(view: MapView) {
+    setViewPromptOpen(false);
+    rememberView(view);
+    showView(view);
+  }
+  function showView(view: MapView) {
+    if (view === "cards") {
+      setOverview(false);
+      setReadingMode("puzzle");
+      return;
+    }
+    if (readingMode === "puzzle") setReadingMode("mixed");
+    setOverview(view === "overview");
+  }
   // Ungluing cards, on demand from a card's menu: just this one, or every
   // card of its block. An unglued card moves on its own, and dragging it
   // against another card glues it back.
@@ -2111,6 +2199,7 @@ export function MapPage() {
     addBranch: (node) => addBranchFromCard(node),
     hoverText: (nodeId) => void ensureNodeText([nodeId]),
     iconHover: (nodeId, on) => setChompHoverId((cur) => (on ? nodeId : cur === nodeId ? null : cur)),
+    unfold: (nodeId) => toggleFold(nodeId),
   });
 
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
@@ -2554,6 +2643,7 @@ export function MapPage() {
               solvedZones={solvedZones}
               walls={isDiscussionMode}
               realmBorders
+              cardBoard={cardBoard}
               drawing={
                 drawMode
                   ? {
@@ -2619,6 +2709,7 @@ export function MapPage() {
                   inChosenCircle={!!spotlightedSet?.has(node.nodeId)}
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
+                  foldedCount={fold.counts.get(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
                   triumphant={solved.successIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
@@ -2637,7 +2728,11 @@ export function MapPage() {
                     !unmutedAttackNodeIds?.has(node.nodeId)
                   }
                   isParent={parentIds.has(node.nodeId)}
-                  quiet={childIsQuiet(node) || (zoneMutedIds.has(node.nodeId) && selectedId !== node.nodeId)}
+                  // Cards on the board all read alike, to be compared.
+                  quiet={
+                    !cardBoard.has(node.nodeId) &&
+                    (childIsQuiet(node) || (zoneMutedIds.has(node.nodeId) && selectedId !== node.nodeId))
+                  }
                   hideCaption={hiddenChildCaptions.has(node.nodeId) && inlineEditId !== node.nodeId}
                   dropHighlight={
                     puzzleConnect?.overId === node.nodeId
@@ -2784,15 +2879,19 @@ export function MapPage() {
             <>
               {!loading && <GestureHint />}
               <ViewCorner
-                level={abstractionLevel}
-                levels={levelCount(depthByNode)}
-                hiddenCount={unpackedNodes.length - visibleNodes.length}
-                onLevelChange={setAbstractionLevel}
-                readingMode={readingMode}
-                onReadingModeChange={setReadingMode}
                 minimapShown={minimapShown}
                 onToggleMinimap={toggleMinimap}
+                view={currentView(readingMode, overviewOn)}
+                onViewChange={chooseView}
+                onLayCardsClose={layCardsClose}
               />
+              {viewPromptOpen && (
+                <ViewPrompt
+                  view={currentView(readingMode, overviewOn)}
+                  onChoose={chooseView}
+                  onClose={closeViewPrompt}
+                />
+              )}
               {minimapShown && (
               <MiniMap
                 wrapRef={wrapRef}
@@ -3013,6 +3112,8 @@ export function MapPage() {
                     ? () => setMovingNote(selectedNode)
                     : undefined
                 }
+                onAutoPack={mapParents.has(selectedNode.nodeId) ? () => toggleFold(selectedNode.nodeId) : undefined}
+                autoPacked={folded.has(selectedNode.nodeId)}
                 ghostsHidden={ghostsHidden}
                 onToggleGhosts={
                   isOwnNode(selectedNode) && !onCardBoard(selectedNode)

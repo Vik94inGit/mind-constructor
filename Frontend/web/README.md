@@ -49,7 +49,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   card let go on top of others is moved just clear of them, and one dragged close to another (with
   Move on) glues flush against its side — two of your cards glued together get linked and then drag
   as one (`utils/cardGlue.ts`); drag from a card's side handle onto another of your cards to link
-  them. No quick-add ghosts ring a card; instead your selected card has a + button on its bottom edge
+  them. The cards view draws no links: no branch arrows, links, zones or parent rings between two
+  cards, so they read as notes spread on a desk. Cards that have no spot of their own yet are laid
+  close together in reading order (each top idea, then its branch), in a block shaped like the
+  screen, under the cards already placed; your own cards' spots are saved, someone else's are laid
+  out just for you (`utils/cardPack.ts`, `hooks/useCardPacking.ts`). Drag any two side by side to
+  compare them; *Lay the cards close* in the eye menu packs them all again. No quick-add ghosts ring a card; instead your selected card has a + button on its bottom edge
   that starts a branch just under it, clear of the cards around (`cardGlue.ts` `spotBelow`). Each card's fill color can be changed in
   its panel's Info tab (per browser). Each zone can also take its own view (cards, mixed, icons + text, the default look, or
   dots) from the ⋯ button beside its name, so one canvas can show different
@@ -61,6 +66,17 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   weapon marks, quick-add ghosts) and the view glides to the middle of the map; zones near the
   middle of the view stay at full strength while the rest are muted; selecting a node centers it on
   screen.
+- **Views and auto-pack** — the eye menu in the bottom-right corner switches between three ways to
+  look at a map: *Whole map*, *Overview* and *Cards* (`utils/viewPrompt.ts`), which took the place
+  of the old "simpler ↔ more detail" equalizer. The overview
+  auto-packs every parent whose children are all leaves, so the map keeps its shape and only its
+  last details go. Any parent can also be packed or opened on its own from its panel's Info tab
+  (*Pack its branch*); a packed parent shows a "+N" pill on its right that opens it again. Auto-pack
+  is only a way of looking, per browser and per map, and changes nothing on the map
+  (`utils/autoPack.ts`), unlike packing nodes into a container. Once a map of six or more nodes
+  has built itself up, a small card asks once which of the three views to use (`map/ViewPrompt.tsx`);
+  the answer is kept (per browser, closing the card keeps the view as it is) and every map opens in
+  it from then on.
 - **Right-click on empty canvas** — a desktop-style menu at the click point: *Paste here*, *New node ▸*
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* (grows that map kind's starter structure right there, see `utils/templates.ts`),
