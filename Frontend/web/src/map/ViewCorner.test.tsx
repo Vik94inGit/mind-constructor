@@ -6,17 +6,15 @@ import { I18nProvider } from "../i18n/I18nContext";
 import { TRANSLATIONS } from "../i18n/translations";
 
 const s = TRANSLATIONS.en.ui.abstraction;
+const a = TRANSLATIONS.en.ui.autoPack;
 
 function renderCorner(overrides: Partial<React.ComponentProps<typeof ViewCorner>> = {}) {
   const props = {
-    level: null,
-    levels: 3,
-    hiddenCount: 0,
-    onLevelChange: vi.fn(),
-    readingMode: "actual" as const,
-    onReadingModeChange: vi.fn(),
     minimapShown: true,
     onToggleMinimap: vi.fn(),
+    view: "map" as const,
+    onViewChange: vi.fn(),
+    onLayCardsClose: vi.fn(),
     ...overrides,
   };
   render(
@@ -35,24 +33,14 @@ describe("ViewCorner", () => {
     expect(screen.getByText(s.minimap)).toBeInTheDocument();
   });
 
-  it("steps one simpler / more detail equalizer: levels first, then text", async () => {
-    const props = renderCorner({ level: 2, readingMode: "mixed" });
-    await userEvent.click(screen.getByRole("button", { name: s.menu }));
-    expect(screen.getByText(s.level(2, 3))).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: s.richer }));
-    expect(props.onLevelChange).toHaveBeenLastCalledWith(null);
-    expect(props.onReadingModeChange).toHaveBeenLastCalledWith("mixed");
-    await userEvent.click(screen.getByRole("button", { name: s.simpler }));
-    expect(props.onLevelChange).toHaveBeenLastCalledWith(1);
-    expect(props.onReadingModeChange).toHaveBeenLastCalledWith("mixed");
-  });
-
-  it("has one detail equalizer, no separate level or view steppers", async () => {
+  it("has the three views in place of the detail equalizer", async () => {
     renderCorner();
     await userEvent.click(screen.getByRole("button", { name: s.menu }));
-    expect(screen.getAllByRole("button", { name: s.richer })).toHaveLength(1);
-    expect(screen.queryByRole("button", { name: s.fineTune })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: s.moreDetail })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: s.richer })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: s.simpler })).not.toBeInTheDocument();
+    for (const v of ["map", "overview", "cards"] as const) {
+      expect(screen.getByRole("button", { name: a.views[v] })).toBeInTheDocument();
+    }
   });
 
   it("toggles the minimap", async () => {
@@ -68,5 +56,21 @@ describe("ViewCorner", () => {
     expect(button.parentElement!.className).toContain("z-[45]");
     await userEvent.click(button);
     expect(button.parentElement!.className).toContain("z-[49]");
+  });
+
+  it("switches between the whole map, the overview and the cards", async () => {
+    const props = renderCorner({ view: "cards" });
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    expect(screen.getByRole("button", { name: a.views.cards })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: a.views.overview }));
+    expect(props.onViewChange).toHaveBeenCalledWith("overview");
+    await userEvent.click(screen.getByRole("button", { name: /Lay the cards close/ }));
+    expect(props.onLayCardsClose).toHaveBeenCalled();
+  });
+
+  it("offers to lay the cards close only in the cards view", async () => {
+    renderCorner({ view: "map" });
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    expect(screen.queryByRole("button", { name: /Lay the cards close/ })).not.toBeInTheDocument();
   });
 });

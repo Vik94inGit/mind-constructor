@@ -17,6 +17,7 @@ export type CanvasNodeActions = {
   addBranch: (node: NodeDoc) => void;
   hoverText: (nodeId: string) => void;
   iconHover: (nodeId: string, hovered: boolean) => void;
+  unfold: (nodeId: string) => void;
 };
 
 type CardProps = ComponentProps<typeof NodeCard>;
@@ -32,7 +33,8 @@ type Callback =
   | "onConnectStart"
   | "onAddBranch"
   | "onHoverText"
-  | "onIconHover";
+  | "onIconHover"
+  | "onUnfold";
 
 interface Props extends Omit<CardProps, Callback | "flightVector"> {
   actions: CanvasNodeActions;
@@ -87,6 +89,7 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
       onAddBranch={canAddBranch ? () => actions.addBranch(node) : undefined}
       onHoverText={() => actions.hoverText(node.nodeId)}
       onIconHover={canChomp ? (hovered) => actions.iconHover(node.nodeId, hovered) : undefined}
+      onUnfold={card.foldedCount ? () => actions.unfold(node.nodeId) : undefined}
     />
   );
 });

@@ -322,6 +322,20 @@ export interface UiStrings {
     takeParentPlace: string;
   };
   minimapTitle: string;
+  /** Auto-pack (utils/autoPack.ts), the three views (utils/viewPrompt.ts) and the cards view's packing (utils/cardPack.ts). */
+  autoPack: {
+    pack: string;
+    unpack: string;
+    hint: string;
+    open: (n: number) => string;
+    views: { map: string; overview: string; cards: string };
+    viewHints: { map: string; overview: string; cards: string };
+    viewLabel: string;
+    layClose: string;
+    layCloseHint: string;
+    promptTitle: string;
+    promptClose: string;
+  };
   abstraction: {
     title: string;
     label: string;
@@ -908,6 +922,23 @@ const en: UiStrings = {
     takeParentPlace: "Couldn't make it the head of the zone.",
   },
   minimapTitle: "Minimap — click or drag to jump around the map",
+  autoPack: {
+    pack: "Pack its branch",
+    unpack: "Unpack its branch",
+    hint: "Tuck everything below this node in, to see the map without its details (only for you)",
+    open: (n) => `${n} packed in — tap to open`,
+    views: { map: "Whole map", overview: "Overview", cards: "Cards" },
+    viewHints: {
+      map: "Every node, with its links and zones",
+      overview: "Each parent packs its last details in, so you see what the map is about",
+      cards: "Cards close together, no links: drag them side by side to compare",
+    },
+    viewLabel: "View",
+    layClose: "Lay the cards close",
+    layCloseHint: "Put every card back close together, in reading order",
+    promptTitle: "How would you like to look at this map?",
+    promptClose: "Close",
+  },
   abstraction: {
     title: "Level of abstraction — fewer levels show only the bigger ideas",
     label: "Detail",
@@ -920,7 +951,7 @@ const en: UiStrings = {
     moreText: "More text",
     lessText: "Less text",
     minimap: "Minimap",
-    menu: "View controls: detail, view and minimap",
+    menu: "View controls: view and minimap",
     simpler: "Simpler",
     richer: "More detail",
     levels: "Levels",
@@ -1463,6 +1494,23 @@ const cs: UiStrings = {
     takeParentPlace: "Nepodařilo se z něj udělat hlavu zóny.",
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
+  autoPack: {
+    pack: "Sbalit větev",
+    unpack: "Rozbalit větev",
+    hint: "Schovat vše pod tímto uzlem a vidět mapu bez detailů (jen pro vás)",
+    open: (n) => `Sbaleno ${n} — klepnutím otevřete`,
+    views: { map: "Celá mapa", overview: "Přehled", cards: "Karty" },
+    viewHints: {
+      map: "Všechny uzly i s propojeními a zónami",
+      overview: "Každý rodič sbalí poslední detaily, takže vidíte, o čem mapa je",
+      cards: "Karty těsně u sebe, bez propojení: přetáhněte je vedle sebe a porovnejte",
+    },
+    viewLabel: "Zobrazení",
+    layClose: "Srovnat karty k sobě",
+    layCloseHint: "Položit všechny karty znovu těsně k sobě, v pořadí čtení",
+    promptTitle: "Jak se chcete na tuto mapu dívat?",
+    promptClose: "Zavřít",
+  },
   abstraction: {
     title: "Úroveň abstrakce — méně úrovní ukáže jen hlavní myšlenky",
     label: "Detail",
@@ -1475,7 +1523,7 @@ const cs: UiStrings = {
     moreText: "Více textu",
     lessText: "Méně textu",
     minimap: "Minimapa",
-    menu: "Ovládání zobrazení: detail, zobrazení a minimapa",
+    menu: "Ovládání zobrazení: zobrazení a minimapa",
     simpler: "Jednodušší",
     richer: "Více detailů",
     levels: "Úrovně",
@@ -2017,6 +2065,23 @@ const uk: UiStrings = {
     takeParentPlace: "Не вдалося зробити його головою зони.",
   },
   minimapTitle: "Мінімапа — клацніть або перетягніть, щоб перейти по мапі",
+  autoPack: {
+    pack: "Згорнути гілку",
+    unpack: "Розгорнути гілку",
+    hint: "Сховати все під цим вузлом, щоб бачити мапу без деталей (лише для вас)",
+    open: (n) => `Згорнуто ${n} — торкніться, щоб відкрити`,
+    views: { map: "Уся мапа", overview: "Огляд", cards: "Картки" },
+    viewHints: {
+      map: "Усі вузли разом із зв'язками та зонами",
+      overview: "Кожен батько згортає останні деталі, тож видно, про що мапа",
+      cards: "Картки щільно поруч, без зв'язків: перетягніть їх пліч-о-пліч, щоб порівняти",
+    },
+    viewLabel: "Вигляд",
+    layClose: "Скласти картки щільно",
+    layCloseHint: "Знову покласти всі картки щільно поруч, у порядку читання",
+    promptTitle: "Як ви хочете переглянути цю мапу?",
+    promptClose: "Закрити",
+  },
   abstraction: {
     title: "Рівень абстракції — менше рівнів показує лише головні ідеї",
     label: "Деталі",
@@ -2029,7 +2094,7 @@ const uk: UiStrings = {
     moreText: "Більше тексту",
     lessText: "Менше тексту",
     minimap: "Мінімапа",
-    menu: "Керування виглядом: деталі, вигляд і мінімапа",
+    menu: "Керування виглядом: вигляд і мінімапа",
     simpler: "Простіше",
     richer: "Більше деталей",
     levels: "Рівні",
@@ -2574,6 +2639,23 @@ const ru: UiStrings = {
     takeParentPlace: "Не удалось сделать его главой зоны.",
   },
   minimapTitle: "Миникарта — щёлкните или перетащите, чтобы перейти по карте",
+  autoPack: {
+    pack: "Свернуть ветку",
+    unpack: "Развернуть ветку",
+    hint: "Спрятать всё под этим узлом, чтобы видеть карту без деталей (только для вас)",
+    open: (n) => `Свёрнуто ${n} — нажмите, чтобы открыть`,
+    views: { map: "Вся карта", overview: "Обзор", cards: "Карточки" },
+    viewHints: {
+      map: "Все узлы вместе со связями и зонами",
+      overview: "Каждый родитель сворачивает последние детали, чтобы было видно, о чём карта",
+      cards: "Карточки плотно рядом, без связей: перетащите их бок о бок, чтобы сравнить",
+    },
+    viewLabel: "Вид",
+    layClose: "Сложить карточки плотно",
+    layCloseHint: "Снова положить все карточки плотно рядом, в порядке чтения",
+    promptTitle: "Как вы хотите посмотреть эту карту?",
+    promptClose: "Закрыть",
+  },
   abstraction: {
     title: "Уровень абстракции — меньше уровней показывает только главные идеи",
     label: "Детали",
@@ -2586,7 +2668,7 @@ const ru: UiStrings = {
     moreText: "Больше текста",
     lessText: "Меньше текста",
     minimap: "Миникарта",
-    menu: "Управление видом: детали, вид и миникарта",
+    menu: "Управление видом: вид и миникарта",
     simpler: "Проще",
     richer: "Больше деталей",
     levels: "Уровни",

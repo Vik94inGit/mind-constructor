@@ -150,6 +150,9 @@ interface Props {
   onMagnet?: () => Promise<number>;
   /** Change parent: pick another node to hang this one from (MapPage's reparent mode). */
   onChangeParent?: () => void;
+  /** Auto-pack: set on a parent — tucks its branch in for a glance, or opens it again (see InfoTab). */
+  onAutoPack?: () => void;
+  autoPacked?: boolean;
   /** Swap with parent: this node takes its parent's place as head of the zone (utils/edgeRedirect.ts takeParentPlace). */
   onSwapWithParent?: () => void;
   /** The ring of ghosts around the opened node, and the 👻 that hides it. */
@@ -194,6 +197,8 @@ export function NodePanel({
   onToggleLock,
   onMagnet,
   onChangeParent,
+  onAutoPack,
+  autoPacked,
   onSwapWithParent,
   ghostsHidden = false,
   onToggleGhosts,
@@ -1013,6 +1018,8 @@ export function NodePanel({
           onToggleLock={onToggleLock}
           onMagnet={onMagnet}
           onChangeParent={onChangeParent}
+          onAutoPack={onAutoPack}
+          autoPacked={autoPacked}
           onSwapWithParent={onSwapWithParent}
           textareaRef={textareaRef}
           readonlyTextRef={readonlyTextRef}
