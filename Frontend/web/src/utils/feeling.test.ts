@@ -22,7 +22,7 @@ describe("feelings", () => {
     expect(withFeeling(one, "a", null)).toEqual({});
   });
 
-  it("drops anything that isn't one of the eight feelings", () => {
+  it("drops anything that isn't one of the feelings", () => {
     expect(parseFeelings({ a: "calm", b: "bored", c: 3 })).toEqual({ a: "calm" });
     expect(parseFeelings(null)).toEqual({});
   });

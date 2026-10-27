@@ -5,16 +5,42 @@
 // Backend's MapViewState.feelings / checkIn). A feeling is only a badge and a
 // tint; it never moves a node.
 
-export const FEELINGS = ["worried", "sad", "angry", "confused", "hopeful", "excited", "calm", "relieved"] as const;
+// Heavy ones first, then the lighter ones, so the picker reads as a scale.
+export const FEELINGS = [
+  "worried",
+  "anxious",
+  "scared",
+  "sad",
+  "angry",
+  "frustrated",
+  "confused",
+  "tired",
+  "curious",
+  "hopeful",
+  "excited",
+  "happy",
+  "proud",
+  "grateful",
+  "calm",
+  "relieved",
+] as const;
 export type Feeling = (typeof FEELINGS)[number];
 
 export const FEELING_EMOJI: Record<Feeling, string> = {
   worried: "😟",
+  anxious: "😰",
+  scared: "😨",
   sad: "😢",
   angry: "😠",
+  frustrated: "😤",
   confused: "😕",
+  tired: "😩",
+  curious: "🤔",
   hopeful: "🙂",
   excited: "🤩",
+  happy: "😄",
+  proud: "😎",
+  grateful: "🥰",
   calm: "😌",
   relieved: "😮‍💨",
 };
@@ -22,11 +48,19 @@ export const FEELING_EMOJI: Record<Feeling, string> = {
 /** A soft color per feeling, for the badge's tint. */
 export const FEELING_COLOR: Record<Feeling, string> = {
   worried: "#f59e0b",
+  anxious: "#fb923c",
+  scared: "#818cf8",
   sad: "#60a5fa",
   angry: "#ef4444",
+  frustrated: "#f97316",
   confused: "#a78bfa",
+  tired: "#94a3b8",
+  curious: "#22d3ee",
   hopeful: "#34d399",
   excited: "#f472b6",
+  happy: "#facc15",
+  proud: "#c084fc",
+  grateful: "#fb7185",
   calm: "#2dd4bf",
   relieved: "#84cc16",
 };

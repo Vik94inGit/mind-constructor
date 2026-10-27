@@ -120,7 +120,7 @@ describe("userStateAbl", () => {
 
     it("saves the viewer's own feeling per node and a before/after check-in", async () => {
       const fields = {
-        feelings: { a: "worried", b: "relieved" },
+        feelings: { a: "worried", b: "relieved", c: "grateful", d: "frustrated" },
         checkIn: { before: { feeling: "worried", strength: 4, at: 1 }, after: { feeling: "calm", strength: 2, at: 2 } },
       };
       await updateMapViewStateAbl("m1", fields, "u1");

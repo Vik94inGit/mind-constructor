@@ -809,7 +809,10 @@ export const NodeCard = memo(function NodeCard({
             title={t.ui.feelings.badge(t.ui.feelings.names[feeling])}
             data-testid="feeling-badge"
           >
-            <span aria-hidden="true">{FEELING_EMOJI[feeling]}</span>
+            {/* Keyed by the feeling, so each new one pops in. */}
+            <span key={feeling} aria-hidden="true" className="inline-block animate-feeling-pop">
+              {FEELING_EMOJI[feeling]}
+            </span>
             <span className="sr-only">{t.ui.feelings.badge(t.ui.feelings.names[feeling])}</span>
           </div>
         )}

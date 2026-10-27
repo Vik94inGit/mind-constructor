@@ -2,7 +2,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { FEELINGS, FEELING_COLOR, FEELING_EMOJI } from "../utils/feeling";
 import type { Feeling } from "../utils/feeling";
 
-// One tap picks a feeling (utils/feeling.ts): a row of the eight emoji, the
+// One tap picks a feeling (utils/feeling.ts): a row of the sixteen emoji, the
 // chosen one ringed in its own color. Tapping the chosen one again clears it
 // when `clearable`; so does the "None" button, when `noneLabel` is given.
 export function FeelingPicker({
@@ -41,7 +41,9 @@ export function FeelingPicker({
             }`}
             style={selected ? { borderColor: FEELING_COLOR[f], background: `${FEELING_COLOR[f]}33` } : undefined}
           >
-            <span aria-hidden="true">{FEELING_EMOJI[f]}</span>
+            <span key={selected ? "on" : "off"} aria-hidden="true" className={selected ? "inline-block animate-feeling-pop" : undefined}>
+              {FEELING_EMOJI[f]}
+            </span>
           </button>
         );
       })}
