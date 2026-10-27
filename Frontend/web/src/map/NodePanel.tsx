@@ -154,6 +154,8 @@ interface Props {
   autoPacked?: boolean;
   /** Swap with parent: this node takes its parent's place as head of the zone (utils/edgeRedirect.ts takeParentPlace). */
   onSwapWithParent?: () => void;
+  /** Move to a map: shown on the Inbox's notes (utils/inbox.ts). */
+  onMoveToMap?: () => void;
   /** The ring of ghosts around the opened node, and the 👻 that hides it. */
   ghostsHidden?: boolean;
   onToggleGhosts?: () => void;
@@ -199,6 +201,7 @@ export function NodePanel({
   onAutoPack,
   autoPacked,
   onSwapWithParent,
+  onMoveToMap,
   ghostsHidden = false,
   onToggleGhosts,
   autoFocusText = false,
@@ -1028,6 +1031,7 @@ export function NodePanel({
           onAutoPack={onAutoPack}
           autoPacked={autoPacked}
           onSwapWithParent={onSwapWithParent}
+          onMoveToMap={onMoveToMap}
           textareaRef={textareaRef}
           readonlyTextRef={readonlyTextRef}
           textDraft={textDraft}

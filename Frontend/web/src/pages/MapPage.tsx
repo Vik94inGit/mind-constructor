@@ -132,6 +132,8 @@ import { HistoryPanel } from "../map/HistoryPanel";
 import { BURST_MS, NodeBurst } from "../map/NodeBurst";
 import { mapBackgroundStyle } from "../utils/mapBackground";
 import { useConfirm } from "../context/ConfirmContext";
+import { MoveNoteModal } from "../dashboard/MoveNoteModal";
+import { findInbox, noteBranch } from "../utils/inbox";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -291,6 +293,8 @@ export function MapPage() {
   // (whole map vs. one cluster) never overlap and need different node
   // lists/titles passed into the same ExportTextModal.
   const [extractClusterRootId, setExtractClusterRootId] = useState<string | null>(null);
+  // The Inbox note whose "Move to a map" picker is open (dashboard/MoveNoteModal).
+  const [movingNote, setMovingNote] = useState<NodeDoc | null>(null);
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
   const { shotState, triggerWeaponShot } = useWeaponReplay();
   // The node the pointer rests on, when it starts a Pac-Man run: a strong
@@ -1337,6 +1341,9 @@ export function MapPage() {
   // owns like any other, just one that happened to spawn from an attack
   // rather than the toolbar. Client-side only: this can't stop a crafted
   // request straight to the API, just the UI paths.
+  // This map is the user's Inbox (utils/inbox.ts): its notes offer "Move to a map".
+  const isInboxMap = !!map && !!user && findInbox([map], user._id, t.dashboard.quickNote.inboxName)?.mapId === map.mapId;
+
   function isOwnNode(node: NodeDoc) {
     return idOf(node.userId) === user?._id;
   }
@@ -3087,6 +3094,12 @@ export function MapPage() {
                 onSwapWithParent={
                   isOwnNode(selectedNode) && zoneParentId(selectedNode) ? () => void headZone(selectedNode) : undefined
                 }
+                // Move to a map: only on the Inbox, where quick notes wait to be sorted.
+                onMoveToMap={
+                  isInboxMap && isOwnNode(selectedNode) && !selectedNode.isWeapon && !selectedNode.isProtection
+                    ? () => setMovingNote(selectedNode)
+                    : undefined
+                }
                 onAutoPack={mapParents.has(selectedNode.nodeId) ? () => toggleFold(selectedNode.nodeId) : undefined}
                 autoPacked={folded.has(selectedNode.nodeId)}
                 ghostsHidden={ghostsHidden}
@@ -3177,6 +3190,23 @@ export function MapPage() {
           )
         )}
       </div>
+
+      {movingNote && map && (
+        <MoveNoteModal
+          inboxId={map.mapId}
+          noteId={movingNote.nodeId}
+          noteText={movingNote.text}
+          onClose={() => setMovingNote(null)}
+          onMoved={(target) => {
+            const gone = new Set(noteBranch(nodes, movingNote.nodeId));
+            setNodes((prev) => prev.filter((n) => !gone.has(n.nodeId)));
+            setEdges((prev) => prev.filter((e) => !gone.has(nodeRefId(e.fromNodeId) ?? "") && !gone.has(nodeRefId(e.toNodeId) ?? "")));
+            setSelectedId(null);
+            setMovingNote(null);
+            showNotice(t.ui.inbox.moved(target.name));
+          }}
+        />
+      )}
 
       {pictureView && <PictureViewer key={pictureView.nodeId} images={pictureView.images} onClose={closePictureView} />}
 
