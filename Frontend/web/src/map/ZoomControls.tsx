@@ -24,7 +24,7 @@ export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset, onFit, minima
   const { t } = useI18n();
   return (
     <div className={`absolute ${minimapShown ? "bottom-[142px]" : "bottom-[56px]"} right-3 z-[45] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card`}>
-      <button type="button" className={stepBtn} disabled={zoom <= MIN_ZOOM} title={t.map.toolbar.zoomOut} onClick={onZoomOut}>
+      <button type="button" className={stepBtn} disabled={zoom <= MIN_ZOOM} title={t.map.toolbar.zoomOut} aria-label={t.map.toolbar.zoomOut} onClick={onZoomOut}>
         −
       </button>
       <button
@@ -36,7 +36,7 @@ export function ZoomControls({ zoom, onZoomOut, onZoomIn, onReset, onFit, minima
       >
         {Math.round(zoom * 100)}%
       </button>
-      <button type="button" className={stepBtn} disabled={zoom >= MAX_ZOOM} title={t.map.toolbar.zoomIn} onClick={onZoomIn}>
+      <button type="button" className={stepBtn} disabled={zoom >= MAX_ZOOM} title={t.map.toolbar.zoomIn} aria-label={t.map.toolbar.zoomIn} onClick={onZoomIn}>
         +
       </button>
       <button type="button" className={stepBtn} title={t.map.toolbar.fitMap} aria-label={t.map.toolbar.fitMap} onClick={onFit}>

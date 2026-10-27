@@ -335,6 +335,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
             // claimed by the browser as double-tap-to-zoom on a phone.
             style={{ left: x, top: y, touchAction: onSketch ? "none" : "manipulation", opacity: sketch?.type === type ? 0.3 : undefined }}
             title={armedType === type ? `${t.ui.types[type]} — ${t.ui.node.ghostAgain}` : onSketch ? `${t.ui.types[type]} — ${t.ui.node.ghostDrag}` : t.ui.types[type]}
+            aria-label={t.ui.types[type]}
             onPointerDown={(e) => startSketch(e, type, { x, y })}
             onClick={(e) => {
               e.stopPropagation();

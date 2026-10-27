@@ -1,3 +1,5 @@
+import { useI18n } from "../i18n/I18nContext";
+
 // The error banner's dismiss button.
 const btnSmGhost =
   "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50";
@@ -18,12 +20,13 @@ export function MapBanner({
   message: string;
   onDismiss: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div
       className={`mx-4 mt-[0.6rem] flex items-center justify-between gap-3 rounded-lg ${TONE_CLASS[tone]} px-[0.9rem] py-[0.7rem] text-[0.85rem]`}
     >
       {message}
-      <button className={btnSmGhost} onClick={onDismiss}>
+      <button type="button" className={btnSmGhost} title={t.ui.common.close} aria-label={t.ui.common.close} onClick={onDismiss}>
         ✕
       </button>
     </div>

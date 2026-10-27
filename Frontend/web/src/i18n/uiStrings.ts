@@ -137,6 +137,9 @@ export interface UiStrings {
     byUser: (name: string) => string;
     /** The panel's buttons that read the previous / next node (← / → on the keyboard too). */
     prevNode: string;
+    /** Screen-reader names: the panel's text field, and its row of tabs. */
+    textLabel: string;
+    tabsLabel: string;
     nextNode: string;
     root: string;
     healthLine: (health: number, defeated: boolean) => string;
@@ -719,6 +722,8 @@ const en: UiStrings = {
   node: {
     byUser: (name) => `by ${name}`,
     prevNode: "Previous node (←)",
+    textLabel: "Node text",
+    tabsLabel: "Node sections",
     nextNode: "Next node (→)",
     root: "root",
     healthLine: (h, defeated) => `${h}/100 health${defeated ? " · defeated" : ""}`,
@@ -1309,6 +1314,8 @@ const cs: UiStrings = {
   node: {
     byUser: (name) => `od ${name}`,
     prevNode: "Předchozí uzel (←)",
+    textLabel: "Text uzlu",
+    tabsLabel: "Části uzlu",
     nextNode: "Další uzel (→)",
     root: "kořen",
     healthLine: (h, defeated) => `${h}/100 zdraví${defeated ? " · poražen" : ""}`,
@@ -1898,6 +1905,8 @@ const uk: UiStrings = {
   node: {
     byUser: (name) => `від ${name}`,
     prevNode: "Попередній вузол (←)",
+    textLabel: "Текст вузла",
+    tabsLabel: "Розділи вузла",
     nextNode: "Наступний вузол (→)",
     root: "корінь",
     healthLine: (h, defeated) => `${h}/100 здоров’я${defeated ? " · переможений" : ""}`,
@@ -2490,6 +2499,8 @@ const ru: UiStrings = {
   node: {
     byUser: (name) => `от ${name}`,
     prevNode: "Предыдущий узел (←)",
+    textLabel: "Текст узла",
+    tabsLabel: "Разделы узла",
     nextNode: "Следующий узел (→)",
     root: "корень",
     healthLine: (h, defeated) => `${h}/100 здоровья${defeated ? " · побеждён" : ""}`,

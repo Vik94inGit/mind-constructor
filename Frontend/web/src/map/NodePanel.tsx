@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
@@ -22,6 +22,7 @@ import { PackedTab } from "./nodePanel/PackedTab";
 import { HistoryTab } from "./nodePanel/HistoryTab";
 import { ImagesSection } from "./nodePanel/ImagesSection";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
+import { moveRovingFocus } from "../utils/roving";
 import { MAX_NODE_IMAGES, imageFilesFrom, makeCardImage, makeIconImage, shrinkImage } from "../utils/images";
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
@@ -358,6 +359,7 @@ export function NodePanel({
     "history",
   ];
   const [tab, setTab] = useState<Tab>("info");
+  const tabIdBase = useId();
 
   // A <textarea>'s own rendered height is CSS/rows-driven, not content-
   // driven — removing max-height above (the `expanded` class swap) doesn't
@@ -901,31 +903,6 @@ export function NodePanel({
         ...(panelHeight != null ? { height: panelHeight, maxHeight: panelHeight } : undefined),
       }}
     >
-      {/* Top row, pinned to the sheet's top edge: the big previous/next
-          arrows at either end, right next to the canvas, and the resize
-          handle between them: drag it up to give the panel (and the text
-          box in it) more room, down for less (see
-          panelHeight/onResizeHandlePointerDown). The handle is its own
-          element so pressing an arrow never starts a resize. */}
-      <div className="flex flex-shrink-0 items-center gap-2 px-3 pt-2">
-        {onStepNode && (
-          <button className={stepBtn} title={t.ui.node.prevNode} aria-label={t.ui.node.prevNode} onClick={() => onStepNode(-1, false)}>
-            ←
-          </button>
-        )}
-        <div
-          className="flex h-[2.75rem] flex-1 touch-none cursor-ns-resize items-center justify-center select-none"
-          onPointerDown={onResizeHandlePointerDown}
-          title={t.ui.panelResizeHandle}
-        >
-          <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
-        </div>
-        {onStepNode && (
-          <button className={stepBtn} title={t.ui.node.nextNode} aria-label={t.ui.node.nextNode} onClick={() => onStepNode(1, false)}>
-            →
-          </button>
-        )}
-      </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-3">
       {/* Grip handle — the only way to drag this sheet off its default
           bottom dock (see dragOffset/onGripPointerDown above). A dedicated
@@ -981,9 +958,28 @@ export function NodePanel({
             </p>
           </div>
           {tabs.length > 1 && (
-            <div className="flex flex-wrap gap-[0.35rem]">
+            // One Tab stop on the open tab; the arrow keys switch tabs.
+            <div
+              className="flex flex-wrap gap-[0.35rem]"
+              role="tablist"
+              aria-label={t.ui.node.tabsLabel}
+              onKeyDown={(e) => {
+                const to = moveRovingFocus(e, '[role="tab"]');
+                if (to !== null) setTab(tabs[to]);
+              }}
+            >
               {tabs.map((t) => (
-                <button key={t} className={tabBtn(tab === t)} onClick={() => setTab(t)}>
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  id={`${tabIdBase}-tab-${t}`}
+                  aria-selected={tab === t}
+                  aria-controls={`${tabIdBase}-panel`}
+                  tabIndex={tab === t ? 0 : -1}
+                  className={tabBtn(tab === t)}
+                  onClick={() => setTab(t)}
+                >
                   {tabLabel[t]}
                 </button>
               ))}
@@ -1004,7 +1000,7 @@ export function NodePanel({
               <span className={ghostsHidden ? "opacity-40 grayscale" : ""}>👻</span>
             </button>
           )}
-          <button className={closeBtn} onClick={onClose}>
+          <button type="button" className={closeBtn} title={t.ui.common.close} aria-label={t.ui.common.close} onClick={onClose}>
             ✕
           </button>
         </div>
@@ -1014,6 +1010,10 @@ export function NodePanel({
         <div className="mt-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
       )}
 
+      <div
+        id={`${tabIdBase}-panel`}
+        {...(tabs.length > 1 ? { role: "tabpanel", "aria-labelledby": `${tabIdBase}-tab-${tab}` } : {})}
+      >
       {tab === "info" && (
         <InfoTab
           node={node}
@@ -1142,6 +1142,35 @@ export function NodePanel({
       {tab === "pack" && <PackedTab packedMembers={packedMembers} busy={busy} onUnpack={handleUnpack} />}
 
       {tab === "history" && <HistoryTab history={history} />}
+      </div>
+      </div>
+      {/* Top row, pinned to the sheet's top edge: the big previous/next
+          arrows at either end, right next to the canvas, and the resize
+          handle between them: drag it up to give the panel (and the text
+          box in it) more room, down for less (see
+          panelHeight/onResizeHandlePointerDown). The handle is its own
+          element so pressing an arrow never starts a resize. Comes after
+          the panel's content in the markup (order-first draws it on top), so
+          Tab reaches the type, the tabs, close and the open tab's content
+          before these arrows. */}
+      <div className="order-first flex flex-shrink-0 items-center gap-2 px-3 pt-2">
+        {onStepNode && (
+          <button className={stepBtn} title={t.ui.node.prevNode} aria-label={t.ui.node.prevNode} onClick={() => onStepNode(-1, false)}>
+            ←
+          </button>
+        )}
+        <div
+          className="flex h-[2.75rem] flex-1 touch-none cursor-ns-resize items-center justify-center select-none"
+          onPointerDown={onResizeHandlePointerDown}
+          title={t.ui.panelResizeHandle}
+        >
+          <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
+        </div>
+        {onStepNode && (
+          <button className={stepBtn} title={t.ui.node.nextNode} aria-label={t.ui.node.nextNode} onClick={() => onStepNode(1, false)}>
+            →
+          </button>
+        )}
       </div>
     </div>
   );

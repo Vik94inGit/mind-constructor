@@ -38,6 +38,8 @@ export function PackPickerPanel({ containerText, picks, error, onRemove, onConfi
         </div>
         <button
           className="inline-flex flex-shrink-0 cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.5rem] py-[0.3rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] hover:bg-surface-2"
+          title={t.ui.common.cancel}
+          aria-label={t.ui.common.cancel}
           onClick={onCancel}
         >
           ✕
@@ -60,6 +62,7 @@ export function PackPickerPanel({ containerText, picks, error, onRemove, onConfi
                 className="inline-flex flex-shrink-0 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent px-[0.4rem] py-[0.1rem] text-[0.78rem] font-semibold text-ink-soft hover:bg-surface"
                 onClick={() => onRemove(n.nodeId)}
                 title={t.ui.pack.removeTitle}
+                aria-label={t.ui.pack.removeTitle}
               >
                 ✕
               </button>

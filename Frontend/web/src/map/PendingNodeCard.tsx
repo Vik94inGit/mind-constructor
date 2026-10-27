@@ -126,6 +126,7 @@ export function PendingNodeCard({ x, y, type, initialText = "", emoji, iconOnly 
             className="flex h-full w-full cursor-pointer items-center justify-center rounded-full overflow-hidden border-2 bg-surface p-0 font-[inherit] shadow-card hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)]"
             style={{ borderColor: NODE_TYPE_COLORS[draftType] }}
             title={t.ui.node.clickToChangeType}
+            aria-label={`${t.ui.types[draftType]} — ${t.ui.node.clickToChangeType}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();

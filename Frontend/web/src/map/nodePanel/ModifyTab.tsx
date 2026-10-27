@@ -78,18 +78,18 @@ export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutc
       {node.isWeapon && target && (
         <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
           {t.ui.node.pointsAt}{" "}
-          <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(target.nodeId)}>
+          <button type="button" className="cursor-pointer text-left" onClick={() => onSelectNode(target.nodeId)}>
             {target.text.slice(0, 40)}
-          </a>
+          </button>
         </p>
       )}
 
       {node.isProtection && protectedTarget && (
         <p style={{ fontSize: "0.8rem", marginTop: "0.4rem" }}>
           🛡️ {t.ui.node.protects}{" "}
-          <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(protectedTarget.nodeId)}>
+          <button type="button" className="cursor-pointer text-left" onClick={() => onSelectNode(protectedTarget.nodeId)}>
             {protectedTarget.text.slice(0, 40)}
-          </a>
+          </button>
         </p>
       )}
 
@@ -105,9 +105,9 @@ export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutc
           {protectors.map((p, i) => (
             <span key={p.nodeId}>
               {i > 0 && ", "}
-              <a role="button" style={{ cursor: "pointer" }} onClick={() => onSelectNode(p.nodeId)}>
+              <button type="button" className="cursor-pointer text-left" onClick={() => onSelectNode(p.nodeId)}>
                 {p.text.slice(0, 24)}
-              </a>
+              </button>
             </span>
           ))}
         </p>
@@ -343,6 +343,7 @@ export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutc
             onClick={() => onSetSymbol("check")}
             disabled={busy}
             title={t.ui.node.symbolCheckTitle}
+            aria-label={t.ui.node.symbolCheckTitle}
           >
             ✓
           </button>
@@ -355,6 +356,7 @@ export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutc
             onClick={() => onSetSymbol("cross")}
             disabled={busy}
             title={t.ui.node.symbolCrossTitle}
+            aria-label={t.ui.node.symbolCrossTitle}
           >
             ✗
           </button>
@@ -413,6 +415,8 @@ export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutc
                 <button
                   className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => onDeleteEdge(e.edgeId)}
+                  title={t.ui.contextMenu.unlinkEdge(other ? other.text.slice(0, 24) : "…")}
+                  aria-label={t.ui.contextMenu.unlinkEdge(other ? other.text.slice(0, 24) : "…")}
                 >
                   ✕
                 </button>

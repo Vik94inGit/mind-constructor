@@ -1004,6 +1004,7 @@ export const NodeCard = memo(function NodeCard({
               className={`flex h-full w-full cursor-pointer items-center justify-center p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${shapeBodyClass(node.shape)}`}
               style={{ borderColor: softEdge(circleBorderColor) }}
               title={t.ui.node.clickToChangeType}
+              aria-label={`${t.ui.types[displayType]} — ${t.ui.node.clickToChangeType}`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();

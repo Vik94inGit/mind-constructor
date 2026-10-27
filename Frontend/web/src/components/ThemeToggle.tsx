@@ -45,6 +45,7 @@ export function ThemeToggle() {
       type="button"
       className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-ink transition-[background-color] duration-[120ms] hover:bg-surface-2"
       title={theme === "dark" ? t.theme.toggleToLight : t.theme.toggleToDark}
+      aria-label={theme === "dark" ? t.theme.toggleToLight : t.theme.toggleToDark}
       onClick={toggleTheme}
     >
       {theme === "dark" ? <SunIcon /> : <MoonIcon />}
