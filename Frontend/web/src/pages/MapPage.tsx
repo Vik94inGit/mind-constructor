@@ -55,6 +55,7 @@ import type { RedirectRefusal } from "../utils/edgeRedirect";
 import { NewNodePanel } from "../map/NewNodePanel";
 import { useFlipSequence } from "../hooks/useFlipSequence";
 import { NodeContextMenu } from "../map/NodeContextMenu";
+import { CheckInPrompt } from "../map/CheckInPrompt";
 import type { NodeLinkItem } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { MiniMap } from "../map/MiniMap";
@@ -232,6 +233,10 @@ export function MapPage() {
     toggleBlockLock: toggleStoredBlockLock,
     cardFills,
     setCardFill,
+    feelings,
+    setFeeling,
+    checkIn,
+    setCheckIn,
     detachedPieces,
     setPiecesDetached,
     savedView,
@@ -2437,6 +2442,7 @@ export function MapPage() {
           busy={finishBusy}
         />
       )}
+      {mapId && !timeLapse && <CheckInPrompt key={mapId} mapId={mapId} checkIn={checkIn} finished={isFinished} onSave={setCheckIn} />}
 
       <div className="flex min-h-0 flex-1">
         {desktopLayout && !presenting && renderToolbar(true)}
@@ -2742,6 +2748,7 @@ export function MapPage() {
                   actions={nodeActions}
                   canResize={canEditNode(node)}
                   cardFill={cardFills[node.nodeId]}
+                  feeling={node.isWeapon ? undefined : feelings[node.nodeId]}
                   dotted={dotZoom || dottedByZone(node.nodeId)}
                   blockLocked={!!blockLocks[node.nodeId]}
                   canToggleLock={isOwnNode(node)}
@@ -3118,6 +3125,11 @@ export function MapPage() {
                     ? () => magnetize(selectedNode)
                     : undefined
                 }
+                feeling={
+                  selectedNode.isWeapon
+                    ? null
+                    : { value: feelings[selectedNode.nodeId], onChange: (f) => setFeeling(selectedNode.nodeId, f) }
+                }
                 cardFill={(() => {
                   const mode = modeOf(selectedNode.nodeId);
                   const isCard =
@@ -3260,6 +3272,11 @@ export function MapPage() {
             nodeGroups.some((g) => g.rootId === contextMenu.node.nodeId)
               ? { value: zoneDisplay[contextMenu.node.nodeId] ?? null, onPick: (m) => setZoneMode(contextMenu.node.nodeId, m) }
               : undefined
+          }
+          feeling={
+            contextMenu.node.isWeapon
+              ? undefined
+              : { value: feelings[contextMenu.node.nodeId], onPick: (f) => setFeeling(contextMenu.node.nodeId, f) }
           }
           onClose={() => setContextMenu(null)}
           onCreate={() => {

@@ -62,4 +62,13 @@ describe("NodeContextMenu", () => {
     fireEvent.click(screen.getByText(en.ui.display.zoneLayoutNested));
     expect(onPick).toHaveBeenCalledWith("nested");
   });
+
+  it("sets the viewer's own feeling from the Feeling submenu, even on someone else's node", () => {
+    const onPick = vi.fn();
+    const { onClose } = setup({ isOwner: false, feeling: { value: undefined, onPick } });
+    fireEvent.click(screen.getByText(`${en.ui.feelings.label} ›`));
+    fireEvent.click(screen.getByText(en.ui.feelings.names.hopeful));
+    expect(onPick).toHaveBeenCalledWith("hopeful");
+    expect(onClose).toHaveBeenCalled();
+  });
 });

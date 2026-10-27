@@ -5,6 +5,8 @@ import { THINK_STRINGS } from "./thinkStrings";
 import type { ThinkStrings } from "./thinkStrings";
 import { SIEGE_STRINGS } from "./siegeStrings";
 import type { SiegeStrings } from "./siegeStrings";
+import { FEELING_STRINGS } from "./feelingStrings";
+import type { FeelingStrings } from "./feelingStrings";
 
 // The rest of the app's user-facing text — panels, menus, modals, and the
 // messages shown when something goes wrong. translations.ts keeps the core
@@ -419,6 +421,8 @@ export interface UiStrings {
   think: ThinkStrings;
   /** The opponent's turn in discussion mode — see siegeStrings.ts. */
   siege: SiegeStrings;
+  /** Feelings on thoughts and the before/after check-in — see feelingStrings.ts. */
+  feelings: FeelingStrings;
   /** The offline / syncing indicator — see components/OfflineBanner.tsx. */
   offline: {
     offline: string;
@@ -1028,6 +1032,7 @@ const en: UiStrings = {
   },
   think: THINK_STRINGS.en,
   siege: SIEGE_STRINGS.en,
+  feelings: FEELING_STRINGS.en,
   cardMenuLabel: "Map menu",
   offline: {
     offline: "Offline · saved on this device",
@@ -1617,6 +1622,7 @@ const cs: UiStrings = {
   },
   think: THINK_STRINGS.cs,
   siege: SIEGE_STRINGS.cs,
+  feelings: FEELING_STRINGS.cs,
   cardMenuLabel: "Nabídka mapy",
   offline: {
     offline: "Offline · ukládá se v zařízení",
@@ -2205,6 +2211,7 @@ const uk: UiStrings = {
   },
   think: THINK_STRINGS.uk,
   siege: SIEGE_STRINGS.uk,
+  feelings: FEELING_STRINGS.uk,
   cardMenuLabel: "Меню мапи",
   offline: {
     offline: "Офлайн · зберігається на пристрої",
@@ -2796,6 +2803,7 @@ const ru: UiStrings = {
   },
   think: THINK_STRINGS.ru,
   siege: SIEGE_STRINGS.ru,
+  feelings: FEELING_STRINGS.ru,
   cardMenuLabel: "Меню карты",
   offline: {
     offline: "Офлайн · сохраняется на устройстве",

@@ -2,6 +2,7 @@ import { describe, beforeEach, it, expect, vi } from "vitest";
 import { getMapByIdDao } from "../src/dao/mapsDao.js";
 import {
   deleteDraftDao,
+  getCheckInsDao,
   getDraftDao,
   getMapViewStateDao,
   getUserStateDao,
@@ -11,6 +12,7 @@ import {
 } from "../src/dao/userStateDao.js";
 import {
   deleteDraftAbl,
+  getCheckInsAbl,
   getDraftAbl,
   getMapViewStateAbl,
   getUserStateAbl,
@@ -29,6 +31,7 @@ vi.mock("../src/dao/userStateDao.js", () => ({
   updatePreferencesDao: vi.fn(),
   getMapViewStateDao: vi.fn(),
   updateMapViewStateDao: vi.fn(),
+  getCheckInsDao: vi.fn(),
   getDraftDao: vi.fn(),
   saveDraftDao: vi.fn(),
   deleteDraftDao: vi.fn(),
@@ -109,6 +112,46 @@ describe("userStateAbl", () => {
       await expect(updateMapViewStateAbl("m1", { cardFills: { a: "red" } }, "u1")).rejects.toThrow(ValidationError);
       await expect(updateMapViewStateAbl("m1", { zoom: 2 }, "u1")).rejects.toThrow(ValidationError);
       await expect(updateMapViewStateAbl("m1", { zoneLayout: { r: "flat" } }, "u1")).rejects.toThrow(ValidationError);
+    });
+  });
+
+  describe("feelings and check-ins", () => {
+    beforeEach(() => vi.mocked(getMapByIdDao).mockResolvedValue({ mapId: "m1" } as never));
+
+    it("saves the viewer's own feeling per node and a before/after check-in", async () => {
+      const fields = {
+        feelings: { a: "worried", b: "relieved" },
+        checkIn: { before: { feeling: "worried", strength: 4, at: 1 }, after: { feeling: "calm", strength: 2, at: 2 } },
+      };
+      await updateMapViewStateAbl("m1", fields, "u1");
+      expect(updateMapViewStateDao).toHaveBeenCalledWith("u1", "m1", fields);
+    });
+
+    it("lets a check-in wait for its after, or be cleared", async () => {
+      await updateMapViewStateAbl("m1", { checkIn: { before: { feeling: "sad", strength: 1, at: 1 }, after: null } }, "u1");
+      await updateMapViewStateAbl("m1", { checkIn: null }, "u1");
+      expect(updateMapViewStateDao).toHaveBeenCalledTimes(2);
+    });
+
+    it("rejects a feeling that isn't on the list, and a strength outside 1-5", async () => {
+      await expect(updateMapViewStateAbl("m1", { feelings: { a: "bored" } }, "u1")).rejects.toThrow(ValidationError);
+      await expect(
+        updateMapViewStateAbl("m1", { checkIn: { before: { feeling: "calm", strength: 6, at: 1 } } }, "u1"),
+      ).rejects.toThrow(ValidationError);
+      await expect(
+        updateMapViewStateAbl("m1", { checkIn: { before: { feeling: "calm", strength: 2.5, at: 1 } } }, "u1"),
+      ).rejects.toThrow(ValidationError);
+      expect(updateMapViewStateDao).not.toHaveBeenCalled();
+    });
+
+    it("lists the check-in of every map that has one", async () => {
+      const before = { feeling: "worried", strength: 4, at: 1 };
+      vi.mocked(getCheckInsDao).mockResolvedValue([
+        { mapId: "m1", checkIn: { before, after: null } },
+        { mapId: "m2", checkIn: null },
+      ] as never);
+      await expect(getCheckInsAbl("u1")).resolves.toEqual({ m1: { before, after: null } });
+      expect(getCheckInsDao).toHaveBeenCalledWith("u1");
     });
   });
 

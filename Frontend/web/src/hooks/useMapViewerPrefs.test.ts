@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { useMapViewerPrefs } from "./useMapViewerPrefs";
 import { loadBlockLocks } from "../utils/blockLock";
 import { loadCardFills } from "../utils/cardFill";
+import { loadFeelings } from "../utils/feeling";
 import { loadZoneDisplay } from "../utils/zoneDisplay";
 import { loadReadingMode } from "../utils/readingMode";
 
@@ -26,6 +27,15 @@ describe("useMapViewerPrefs", () => {
     expect(loadCardFills("m1")).toEqual({ n1: "#fde68a" });
     act(() => result.current.setCardFill("n1", null));
     expect(result.current.cardFills).toEqual({});
+  });
+
+  it("sets and clears the viewer's own feeling on a node", () => {
+    const { result } = renderHook(() => useMapViewerPrefs("m1"));
+    act(() => result.current.setFeeling("n1", "worried"));
+    expect(result.current.feelings).toEqual({ n1: "worried" });
+    expect(loadFeelings("m1")).toEqual({ n1: "worried" });
+    act(() => result.current.setFeeling("n1", null));
+    expect(loadFeelings("m1")).toEqual({});
   });
 
   it("stores the reading mode and zone display", () => {

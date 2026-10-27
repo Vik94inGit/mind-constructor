@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   deleteDraft,
+  getCheckIns,
   getDraft,
   getMapViewState,
   getUserState,
@@ -16,6 +17,7 @@ const router = Router();
 
 router.get("/", protect, getUserState);
 router.patch("/preferences", protect, updatePreferences);
+router.get("/check-ins", protect, getCheckIns);
 router.get<{ mapId: string }>("/maps/:mapId", protect, getMapViewState);
 router.patch<{ mapId: string }>("/maps/:mapId", protect, updateMapViewState);
 router.get<{ kind: string }>("/drafts/:kind", protect, getDraft);

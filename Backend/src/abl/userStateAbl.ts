@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getMapByIdDao } from "../dao/mapsDao.js";
 import {
   deleteDraftDao,
+  getCheckInsDao,
   getDraftDao,
   getMapViewStateDao,
   getUserStateDao,
@@ -9,7 +10,12 @@ import {
   updateMapViewStateDao,
   updatePreferencesDao,
 } from "../dao/userStateDao.js";
-import { DRAFT_KINDS, LANGUAGES, READING_MODES, THEMES, ZONE_LAYOUTS, ZONE_MODES } from "../models/UserState.js";
+import {
+  CHECK_IN_STRENGTH_MAX,
+  CHECK_IN_STRENGTH_MIN,
+  DRAFT_KINDS,
+  FEELINGS,
+  LANGUAGES, READING_MODES, THEMES, ZONE_LAYOUTS, ZONE_MODES } from "../models/UserState.js";
 import { NODE_TYPES } from "../models/Node.js";
 import type { DraftKind } from "../models/UserState.js";
 import { ValidationError, parseOrThrow } from "./errors.js";
@@ -49,6 +55,18 @@ const preferencesSchema = z
   .partial()
   .strict();
 
+const checkInEntrySchema = z
+  .object({
+    feeling: z.enum(FEELINGS),
+    strength: z.number().int().min(CHECK_IN_STRENGTH_MIN).max(CHECK_IN_STRENGTH_MAX),
+    at: z.number().int().nonnegative(),
+  })
+  .strict();
+const checkInSchema = z
+  .object({ before: checkInEntrySchema.nullable(), after: checkInEntrySchema.nullable() })
+  .partial()
+  .strict();
+
 const COORD_LIMIT = 100000;
 const mapViewSchema = z
   .object({
@@ -56,6 +74,8 @@ const mapViewSchema = z
     zoneDisplay: idRecord(z.enum(ZONE_MODES)),
     zoneLayout: idRecord(z.enum(ZONE_LAYOUTS)),
     cardFills: idRecord(z.string().regex(/^#[0-9a-fA-F]{6}$/, "a fill is a #rrggbb color")),
+    feelings: idRecord(z.enum(FEELINGS)),
+    checkIn: checkInSchema.nullable(),
     blockLocks: z.array(z.string().max(64)).max(MAX_ENTRIES),
     detachedPieces: z.array(z.string().max(64)).max(MAX_ENTRIES),
     center: z.object({ x: z.number().min(-COORD_LIMIT).max(COORD_LIMIT), y: z.number().min(-COORD_LIMIT).max(COORD_LIMIT) }).nullable(),
@@ -101,6 +121,14 @@ export const updateMapViewStateAbl = async (mapId: string, input: unknown, userI
   const fields = parseOrThrow(mapViewSchema, input);
   await requireMap(mapId, userId);
   return await updateMapViewStateDao(userId, mapId, fields);
+};
+
+/** The user's before/after check-in on every map that has one (mapId -> { before, after }), for the dashboard. */
+export const getCheckInsAbl = async (userId: string) => {
+  const views = await getCheckInsDao(userId);
+  const out: Record<string, unknown> = {};
+  for (const v of views) if (v.checkIn) out[v.mapId] = v.checkIn;
+  return out;
 };
 
 export const getDraftAbl = async (kind: string, userId: string) => {

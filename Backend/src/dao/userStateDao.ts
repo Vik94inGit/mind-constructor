@@ -26,6 +26,11 @@ export const updateMapViewStateDao = async (userId: string, mapId: string, field
   return view;
 };
 
+// Only the maps the user checked in on, and only their check-ins.
+export const getCheckInsDao = async (userId: string) => {
+  return await MapViewState.find({ userId, checkIn: { $ne: null } }, { mapId: 1, checkIn: 1 }).lean();
+};
+
 // A deleted map leaves everyone's view of it, and stops being anyone's last map.
 export const removeMapViewStatesDao = async (mapId: string) => {
   await Promise.all([

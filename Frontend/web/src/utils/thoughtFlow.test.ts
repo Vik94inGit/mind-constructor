@@ -17,8 +17,10 @@ import { MAP_KINDS } from "../types";
 
 vi.mock("../api/maps", () => ({ createMap: vi.fn() }));
 vi.mock("../api/nodes", () => ({ createNode: vi.fn() }));
+vi.mock("../api/state", () => ({ saveMapViewState: vi.fn() }));
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
+import * as stateApi from "../api/state";
 
 const th = (id: string, parentId = ROOT_ID, text = id): Thought => ({ id, text, type: "Option", parentId, prompt: "anythingElse" });
 
@@ -174,5 +176,42 @@ describe("buildMapFromDraft", () => {
     expect(calls[1]).toMatchObject({ text: "a", parentId: "n0" });
     expect(calls[2]).toMatchObject({ text: "b", parentId: "n1" });
     expect(progress).toEqual([1, 2, 3]);
+  });
+
+  it("keeps the thoughts' feelings and the before check-in in the user's own view of the new map", async () => {
+    vi.mocked(mapsApi.createMap).mockResolvedValue({ mapId: "m2", name: "x", ownerId: "u" });
+    let n = 0;
+    vi.mocked(nodesApi.createNode).mockImplementation(async () => ({ nodeId: `n${n++}` }) as never);
+    const before = { feeling: "worried" as const, strength: 4, at: 5 };
+
+    await buildMapFromDraft(
+      {
+        kind: "problem",
+        center: "Moving abroad",
+        step: 3,
+        promptIndex: 0,
+        thoughts: [{ ...th("a"), feeling: "sad" }, th("b")],
+        checkIn: before,
+      },
+      { name: "", personal: true, ownerColor: "#000", color: "#111" },
+    );
+
+    expect(stateApi.saveMapViewState).toHaveBeenCalledWith("m2", {
+      feelings: { n1: "sad" },
+      checkIn: { before: { ...before, at: expect.any(Number) }, after: null },
+    });
+    const saved = vi.mocked(stateApi.saveMapViewState).mock.calls[0][1];
+    // Stamped as of building the map, not of the Start step.
+    expect(saved.checkIn?.before?.at).toBeGreaterThan(5);
+  });
+
+  it("saves no view when nothing was felt", async () => {
+    vi.mocked(mapsApi.createMap).mockResolvedValue({ mapId: "m3", name: "x", ownerId: "u" });
+    vi.mocked(nodesApi.createNode).mockResolvedValue({ nodeId: "n" } as never);
+    await buildMapFromDraft(
+      { kind: "problem", center: "c", step: 3, promptIndex: 0, thoughts: [th("a")] },
+      { name: "", personal: true, ownerColor: "#000", color: "#111" },
+    );
+    expect(stateApi.saveMapViewState).not.toHaveBeenCalled();
   });
 });
