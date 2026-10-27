@@ -36,7 +36,7 @@ node) must be told apart by something the user can see before they let go.
 | Node | Tap | Click | Opens its panel and the ring of ghosts |
 | Ring of ghosts | Tap a ghost | Click a ghost | Adds a thought of that type |
 | Ring of ghosts | Drag a type out | Drag a type out | Sketches a new branch where it's let go |
-| Node, Move mode (✥) | Drag | Drag | Moves it; glues to a card it lands beside; joins a zone it's dropped on |
+| Node, Move mode (✥) | Drag | Drag | Moves it; glues to a card it lands beside; joins a zone it's dropped on (a card in the cards view only moves clear of other cards) |
 | Node, Move mode | Hold still, lift | Shift+click | Adds it to a group selection (or opens a card's menu) |
 | Group member | Drag | Drag | Moves the group, the others following its path |
 | Node, not Move mode | Swipe | Drag | Pans the map |
