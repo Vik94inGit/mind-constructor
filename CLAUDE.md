@@ -99,6 +99,12 @@ npm run build        # tsc -b && vite build
 - Keep the frontend's mirrored rules (`utils/finish.ts`, `utils/nodeType.ts`) in step with the
   backend's (`finishAbl.ts`, `attackAbl.ts`) in the same change.
 - Pull logic out of `MapPage.tsx` into a hook or a pure util with tests rather than growing it.
+- **Design before code for gestures.** Before building a new gesture on the map (a drag, hold, tap
+  target, right-click, key or mode) or changing how one behaves, write a one-page sketch in
+  `docs/gestures/<name>.md` from [docs/gestures/TEMPLATE.md](docs/gestures/TEMPLATE.md), check it
+  against the inventory in [docs/gestures/README.md](docs/gestures/README.md), and get one quick test
+  from the user before coding. Then build it in one PR that links the sketch and updates the
+  inventory. If asked to build a gesture without a sketch, draft the sketch first and ask for the test.
 - When you add, rename or remove a route, ABL module, DAO or model, update
   [Backend/CLAUDE.md](Backend/CLAUDE.md); when you add or change a user-facing feature, update
   [Frontend/web/README.md](Frontend/web/README.md); update this file when the layout or the
