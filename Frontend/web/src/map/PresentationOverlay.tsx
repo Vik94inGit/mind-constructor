@@ -1,6 +1,7 @@
 import { useI18n } from "../i18n/I18nContext";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
+import { nodeRefId } from "../utils/nodeType";
 import type { NodeDoc } from "../types";
 
 interface Props {
@@ -21,6 +22,10 @@ export function PresentationOverlay({ slides, index, onIndexChange, onExit }: Pr
   const { t } = useI18n();
   const node = slides[index];
   if (!node) return null;
+  // A child's slide names the parent it hangs from (shown just before it,
+  // see computeSlideOrder), when that parent is in the show.
+  const parentId = nodeRefId(node.parentId);
+  const parent = parentId ? slides.find((s) => s.nodeId === parentId) : undefined;
   const atStart = index === 0;
   const atEnd = index === slides.length - 1;
 
@@ -49,6 +54,11 @@ export function PresentationOverlay({ slides, index, onIndexChange, onExit }: Pr
         {/* The node's own type icon, large — a slide used to be text-only
             (type name + headline), which read as flat compared to the
             crowned, colored icons the same node wears on the canvas. */}
+        {parent && (
+          <span className="max-w-[700px] truncate text-[0.95rem] text-ink-soft">
+            {t.ui.presentation.under(parent.title || parent.text || "")}
+          </span>
+        )}
         <div
           className="flex h-16 w-16 items-center justify-center rounded-full border-2"
           style={{ borderColor: NODE_TYPE_COLORS[node.type] }}

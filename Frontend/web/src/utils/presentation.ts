@@ -44,49 +44,63 @@ function bySibling(indexById: Map<string, number>) {
   return (a: NodeDoc, b: NodeDoc) => rank(a) - rank(b) || indexById.get(a.nodeId)! - indexById.get(b.nodeId)!;
 }
 
-// The order a presentation slideshow steps through a map's nodes: a depth-
-// first walk of the parentId forest, one root's whole subtree finished
-// before the next root starts. A root flagged isFirstNode leads the whole
-// show when present among the roots; isFirstNode is set once at creation
-// and never reassigned (see Backend/CLAUDE.md), so a map whose original
-// first node was since deleted can have none at all — that case falls
-// through to the ordinary array-index tie-break below it, which already
-// picks the earliest-created root, so no separate fallback branch is
-// needed. `visited` guards a corrupt cyclic parentId chain: each node is
-// visited (and appears in the output) at most once, however its ancestors
-// point.
+// When a node was made: its createdAt, tied by its place in `nodes` (the
+// backend hands nodes back in creation order). A node with no createdAt
+// sorts ahead of dated ones, keeping its place among them.
+function byCreation(indexById: Map<string, number>) {
+  return (a: NodeDoc, b: NodeDoc) => {
+    const at = a.createdAt ?? "";
+    const bt = b.createdAt ?? "";
+    return at < bt ? -1 : at > bt ? 1 : indexById.get(a.nodeId)! - indexById.get(b.nodeId)!;
+  };
+}
+
+// Children read left to right, the way they sit on the canvas (their stored
+// x), so the slideshow and the org chart it tidies into agree with what the
+// user laid out. Ties fall back to the sibling order.
+function leftToRight(indexById: Map<string, number>) {
+  const sibling = bySibling(indexById);
+  return (a: NodeDoc, b: NodeDoc) => (a.x ?? 0) - (b.x ?? 0) || sibling(a, b);
+}
+
+// The order a presentation slideshow steps through a map's nodes: the
+// parents (every node with children, and every root) in the order they were
+// made, each followed straight away by its own children, left to right — so
+// a slide's parent has just been shown, and the overlay names it. A child
+// that is itself a parent shows among its siblings, and its own children
+// follow when its turn as a parent comes. Each node shows once. A root
+// flagged isFirstNode leads the show when present. A trailing pass in the
+// caller's array order picks up anything a corrupt cyclic parentId chain
+// left out (every node in the cycle "has a parent", so none is a root).
 //
 // Callers are expected to hand this an already-filtered node list — see
-// MapPage's own slideNodes memo, which drops weapon/protection decorator
-// nodes and anything the map owner has hidden from members before this
-// ever runs, since a presentation is for showing, not for drag/attack
+// usePresentation's own slideNodes memo, which drops weapon/protection
+// decorator nodes and anything the map owner has hidden from members before
+// this ever runs, since a presentation is for showing, not for drag/attack
 // bookkeeping or a branch deliberately kept out of sight.
 export function computeSlideOrder(nodes: NodeDoc[]): NodeDoc[] {
   const { indexById, childrenByParent, roots } = buildForest(nodes);
-  const sibling = bySibling(indexById);
-  for (const list of childrenByParent.values()) list.sort(sibling);
-  roots.sort((a, b) => {
-    if (!!a.isFirstNode !== !!b.isFirstNode) return a.isFirstNode ? -1 : 1;
-    return sibling(a, b);
-  });
+  const order = leftToRight(indexById);
+  for (const list of childrenByParent.values()) list.sort(order);
+  const created = byCreation(indexById);
+  const rootIds = new Set(roots.map((r) => r.nodeId));
+  const leads = (n: NodeDoc) => (n.isFirstNode && rootIds.has(n.nodeId) ? 0 : 1);
+  const parents = nodes
+    .filter((n) => rootIds.has(n.nodeId) || childrenByParent.has(n.nodeId))
+    .sort((a, b) => leads(a) - leads(b) || created(a, b));
 
   const out: NodeDoc[] = [];
-  const visited = new Set<string>();
-  function walk(n: NodeDoc) {
-    if (visited.has(n.nodeId)) return;
-    visited.add(n.nodeId);
+  const shown = new Set<string>();
+  const show = (n: NodeDoc) => {
+    if (shown.has(n.nodeId)) return;
+    shown.add(n.nodeId);
     out.push(n);
-    for (const c of childrenByParent.get(n.nodeId) ?? []) walk(c);
+  };
+  for (const p of parents) {
+    show(p);
+    for (const c of childrenByParent.get(p.nodeId) ?? []) show(c);
   }
-  for (const r of roots) walk(r);
-  // A node whose entire parentId chain loops back on itself (corrupt data —
-  // every node in the cycle "has a parent," so none of them ever landed in
-  // `roots` above) would otherwise never be visited at all and silently
-  // vanish from the slideshow. `walk` is already idempotent, so a second
-  // pass over every node, in the caller's own array order, only ever picks
-  // up whatever a cycle left stranded — everything the roots pass already
-  // reached is skipped via `visited`.
-  for (const n of nodes) walk(n);
+  for (const n of nodes) show(n);
   return out;
 }
 
@@ -119,9 +133,9 @@ export function computeGeometrizedPositions(nodes: NodeDoc[]): Map<string, { x: 
   const out = new Map<string, { x: number; y: number }>();
   if (nodes.length === 0) return out;
   const { indexById, childrenByParent, roots } = buildForest(nodes);
-  const sibling = bySibling(indexById);
-  for (const list of childrenByParent.values()) list.sort(sibling);
-  roots.sort(sibling);
+  const order = leftToRight(indexById);
+  for (const list of childrenByParent.values()) list.sort(order);
+  roots.sort(byCreation(indexById));
 
   const leaves = (n: NodeDoc): number => {
     const kids = childrenByParent.get(n.nodeId);
