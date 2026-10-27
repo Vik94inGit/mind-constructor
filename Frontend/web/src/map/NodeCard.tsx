@@ -112,6 +112,9 @@ interface Props {
   hideCaption?: boolean;
   /** How many nodes are currently packed into this one (MapPage's packedCountByContainer) — undefined/0 renders no badge. See the corner-badge markup below. */
   packedCount?: number;
+  /** Auto-pack (utils/autoPack.ts): how many nodes this parent has tucked in — a "+N" pill on its right that opens them again (onUnfold). */
+  foldedCount?: number;
+  onUnfold?: () => void;
   /** True for a Problem-type node with no Success/Option/Solution child yet — nothing proposed against it. Pulses a persistent danger-colored ring (see index.css's own unsolved-problem-pulse) until that changes. Ignored for every other type. */
   unsolved?: boolean;
   /** A Success that solved a Problem or reached a goal (see computeSolved): always wears its wings and halo, even in the simplified view. */
@@ -181,6 +184,8 @@ export const NodeCard = memo(function NodeCard({
   quiet,
   hideCaption,
   packedCount,
+  foldedCount,
+  onUnfold,
   unsolved,
   triumphant = false,
   dropHighlight,
@@ -710,6 +715,24 @@ export const NodeCard = memo(function NodeCard({
           title) never looked centered in its own zone. With only the icon
           in flow, x/y is the icon's center for every node, always. */}
       <div className="relative flex w-full flex-col items-center" style={inverseScaleStyle}>
+      {!!foldedCount && !dotted && (
+        // Auto-packed: the branch tucked into this parent. The right middle
+        // is free (the step number takes the left).
+        <button
+          type="button"
+          data-testid="auto-pack-count"
+          className="absolute top-1/2 left-[calc(100%+4px)] z-[7] flex h-6 min-w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-2 border-accent bg-surface px-[0.35rem] text-[0.7rem] leading-none font-bold whitespace-nowrap text-accent-ink shadow-card hover:bg-surface-2"
+          title={t.ui.autoPack.open(foldedCount)}
+          aria-label={t.ui.autoPack.open(foldedCount)}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUnfold?.();
+          }}
+        >
+          +{foldedCount}
+        </button>
+      )}
       {dotted && !inlineEditing ? (
         // Zoomed far out: just a point in the node's type color — at that
         // distance icons, cards and badges are only noise, and the dots

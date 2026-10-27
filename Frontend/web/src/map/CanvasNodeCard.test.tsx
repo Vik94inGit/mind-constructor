@@ -32,6 +32,7 @@ function actions(): CanvasNodeActions {
     addBranch: vi.fn(),
     hoverText: vi.fn(),
     iconHover: vi.fn(),
+    unfold: vi.fn(),
   };
 }
 
