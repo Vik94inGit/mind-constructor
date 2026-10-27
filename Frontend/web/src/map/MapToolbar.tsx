@@ -137,6 +137,11 @@ export function MapToolbar({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showDisplayMenu, setShowDisplayMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const modeTitle = offline
+    ? t.map.toolbar.discussionOffline
+    : isDiscussionMode
+      ? t.map.toolbar.discussionTooltip
+      : t.map.toolbar.personalTooltip;
   // A menu item closes the menu, then does its thing.
   const closeAddThen = (action: () => void) => () => {
     setShowAddMenu(false);
@@ -169,6 +174,7 @@ export function MapToolbar({
               replace
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
               title={t.map.toolbar.back}
+              aria-label={t.map.toolbar.back}
             >
               &larr;
             </Link>
@@ -178,6 +184,8 @@ export function MapToolbar({
               type="button"
               className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[1.05rem] font-semibold text-ink hover:bg-surface-2"
               title={t.map.toolbar.add}
+              aria-label={t.map.toolbar.add}
+              aria-expanded={showAddMenu}
               onClick={() => setShowAddMenu((v) => !v)}
             >
               +
@@ -203,6 +211,8 @@ export function MapToolbar({
             type="button"
             className={`${iconBtn} ${moveMode ? pressed : idle}`}
             title={moveMode ? t.map.toolbar.moveOn : t.map.toolbar.moveOff}
+            aria-label={moveMode ? t.map.toolbar.moveOn : t.map.toolbar.moveOff}
+            aria-pressed={moveMode}
             onClick={onToggleMove}
           >
             ✥
@@ -224,6 +234,8 @@ export function MapToolbar({
             type="button"
             className={`${iconBtn} ${drawMode ? pressed : idle}`}
             title={t.ui.lines.toolbar}
+            aria-label={t.ui.lines.toolbar}
+            aria-pressed={drawMode}
             onClick={onToggleDraw}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
@@ -239,6 +251,7 @@ export function MapToolbar({
               type="button"
               className={`${iconBtn} ${showDisplayMenu ? pressed : idle}`}
               title={t.map.toolbar.displayMenu}
+              aria-label={t.map.toolbar.displayMenu}
               aria-expanded={showDisplayMenu}
               onClick={() => setShowDisplayMenu((v) => !v)}
             >
@@ -282,6 +295,8 @@ export function MapToolbar({
               type="button"
               className={`${iconBtn} relative ${showSearch || nodeTypeFilter.length > 0 ? pressed : idle}`}
               title={nodeTypeFilter.length > 0 ? `${t.ui.search.title} · ${t.ui.search.filtered(nodeTypeFilter.length)}` : t.ui.search.title}
+              aria-label={nodeTypeFilter.length > 0 ? `${t.ui.search.title} · ${t.ui.search.filtered(nodeTypeFilter.length)}` : t.ui.search.title}
+              aria-expanded={showSearch}
               onClick={() => setShowSearch((v) => !v)}
             >
               <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
@@ -329,6 +344,7 @@ export function MapToolbar({
           type="button"
           className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent text-[0.95rem] font-semibold text-ink hover:bg-surface-2"
           title={t.map.toolbar.expandToolbar}
+          aria-label={t.map.toolbar.expandToolbar}
           onClick={onExpand}
         >
           ⋮
@@ -344,13 +360,8 @@ export function MapToolbar({
         <button
           type="button"
           className={`${iconBtn} ${isDiscussionMode ? idle : pressed}`}
-          title={
-            offline
-              ? t.map.toolbar.discussionOffline
-              : isDiscussionMode
-                ? t.map.toolbar.discussionTooltip
-                : t.map.toolbar.personalTooltip
-          }
+          title={modeTitle}
+          aria-label={modeTitle}
           disabled={offline}
           onClick={onToggleMapMode}
         >
@@ -365,14 +376,14 @@ export function MapToolbar({
           toggle — it attacks with whatever type the strategy calls for,
           which only the owner may do in battle mode. */}
       {isOwner && isDiscussionMode && onOpponentTurn && (
-        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.open} onClick={onOpponentTurn}>
+        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.open} aria-label={t.ui.siege.open} onClick={onOpponentTurn}>
           ♜
         </button>
       )}
       {/* Finish the discussion (owner) or agree to finish (everyone else) —
           muted while the owner may not finish yet; the press then says why. */}
       {isDiscussionMode && onHistory && (
-        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.history.open} onClick={onHistory}>
+        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.history.open} aria-label={t.ui.siege.history.open} onClick={onHistory}>
           ◷
         </button>
       )}
@@ -381,6 +392,7 @@ export function MapToolbar({
           type="button"
           className={`${iconBtn} ${finish.pressed ? pressed : idle} ${finish.muted ? "opacity-50" : ""}`}
           title={finish.title}
+          aria-label={finish.title}
           aria-pressed={finish.pressed}
           onClick={finish.onClick}
         >

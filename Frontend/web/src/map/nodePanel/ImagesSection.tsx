@@ -54,6 +54,7 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
                   type="button"
                   className="block w-full cursor-zoom-in overflow-hidden rounded-md border border-line bg-surface-2 p-0"
                   title={s.open}
+                  aria-label={s.open}
                   onClick={() => setOpen(i)}
                 >
                   {/* The whole picture, scaled to the panel's width (and

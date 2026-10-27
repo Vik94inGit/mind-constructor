@@ -86,16 +86,60 @@ describe("NodePanel", () => {
   it("shows each tab's content", async () => {
     const user = userEvent.setup();
     renderPanel();
-    await user.click(screen.getByRole("button", { name: en.map.panelTabs.modify }));
+    await user.click(screen.getByRole("tab", { name: en.map.panelTabs.modify }));
     expect(screen.getByText(/Other node/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: en.map.panelTabs.attack }));
+    await user.click(screen.getByRole("tab", { name: en.map.panelTabs.attack }));
     expect(screen.getByLabelText(en.ui.attack.objection)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: en.map.panelTabs.protect }));
+    await user.click(screen.getByRole("tab", { name: en.map.panelTabs.protect }));
     expect(screen.getByLabelText(en.ui.protect.why)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: en.map.panelTabs.packed(1) }));
+    await user.click(screen.getByRole("tab", { name: en.map.panelTabs.packed(1) }));
     expect(screen.getByText("Packed one")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: en.map.panelTabs.history }));
+    await user.click(screen.getByRole("tab", { name: en.map.panelTabs.history }));
     expect(await screen.findByText("-7")).toBeInTheDocument();
+  });
+
+  it("tabs through the type, the open tab, close and the text before the arrows", async () => {
+    const user = userEvent.setup();
+    renderPanel({ onStepNode: vi.fn() });
+    await user.tab();
+    expect(screen.getByRole("radio", { checked: true })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("tab", { name: en.map.panelTabs.info })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: en.ui.common.close })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("textbox", { name: en.ui.node.textLabel })).toHaveFocus();
+    const close = screen.getByRole("button", { name: en.ui.common.close });
+    const prev = screen.getByRole("button", { name: en.ui.node.prevNode });
+    expect(close.compareDocumentPosition(prev) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("switches tabs with the arrow keys, one Tab stop for the row", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.filter((el) => el.tabIndex === 0)).toHaveLength(1);
+    screen.getByRole("tab", { name: en.map.panelTabs.info }).focus();
+    await user.keyboard("{ArrowRight}");
+    const modify = screen.getByRole("tab", { name: en.map.panelTabs.modify });
+    expect(modify).toHaveFocus();
+    expect(modify).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", modify.id);
+    await user.keyboard("{End}");
+    expect(screen.getByRole("tab", { name: en.map.panelTabs.history })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("moves between types with the arrows without changing the type", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const radios = screen.getAllByRole("radio");
+    expect(radios.filter((el) => el.tabIndex === 0)).toEqual([screen.getByRole("radio", { checked: true })]);
+    vi.mocked(nodesApi.updateNode).mockClear();
+    screen.getByRole("radio", { checked: true }).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(document.activeElement).not.toBe(screen.getByRole("radio", { checked: true }));
+    expect(document.activeElement).toHaveAttribute("role", "radio");
+    expect(nodesApi.updateNode).not.toHaveBeenCalled();
   });
 
   it("opens an attack on your node on its Attack tab", () => {
@@ -115,13 +159,13 @@ describe("NodePanel", () => {
 
   it("hides Protect in Personal mode", () => {
     renderPanel({ discussionMode: false });
-    expect(screen.queryByRole("button", { name: en.map.panelTabs.protect })).toBeNull();
+    expect(screen.queryByRole("tab", { name: en.map.panelTabs.protect })).toBeNull();
   });
 
   it("hides Attack in Personal mode", () => {
     renderPanel({ discussionMode: false });
-    expect(screen.queryByRole("button", { name: en.map.panelTabs.attack })).toBeNull();
-    expect(screen.getByRole("button", { name: en.map.panelTabs.info })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: en.map.panelTabs.attack })).toBeNull();
+    expect(screen.getByRole("tab", { name: en.map.panelTabs.info })).toBeInTheDocument();
   });
 
   it("offers Swap with parent on the Info tab, and swaps when pressed", async () => {
