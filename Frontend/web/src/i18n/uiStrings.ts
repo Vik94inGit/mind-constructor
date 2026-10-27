@@ -30,7 +30,7 @@ export interface UiStrings {
     done: string;
   };
   visibility: { hide: string; show: string; hint: string; badge: string };
-  search: { title: string; placeholder: string; none: string; found: (count: number) => string };
+  search: { title: string; placeholder: string; none: string; found: (count: number) => string; byType: string; clearTypes: string; filtered: (count: number) => string };
   compact: { label: string; hint: string };
   types: Record<NodeType, string>;
   templates: {
@@ -38,6 +38,7 @@ export interface UiStrings {
     problem: { button: string; hint: string };
     goal: { button: string; hint: string };
     retry: { title: string; hint: string; button: string };
+    idea: { button: string; hint: string };
     created: (count: number) => string;
     failed: string;
     nodes: Record<TemplateNodeKey, string>;
@@ -555,7 +556,7 @@ const en: UiStrings = {
     done: "Done",
   },
   visibility: { hide: "Hide this branch from invited users", show: "Show this branch to invited users", hint: "Invited members cannot see this node or anything hanging from it. You always see it.", badge: "Hidden from invited users" },
-  search: { title: "Search nodes", placeholder: "Find a node by its title or text", none: "Nothing found", found: (n) => `${n} found` },
+  search: { title: "Search nodes", placeholder: "Find a node by its title or text", none: "Nothing found", found: (n) => `${n} found`, byType: "Show only", clearTypes: "All types", filtered: (n) => `Showing ${n} ${n === 1 ? "type" : "types"}` },
   compact: { label: "Simplified view", hint: "Smaller icons, no halo or horns, no circle rings — less clutter on a small screen" },
   types: {
     Problem: "Problem",
@@ -572,6 +573,7 @@ const en: UiStrings = {
     problem: { button: "Analyze this problem", hint: "Adds sub-problems, the risk of doing nothing, past experience, ways to solve, a plan and its result." },
     goal: { button: "Plan this goal", hint: "Adds a success criterion, ordered steps, an obstacle with a fallback, and a review." },
     retry: { title: "This did not work out", hint: "Find out why, then choose what to change before trying again.", button: "Analyze and try again" },
+    idea: { button: "Develop this idea", hint: "Adds the need it meets, how it would work and a first try, what would prove it, what could kill it, what is unknown, and another idea." },
     created: (n) => `Added ${n} ${n === 1 ? "node" : "nodes"}`,
     failed: "Could not add the template",
     nodes: {
@@ -614,11 +616,19 @@ const en: UiStrings = {
       wentBad2: "What else went wrong?",
       tryNext1: "One thing we will do differently",
       tryNext2: "Another change to try",
+      rootIdea: "What is the idea, in one sentence?",
+      ideaNeed: "What need or problem does it answer, and for whom?",
+      ideaHow: "How would it work?",
+      ideaTry: "The smallest way to try it this week",
+      ideaProof: "What would show that it works?",
+      ideaRisk: "What could kill it?",
+      ideaUnknown: "What do we not know yet?",
+      ideaAlternative: "Another idea for the same need",
     },
   },
   canvasMenu: {
     newNode: "New node",
-    structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)" },
+    structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)", idea: "Develop an idea" },
   },
   contextMenu: {
     createBranch: "Create branch",
@@ -1135,7 +1145,7 @@ const cs: UiStrings = {
     done: "Hotovo",
   },
   visibility: { hide: "Skrýt tuto větev pozvaným uživatelům", show: "Zobrazit tuto větev pozvaným uživatelům", hint: "Pozvaní členové tento uzel ani nic, co z něj vychází, neuvidí. Vy jej vidíte vždy.", badge: "Skryto před pozvanými uživateli" },
-  search: { title: "Hledat uzly", placeholder: "Najít uzel podle názvu nebo textu", none: "Nic nenalezeno", found: (n) => `Nalezeno: ${n}` },
+  search: { title: "Hledat uzly", placeholder: "Najít uzel podle názvu nebo textu", none: "Nic nenalezeno", found: (n) => `Nalezeno: ${n}`, byType: "Jen typy", clearTypes: "Všechny typy", filtered: (n) => `Zobrazeno typů: ${n}` },
   compact: { label: "Zjednodušený pohled", hint: "Menší ikony, bez svatozáře a rohů a bez kruhů — méně rušivých prvků na malé obrazovce" },
   types: {
     Problem: "Problém",
@@ -1152,6 +1162,7 @@ const cs: UiStrings = {
     problem: { button: "Analyzovat tento problém", hint: "Přidá dílčí problémy, riziko nicnedělání, dosavadní zkušenosti, možnosti řešení, plán a jeho výsledek." },
     goal: { button: "Naplánovat tento cíl", hint: "Přidá kritérium úspěchu, očíslované kroky, překážku se záložním plánem a kontrolu." },
     retry: { title: "Nevyšlo to", hint: "Zjistěte proč a rozhodněte, co změnit, než to zkusíte znovu.", button: "Analyzovat a zkusit znovu" },
+    idea: { button: "Rozvinout nápad", hint: "Přidá potřebu, na kterou odpovídá, jak by fungoval a první pokus, co by ho potvrdilo, co by ho zabilo, co nevíme a další nápad." },
     created: (n) => `Přidáno: ${csNodes(n)}`,
     failed: "Šablonu se nepodařilo přidat",
     nodes: {
@@ -1194,11 +1205,19 @@ const cs: UiStrings = {
       wentBad2: "Co dalšího se pokazilo?",
       tryNext1: "Jedna věc, kterou uděláme jinak",
       tryNext2: "Další změna k vyzkoušení",
+      rootIdea: "Jaký je nápad, jednou větou?",
+      ideaNeed: "Na jakou potřebu nebo problém odpovídá a pro koho?",
+      ideaHow: "Jak by to fungovalo?",
+      ideaTry: "Nejmenší způsob, jak to vyzkoušet tento týden",
+      ideaProof: "Co by ukázalo, že to funguje?",
+      ideaRisk: "Co by to mohlo zabít?",
+      ideaUnknown: "Co ještě nevíme?",
+      ideaAlternative: "Jiný nápad pro stejnou potřebu",
     },
   },
   canvasMenu: {
     newNode: "Nový uzel",
-    structures: { problem: "Analyzovat problém", goal: "Naplánovat cíl", decision: "Rozhodnout se", retro: "Ohlédnutí (retrospektiva)" },
+    structures: { problem: "Analyzovat problém", goal: "Naplánovat cíl", decision: "Rozhodnout se", retro: "Ohlédnutí (retrospektiva)", idea: "Rozvinout nápad" },
   },
   contextMenu: {
     createBranch: "Vytvořit větev",
@@ -1714,7 +1733,7 @@ const uk: UiStrings = {
     done: "Готово",
   },
   visibility: { hide: "Сховати цю гілку від запрошених", show: "Показати цю гілку запрошеним", hint: "Запрошені учасники не бачать цей вузол і все, що від нього відходить. Ви бачите його завжди.", badge: "Приховано від запрошених" },
-  search: { title: "Пошук вузлів", placeholder: "Знайти вузол за назвою або текстом", none: "Нічого не знайдено", found: (n) => `Знайдено: ${n}` },
+  search: { title: "Пошук вузлів", placeholder: "Знайти вузол за назвою або текстом", none: "Нічого не знайдено", found: (n) => `Знайдено: ${n}`, byType: "Лише типи", clearTypes: "Усі типи", filtered: (n) => `Показано типів: ${n}` },
   compact: { label: "Спрощений вигляд", hint: "Менші іконки, без німба й рогів та кілець — менше візуального шуму на малому екрані" },
   types: {
     Problem: "Проблема",
@@ -1731,6 +1750,7 @@ const uk: UiStrings = {
     problem: { button: "Проаналізувати цю проблему", hint: "Додає підпроблеми, ризик бездіяльності, попередній досвід, способи вирішення, план і його результат." },
     goal: { button: "Спланувати цю ціль", hint: "Додає критерій успіху, пронумеровані кроки, перешкоду із запасним планом і перевірку." },
     retry: { title: "Не вийшло", hint: "З’ясуйте чому й вирішіть, що змінити, перш ніж пробувати знову.", button: "Проаналізувати й спробувати знову" },
+    idea: { button: "Розвинути ідею", hint: "Додає потребу, на яку вона відповідає, як вона працюватиме і першу спробу, що її підтвердить, що може її вбити, що невідомо, та ще одну ідею." },
     created: (n) => `Додано: ${ukNodes(n)}`,
     failed: "Не вдалося додати шаблон",
     nodes: {
@@ -1773,11 +1793,19 @@ const uk: UiStrings = {
       wentBad2: "Що ще пішло не так?",
       tryNext1: "Одна річ, яку ми зробимо інакше",
       tryNext2: "Ще одна зміна для спроби",
+      rootIdea: "Яка ідея, одним реченням?",
+      ideaNeed: "На яку потребу чи проблему вона відповідає і для кого?",
+      ideaHow: "Як це працюватиме?",
+      ideaTry: "Найменший спосіб спробувати це цього тижня",
+      ideaProof: "Що покаже, що це працює?",
+      ideaRisk: "Що може це вбити?",
+      ideaUnknown: "Чого ми ще не знаємо?",
+      ideaAlternative: "Інша ідея для тієї ж потреби",
     },
   },
   canvasMenu: {
     newNode: "Новий вузол",
-    structures: { problem: "Проаналізувати проблему", goal: "Спланувати ціль", decision: "Ухвалити рішення", retro: "Озирнутися назад (ретроспектива)" },
+    structures: { problem: "Проаналізувати проблему", goal: "Спланувати ціль", decision: "Ухвалити рішення", retro: "Озирнутися назад (ретроспектива)", idea: "Розвинути ідею" },
   },
   contextMenu: {
     createBranch: "Створити гілку",
@@ -2296,7 +2324,7 @@ const ru: UiStrings = {
     done: "Готово",
   },
   visibility: { hide: "Скрыть эту ветку от приглашённых", show: "Показать эту ветку приглашённым", hint: "Приглашённые участники не видят этот узел и всё, что от него отходит. Вы видите его всегда.", badge: "Скрыто от приглашённых" },
-  search: { title: "Поиск узлов", placeholder: "Найти узел по названию или тексту", none: "Ничего не найдено", found: (n) => `Найдено: ${n}` },
+  search: { title: "Поиск узлов", placeholder: "Найти узел по названию или тексту", none: "Ничего не найдено", found: (n) => `Найдено: ${n}`, byType: "Только типы", clearTypes: "Все типы", filtered: (n) => `Показано типов: ${n}` },
   compact: { label: "Упрощённый вид", hint: "Меньшие иконки, без нимба и рогов и без колец — меньше визуального шума на маленьком экране" },
   types: {
     Problem: "Проблема",
@@ -2313,6 +2341,7 @@ const ru: UiStrings = {
     problem: { button: "Проанализировать эту проблему", hint: "Добавляет подпроблемы, риск бездействия, прошлый опыт, способы решения, план и его результат." },
     goal: { button: "Спланировать эту цель", hint: "Добавляет критерий успеха, пронумерованные шаги, препятствие с запасным планом и проверку." },
     retry: { title: "Не получилось", hint: "Выясните почему и решите, что изменить, прежде чем пробовать снова.", button: "Проанализировать и попробовать снова" },
+    idea: { button: "Развить идею", hint: "Добавляет потребность, на которую она отвечает, как она будет работать и первую пробу, что её подтвердит, что может её убить, что неизвестно, и ещё одну идею." },
     created: (n) => `Добавлено: ${ruNodes(n)}`,
     failed: "Не удалось добавить шаблон",
     nodes: {
@@ -2355,11 +2384,19 @@ const ru: UiStrings = {
       wentBad2: "Что ещё пошло не так?",
       tryNext1: "Одна вещь, которую мы сделаем иначе",
       tryNext2: "Ещё одно изменение для проверки",
+      rootIdea: "В чём идея, одним предложением?",
+      ideaNeed: "На какую потребность или проблему она отвечает и для кого?",
+      ideaHow: "Как это будет работать?",
+      ideaTry: "Самый маленький способ попробовать это на этой неделе",
+      ideaProof: "Что покажет, что это работает?",
+      ideaRisk: "Что может это убить?",
+      ideaUnknown: "Чего мы ещё не знаем?",
+      ideaAlternative: "Другая идея для той же потребности",
     },
   },
   canvasMenu: {
     newNode: "Новый узел",
-    structures: { problem: "Проанализировать проблему", goal: "Спланировать цель", decision: "Принять решение", retro: "Оглянуться назад (ретроспектива)" },
+    structures: { problem: "Проанализировать проблему", goal: "Спланировать цель", decision: "Принять решение", retro: "Оглянуться назад (ретроспектива)", idea: "Развить идею" },
   },
   contextMenu: {
     createBranch: "Создать ветку",

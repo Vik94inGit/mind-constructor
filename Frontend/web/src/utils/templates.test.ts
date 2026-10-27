@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutTemplate } from "./templates";
+import { NODE_TYPE_TEMPLATE, layoutTemplate } from "./templates";
 import { CANVAS_H, CANVAS_W, getCirclePackSpacing } from "./canvasLayout";
 import { outlinePoints, shapeStep, shapeTree } from "./shapeLayout";
 import type { Obstacle } from "./canvasLayout";
@@ -63,7 +63,7 @@ describe("layoutTemplate", () => {
   });
 
   it("places one entry per node across every template kind, in parent-before-child order", () => {
-    for (const kind of ["problem", "goal", "retry", "decision", "retro"] as const) {
+    for (const kind of ["problem", "goal", "retry", "decision", "retro", "idea"] as const) {
       const placed = layoutTemplate(kind, { x: CANVAS_W / 2, y: CANVAS_H / 2 });
       const seen = new Set<string>();
       for (const p of placed) {
@@ -71,5 +71,26 @@ describe("layoutTemplate", () => {
         seen.add(p.key);
       }
     }
+  });
+
+  it("grows an idea into its need, how it works with a first try, proof, risk, unknown and another idea", () => {
+    const placed = layoutTemplate("idea", { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+    expect(placed.map((p) => [p.key, p.type, p.parentKey])).toEqual([
+      ["ideaNeed", "Problem", null],
+      ["ideaHow", "Solution", null],
+      ["ideaTry", "Option", "ideaHow"],
+      ["ideaProof", "Success", null],
+      ["ideaRisk", "Fail", null],
+      ["ideaUnknown", "unknown", null],
+      ["ideaAlternative", "Idea", null],
+    ]);
+  });
+});
+
+describe("NODE_TYPE_TEMPLATE", () => {
+  it("offers the idea template on an Idea node, and none on an Option", () => {
+    expect(NODE_TYPE_TEMPLATE.Idea).toBe("idea");
+    expect(NODE_TYPE_TEMPLATE.Problem).toBe("problem");
+    expect(NODE_TYPE_TEMPLATE.Option).toBeUndefined();
   });
 });

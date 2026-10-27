@@ -3,7 +3,7 @@ import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import { imageFilesFrom } from "../../utils/images";
 import { MAX_NODE_TEXT } from "../../utils/nodeText";
 import { isMobileViewport } from "../../utils/canvasLayout";
-import type { TemplateKind } from "../../utils/templates";
+import type { NodeTemplateKind } from "../../utils/templates";
 import { CARD_FILL_COLORS } from "../../utils/cardFill";
 import { CARD_FONT_DEFAULT } from "../StickerCard";
 import { CARD_FONT_MAX, CARD_FONT_MIN, CARD_SHAPES } from "../../types";
@@ -44,12 +44,12 @@ interface Props {
   setExpanded: Dispatch<SetStateAction<boolean>>;
   textHeight: number | null;
   copied: boolean;
-  templateKind: TemplateKind | null;
+  templateKind: NodeTemplateKind | null;
   /** Resolves true unless the save failed. */
   onTextSave: () => Promise<boolean>;
   onCopyText: () => void;
   onDelete: () => void;
-  onTemplate: (kind: TemplateKind) => void;
+  onTemplate: (kind: NodeTemplateKind) => void;
   onClose: () => void;
   /** The node's pictures (ImagesSection), shown under the text inside the same box, like a post. */
   imagesSection?: ReactNode;
@@ -351,24 +351,14 @@ export function InfoTab({ node, isCreator, busy, cardFill, cardLook, textLocked,
         <div className="text-[0.78rem] font-semibold text-ink-soft">
           {templateKind === "retry" ? t.ui.templates.retry.title : t.ui.templates.section}
         </div>
-        <p className="mt-1 text-[0.78rem] text-ink-soft">
-          {templateKind === "problem"
-            ? t.ui.templates.problem.hint
-            : templateKind === "goal"
-              ? t.ui.templates.goal.hint
-              : t.ui.templates.retry.hint}
-        </p>
+        <p className="mt-1 text-[0.78rem] text-ink-soft">{t.ui.templates[templateKind].hint}</p>
         <button
           type="button"
           className="mt-2 inline-flex cursor-pointer items-center rounded-lg border border-accent bg-accent-soft px-3 py-[0.4rem] text-[0.85rem] font-semibold text-accent-ink disabled:cursor-not-allowed disabled:opacity-50"
           disabled={busy}
           onClick={() => onTemplate(templateKind)}
         >
-          {templateKind === "problem"
-            ? t.ui.templates.problem.button
-            : templateKind === "goal"
-              ? t.ui.templates.goal.button
-              : t.ui.templates.retry.button}
+          {t.ui.templates[templateKind].button}
         </button>
       </div>
     )}

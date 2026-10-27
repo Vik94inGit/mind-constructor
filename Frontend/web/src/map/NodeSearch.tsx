@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
-import type { NodeDoc } from "../types";
+import { filterNodes, isFiltering, toggleType } from "../utils/nodeFilter";
+import { NODE_TYPES } from "../types";
+import type { NodeDoc, NodeType } from "../types";
 
 interface Props {
   nodes: NodeDoc[];
@@ -10,6 +12,9 @@ interface Props {
   /** The ids matching the current query (null while nothing is typed) — the canvas dims everything else. */
   onMatches: (ids: Set<string> | null) => void;
   onPick: (nodeId: string) => void;
+  /** The node types picked under the search (empty = all). Kept by the map, so the filter outlives the popup. */
+  types: NodeType[];
+  onTypes: (types: NodeType[]) => void;
   onClose: () => void;
   /** Where it opens from its button: below (top toolbar) or to the right (desktop side panel). */
   side?: "below" | "right";
@@ -17,13 +22,12 @@ interface Props {
 
 const MAX_RESULTS = 8;
 
-// Lowercase and without accents, so "kralovstvi" finds "Království".
-const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-
 // The toolbar's node search: type to find nodes by their title, text or zone
-// name. Matching nodes stay lit on the canvas while the rest dim; clicking a
-// result selects that node and brings it to the middle of the screen.
-export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, onClose, side = "below" }: Props) {
+// name, and/or pick node types to show only those (utils/nodeFilter.ts).
+// Matching nodes stay lit on the canvas while the rest dim; clicking a
+// result selects that node and brings it to the middle of the screen. The
+// picked types stay in force after the popup closes; the typed words don't.
+export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, types, onTypes, onClose, side = "below" }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState("");
@@ -53,15 +57,23 @@ export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, onClose, sid
     };
   }, [onClose]);
 
+  const filtering = isFiltering(query, types);
   const matches = useMemo(() => {
-    const needle = fold(query.trim());
-    if (!needle) return [];
-    return nodes.filter((n) => fold(`${n.title ?? ""} ${n.text} ${n.zoneName ?? ""}`).includes(needle));
+    if (!filtering) return [];
+    return filterNodes(nodes, query, types);
     // `textsReady`: the texts arrive into `nodes` after the first render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, nodes, textsReady]);
+  }, [filtering, query, types, nodes, textsReady]);
+  // Only the types this map actually has, each with how many nodes it has.
+  const typeCounts = useMemo(() => {
+    const counts = new Map<NodeType, number>();
+    for (const n of nodes) counts.set(n.type, (counts.get(n.type) ?? 0) + 1);
+    return NODE_TYPES.filter((type) => counts.has(type) || types.includes(type)).map((type) => ({ type, count: counts.get(type) ?? 0 }));
+  }, [nodes, types]);
 
   useEffect(() => {
+    // The picked types dim the canvas on their own (the map keeps them), so
+    // only typed words need reporting.
     onMatches(query.trim() ? new Set(matches.map((n) => n.nodeId)) : null);
   }, [query, matches, onMatches]);
   useEffect(() => () => onMatches(null), [onMatches]);
@@ -86,7 +98,42 @@ export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, onClose, sid
         placeholder={t.ui.search.placeholder}
         className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.45rem] text-[0.88rem] font-[inherit] text-ink placeholder:text-ink-soft focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
       />
-      {query.trim() && (
+      {typeCounts.length > 1 && (
+        <div className="flex flex-col gap-[0.3rem] px-[0.2rem]" role="group" aria-label={t.ui.search.byType}>
+          <div className="text-[0.72rem] text-ink-soft">{t.ui.search.byType}</div>
+          <div className="flex flex-wrap gap-[0.3rem]">
+            {typeCounts.map(({ type, count }) => {
+              const on = types.includes(type);
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  aria-pressed={on}
+                  title={t.ui.types[type]}
+                  onClick={() => onTypes(toggleType(types, type))}
+                  className={`inline-flex cursor-pointer items-center gap-[0.3rem] rounded-full border px-[0.5rem] py-[0.2rem] text-[0.75rem] ${
+                    on ? "border-accent bg-accent-soft font-semibold text-accent-ink" : "border-line bg-surface text-ink hover:bg-surface-2"
+                  }`}
+                >
+                  <NodeTypeSymbol type={type} size={13} />
+                  <span>{t.ui.types[type]}</span>
+                  <span className="text-ink-soft">{count}</span>
+                </button>
+              );
+            })}
+            {types.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onTypes([])}
+                className="cursor-pointer rounded-full border border-transparent px-[0.5rem] py-[0.2rem] text-[0.75rem] text-ink-soft underline hover:text-ink"
+              >
+                {t.ui.search.clearTypes}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {filtering && (
         <div className="px-[0.2rem] text-[0.72rem] text-ink-soft">
           {matches.length === 0 ? t.ui.search.none : t.ui.search.found(matches.length)}
         </div>

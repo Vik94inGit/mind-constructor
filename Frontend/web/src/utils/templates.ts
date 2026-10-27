@@ -17,8 +17,23 @@ import type { MapKind, NodeType } from "../types";
 //    advantage and its risk.
 //  - "retro": what went well, what went badly, and what to change — the
 //    starting structure of a retrospective map (see MAP_KIND_ROOTS).
+//  - "idea": turn a loose idea into something testable — the need it meets,
+//    how it would work and the smallest way to try it, what would show it
+//    works, what could kill it, what is still unknown, and another idea for
+//    the same need.
 
-export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro";
+export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro" | "idea";
+
+/** The templates a single node offers to grow from itself (NodePanel's Info tab). */
+export type NodeTemplateKind = Extract<TemplateKind, "problem" | "goal" | "retry" | "idea">;
+
+// Which template a node of each type offers, if any.
+export const NODE_TYPE_TEMPLATE: Partial<Record<NodeType, NodeTemplateKind>> = {
+  Problem: "problem",
+  Solution: "goal",
+  Fail: "retry",
+  Idea: "idea",
+};
 
 export type TemplateNodeKey =
   | "subProblem1"
@@ -59,7 +74,15 @@ export type TemplateNodeKey =
   | "wentBad1"
   | "wentBad2"
   | "tryNext1"
-  | "tryNext2";
+  | "tryNext2"
+  | "rootIdea"
+  | "ideaNeed"
+  | "ideaHow"
+  | "ideaTry"
+  | "ideaProof"
+  | "ideaRisk"
+  | "ideaUnknown"
+  | "ideaAlternative";
 
 interface TemplateNode {
   key: TemplateNodeKey;
@@ -118,6 +141,14 @@ const TEMPLATES: Record<TemplateKind, TemplateNode[]> = {
     { key: "tryNext1", type: "Option" },
     { key: "tryNext2", type: "Option" },
   ],
+  idea: [
+    { key: "ideaNeed", type: "Problem" },
+    { key: "ideaHow", type: "Solution", children: [{ key: "ideaTry", type: "Option" }] },
+    { key: "ideaProof", type: "Success" },
+    { key: "ideaRisk", type: "Fail" },
+    { key: "ideaUnknown", type: "unknown" },
+    { key: "ideaAlternative", type: "Idea" },
+  ],
 };
 
 // The node a new map of each kind starts from, and the template grown from it.
@@ -126,6 +157,7 @@ export const MAP_KIND_ROOTS: Record<MapKind, { key: TemplateNodeKey; type: NodeT
   decision: { key: "rootDecision", type: "Problem", template: "decision" },
   goal: { key: "rootGoal", type: "Solution", template: "goal" },
   retro: { key: "rootRetro", type: "unknown", template: "retro" },
+  idea: { key: "rootIdea", type: "Idea", template: "idea" },
 };
 
 export interface PlacedTemplateNode {

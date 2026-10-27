@@ -3,7 +3,8 @@ import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf } from "../utils/nodeType";
-import type { TemplateKind } from "../utils/templates";
+import { NODE_TYPE_TEMPLATE } from "../utils/templates";
+import type { NodeTemplateKind, TemplateKind } from "../utils/templates";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ringKindFor } from "./OutcomeBadge";
 import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
@@ -329,18 +330,10 @@ export function NodePanel({
         : t.ui.attack.hintPositiveTarget;
 
   // Growing a template branch — only offered on a node that has no branch
-  // yet (Problem or Solution: a ready structure; Fail: analyze and retry).
+  // yet (Problem, Solution or Idea: a ready structure; Fail: analyze and retry).
   const hasChildren = nodes.some((n) => nodeRefId(n.parentId) === node.nodeId);
-  const templateKind: TemplateKind | null =
-    !isCreator || hasChildren || node.isWeapon || node.isProtection
-      ? null
-      : node.type === "Problem"
-        ? "problem"
-        : node.type === "Solution"
-          ? "goal"
-          : node.type === "Fail"
-            ? "retry"
-            : null;
+  const templateKind: NodeTemplateKind | null =
+    !isCreator || hasChildren || node.isWeapon || node.isProtection ? null : (NODE_TYPE_TEMPLATE[node.type] ?? null);
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
   // symbol at all — "unknown" nodes render the plain NodeTypeIcon glyph
   // instead, nothing here to override.

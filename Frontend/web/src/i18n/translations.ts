@@ -108,6 +108,7 @@ export interface Translation {
         decision: { label: string; desc: string };
         goal: { label: string; desc: string };
         retro: { label: string; desc: string };
+        idea: { label: string; desc: string };
       };
       mode: {
         label: string;
@@ -315,6 +316,7 @@ const en: Translation = {
         decision: { label: "Decision", desc: "Compare options with their advantages and risks." },
         goal: { label: "Goal planning", desc: "A goal with success criteria, steps, obstacles and a review." },
         retro: { label: "Retrospective", desc: "What went well, what did not, and what to change." },
+        idea: { label: "Idea", desc: "Grow an idea: the need it meets, how it works, a first try, and what could kill it." },
       },
       mode: {
         label: "Mode",
@@ -509,6 +511,7 @@ const cs: Translation = {
         decision: { label: "Rozhodnutí", desc: "Porovnejte varianty s jejich výhodami a riziky." },
         goal: { label: "Plánování cíle", desc: "Cíl s kritérii úspěchu, kroky, překážkami a kontrolou." },
         retro: { label: "Retrospektiva", desc: "Co se povedlo, co ne a co změnit." },
+        idea: { label: "Nápad", desc: "Rozviňte nápad: potřeba, jak funguje, první pokus a co by ho zabilo." },
       },
       mode: {
         label: "Režim",
@@ -703,6 +706,7 @@ const uk: Translation = {
         decision: { label: "Рішення", desc: "Порівняйте варіанти з їхніми перевагами й ризиками." },
         goal: { label: "Планування цілі", desc: "Ціль із критеріями успіху, кроками, перешкодами та перевіркою." },
         retro: { label: "Ретроспектива", desc: "Що вдалося, що ні і що змінити." },
+        idea: { label: "Ідея", desc: "Розвиньте ідею: потреба, як вона працює, перша спроба і що може її вбити." },
       },
       mode: {
         label: "Режим",
@@ -897,6 +901,7 @@ const ru: Translation = {
         decision: { label: "Решение", desc: "Сравните варианты с их преимуществами и рисками." },
         goal: { label: "Планирование цели", desc: "Цель с критериями успеха, шагами, препятствиями и проверкой." },
         retro: { label: "Ретроспектива", desc: "Что получилось, что нет и что изменить." },
+        idea: { label: "Идея", desc: "Развейте идею: потребность, как она работает, первая проба и что может её убить." },
       },
       mode: {
         label: "Режим",

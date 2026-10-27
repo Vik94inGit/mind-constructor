@@ -48,6 +48,9 @@ interface Props {
   onLoadTexts: () => Promise<void>;
   onSearchMatches: (ids: Set<string> | null) => void;
   onPickSearchResult: (nodeId: string) => void;
+  /** Node types picked in the search (empty = all); the rest dim. */
+  nodeTypeFilter: NodeType[];
+  onNodeTypeFilter: (types: NodeType[]) => void;
   onToggleMapMode: () => void;
   /** Discussion mode: opens the opponent's turn (see SiegePanel). */
   onOpponentTurn?: () => void;
@@ -112,6 +115,8 @@ export function MapToolbar({
   onLoadTexts,
   onSearchMatches,
   onPickSearchResult,
+  nodeTypeFilter,
+  onNodeTypeFilter,
   onToggleMapMode,
   onExitDemo,
   onInvite,
@@ -275,14 +280,17 @@ export function MapToolbar({
           <div className="relative">
             <button
               type="button"
-              className={`${iconBtn} ${showSearch ? pressed : idle}`}
-              title={t.ui.search.title}
+              className={`${iconBtn} relative ${showSearch || nodeTypeFilter.length > 0 ? pressed : idle}`}
+              title={nodeTypeFilter.length > 0 ? `${t.ui.search.title} · ${t.ui.search.filtered(nodeTypeFilter.length)}` : t.ui.search.title}
               onClick={() => setShowSearch((v) => !v)}
             >
               <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
                 <circle cx="6.5" cy="6.5" r="4.2" stroke="currentColor" strokeWidth="1.8" fill="none" />
                 <path d="M9.8 9.8 L14 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
+              {nodeTypeFilter.length > 0 && (
+                <span className="absolute -right-[2px] -top-[2px] h-[7px] w-[7px] rounded-full bg-accent" aria-hidden="true" />
+              )}
             </button>
             {showSearch && (
               <NodeSearch
@@ -291,6 +299,8 @@ export function MapToolbar({
                 onLoadTexts={onLoadTexts}
                 onMatches={onSearchMatches}
                 onPick={onPickSearchResult}
+                types={nodeTypeFilter}
+                onTypes={onNodeTypeFilter}
                 onClose={() => setShowSearch(false)}
               />
             )}

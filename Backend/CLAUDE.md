@@ -237,7 +237,7 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   an extra room `map:{id}:owner`, and `broadcastToMap` sends any event whose payload mentions a hidden
   node's `nodeId` to that room only (per-map queue keeps event order); a toggle broadcasts
   `nodes:visibility` (no node id in its payload, so everyone gets it) and clients reload what they may see.
-- **`Map.kind`** — `problem | decision | goal | retro` (`MAP_KINDS`), chosen when a map is created
+- **`Map.kind`** — `problem | decision | goal | retro | idea` (`MAP_KINDS`), chosen when a map is created
   (`POST /api/` body `kind`, alongside `discussionMode`). Descriptive only; a frontend seeds the matching
   starter structure itself (`utils/seedMap.ts`), so the seeded text is in the user's language. The older
   server-side `template` seeds (blank / single-problem / decision-tree / pro-con / demo) still work.
