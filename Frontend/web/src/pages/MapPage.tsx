@@ -1021,30 +1021,18 @@ export function MapPage() {
     [nodeGroups, solved],
   );
 
-  // The map's entrance (see hooks/useNodeEntrance.ts): on open, the nodes
-  // appear one after another in the order they were made, then the zones are
-  // drawn round them one by one, all straight onto the canvas DOM (posFor
-  // never sees it); skip is wired to any pointer-down or wheel on the canvas.
-  // Every map opens this way, Personal and Discussion alike, the way a
-  // template branch fills in node by node. The camera comes in to native size
-  // and follows each node as it appears, then steps back to the whole map for
-  // the zones (not after a skip: the user has the camera then).
+  // The map's entrance (see hooks/useNodeEntrance.ts): the first time a map
+  // opens in this browser, its nodes appear in the order they were made, then
+  // the zones are drawn round them, all within a couple of seconds and
+  // straight onto the canvas DOM (posFor never sees it); skip is wired to any
+  // pointer-down or wheel on the canvas. Every map opens this way once,
+  // Personal and Discussion alike; the camera stays on the opening framing,
+  // and the full node-by-node story is the time-lapse's to tell.
   const entrance = useNodeEntrance({
+    mapId,
     visibleNodes,
     zoneRootIds: nodeGroups.map((g) => g.rootId),
     canvasRef,
-    onNodeAppear: (id) => {
-      const p = positions.get(id);
-      if (!p) return;
-      if (zoom < 0.995) {
-        zoomFromCenter(0, 1);
-        setTimeout(() => centerOnPoint(p.x, p.y, { aboveSheet: false }), 260);
-      } else {
-        centerOnPoint(p.x, p.y, { aboveSheet: false });
-      }
-    },
-    onZonesStart: fitAll,
-    onFinish: fitAll,
   });
 
   // Whether a node is drawn as a puzzle card right now — the only nodes that

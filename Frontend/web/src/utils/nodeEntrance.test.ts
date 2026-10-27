@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APPEAR_MS, appearAmount, LEAD_MS, MAX_SPREAD_MS, STAGGER_MS, ZONE_STAGGER_MS, zoneKey, applyEntranceFrame, computeEntranceDelays, entranceEndMs } from "./nodeEntrance";
+import { APPEAR_MS, appearAmount, hasSeenEntrance, LEAD_MS, markEntranceSeen, MAX_ENTRANCE_MS, MAX_SPREAD_MS, STAGGER_MS, ZONE_STAGGER_MS, zoneKey, applyEntranceFrame, computeEntranceDelays, entranceEndMs } from "./nodeEntrance";
 import { makeNode } from "../test/fixtures";
 
 describe("computeEntranceDelays", () => {
@@ -37,6 +37,24 @@ describe("computeEntranceDelays", () => {
   it("starts the last node within a bounded time however big the map is", () => {
     const many = Array.from({ length: 500 }, (_, i) => makeNode({ nodeId: `n${i}` }));
     expect(entranceEndMs(computeEntranceDelays(many))).toBeLessThanOrEqual(LEAD_MS + MAX_SPREAD_MS + APPEAR_MS);
+  });
+
+  it("is over within about two and a half seconds, zones included, however big the map is", () => {
+    const many = Array.from({ length: 500 }, (_, i) => makeNode({ nodeId: `n${i}` }));
+    const zones = many.slice(0, 80).map((n) => n.nodeId);
+    const end = entranceEndMs(computeEntranceDelays(many, zones));
+    expect(end).toBeLessThanOrEqual(MAX_ENTRANCE_MS);
+    expect(MAX_ENTRANCE_MS).toBeLessThanOrEqual(2500);
+  });
+});
+
+describe("hasSeenEntrance", () => {
+  it("is remembered per map in this browser", () => {
+    localStorage.clear();
+    expect(hasSeenEntrance("m1")).toBe(false);
+    markEntranceSeen("m1");
+    expect(hasSeenEntrance("m1")).toBe(true);
+    expect(hasSeenEntrance("m2")).toBe(false);
   });
 });
 

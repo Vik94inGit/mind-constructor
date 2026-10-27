@@ -5,13 +5,13 @@ import { APPEAR_MS, LEAD_MS, SKIP_MS, STAGGER_MS } from "../utils/nodeEntrance";
 import { makeNode } from "../test/fixtures";
 import type { NodeDoc } from "../types";
 
-function setup(nodes: NodeDoc[], zoneRootIds?: string[]) {
+function setup(nodes: NodeDoc[], zoneRootIds?: string[], mapId?: string) {
   const onNodeAppear = vi.fn();
   const onFinish = vi.fn();
   const root = document.createElement("div");
   root.innerHTML = nodes.map((n) => `<div data-reveal-node="${n.nodeId}"></div>`).join("");
   document.body.appendChild(root);
-  const hook = renderHook(() => useNodeEntrance({ visibleNodes: nodes, zoneRootIds, canvasRef: { current: root }, onNodeAppear, onFinish }));
+  const hook = renderHook(() => useNodeEntrance({ mapId, visibleNodes: nodes, zoneRootIds, canvasRef: { current: root }, onNodeAppear, onFinish }));
   const opacity = (id: string) => (root.querySelector(`[data-reveal-node="${id}"]`) as HTMLElement).style.opacity;
   return { ...hook, opacity, onNodeAppear, onFinish };
 }
@@ -29,6 +29,7 @@ describe("useNodeEntrance", () => {
   afterEach(() => {
     vi.useRealTimers();
     document.body.innerHTML = "";
+    localStorage.clear();
   });
 
   it("brings the nodes in one after another, in the order they were made, with the camera following, then steps back", () => {
@@ -87,5 +88,19 @@ describe("useNodeEntrance", () => {
     act(() => vi.advanceTimersByTime(APPEAR_MS + 50));
     expect(onZonesStart).toHaveBeenCalledTimes(1);
     expect(onNodeAppear).toHaveBeenCalledTimes(3);
+  });
+
+  it("plays only the first time a map opens in this browser", () => {
+    const first = setup(mapNodes(), undefined, "m1");
+    expect(first.result.current.active).toBe(true);
+    act(() => vi.advanceTimersByTime(5000));
+    first.unmount();
+
+    const again = setup(mapNodes(), undefined, "m1");
+    expect(again.result.current.active).toBe(false);
+    expect(again.opacity("a")).toBe("");
+
+    const other = setup(mapNodes(), undefined, "m2");
+    expect(other.result.current.active).toBe(true);
   });
 });
