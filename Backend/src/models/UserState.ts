@@ -13,7 +13,24 @@ export const ZONE_MODES = [...READING_MODES, "dots"] as const;
 export const ZONE_LAYOUTS = ["zones", "nested", "none"] as const;
 // How a thought feels to the one looking at it (MapViewState.feelings) and
 // how they felt about the map before and after thinking it through (checkIn).
-export const FEELINGS = ["worried", "sad", "angry", "confused", "hopeful", "excited", "calm", "relieved"] as const;
+export const FEELINGS = [
+  "worried",
+  "anxious",
+  "scared",
+  "sad",
+  "angry",
+  "frustrated",
+  "confused",
+  "tired",
+  "curious",
+  "hopeful",
+  "excited",
+  "happy",
+  "proud",
+  "grateful",
+  "calm",
+  "relieved",
+] as const;
 export const CHECK_IN_STRENGTH_MIN = 1;
 export const CHECK_IN_STRENGTH_MAX = 5;
 export const DRAFT_KINDS = ["think", "textSplit"] as const;

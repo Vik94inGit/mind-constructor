@@ -29,11 +29,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   equilateral triangle, each deeper one a step out from the one it hangs from, and the zone rules
   only nudge what would cover another node or cross a castle wall. The draft is kept in the browser until then. See
   `src/pages/ThinkPage.tsx` and `src/utils/thoughtFlow.ts`.
-- **Feelings and the before/after check-in** — a thought can carry how it feels to you (😟 worried,
-  😢 sad, 😠 angry, 😕 confused, 🙂 hopeful, 🤩 excited, 😌 calm, 😮‍💨 relieved): one tap in the node
+- **Feelings and the before/after check-in** — a thought can carry how it feels to you (16 feelings,
+  heavy to light: 😟 worried, 😰 anxious, 😨 scared, 😢 sad, 😠 angry, 😤 frustrated, 😕 confused,
+  😩 tired, 🤔 curious, 🙂 hopeful, 🤩 excited, 😄 happy, 😎 proud, 🥰 grateful, 😌 calm, 😮‍💨 relieved): one tap in the node
   panel's Info tab, the right-click menu's **Feeling ›**, or right after writing it in *Think it
   through* ("How does this one feel?", skippable). It shows as a small tinted emoji badge on the
-  card's right edge; nothing moves. *Think it through* also asks "How do you feel about this right
+  card's right edge that bounces in when set (not under reduced motion); nothing moves. *Think it through* also asks "How do you feel about this right
   now?" (a feeling and a 1–5 strength) on its first step; once the map is finished, or the next time
   you open it (from ten minutes after building it), the canvas asks "And now?" and shows the shift,
   e.g. 😟 4 → 😌 2. The dashboard's map tile shows the same shift (or 😟 4 → ? while it waits), and
