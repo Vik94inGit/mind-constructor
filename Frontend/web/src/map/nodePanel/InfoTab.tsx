@@ -106,7 +106,10 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             // A ghost's prompt (see NodeDoc.prompt) is the question to answer here.
             placeholder={node.prompt || undefined}
             onChange={(e) => setTextDraft(e.target.value)}
-            disabled={busy}
+            // readOnly, not disabled, while a save is out: a disabled field
+            // drops focus (closing a phone's keyboard) and Safari repaints it
+            // pale, a flash on every save.
+            readOnly={busy}
             onKeyDown={(e) => {
               // Up/Left at the very start of the text, or Down/Right at the
               // very end, saves and moves on to the previous/next node (see

@@ -384,6 +384,10 @@ svg[data-replay] [data-reveal-zone] {
        real improvement where it does apply, with no downside where it
        doesn't. */
     overscroll-behavior-x: none;
+    /* No grey/white box flashing over whatever a finger taps (a node, the
+       text field in the bottom sheet): every control here shows its own
+       pressed/focused state. */
+    -webkit-tap-highlight-color: transparent;
   }
   code {
     font-family: "IBM Plex Mono", "Courier New", monospace;
@@ -513,5 +517,18 @@ svg[data-replay] [data-reveal-zone] {
   .pacman-node-run,
   .pacman-mouth {
     animation: none;
+  }
+}
+
+/* iPhone/iPad Safari zooms the whole page in when a field under 16px is
+   focused, then leaves it there: tapping the node's text in the bottom sheet
+   flashed the page as it jumped in towards the field. 16px stops that. Only
+   on iOS (-webkit-touch-callout is Safari-only), and outside any @layer so
+   it outranks the text-[…] utilities on each field. */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
   }
 }

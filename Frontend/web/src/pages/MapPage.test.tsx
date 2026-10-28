@@ -162,6 +162,28 @@ describe("MapPage", () => {
     expect(screen.queryByText("Tap the new parent for “Beta”")).toBeNull();
   });
 
+  it("keeps the ghost ring down after a node picked from it is cancelled, until the node is opened again", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => nodeEl("a"));
+    await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    const ghost = () => document.querySelector<HTMLButtonElement>('button.animate-ghost-in[aria-label="Idea"]');
+    await waitFor(() => expect(ghost()).not.toBeNull());
+    await user.click(ghost()!);
+    await user.click(ghost()!);
+    const panel = await screen.findByTestId("new-node-panel");
+    await user.click(within(panel).getAllByRole("button", { name: "Cancel" })[0]);
+    await waitFor(() => expect(screen.queryByTestId("new-node-panel")).toBeNull());
+    // Give the ring every chance to come back.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(ghost()).toBeNull();
+
+    await user.click(nodeEl("a").parentElement!);
+    await waitFor(() => expect(screen.queryByDisplayValue("some text")).toBeNull());
+    await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    await waitFor(() => expect(ghost()).not.toBeNull());
+  });
+
   it("asks once for a view after the map has opened, and keeps the answer", async () => {
     markEntranceSeen("m1");
     vi.mocked(nodesApi.listNodes).mockResolvedValue(

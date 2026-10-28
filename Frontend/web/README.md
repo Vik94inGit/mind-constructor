@@ -145,7 +145,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
 - **Hiding the ghosts** — the ring of ghosts comes up round every node you open; the 👻 at the top of
-  its panel hides it for that node, and opening another brings the ghosts back.
+  its panel hides it for that node, and opening another brings the ghosts back. Cancelling a node
+  picked from the ring hides it the same way, so it doesn't pop straight back up.
 - **Changing a parent** — its own mode. Press ↪ *Change parent* on the child's Info tab. The panel and
   the ghosts go away, the child stays ringed, and a short bar
   (`map/ReparentBar.tsx`) says to tap the new parent; nodes don't drag meanwhile, so a swipe pans the

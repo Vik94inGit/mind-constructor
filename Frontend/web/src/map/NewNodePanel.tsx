@@ -131,7 +131,7 @@ export function NewNodePanel({ type, emoji, prompt = "", onTypeChange, onClearEm
           maxLength={MAX_NODE_TEXT}
           value={text}
           placeholder={asGhost ? t.ui.newNode.ghostPlaceholder : prompt || t.ui.newNode.placeholder}
-          disabled={busy}
+          readOnly={busy}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
