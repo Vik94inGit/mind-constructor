@@ -75,6 +75,7 @@ export const createNodeMutationDao = async (
     x?: number;
     y?: number;
     color?: string;
+    picture?: { id: string; kind: string; dot: number } | null;
     isFirstNode: boolean;
     parentId?: mongoose.Types.ObjectId | string | null;
     userId: string;
@@ -95,6 +96,7 @@ export const createNodeMutationDao = async (
     x: nodeData.x,
     y: nodeData.y,
     color: nodeData.color,
+    picture: nodeData.picture ?? null,
     isFirstNode: nodeData.isFirstNode,
   });
   return node.populate(NODE_POPULATE);

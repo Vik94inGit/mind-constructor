@@ -47,6 +47,9 @@ import { NodeContextMenu } from "../map/NodeContextMenu";
 import { CheckInPrompt } from "../map/CheckInPrompt";
 import type { NodeLinkItem } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
+import { PicturePicker } from "../map/PicturePicker";
+import { PictureLayer } from "../map/PictureLayer";
+import { pictureGroups } from "../utils/pictures";
 import { MiniMap } from "../map/MiniMap";
 import { PictureViewer } from "../map/PictureViewer";
 import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
@@ -1448,7 +1451,12 @@ export function MapPage() {
   }, [pendingCreate?.x, pendingCreate?.y]);
   // "Text → nodes" (canvas right-click menu): where on the canvas it was asked for.
   const [textNodesAt, setTextNodesAt] = useState<{ x: number; y: number } | null>(null);
-  const { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText } = useNodeCreation({
+  // "Draw a picture" is choosing a picture: where it goes, or "view" for the
+  // middle of what's on screen (the "+" menu).
+  const [picturePickerAt, setPicturePickerAt] = useState<{ x: number; y: number } | "view" | null>(null);
+  // Every picture on the map (utils/pictures.ts), drawn on the canvas and the minimap.
+  const pictures = useMemo(() => pictureGroups(visibleNodes), [visibleNodes]);
+  const { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText, drawPicture } = useNodeCreation({
     mapId,
     positions,
     pendingCreate,
@@ -1463,6 +1471,7 @@ export function MapPage() {
     placeNode,
     viewportBounds,
     showNodes,
+    showPoints,
     showNotice,
     onCreated: () => {
       setMultiSelectIds(new Set());
@@ -1665,6 +1674,7 @@ export function MapPage() {
       onInvite={() => setShowInvite(true)}
       onCreateNode={startCreateNodeInView}
       onCreateCircle={createCircle}
+      onDrawPicture={() => setPicturePickerAt("view")}
       onCopyMap={copyWholeMap}
       onPaste={() => pasteClipboard()}
       onExportText={openExportText}
@@ -1738,6 +1748,7 @@ export function MapPage() {
             onPointerMove={drawMode ? onDrawPointerMove : undefined}
             onContextMenu={onCanvasContextMenu}
           >
+            {view !== "cards" && <PictureLayer pictures={pictures} posFor={posFor} />}
             <CanvasBackdrop
               replaying={!!timeLapse}
               onZoneMenu={(rootId, x, y) => {
@@ -2033,6 +2044,7 @@ export function MapPage() {
                 nodes={visibleNodes}
                 edges={edges}
                 lines={lines}
+                pictures={pictures}
                 positions={positions}
                 groups={nodeGroups.map((g) => ({ ...g, variant: !!nodes.find((n) => n.nodeId === g.rootId)?.parentId }))}
                 canvasW={CANVAS_W}
@@ -2434,6 +2446,11 @@ export function MapPage() {
             setInlineEditId(null);
             void growStructure(kind, at);
           }}
+          onDrawPicture={() => {
+            setCanvasContextMenu(null);
+            setInlineEditId(null);
+            setPicturePickerAt({ x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY });
+          }}
           onTextToNodes={() => {
             setCanvasContextMenu(null);
             setInlineEditId(null);
@@ -2442,6 +2459,21 @@ export function MapPage() {
           onTextToMap={() => {
             setCanvasContextMenu(null);
             navigate("/split");
+          }}
+        />
+      )}
+
+      {picturePickerAt && (
+        <PicturePicker
+          onClose={() => setPicturePickerAt(null)}
+          onPick={(kind) => {
+            const view = viewportBounds();
+            const at =
+              picturePickerAt === "view"
+                ? { x: (view.minX + view.maxX) / 2, y: (view.minY + view.maxY) / 2 }
+                : picturePickerAt;
+            setPicturePickerAt(null);
+            void drawPicture(kind, at);
           }}
         />
       )}

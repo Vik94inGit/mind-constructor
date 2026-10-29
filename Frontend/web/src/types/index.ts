@@ -200,6 +200,8 @@ export interface NodeDoc {
   prompt?: string;
   /** True while the node has never been written in (see Backend's Node.ghost) — the canvas draws it faded until someone fills it. */
   ghost?: boolean;
+  /** Which dot of a picture this node is (see Backend's Node.picture and utils/pictures.ts); null/absent for every other node. */
+  picture?: { id: string; kind: string; dot: number } | null;
   /** Optional step number (1..9999) for labeling a process's steps — see Backend's Node.order. null/absent means "not numbered". */
   order?: number | null;
   type: NodeType;

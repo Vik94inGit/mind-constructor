@@ -114,6 +114,22 @@ export const NodeSchema = new mongoose.Schema(
       max: 9999,
       validate: { validator: (v: number | null) => v === null || Number.isInteger(v), message: "order must be a whole number" },
     },
+    // Which dot of a picture this node is, for a node made by "Draw a
+    // picture": the frontend lays a picture out as ghost nodes, one per dot,
+    // and draws its lines between them as they are filled in, so a finished
+    // picture shows the thoughts are all there. `id` names one picture on the
+    // map (its dots share it), `kind` which picture it is (the frontend owns
+    // the list, utils/pictures.ts) and `dot` the node's place in it. Set at
+    // creation only. null (the default) for every other node.
+    picture: {
+      type: {
+        _id: false,
+        id: { type: String, required: true, maxlength: 40 },
+        kind: { type: String, required: true, maxlength: 20 },
+        dot: { type: Number, required: true, min: 0, max: 63 },
+      },
+      default: null,
+    },
     // An optional emoji for the node — a frontend draws the node's icon as a
     // two-sided card, this emoji on one face and the type's own symbol on the
     // other. Empty (the default) means none. Small, so it rides along on the

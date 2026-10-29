@@ -51,6 +51,13 @@ const emojiSchema = z
   .max(32, "emoji must be at most 32 characters")
   .refine((v) => v === "" || !/[\p{L}\p{N}]/u.test(v), "emoji must be an emoji, not text");
 
+// Node.picture — which dot of a picture a node is ("Draw a picture").
+const pictureSchema = z.object({
+  id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, "picture id must be 1-40 letters, digits, - or _"),
+  kind: z.string().regex(/^[a-z]{1,20}$/, "picture kind must be 1-20 lowercase letters"),
+  dot: z.number().int("picture dot must be a whole number").min(0).max(63),
+});
+
 // Node.order — a whole step number, 1..9999. null clears it (update only).
 const orderSchema = z
   .number()
@@ -175,6 +182,7 @@ const createNodeSchema = z.object({
   // See Node.MANUAL_ZONE_COLORS — a manually-placed zone ring, independent
   // of the automatic circle detection.
   manualZone: z.enum(MANUAL_ZONE_COLORS).nullish(),
+  picture: pictureSchema.nullish(),
 });
 
 // The clearest example of "why ABL": creating a node is two DAO calls

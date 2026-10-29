@@ -8,6 +8,8 @@ import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import { layoutTemplate, MAP_KIND_ROOTS } from "../utils/templates";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import { sleep } from "../utils/sleep";
+import { layoutPicture, newPictureId } from "../utils/pictures";
+import type { PictureKind } from "../utils/pictures";
 import { piecesParentsFirst } from "../utils/textSplit";
 import type { Translation } from "../i18n/translations";
 import type { MapKind, NodeDoc, NodeType } from "../types";
@@ -55,6 +57,9 @@ export interface TextNodesPlan {
 // template branch reads as its own discrete step (plus its celebrate burst),
 // not a flash of everything at once.
 const TEMPLATE_NODE_STAGGER_MS = 250;
+// A picture's dots come in quicker: there are more of them, and they read as
+// one drawing being dotted out rather than a structure growing.
+const PICTURE_DOT_STAGGER_MS = 120;
 
 interface Params {
   mapId: string | undefined;
@@ -72,6 +77,8 @@ interface Params {
   placeNode: (desired: Pt, moving: MovingNode[], extra?: ExtraNode[]) => Pt;
   viewportBounds: () => ViewportBounds;
   showNodes: (ids: string[]) => void;
+  /** Frames the view on these canvas points (useCanvasFraming's showPoints). */
+  showPoints: (pts: Pt[]) => void;
   showNotice: (message: string) => void;
   /** Called once a node is made (see confirmPendingCreate). */
   onCreated: (node: NodeDoc, at: Pt) => void;
@@ -93,6 +100,7 @@ export function useNodeCreation({
   placeNode,
   viewportBounds,
   showNodes,
+  showPoints,
   showNotice,
   onCreated,
   t,
@@ -267,6 +275,40 @@ export function useNodeCreation({
     }
   }
 
+  // "Draw a picture" (utils/pictures.ts): the picture's dots as ghosts, one
+  // node per dot, centered as near `desired` as the map has room for. Each
+  // ghost asks the picture's question, numbered like a connect-the-dots page;
+  // none hangs from another, so a picture never makes a zone.
+  async function drawPicture(kind: PictureKind, desired: Pt) {
+    if (!mapId) return;
+    setActionError(null);
+    const dots = layoutPicture(kind, desired, [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()]);
+    const id = newPictureId();
+    const question = t.ui.pictures.questions[kind];
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    // The whole picture in view before its first dot lands, so it is seen being dotted out.
+    showPoints(dots);
+    try {
+      for (let dot = 0; dot < dots.length; dot++) {
+        const node = await nodesApi.createNode(mapId, {
+          text: "",
+          prompt: `${dot + 1}. ${question}`,
+          type: "Idea",
+          x: dots[dot].x,
+          y: dots[dot].y,
+          parentId: null,
+          picture: { id, kind, dot },
+        });
+        upsertNode(node);
+        setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
+        await sleep(PICTURE_DOT_STAGGER_MS);
+      }
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.pictures.failed);
+    }
+  }
+
   // "Text → nodes": makes everything a TextNodesPlan asks for, in order — the
   // main node first (the pieces need its real id as their parent), then each
   // piece on its spot, then packs the pieces that didn't fit into the main
@@ -345,5 +387,5 @@ export function useNodeCreation({
     showNotice(t.ui.textNodes.created(total, packedIds.length));
   }
 
-  return { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText };
+  return { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText, drawPicture };
 }

@@ -97,7 +97,17 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Right-click on empty canvas** — a desktop-style menu at the click point: *Paste here*, *New node ▸*
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
-  *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+  *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+- **Draw a picture** — from the right-click menu (at the click point) or the "+" menu (in the middle of
+  the view), pick a heart, star, house, tree, fish or smile. Its dots arrive as numbered ghosts, like a
+  connect-the-dots page, each asking the picture's question ("What do you love?"). Write in two
+  neighbouring dots and the line between them is inked in the picture's colour; until then it is a faint
+  dotted guide, and a closed shape fills in a little more with every dot. A caption under the picture
+  says how much of it is drawn ("Heart · 60% drawn", then "done!"), and the minimap draws the inked lines
+  too with the percentage in its corner. The picture is placed whole where it doesn't cover anything,
+  its dots never hang from one another (so no zone forms), and moving a dot bends the drawing with it.
+  Each node knows its dot through `Node.picture`; the pictures themselves live in `src/utils/pictures.ts`
+  (`map/PicturePicker.tsx`, `map/PictureLayer.tsx`).
 - **Text → nodes** — paste a text on the map itself, mark its pieces (by hand, or every line/sentence
   at once) and they become nodes around the click point, hanging from the whole text as a main node.
   The map's free room is counted first (`utils/freeSpots.ts`); when not every new node fits, the user

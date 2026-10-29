@@ -9,6 +9,8 @@ import type { NodeDoc } from "../types";
 
 vi.mock("../api/nodes", () => ({ createNode: vi.fn(), packNodes: vi.fn() }));
 import * as nodesApi from "../api/nodes";
+vi.mock("../utils/sleep", () => ({ sleep: () => Promise.resolve() }));
+import { PICTURES } from "../utils/pictures";
 
 function setup(pendingCreate: PendingCreate | null = null) {
   const params = {
@@ -26,6 +28,7 @@ function setup(pendingCreate: PendingCreate | null = null) {
     placeNode: (p: { x: number; y: number }) => p,
     viewportBounds: () => FULL_CANVAS_BOUNDS,
     showNodes: vi.fn(),
+    showPoints: vi.fn(),
     showNotice: vi.fn(),
     onCreated: vi.fn(),
     t: TRANSLATIONS.en,
@@ -52,6 +55,21 @@ describe("useNodeCreation", () => {
     expect(params.upsertNode).toHaveBeenCalled();
     expect(params.onCreated).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "n1" }), { x: 10, y: 20 });
     expect(params.setPendingCreate).toHaveBeenCalledWith(null);
+  });
+
+  it("dots a picture out as numbered ghosts that share one picture id", async () => {
+    const { result, params } = setup();
+    await act(() => result.current.drawPicture("star", { x: 1200, y: 800 }));
+    const calls = vi.mocked(nodesApi.createNode).mock.calls.map((c) => c[1]);
+    expect(calls).toHaveLength(PICTURES.star.dots.length);
+    const ids = new Set(calls.map((c) => c.picture?.id));
+    expect(ids.size).toBe(1);
+    calls.forEach((c, i) => {
+      expect(c).toMatchObject({ text: "", type: "Idea", parentId: null, picture: { kind: "star", dot: i } });
+      expect(c.prompt).toBe(`${i + 1}. ${TRANSLATIONS.en.ui.pictures.questions.star}`);
+    });
+    expect(params.showPoints).toHaveBeenCalledTimes(1);
+    expect(params.upsertNode).toHaveBeenCalledTimes(PICTURES.star.dots.length);
   });
 
   it("does nothing without a pending node", async () => {
