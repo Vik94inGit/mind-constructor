@@ -1,4 +1,4 @@
-import { CANVAS_W, CANVAS_H, footprintObstacles, freeFootprintScale } from "../utils/canvasLayout";
+import { CANVAS_W, CANVAS_H, footprintObstacles } from "../utils/canvasLayout";
 import type { NodeGroup, Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, makeZoneRule, othersTerritory, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
@@ -11,7 +11,6 @@ interface Params {
   visibleNodes: NodeDoc[];
   positions: Map<string, Pt>;
   nodeGroups: NodeGroup[];
-  zoom: number;
   viewportBounds: () => ViewportBounds;
   zoneLayouts: Record<string, ZoneLayout>;
   /** In a discussion no drop lands inside another player's castle. */
@@ -20,7 +19,7 @@ interface Params {
 }
 
 // Where a new or moved node may go on the canvas — see utils/zoneRules.ts.
-export function usePlacement({ visibleNodes, positions, nodeGroups, zoom, viewportBounds, zoneLayouts, discussionOn, userId }: Params) {
+export function usePlacement({ visibleNodes, positions, nodeGroups, viewportBounds, zoneLayouts, discussionOn, userId }: Params) {
   // The points a new or moved node has to stay clear of: every *visible*
   // node's position, minus `exclude` (the thing being placed). Only visible
   // ones — a node packed out of sight still has an entry in `positions`;
@@ -41,12 +40,9 @@ export function usePlacement({ visibleNodes, positions, nodeGroups, zoom, viewpo
   // lands inside another player's castle either.
   // Only the moving nodes move; nothing else on the map is pushed around.
   function placeNode(desired: Pt, moving: MovingNode[], extra: ExtraNode[] = [], opts: { free?: boolean } = {}) {
-    // A drag the person aimed keeps clear of nodes as they look right now,
-    // at this zoom: zoomed out, each one covers more of the canvas.
     const obstacles = footprintObstacles(
       [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
       MIN_NODE_GAP,
-      opts.free ? freeFootprintScale(zoom) : 1,
     );
     return placeByZoneRules(
       desired,

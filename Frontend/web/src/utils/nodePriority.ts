@@ -1,4 +1,4 @@
-import { CAPTION_WIDTH } from "./canvasLayout";
+import { CAPTION_WIDTH, nodeZoomScale } from "./canvasLayout";
 import { nodeRefId } from "./nodeType";
 import type { ReadingMode } from "./readingMode";
 import type { NodeDoc, SizeTier } from "../types";
@@ -59,11 +59,12 @@ export interface Box {
 
 /**
  * Where a node's caption (and a named zone's name) lands, in canvas units.
- * NodeCard draws it at a constant on-screen size, so every screen length
- * here is divided by the zoom.
+ * NodeCard draws it at a constant on-screen size when zoomed in (and with
+ * the canvas when zoomed out, see nodeZoomScale), so every screen length
+ * here is scaled the same way.
  */
 export function captionBox({ pos, sizeMultiplier, lines, namedZone }: CaptionSpec, zoom: number): Box {
-  const z = zoom || 1;
+  const z = 1 / nodeZoomScale(zoom);
   const topGap = namedZone ? ZONE_NAME_GAP_PX : CAPTION_GAP_PX;
   const captionGap = namedZone ? NAMED_ZONE_GAP_PX : CAPTION_GAP_PX;
   const top = pos.y + ((ICON_HALF_PX + topGap) * sizeMultiplier) / z;

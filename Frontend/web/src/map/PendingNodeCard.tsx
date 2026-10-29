@@ -7,6 +7,7 @@ import type { OutcomeType } from "./OutcomeBadge";
 import { NodeCrown } from "./NodeCrown";
 import { useI18n } from "../i18n/I18nContext";
 import { NodeTypeIcon } from "./NodeTypeIcon";
+import { nodeZoomScale } from "../utils/canvasLayout";
 import type { NodeType } from "../types";
 
 interface Props {
@@ -72,7 +73,7 @@ export function PendingNodeCard({ x, y, type, initialText = "", emoji, iconOnly 
   // one there) — nothing outside this component reads this card's own
   // layout footprint, so there's no separate "reserved space" to keep in
   // sync with the visual size the way NodeCard's ring/caption siblings need.
-  const k = 1 / zoom;
+  const k = nodeZoomScale(zoom);
   // z-[33]: same reasoning as QuickAddGhosts's own z-[33] — above MapPage's
   // full-screen NodePanel backdrop (z-30), which otherwise sits on top of
   // this input (the anchor node that opened it stays selected the whole

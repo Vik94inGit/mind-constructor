@@ -3,7 +3,7 @@ import {
   avoidOverlap,
   dropTargetDistance,
   footprintObstacles,
-  freeFootprintScale,
+  nodeZoomScale,
   NODE_FOOTPRINT,
   realmMembers,
   selfIntersects,
@@ -84,27 +84,20 @@ describe("avoidOverlap", () => {
   });
 });
 
-describe("freeFootprintScale", () => {
-  it("grows a node's footprint as the map zooms out, since icons keep their size on screen", () => {
-    expect(freeFootprintScale(1)).toBe(1);
-    expect(freeFootprintScale(0.6)).toBeCloseTo(1 / 0.6);
+describe("nodeZoomScale", () => {
+  it("keeps a node one size on screen when zoomed in", () => {
+    expect(nodeZoomScale(1)).toBe(1);
+    expect(nodeZoomScale(2)).toBeCloseTo(0.5);
   });
 
-  it("never shrinks below the plain footprint when zoomed in, and stays plain for dots", () => {
-    expect(freeFootprintScale(2)).toBe(1);
-    expect(freeFootprintScale(0.5)).toBe(1);
-  });
-
-  it("keeps a node dropped beside another clear of it on screen when zoomed out", () => {
-    const zoom = 0.6;
-    const other = { x: 1000, y: 1000 };
-    // Right next to it: clear at normal zoom, but on screen at 60% the two would overlap.
-    const desired = { x: other.x + NODE_FOOTPRINT.w + 10, y: other.y };
-    expect(avoidOverlap(desired, footprintObstacles([other]))).toEqual(desired);
-    const placed = avoidOverlap(desired, footprintObstacles([other], 0, freeFootprintScale(zoom)));
-    const onScreenGapX = (Math.abs(placed.x - other.x) - NODE_FOOTPRINT.w / zoom) * zoom;
-    const onScreenGapY = (Math.abs(placed.y - other.y) - NODE_FOOTPRINT.h / zoom) * zoom;
-    expect(Math.max(onScreenGapX, onScreenGapY)).toBeGreaterThanOrEqual(-0.5);
+  it("shrinks a node with the canvas when zoomed out, so two nodes apart at 100% stay apart", () => {
+    expect(nodeZoomScale(0.65)).toBe(1);
+    expect(nodeZoomScale(0.5)).toBe(1);
+    // On screen a node is NODE_FOOTPRINT * zoom * scale wide, and so is the gap
+    // the canvas puts between two of them: both shrink together.
+    const zoom = 0.65;
+    const gapOnCanvas = NODE_FOOTPRINT.w + 10;
+    expect(gapOnCanvas * zoom).toBeGreaterThan(NODE_FOOTPRINT.w * zoom * nodeZoomScale(zoom));
   });
 });
 

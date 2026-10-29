@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { chompAim, chompersFor, chompMove, chompTargets } from "../utils/pacman";
 import type { ChompMove } from "../utils/pacman";
 import { nodeSizeMultiplier } from "../utils/nodePriority";
+import { nodeZoomScale } from "../utils/canvasLayout";
 import { useTapChomp } from "./useTapChomp";
 import type { NodeDoc } from "../types";
 
@@ -36,7 +37,7 @@ export function useChompRuns({ visibleNodes, selectedId, steppedToId, dotZoom, z
   const chompMoveCache = useRef(new Map<string, ChompMove>());
   const chompMoves = new Map<string, ChompMove>();
   if (!dotZoom) {
-    const radius = (n: NodeDoc) => (24 * nodeSizeMultiplier(n, isCircleParent(n.nodeId), compact)) / zoom;
+    const radius = (n: NodeDoc) => 24 * nodeSizeMultiplier(n, isCircleParent(n.nodeId), compact) * nodeZoomScale(zoom);
     for (const id of chompIds) {
       const attack = visibleNodes.find((n) => n.nodeId === id);
       const aim = attack && chompAim(attack, visibleNodes);
