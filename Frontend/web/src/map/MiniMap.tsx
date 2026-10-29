@@ -5,6 +5,7 @@ import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc } from "../types";
 import { zoneColorFor } from "../utils/zoneStyle";
 import { useI18n } from "../i18n/I18nContext";
+import { PictureIcon } from "./PicturePicker";
 import { overallPercent, pictureSegments } from "../utils/pictures";
 import type { PictureGroup } from "../utils/pictures";
 
@@ -484,7 +485,9 @@ export const MiniMap = memo(function MiniMap({
           className="pointer-events-none absolute left-1 top-1 rounded-full bg-surface/85 px-1.5 text-[0.65rem] font-semibold text-ink"
           title={t.ui.pictures.minimap(picturePercent)}
         >
-          ✎ {picturePercent}%
+          <span className="inline-flex items-center gap-0.5">
+            <PictureIcon size={10} /> {picturePercent}%
+          </span>
         </div>
       )}
     </div>

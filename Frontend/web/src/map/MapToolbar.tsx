@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PictureIcon } from "./PicturePicker";
 import type { TypeEmoji } from "../utils/emojiFace";
 import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nContext";
@@ -245,6 +246,18 @@ export function MapToolbar({
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
             </svg>
+          </button>
+          {/* Draw a picture (map/PicturePicker.tsx): its own button, not only
+              the "+" menu, so it is one tap away on a phone, where there is
+              no right-click. */}
+          <button
+            type="button"
+            className={`${iconBtn} ${idle}`}
+            title={t.ui.pictures.title}
+            aria-label={t.ui.pictures.title}
+            onClick={onDrawPicture}
+          >
+            <PictureIcon />
           </button>
           {/* Display options — compact view, emoji first, zone layouts and
               presentation. Layers icon, not an eye: the eye in the bottom-right

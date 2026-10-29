@@ -5,6 +5,7 @@ import type { MapKind, NodeType } from "../types";
 import { MAP_KIND_ROOTS } from "../utils/templates";
 import { isMobileViewport } from "../utils/canvasLayout";
 import { NodeTypeIcon } from "./NodeTypeIcon";
+import { PictureIcon } from "./PicturePicker";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
 
@@ -156,8 +157,8 @@ export function CanvasContextMenu({ x, y, onPick, onGrow, onDrawPicture, onTextT
         </button>
       ))}
       <button role="menuitem" className={item} onClick={onDrawPicture}>
-        <span aria-hidden="true" className="inline-flex w-4 justify-center">
-          ✎
+        <span className="inline-flex w-4 justify-center">
+          <PictureIcon />
         </span>
         {t.ui.pictures.entry}
       </button>

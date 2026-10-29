@@ -11,6 +11,38 @@ interface Props {
 const BOX = 96;
 const PAD = 12;
 
+// "Draw a picture" at icon size: a few dots joined into a little star, in
+// the toolbar's monochrome ink.
+export function PictureIcon({ size = 16 }: { size?: number }) {
+  const pts = [
+    [8, 1.8],
+    [10, 6],
+    [14.2, 6.4],
+    [11, 9.4],
+    [12, 14],
+    [8, 11.6],
+    [4, 14],
+    [5, 9.4],
+    [1.8, 6.4],
+    [6, 6],
+  ];
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+      <polygon
+        points={pts.map((p) => p.join(",")).join(" ")}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1"
+        strokeDasharray="1.5 1.5"
+        strokeLinejoin="round"
+      />
+      {pts.filter((_, i) => i % 2 === 0).map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="1.5" fill="currentColor" />
+      ))}
+    </svg>
+  );
+}
+
 // One picture in miniature, the way it starts on the map: its dots, joined
 // by the faint dotted guides that ink in as the dots are written.
 export function PictureThumb({ kind, size = BOX }: { kind: PictureKind; size?: number }) {
