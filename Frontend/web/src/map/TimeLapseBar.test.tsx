@@ -81,4 +81,19 @@ describe("TimeLapseBar", () => {
     await userEvent.click(screen.getByRole("button", { name: t.map.toolbar.timeLapseExit }));
     expect(onExit).toHaveBeenCalled();
   });
+
+  it("opens the newest node's info as it comes back, none before the first", () => {
+    const current = { ...node("a"), type: "Problem", title: "Rent", text: "Rent went up again" } as NodeDoc;
+    const { unmount } = render(
+      <I18nProvider>
+        <TimeLapseBar step={1} total={3} playing={false} current={current} onStep={vi.fn()} onTogglePlay={vi.fn()} onExit={vi.fn()} />
+      </I18nProvider>,
+    );
+    expect(screen.getByText("Rent")).toBeTruthy();
+    expect(screen.getByText("Rent went up again")).toBeTruthy();
+    expect(screen.getByText(t.ui.types.Problem)).toBeTruthy();
+    unmount();
+    renderBar({ step: 0, current });
+    expect(screen.queryByText("Rent went up again")).toBeNull();
+  });
 });

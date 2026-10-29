@@ -259,7 +259,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   framing. Later opens show the map at once; the slow node-by-node story is the **time-lapse**'s
   (`src/hooks/useNodeEntrance.ts`, `src/utils/nodeEntrance.ts`).
 - **Time-lapse** — replays the map from its first node, one node at a time in the order they were
-  made, with the camera following. The replay stays on each node long enough to read it (longer for a
+  made, with the camera following. Each node's info (its type, title and full text, as the node panel's
+  Info tab shows them, read-only) opens above the bar as the node comes back, so the replay reminds you
+  what every thought says; the last one stays open at the end. The replay stays on each node long enough to read it (longer for a
   longer thought, about 2 to 5 s), and the bar offers three speeds, Slow, Normal and Fast, remembered in
   this browser. A zone fades in just after the node that made it (its parent's second child), so the
   nodes come first and the zones they form follow (`src/map/TimeLapseBar.tsx`, `src/hooks/useTimeLapse.ts`).

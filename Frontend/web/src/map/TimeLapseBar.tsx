@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import type { NodeDoc } from "../types";
+import { NodeTypeSymbol } from "./NodeTypeSymbol";
 
 /** A map's nodes in the order they were written, oldest first — what the time-lapse replays. */
 export function timeLapseOrder(nodes: NodeDoc[]): NodeDoc[] {
@@ -60,7 +61,9 @@ interface Props {
 
 // The time-lapse's bottom bar: the map replays node by node from the first
 // thought, and the slider scrubs back and forth through it. Takes the bottom
-// sheet's slot, like DrawLineBar.
+// sheet's slot, like DrawLineBar, and opens the newest node's info above its
+// controls (the read-only part of NodePanel's Info tab), so each thought is
+// read again as it comes back; at the end the last one stays open.
 export function TimeLapseBar({ step, total, playing, current, at, onStep, onTogglePlay, onExit }: Props) {
   const { t, language } = useI18n();
   const s = t.map.toolbar;
@@ -76,49 +79,74 @@ export function TimeLapseBar({ step, total, playing, current, at, onStep, onTogg
   const btn =
     "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color] duration-[120ms] hover:bg-surface-2";
   const date = at ? new Date(at) : null;
+  const info = step > 0 ? current : undefined;
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[46] flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
-      <button type="button" className={btn} aria-label={playing ? s.timeLapsePause : s.timeLapsePlay} title={playing ? s.timeLapsePause : s.timeLapsePlay} onClick={onTogglePlay}>
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          {playing ? (
-            <path d="M3.5 2.5 H5.5 V11.5 H3.5 Z M8.5 2.5 H10.5 V11.5 H8.5 Z" fill="currentColor" />
-          ) : (
-            <path d="M4 2.2 L11.5 7 L4 11.8 Z" fill="currentColor" />
-          )}
-        </svg>
-      </button>
-      <input
-        type="range"
-        min={0}
-        max={total}
-        value={step}
-        aria-label={s.timeLapse}
-        className="min-w-[8rem] flex-1 accent-[var(--accent)]"
-        onChange={(e) => onStep(Number(e.target.value))}
-      />
-      <span className="text-[0.8rem] whitespace-nowrap text-ink-soft tabular-nums">
-        {s.timeLapseStep(step, total)}
-        {date && !Number.isNaN(date.getTime()) ? ` · ${date.toLocaleString(language, { dateStyle: "medium", timeStyle: "short" })}` : ""}
-      </span>
-      <div role="group" aria-label={s.timeLapseSpeed} className="inline-flex overflow-hidden rounded-lg border border-line">
-        {TIME_LAPSE_SPEEDS.map((sp) => (
-          <button
-            key={sp}
-            type="button"
-            aria-pressed={speed === sp}
-            onClick={() => {
-              setSpeed(sp);
-              saveTimeLapseSpeed(sp);
-            }}
-            className={`cursor-pointer px-[0.6rem] py-[0.35rem] text-[0.75rem] font-semibold transition-[background-color] duration-[120ms] ${speed === sp ? "bg-accent-soft text-accent-ink" : "bg-surface text-ink hover:bg-surface-2"}`}
-          >
-            {s.timeLapseSpeeds[sp]}
-          </button>
-        ))}
+    <div className="fixed inset-x-0 bottom-0 z-[46] rounded-t-2xl border-t border-line bg-surface shadow-[var(--shadow-card)]">
+      {info && <TimeLapseInfo key={info.nodeId} node={info} />}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+        <button type="button" className={btn} aria-label={playing ? s.timeLapsePause : s.timeLapsePlay} title={playing ? s.timeLapsePause : s.timeLapsePlay} onClick={onTogglePlay}>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            {playing ? (
+              <path d="M3.5 2.5 H5.5 V11.5 H3.5 Z M8.5 2.5 H10.5 V11.5 H8.5 Z" fill="currentColor" />
+            ) : (
+              <path d="M4 2.2 L11.5 7 L4 11.8 Z" fill="currentColor" />
+            )}
+          </svg>
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={total}
+          value={step}
+          aria-label={s.timeLapse}
+          className="min-w-[8rem] flex-1 accent-[var(--accent)]"
+          onChange={(e) => onStep(Number(e.target.value))}
+        />
+        <span className="text-[0.8rem] whitespace-nowrap text-ink-soft tabular-nums">
+          {s.timeLapseStep(step, total)}
+          {date && !Number.isNaN(date.getTime()) ? ` · ${date.toLocaleString(language, { dateStyle: "medium", timeStyle: "short" })}` : ""}
+        </span>
+        <div role="group" aria-label={s.timeLapseSpeed} className="inline-flex overflow-hidden rounded-lg border border-line">
+          {TIME_LAPSE_SPEEDS.map((sp) => (
+            <button
+              key={sp}
+              type="button"
+              aria-pressed={speed === sp}
+              onClick={() => {
+                setSpeed(sp);
+                saveTimeLapseSpeed(sp);
+              }}
+              className={`cursor-pointer px-[0.6rem] py-[0.35rem] text-[0.75rem] font-semibold transition-[background-color] duration-[120ms] ${speed === sp ? "bg-accent-soft text-accent-ink" : "bg-surface text-ink hover:bg-surface-2"}`}
+            >
+              {s.timeLapseSpeeds[sp]}
+            </button>
+          ))}
+        </div>
+        <button type="button" className={btn} onClick={onExit}>
+          {s.timeLapseExit}
+        </button>
       </div>
-      <button type="button" className={btn} onClick={onExit}>
-        {s.timeLapseExit}
-      </button>
+    </div>
+  );
+}
+
+// The replayed node's info: its type, title and full text, as its panel's
+// Info tab shows them, but only to read. Announced as it changes.
+function TimeLapseInfo({ node }: { node: NodeDoc }) {
+  const { t } = useI18n();
+  const text = node.text || node.prompt || "";
+  return (
+    <div data-time-lapse-info aria-live="polite" className="max-h-[34dvh] overflow-y-auto border-b border-line px-5 pt-3 pb-3">
+      <div className="flex items-center gap-[0.4rem] text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase">
+        <NodeTypeSymbol type={node.type} size={17} />
+        <span>{t.ui.types[node.type]}</span>
+      </div>
+      {node.title && <div className="mt-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>}
+      {text && (
+        <p className={`m-0 mt-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[0.9rem] whitespace-pre-wrap break-words ${node.text ? "text-ink" : "text-ink-soft italic"}`}>
+          {text}
+        </p>
+      )}
     </div>
   );
 }
