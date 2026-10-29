@@ -100,8 +100,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
-- **Draw a picture** — from the right-click menu (at the click point) or the "+" menu (in the middle of
-  the view), pick a heart, star, house, tree, fish or smile. Its dots arrive as numbered ghosts, like a
+- **Draw a picture** — from its own toolbar button (the dotted star, one tap on a phone) or the "+" menu
+  (both put it in the middle of the view), or the right-click menu (at the click point); then
+  pick a heart, star, house, tree, fish or smile. Its dots arrive as numbered ghosts, like a
   connect-the-dots page, each asking the picture's question ("What do you love?"). Write in two
   neighbouring dots and the line between them is inked in the picture's colour; until then it is a faint
   dotted guide, and a closed shape fills in a little more with every dot. A caption under the picture

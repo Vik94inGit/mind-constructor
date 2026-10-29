@@ -81,6 +81,13 @@ describe("MapToolbar", () => {
     expect(onExitDemo).toHaveBeenCalledTimes(1);
   });
 
+  it("opens Draw a picture from its own button, one tap away on a phone", async () => {
+    const user = userEvent.setup();
+    const { onDrawPicture } = renderToolbar();
+    await user.click(screen.getByRole("button", { name: t.ui.pictures.title }));
+    expect(onDrawPicture).toHaveBeenCalledTimes(1);
+  });
+
   it("toggles move mode", async () => {
     const user = userEvent.setup();
     const { onToggleMove } = renderToolbar({ moveMode: false });
