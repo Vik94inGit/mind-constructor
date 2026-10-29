@@ -220,6 +220,11 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `""` = none) is the question a frontend shows as the ghost's placeholder — map templates create
   ghosts with a prompt and no text or title. Both ride along on `GET /:mapId/nodes` like `title`:
   the stored flag is what lets a frontend fade a ghost without the lazy `text` backfill.
+- **`Node.picture`** — `{ id, kind, dot }` or null: which dot of a picture a node is, for nodes made by
+  the frontend's "Draw a picture" (`Frontend/web/src/utils/pictures.ts` owns the pictures and draws
+  their lines between the dots as the ghosts are filled in). `id` groups one picture's dots, `kind`
+  is 1-20 lowercase letters (the backend doesn't keep the list), `dot` 0..63. Set only on
+  `POST /api/nodes/:mapId`; rides along on the node list.
 - **`Node.zoneName`** — an optional name (max 40 chars, `""` = none) for the zone a circle parent
   radiates. Set via `PATCH /api/nodes/:nodeId` (`zoneNameSchema` in `nodeAbl.ts`; an empty string
   clears it), owner-only like every node edit. A frontend shows it under the parent on the canvas and

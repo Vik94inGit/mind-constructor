@@ -63,6 +63,8 @@ interface Props {
   onInvite: () => void;
   onCreateNode: () => void;
   onCreateCircle: () => void;
+  /** Opens "Draw a picture" (map/PicturePicker.tsx), the picture going in the middle of the view. */
+  onDrawPicture: () => void;
   onCopyMap: () => void;
   onPaste: () => void;
   onExportText: () => void;
@@ -122,6 +124,7 @@ export function MapToolbar({
   onInvite,
   onCreateNode,
   onCreateCircle,
+  onDrawPicture,
   onCopyMap,
   onPaste,
   onExportText,
@@ -198,6 +201,7 @@ export function MapToolbar({
                 onInvite={closeAddThen(onInvite)}
                 onCreateNode={closeAddThen(onCreateNode)}
                 onCreateCircle={closeAddThen(onCreateCircle)}
+                onDrawPicture={closeAddThen(onDrawPicture)}
                 onCopyMap={closeAddThen(onCopyMap)}
                 onPaste={closeAddThen(onPaste)}
                 onExportText={closeAddThen(onExportText)}

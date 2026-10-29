@@ -7,6 +7,7 @@ interface Props {
   onInvite: () => void;
   onCreateNode: () => void;
   onCreateCircle: () => void;
+  onDrawPicture: () => void;
   onCopyMap: () => void;
   onPaste: () => void;
   onExportText: () => void;
@@ -31,6 +32,7 @@ export function AddMenu({
   onInvite,
   onCreateNode,
   onCreateCircle,
+  onDrawPicture,
   onCopyMap,
   onPaste,
   onExportText,
@@ -76,6 +78,9 @@ export function AddMenu({
       </button>
       <button className={item} onClick={onCreateCircle}>
         {t.map.addMenu.createCircle}
+      </button>
+      <button className={item} onClick={onDrawPicture}>
+        {t.ui.pictures.entry}
       </button>
       <button className={item} onClick={onCopyMap}>
         {t.ui.clipboard.copyWholeMap}

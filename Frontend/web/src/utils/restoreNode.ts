@@ -75,6 +75,7 @@ async function recreate(mapId: string, n: NodeDoc, parentId: string | null): Pro
     symbolOverride: n.symbolOverride ?? null,
     sizeTier: n.sizeTier ?? null,
     manualZone: n.manualZone ?? null,
+    picture: n.picture ?? null,
   });
   const extra: Partial<NodeDoc> = {};
   for (const key of AFTER_CREATE) {

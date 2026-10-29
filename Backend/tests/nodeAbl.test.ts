@@ -84,6 +84,35 @@ describe("nodeAbl", () => {
       expect(created.prompt).toBe("What could go wrong?");
     });
 
+    it("keeps which dot of a picture a node is", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1" } as never);
+      vi.mocked(countNodesByMapInternalIdDao).mockResolvedValue(1 as never);
+      vi.mocked(createNodeMutationDao).mockResolvedValue({ nodeId: "n1" } as never);
+
+      await createNodeAbl(
+        { text: "", type: "Idea", picture: { id: "p_abc123", kind: "heart", dot: 3 } },
+        "pub123",
+        "user1",
+      );
+
+      const created = vi.mocked(createNodeMutationDao).mock.calls[0][1];
+      expect(created.picture).toEqual({ id: "p_abc123", kind: "heart", dot: 3 });
+    });
+
+    it("rejects a malformed picture", async () => {
+      for (const picture of [
+        { id: "p 1", kind: "heart", dot: 0 },
+        { id: "p1", kind: "Heart!", dot: 0 },
+        { id: "p1", kind: "heart", dot: 1.5 },
+        { id: "p1", kind: "heart", dot: 64 },
+      ]) {
+        await expect(createNodeAbl({ text: "", type: "Idea", picture }, "pub123", "user1")).rejects.toThrow(
+          ValidationError,
+        );
+      }
+      expect(createNodeMutationDao).not.toHaveBeenCalled();
+    });
+
     it("rejects an invalid order at creation too", async () => {
       await expect(
         createNodeAbl({ text: "Step", type: "Option", order: 0 }, "pub123", "user1"),

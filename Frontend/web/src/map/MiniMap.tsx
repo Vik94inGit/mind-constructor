@@ -5,6 +5,8 @@ import type { Sentiment } from "../utils/nodeType";
 import type { EdgeDoc, LineDoc, NodeDoc } from "../types";
 import { zoneColorFor } from "../utils/zoneStyle";
 import { useI18n } from "../i18n/I18nContext";
+import { overallPercent, pictureSegments } from "../utils/pictures";
+import type { PictureGroup } from "../utils/pictures";
 
 // Smaller than the original per-node dots (which were 2.2px and colored one
 // per NodeType) — this brings dots back per the user's own ask, but paired
@@ -63,6 +65,10 @@ interface Props {
   // scaled down and drawn here too, so the way a map has been divided up is
   // visible from the overview as well, not only once zoomed in on it.
   lines: LineDoc[];
+  // The pictures on the map ("Draw a picture", utils/pictures.ts): their
+  // inked lines drawn here too, and how much of them is drawn in the corner,
+  // so a picture's progress shows from the overview.
+  pictures?: PictureGroup[];
   positions: Map<string, { x: number; y: number }>;
   // Same circles the main canvas draws a backdrop for (see MapPage's own
   // nodeGroups) — drawn here too, scaled down, so a circle is findable from
@@ -94,6 +100,7 @@ export const MiniMap = memo(function MiniMap({
   nodes,
   edges,
   lines,
+  pictures = [],
   positions,
   groups,
   canvasW,
@@ -138,6 +145,8 @@ export const MiniMap = memo(function MiniMap({
       resizeObserver.disconnect();
     };
   }, [wrapRef]);
+
+  const picturePercent = overallPercent(pictures);
 
   const scaleX = MINIMAP_W / canvasW;
   const scaleY = MINIMAP_H / canvasH;
@@ -338,6 +347,30 @@ export const MiniMap = memo(function MiniMap({
             strokeLinejoin="round"
           />
         ))}
+        {/* Pictures — each line inked in the picture's colour once both its
+            dots are written in, a faint guide until then. */}
+        {pictures.flatMap((g) =>
+          pictureSegments(g).map((s) => {
+            const a = positions.get(s.from.nodeId);
+            const b = positions.get(s.to.nodeId);
+            if (!a || !b) return null;
+            return (
+              <line
+                key={`picture-${s.key}`}
+                data-drawn={s.drawn || undefined}
+                x1={a.x * scaleX}
+                y1={a.y * scaleY}
+                x2={b.x * scaleX}
+                y2={b.y * scaleY}
+                stroke={s.drawn ? g.def.color : "var(--ink-soft)"}
+                strokeWidth={s.drawn ? 1.6 : 0.6}
+                strokeOpacity={s.drawn ? 0.9 : 0.45}
+                strokeDasharray={s.drawn ? undefined : "1 2"}
+                strokeLinecap="round"
+              />
+            );
+          }),
+        )}
         {/* Per-node dots — colored only by which side of the positive/
             negative split a node's type falls on (same ZONE_COLORS pair the
             zones above use), not a whole palette of per-type colors.
@@ -445,6 +478,15 @@ export const MiniMap = memo(function MiniMap({
           strokeWidth={1.25}
         />
       </svg>
+      {picturePercent !== null && (
+        <div
+          data-testid="minimap-picture-percent"
+          className="pointer-events-none absolute left-1 top-1 rounded-full bg-surface/85 px-1.5 text-[0.65rem] font-semibold text-ink"
+          title={t.ui.pictures.minimap(picturePercent)}
+        >
+          ✎ {picturePercent}%
+        </div>
+      )}
     </div>
   );
 });

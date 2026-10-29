@@ -28,6 +28,7 @@ function renderToolbar(overrides: Partial<React.ComponentProps<typeof MapToolbar
     onInvite: vi.fn(),
     onCreateNode: vi.fn(),
     onCreateCircle: vi.fn(),
+    onDrawPicture: vi.fn(),
     onCopyMap: vi.fn(),
     onPaste: vi.fn(),
     onExportText: vi.fn(),

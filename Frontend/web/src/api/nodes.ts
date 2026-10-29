@@ -30,6 +30,7 @@ export async function createNode(
     symbolOverride?: NodeDoc["symbolOverride"];
     sizeTier?: NodeDoc["sizeTier"];
     manualZone?: NodeDoc["manualZone"];
+    picture?: NodeDoc["picture"];
   },
 ): Promise<NodeDoc> {
   const localId = offline.newLocalId();

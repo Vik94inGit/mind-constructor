@@ -17,7 +17,7 @@ type Pt = { x: number; y: number };
 /** Spots kept clear of the canvas edge — same margin pickNonOverlappingPosition uses. */
 const EDGE_MARGIN = 120;
 
-function clearOf(p: Pt, obstacles: Obstacle[]): boolean {
+export function clearOf(p: Pt, obstacles: Obstacle[]): boolean {
   return obstacles.every((o) => {
     if (o.footprint) {
       return Math.abs(p.x - o.x) >= o.footprint.w || Math.abs(p.y - o.y) >= o.footprint.h;

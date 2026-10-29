@@ -1,6 +1,7 @@
 import type { Language } from "./translations";
 import type { MapKind, NodeType } from "../types";
 import type { TemplateNodeKey } from "../utils/templates";
+import type { PictureKind } from "../utils/pictures";
 import { THINK_STRINGS } from "./thinkStrings";
 import type { ThinkStrings } from "./thinkStrings";
 import { SIEGE_STRINGS } from "./siegeStrings";
@@ -47,6 +48,22 @@ export interface UiStrings {
   };
   /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
   canvasMenu: { newNode: string; structures: Record<MapKind, string> };
+  /** "Draw a picture" — see utils/pictures.ts, map/PicturePicker.tsx and map/PictureLayer.tsx. */
+  pictures: {
+    /** The menu item that opens the picker. */
+    entry: string;
+    title: string;
+    hint: string;
+    names: Record<PictureKind, string>;
+    /** The question every dot of the picture asks, as its ghost's prompt. */
+    questions: Record<PictureKind, string>;
+    /** Under a picture on the canvas: how much of it is drawn. */
+    progress: (name: string, percent: number) => string;
+    done: (name: string) => string;
+    /** The minimap's corner badge. */
+    minimap: (percent: number) => string;
+    failed: string;
+  };
   contextMenu: {
     createBranch: string;
     edit: string;
@@ -638,6 +655,24 @@ const en: UiStrings = {
   canvasMenu: {
     newNode: "New node",
     structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)", idea: "Develop an idea" },
+  },
+  pictures: {
+    entry: "Draw a picture…",
+    title: "Draw a picture",
+    hint: "Its dots arrive as empty thoughts. Write in two neighbours and the line between them draws itself, until the whole picture is there.",
+    names: { heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
+    questions: {
+      heart: "What do you love?",
+      star: "What do you want to reach?",
+      house: "What makes you feel at home?",
+      tree: "What helps you grow?",
+      fish: "Where would you like to go?",
+      smile: "What made you smile lately?",
+    },
+    progress: (name, percent) => `${name} · ${percent}% drawn`,
+    done: (name) => `${name} · done!`,
+    minimap: (percent) => `Pictures ${percent}% drawn`,
+    failed: "Couldn't draw the picture.",
   },
   contextMenu: {
     createBranch: "Create branch",
@@ -1232,6 +1267,24 @@ const cs: UiStrings = {
     newNode: "Nový uzel",
     structures: { problem: "Analyzovat problém", goal: "Naplánovat cíl", decision: "Rozhodnout se", retro: "Ohlédnutí (retrospektiva)", idea: "Rozvinout nápad" },
   },
+  pictures: {
+    entry: "Nakreslit obrázek…",
+    title: "Nakreslit obrázek",
+    hint: "Jeho body přijdou jako prázdné myšlenky. Vyplň dvě sousední a čára mezi nimi se nakreslí sama, dokud nebude celý obrázek hotový.",
+    names: { heart: "Srdce", star: "Hvězda", house: "Dům", tree: "Strom", fish: "Ryba", smile: "Úsměv" },
+    questions: {
+      heart: "Co máš rád/a?",
+      star: "Čeho chceš dosáhnout?",
+      house: "Díky čemu se cítíš jako doma?",
+      tree: "Co ti pomáhá růst?",
+      fish: "Kam by ses chtěl/a vydat?",
+      smile: "Co tě v poslední době rozesmálo?",
+    },
+    progress: (name, percent) => `${name} · nakresleno ${percent} %`,
+    done: (name) => `${name} · hotovo!`,
+    minimap: (percent) => `Obrázky nakresleny z ${percent} %`,
+    failed: "Obrázek se nepodařilo nakreslit.",
+  },
   contextMenu: {
     createBranch: "Vytvořit větev",
     edit: "Upravit",
@@ -1823,6 +1876,24 @@ const uk: UiStrings = {
   canvasMenu: {
     newNode: "Новий вузол",
     structures: { problem: "Проаналізувати проблему", goal: "Спланувати ціль", decision: "Ухвалити рішення", retro: "Озирнутися назад (ретроспектива)", idea: "Розвинути ідею" },
+  },
+  pictures: {
+    entry: "Намалювати картинку…",
+    title: "Намалювати картинку",
+    hint: "Її точки з’являться як порожні думки. Заповни дві сусідні, і лінія між ними намалюється сама, поки не буде вся картинка.",
+    names: { heart: "Серце", star: "Зірка", house: "Будинок", tree: "Дерево", fish: "Риба", smile: "Усмішка" },
+    questions: {
+      heart: "Що ти любиш?",
+      star: "Чого ти хочеш досягти?",
+      house: "Що дає тобі відчуття дому?",
+      tree: "Що допомагає тобі рости?",
+      fish: "Куди б ти хотів(-ла) вирушити?",
+      smile: "Що тебе нещодавно розсмішило?",
+    },
+    progress: (name, percent) => `${name} · намальовано ${percent}%`,
+    done: (name) => `${name} · готово!`,
+    minimap: (percent) => `Картинки намальовано на ${percent}%`,
+    failed: "Не вдалося намалювати картинку.",
   },
   contextMenu: {
     createBranch: "Створити гілку",
@@ -2418,6 +2489,24 @@ const ru: UiStrings = {
   canvasMenu: {
     newNode: "Новый узел",
     structures: { problem: "Проанализировать проблему", goal: "Спланировать цель", decision: "Принять решение", retro: "Оглянуться назад (ретроспектива)", idea: "Развить идею" },
+  },
+  pictures: {
+    entry: "Нарисовать картинку…",
+    title: "Нарисовать картинку",
+    hint: "Её точки появятся как пустые мысли. Заполни две соседние, и линия между ними нарисуется сама, пока не будет вся картинка.",
+    names: { heart: "Сердце", star: "Звезда", house: "Дом", tree: "Дерево", fish: "Рыба", smile: "Улыбка" },
+    questions: {
+      heart: "Что ты любишь?",
+      star: "Чего ты хочешь достичь?",
+      house: "Что даёт тебе чувство дома?",
+      tree: "Что помогает тебе расти?",
+      fish: "Куда бы ты хотел(а) отправиться?",
+      smile: "Что тебя недавно рассмешило?",
+    },
+    progress: (name, percent) => `${name} · нарисовано ${percent}%`,
+    done: (name) => `${name} · готово!`,
+    minimap: (percent) => `Картинки нарисованы на ${percent}%`,
+    failed: "Не удалось нарисовать картинку.",
   },
   contextMenu: {
     createBranch: "Создать ветку",
