@@ -174,9 +174,13 @@ export function MapPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The ring of ghosts is up around each node opened; the 👻 on its panel
-  // hides it for that node. Opening another node brings them back.
+  // hides it for that node, and so does cancelling a node picked from it.
+  // Opening another node brings them back.
   const [ghostsHiddenFor, setGhostsHiddenFor] = useState<string | null>(null);
   const ghostsHidden = !!selectedId && ghostsHiddenFor === selectedId;
+  useEffect(() => {
+    setGhostsHiddenFor((prev) => (prev === selectedId ? prev : null));
+  }, [selectedId]);
   // The time-lapse (TimeLapseBar): how many nodes, oldest first, are shown,
   // and whether it's playing. `null` when it's off.
   const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
@@ -995,6 +999,14 @@ export function MapPage() {
   // attacks at all (the owner can switch it back to Discussion for that).
   function canAttackNode(_node: NodeDoc) {
     return discussionOn;
+  }
+
+  // Changing your mind about a new node: the ring it was picked from stays
+  // down for that node (its panel's 👻 brings it back), rather than popping
+  // straight back up around it as if asking again.
+  function cancelPendingCreate() {
+    if (pendingCreate?.parentId) setGhostsHiddenFor(pendingCreate.parentId);
+    setPendingCreate(null);
   }
 
   // Single entry point for "start editing this node's text/type inline, on
@@ -1981,7 +1993,7 @@ export function MapPage() {
                 emoji={pendingCreate.emoji || undefined}
                 zoom={zoom}
                 onConfirm={confirmPendingCreate}
-                onCancel={() => setPendingCreate(null)}
+                onCancel={cancelPendingCreate}
                 // Keeps pendingCreate.type in sync with whichever type is
                 // currently armed in the card, live.
                 onTypeChange={(draftType) =>
@@ -2166,7 +2178,7 @@ export function MapPage() {
             onTypeChange={(type) => setPendingCreate((prev) => (prev ? { ...prev, type } : prev))}
             onClearEmoji={() => setPendingCreate((prev) => (prev ? { ...prev, emoji: "" } : prev))}
             onCreate={(text, type, images, prompt) => confirmPendingCreate(text, type, images, prompt)}
-            onCancel={() => setPendingCreate(null)}
+            onCancel={cancelPendingCreate}
           />
         ) : (
           // !presenting: NodePanel already only renders when a node is

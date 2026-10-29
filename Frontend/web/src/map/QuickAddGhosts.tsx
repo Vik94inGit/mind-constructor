@@ -175,12 +175,16 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
       el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerup", onUp);
       el.removeEventListener("pointercancel", onUp);
+      el.removeEventListener("lostpointercapture", onUp);
       setSketch(null);
       if (dragged.current && ev.type === "pointerup") onSketch?.(type, at(ev));
     }
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointercancel", onUp);
+    // A finger whose capture is taken away never sends its pointerup here:
+    // without this the dragged ghost stayed stuck on the canvas.
+    el.addEventListener("lostpointercapture", onUp);
   }
   // Read live, every render — see the doc comment above RADIUS/EDGE_MARGIN's
   // old module-level home for why this can't be hoisted back out to module
