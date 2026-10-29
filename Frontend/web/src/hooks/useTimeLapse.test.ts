@@ -60,7 +60,7 @@ describe("useTimeLapse", () => {
   });
 
   it("follows the newest node, and shows the whole map at the end", () => {
-    expect(setup({ step: 1, playing: true }).params.centerOnPoint).toHaveBeenCalledWith(1, 2, { aboveSheet: false });
+    expect(setup({ step: 1, playing: true }).params.centerOnPoint).toHaveBeenCalledWith(1, 2, { aboveSheet: true });
     expect(setup({ step: 2, playing: true }).params.showPoints).toHaveBeenCalled();
   });
 });

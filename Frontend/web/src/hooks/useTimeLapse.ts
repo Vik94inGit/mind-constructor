@@ -80,8 +80,9 @@ export function useTimeLapse({
   }
 
   // The camera follows the replay: it glides to each node as it appears, so
-  // nobody has to hunt for what changed. At the last node it pulls back to
-  // show the whole finished map.
+  // nobody has to hunt for what changed, and keeps it above the node's info
+  // (TimeLapseBar). At the last node it pulls back to show the whole
+  // finished map, still above the last node's info.
   const timeLapseFollowRef = useRef(-1);
   useEffect(() => {
     if (timeLapseStep === null) {
@@ -93,13 +94,13 @@ export function useTimeLapse({
     if (timeLapseStep >= timeLapseNodes.length && timeLapseNodes.length > 0) {
       showPoints(
         timeLapseNodes.map((n) => positions.get(n.nodeId)).filter((pt): pt is Pt => !!pt),
-        { aboveSheet: false },
+        { aboveSheet: true },
       );
       return;
     }
     const newest = timeLapseNodes[timeLapseStep - 1];
     const at = newest ? positions.get(newest.nodeId) : undefined;
-    if (at) centerOnPoint(at.x, at.y, { aboveSheet: false });
+    if (at) centerOnPoint(at.x, at.y, { aboveSheet: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLapseStep]);
 
