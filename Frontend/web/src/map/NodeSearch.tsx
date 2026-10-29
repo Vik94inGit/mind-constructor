@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
+import { useKeepOnScreen } from "../hooks/useKeepOnScreen";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { filterNodes, isFiltering, toggleType } from "../utils/nodeFilter";
 import { NODE_TYPES } from "../types";
@@ -30,6 +31,12 @@ const MAX_RESULTS = 8;
 export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, types, onTypes, onClose, side = "below" }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
+  const onScreen = useKeepOnScreen(ref);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  // Focused once the box has been slid on screen, and without scrolling:
+  // autoFocus ran first and scrolled the whole page sideways to reach a box
+  // still hanging past a phone's edge.
+  useEffect(() => inputRef.current?.focus({ preventScroll: true }), []);
   const [query, setQuery] = useState("");
   const [textsReady, setTextsReady] = useState(false);
 
@@ -81,10 +88,11 @@ export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, types, onTyp
   return (
     <div
       ref={ref}
+      style={onScreen}
       className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex w-[min(300px,calc(100vw-1.5rem))] flex-col gap-[0.35rem] rounded-card border border-line bg-surface p-[0.5rem] shadow-card`}
     >
       <input
-        autoFocus
+        ref={inputRef}
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

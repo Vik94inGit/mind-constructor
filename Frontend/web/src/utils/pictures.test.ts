@@ -75,6 +75,18 @@ describe("layoutPicture", () => {
   });
 });
 
+describe("layoutPicture on a full map", () => {
+  it("lands where the fewest dots cover something, not on top of what is there", () => {
+    // Everything blocked except a band along the bottom: no clear spot exists.
+    const obstacles: { x: number; y: number; minDist: number }[] = [];
+    for (let x = 0; x <= CANVAS_W; x += 100) for (let y = 0; y <= CANVAS_H - 500; y += 100) obstacles.push({ x, y, minDist: 60 });
+    const dots = layoutPicture("house", { x: 1200, y: 300 }, obstacles);
+    const covered = (pts: { x: number; y: number }[]) =>
+      pts.filter((p) => obstacles.some((o) => Math.hypot(p.x - o.x, p.y - o.y) < o.minDist)).length;
+    expect(covered(dots)).toBeLessThan(covered(pictureDots("house", { x: 1200, y: 520 })));
+  });
+});
+
 describe("pictureGroups", () => {
   it("counts how much of each picture is drawn", () => {
     const nodes = [

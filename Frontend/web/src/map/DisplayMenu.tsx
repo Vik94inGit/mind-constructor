@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n/I18nContext";
+import { useKeepOnScreen } from "../hooks/useKeepOnScreen";
 import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
 import type { ZoneLayout } from "../utils/zoneLayout";
 import { MAP_BACKGROUNDS } from "../types";
@@ -59,6 +60,7 @@ export function DisplayMenu({
 }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
+  const onScreen = useKeepOnScreen(ref);
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -78,6 +80,7 @@ export function DisplayMenu({
   return (
     <div
       ref={ref}
+      style={onScreen}
       className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex min-w-[210px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
     >
       <button

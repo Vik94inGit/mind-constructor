@@ -167,8 +167,8 @@ const SEARCH_STEP = 60;
  * Where a picture's dots go: centered as near `desired` as the map allows,
  * fully on the canvas and with every dot clear of `obstacles` (whatever is
  * already on the map). The picture is never squeezed or bent to fit, so it
- * stays the picture; when nowhere is clear it is put at `desired`, kept on
- * the canvas.
+ * stays the picture; when nowhere is clear it goes where the fewest of its
+ * dots land on something, nearest `desired` among those.
  */
 export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacle[] = []): Pt[] {
   const unit = pictureDots(kind, { x: 0, y: 0 });
@@ -178,10 +178,13 @@ export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacl
   const maxY = CANVAS_H - EDGE - Math.max(...unit.map((p) => p.y));
   const clampTo = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
   const start = { x: clampTo(desired.x, minX, maxX), y: clampTo(desired.y, minY, maxY) };
-  const fits = (c: Pt) => unit.every((p) => clearOf({ x: c.x + p.x, y: c.y + p.y }, obstacles));
+  const blocked = (c: Pt) => unit.filter((p) => !clearOf({ x: c.x + p.x, y: c.y + p.y }, obstacles)).length;
   const shift = (c: Pt) => unit.map((p) => ({ x: Math.round(c.x + p.x), y: Math.round(c.y + p.y) }));
 
-  // Rings of candidate middles round the start, nearest first.
+  // Rings of candidate middles round the start, nearest first. A full map
+  // may have no clear spot at all; then the nearest spot with the fewest
+  // dots on something already there, rather than straight on top of it.
+  let best = { at: start, blocked: Infinity };
   const reach = Math.ceil(Math.max(CANVAS_W, CANVAS_H) / SEARCH_STEP);
   for (let r = 0; r <= reach; r++) {
     const ringPts: Pt[] = [];
@@ -194,10 +197,13 @@ export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacl
       }
     }
     ringPts.sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y));
-    const found = ringPts.find(fits);
-    if (found) return shift(found);
+    for (const c of ringPts) {
+      const n = blocked(c);
+      if (n === 0) return shift(c);
+      if (n < best.blocked) best = { at: c, blocked: n };
+    }
   }
-  return shift(start);
+  return shift(best.at);
 }
 
 export interface PictureGroup {

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   CANVAS_W,
   CANVAS_H,
@@ -180,7 +181,11 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions, openAt
       );
     }
     update();
-    const resizeObserver = new ResizeObserver(update);
+    // Rendered right away (flushSync), so the new margins and the scroll
+    // that keeps the map still (the layout effect below) land in the frame
+    // the resize is painted in. Left to React's own timing they came a frame
+    // later, and the map jumped and back whenever the view changed size.
+    const resizeObserver = new ResizeObserver(() => flushSync(update));
     resizeObserver.observe(wrap);
     return () => resizeObserver.disconnect();
     // `loading`: this hook's effects all run from the very first render,
