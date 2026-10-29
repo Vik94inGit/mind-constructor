@@ -47,10 +47,13 @@ describe("childCaptionsCoveringParents", () => {
     expect(childCaptionsCoveringParents(children, [parent], 1).size).toBe(0);
   });
 
-  it("scales with zoom: captions keep their screen size, so zooming out makes them collide", () => {
-    const children = new Map([["side", spec(660, 500)]]);
-    expect(childCaptionsCoveringParents(children, [parent], 1).size).toBe(0);
-    expect(childCaptionsCoveringParents(children, [parent], 0.5).has("side")).toBe(true);
+  it("zoomed in, captions keep their screen size and part; zoomed out, they shrink with the map and never collide", () => {
+    const side = new Map([["side", spec(660, 500)]]);
+    expect(childCaptionsCoveringParents(side, [parent], 1).size).toBe(0);
+    expect(childCaptionsCoveringParents(side, [parent], 0.5).size).toBe(0);
+    const near = new Map([["near", spec(580, 510)]]);
+    expect(childCaptionsCoveringParents(near, [parent], 1).has("near")).toBe(true);
+    expect(childCaptionsCoveringParents(near, [parent], 2.5).size).toBe(0);
   });
 
   it("hangs the caption under the icon, lower for a named zone", () => {

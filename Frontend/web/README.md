@@ -79,7 +79,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   Your own nodes can be locked from the node panel's Info tab, the right-click menu, or the
   padlock on a card's corner (per browser): a locked
   block can't be dragged, glued to another card or have its text edited until unlocked. Zoomed
-  out to 50%, nodes show as plain dots, the canvas drops its other icons (zone-parent rings,
+  in, nodes keep one size on screen and only spread apart; zoomed out, they shrink with the map
+  (`nodeZoomScale` in `utils/canvasLayout.ts`), so nodes that sit apart at 100% never pile onto
+  each other. Zoomed out to 50%, nodes show as plain dots, the canvas drops its other icons (zone-parent rings,
   weapon marks, quick-add ghosts) and the view glides to the middle of the map; zones near the
   middle of the view stay at full strength while the rest are muted; selecting a node centers it on
   screen.

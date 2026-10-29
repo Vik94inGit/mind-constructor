@@ -17,7 +17,7 @@ import type { TypeEmoji } from "../utils/emojiFace";
 import { ShapeContent, shapeBodyClass, shapeRoundClass } from "./nodeShape";
 import { StickerCard } from "./StickerCard";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
-import { CAPTION_WIDTH } from "../utils/canvasLayout";
+import { CAPTION_WIDTH, nodeZoomScale } from "../utils/canvasLayout";
 import { useI18n } from "../i18n/I18nContext";
 import {
   burstParticles,
@@ -654,9 +654,10 @@ export const NodeCard = memo(function NodeCard({
         : NODE_TYPE_COLORS[displayType];
 
   // Counter-scales this node's own visual content against MapPage's canvas
-  // zoom, so icons/captions stay a constant size on screen while zooming —
-  // only the canvas's own spacing (everything's x/y) actually grows or
-  // shrinks. Applied on its own inner wrapper (see the JSX below) rather
+  // zoom when zoomed in, so icons/captions stay a constant size on screen and
+  // only the canvas's own spacing (everything's x/y) grows. Zoomed out they
+  // shrink with the canvas instead, so they never pile onto each other (see
+  // nodeZoomScale). Applied on its own inner wrapper (see the JSX below) rather
   // than folded into this element's own `classes`/`style` transform,
   // specifically because that outer transform isn't always this element's
   // own inline style to begin with — the chaotic-drift and weapon-fly-in
@@ -680,7 +681,7 @@ export const NodeCard = memo(function NodeCard({
   // any zoom (utils/cardGlue.ts). A zone parent drawn as a card in the mixed
   // view stays one size on screen, like the icons around it.
   const canvasCard = puzzle && readingMode === "puzzle";
-  const inverseScaleStyle: CSSProperties = { transform: canvasCard ? "none" : `scale(${sizeMultiplier / zoom})` };
+  const inverseScaleStyle: CSSProperties = { transform: canvasCard ? "none" : `scale(${sizeMultiplier * nodeZoomScale(zoom)})` };
 
   // A picture card (NodeDoc.cardImage) takes the round icon's place, so the
   // node shows one picture rather than a card stacked over an icon, selected

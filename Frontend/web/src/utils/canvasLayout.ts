@@ -272,14 +272,14 @@ export interface Obstacle {
 // Icon (48) + gap + a two-row title, roughly — and CAPTION_WIDTH wide.
 export const NODE_FOOTPRINT = { w: CAPTION_WIDTH, h: 90 };
 
-// How much bigger than NODE_FOOTPRINT a node looks on the canvas at `zoom`.
-// Icons and captions keep one size on screen (NodeCard counter-scales them by
-// 1/zoom), so at half zoom a node covers twice the canvas. Never below 1, so
-// nodes placed while zoomed in don't overlap again at normal zoom. Dots (at
-// DOT_ZOOM and below) are tiny, so there the plain footprint holds.
-export function freeFootprintScale(zoom: number): number {
-  if (zoom <= DOT_ZOOM + 0.005) return 1;
-  return Math.max(1, 1 / zoom);
+// How much a node's own drawing (icon, caption, card) is scaled inside the
+// zoomed canvas. Zoomed in, it keeps one size on screen (1/zoom), so the
+// nodes only spread apart. Zoomed out, it shrinks with the canvas like
+// everything else: holding it at screen size there made every node cover
+// more of the canvas, and nodes that sat apart at 100% piled onto each other.
+// So a node never covers more of the canvas than NODE_FOOTPRINT, at any zoom.
+export function nodeZoomScale(zoom: number): number {
+  return 1 / Math.max(1, zoom || 1);
 }
 
 // Spacing obstacles, one per point — see Obstacle. Deliberately one flat
@@ -292,8 +292,7 @@ export function nodeObstacles(points: { x: number; y: number }[], minDist = getN
 
 // Footprint obstacles, one per point — see Obstacle. `pad` keeps that much
 // empty space between two footprints on top of not touching. `scale` grows
-// the footprint itself: a node is drawn the same size on screen at any zoom,
-// so zoomed out it covers more of the canvas (see freeFootprintScale).
+// the footprint itself.
 export function footprintObstacles(points: { x: number; y: number }[], pad = 0, scale = 1): Obstacle[] {
   const footprint = { w: NODE_FOOTPRINT.w * scale + pad, h: NODE_FOOTPRINT.h * scale + pad };
   return points.map((p) => ({ x: p.x, y: p.y, minDist: 0, footprint }));
@@ -451,8 +450,7 @@ export function circleSentiment(members: NodeDoc[]): Sentiment {
 
 // How close a drop has to land to an existing node to read as "onto it"
 // (join its circle) instead of just "near it" (a normal reposition): anywhere
-// over the node's whole card as it looks at this zoom (`scale`, see
-// freeFootprintScale), plus a small margin round it. A drop that covers no
+// over the node's whole card (times `scale`), plus a small margin round it. A drop that covers no
 // node at all is a plain reposition and lands right where it was let go.
 export const DROP_TARGET_PAD = 16;
 export function dropTargetDistance(p: Pt, target: Pt, scale = 1): number | null {
