@@ -36,4 +36,11 @@ describe("mapBackgroundStyle", () => {
     expect(String(plain.backgroundImage).startsWith("linear-gradient(color-mix(in srgb, color-mix(in srgb, #5d8fcf 14%")).toBe(true);
     expect(plain.backgroundSize).toBe("auto, cover");
   });
+
+  it("marks a canvas with a picture for higher-contrast icons, and only then", () => {
+    expect(mapBackgroundStyle("dots", null, "data:image/webp;base64,AAAA").className).toBe("canvas-on-picture");
+    expect(mapBackgroundStyle("dark", null, "data:image/webp;base64,AAAA").className).toBe("canvas-soft-dark canvas-on-picture");
+    expect(mapBackgroundStyle("dots", "sage").className).toBe("");
+    expect(mapBackgroundStyle("dark").className).toBe("canvas-soft-dark");
+  });
 });

@@ -52,8 +52,10 @@ const PUZZLE_MAX_WIDTH = 240;
 const NO_TYPE_EMOJI: TypeEmoji = {};
 // A node's outline in its type's color, toned down so a map full of nodes
 // doesn't read as a field of bright rims.
+// --node-edge-mix: full strength over a picture background (index.css's
+// canvas-on-picture), where a half-see-through rim gets lost.
 export function softEdge(color: string): string {
-  return `color-mix(in srgb, ${color} 55%, transparent)`;
+  return `color-mix(in srgb, ${color} var(--node-edge-mix, 55%), transparent)`;
 }
 const PUZZLE_SELECTED_MAX_WIDTH = 180;
 // A puzzle card shows about this many characters of its text on the canvas
@@ -1177,7 +1179,7 @@ export const NodeCard = memo(function NodeCard({
         // tier the same way the caption does, so it stays a constant size on
         // screen.
         <div
-          className="absolute top-full left-1/2 mt-[0.15rem] max-w-[10rem] overflow-hidden rounded-[3px] px-[0.3rem] text-[0.6rem] leading-[1.3] font-semibold tracking-[0.04em] text-ellipsis whitespace-nowrap uppercase"
+          className="canvas-halo-text absolute top-full left-1/2 mt-[0.15rem] max-w-[10rem] overflow-hidden rounded-[3px] px-[0.3rem] text-[0.6rem] leading-[1.3] font-semibold tracking-[0.04em] text-ellipsis whitespace-nowrap uppercase"
           style={{
             color: ZONE_COLORS[parentCrownSentiment!],
             transform: `translateX(-50%) scale(${1 / sizeMultiplier})`,

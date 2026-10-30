@@ -8,7 +8,10 @@ import { imageSrc } from "./images";
  * element. null — every map that never picked one — is the dot grid it has
  * always had. "dark" also gets the `canvas-soft-dark` class (index.css), which
  * switches everything drawn on the canvas to dark colours, so cards, lines and
- * zone labels stay readable on it in the light theme too.
+ * zone labels stay readable on it in the light theme too. A picture
+ * (Map.backgroundImage) adds `canvas-on-picture` (index.css): brighter type
+ * colours in the dark theme, full-strength icon rims and a halo of the paper
+ * round icons and labels, so they stand out from a busy picture.
  */
 export function mapBackgroundStyle(
   background: MapBackground | null | undefined,
@@ -26,7 +29,7 @@ export function mapBackgroundStyle(
   const layers = [base.style.backgroundImage, `linear-gradient(${veil}, ${veil})`, `url("${imageSrc(image)}")`].filter(Boolean);
   const sizes = [base.style.backgroundImage ? (base.style.backgroundSize ?? "auto") : null, "auto", "cover"].filter(Boolean);
   return {
-    className: base.className,
+    className: `${base.className} ${ON_PICTURE_CLASS}`.trim(),
     style: {
       backgroundColor: paper,
       backgroundImage: layers.join(", "),
@@ -36,6 +39,9 @@ export function mapBackgroundStyle(
     },
   };
 }
+
+/** The class a canvas with a picture under it gets, for its higher-contrast icons (index.css). */
+export const ON_PICTURE_CLASS = "canvas-on-picture";
 
 /** How much of the paper lies over a background picture, in percent: enough to keep it soft. */
 export const IMAGE_VEIL = 60;

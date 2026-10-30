@@ -14,7 +14,7 @@ export function shapeRoundClass(shape: NodeShape | null | undefined): string {
 export function shapeBodyClass(shape: NodeShape | null | undefined): string {
   return shape === "triangle"
     ? "relative"
-    : `${shapeRoundClass(shape)} overflow-hidden border-2 bg-[var(--node-fill)] shadow-card`;
+    : `node-body ${shapeRoundClass(shape)} overflow-hidden border-2 bg-[var(--node-fill)] shadow-card`;
 }
 
 /** Wraps the icon's content in its shape: a triangle draws its outline behind the content and sits it toward the wide base. */
@@ -24,7 +24,7 @@ export function ShapeContent({ shape, color, children }: { shape: NodeShape | nu
     <>
       <svg
         aria-hidden="true"
-        className="pointer-events-none absolute inset-[-8%] h-[116%] w-[116%] overflow-visible drop-shadow-sm"
+        className="node-body-triangle pointer-events-none absolute inset-[-8%] h-[116%] w-[116%] overflow-visible drop-shadow-sm"
         viewBox="0 0 100 100"
         data-testid="node-shape-triangle"
       >
