@@ -13,6 +13,15 @@ export const ZONE_PALETTE_HEX: Record<ZonePaletteColor, string> = {
   slate: "#7b8794",
 };
 
+/**
+ * A palette colour as a muted background: mixed into the paper colour, so a
+ * picked colour tints the map or a picture without drowning what's on it.
+ * Works in both themes, since --paper is the theme's own paper.
+ */
+export function softTint(color: ZonePaletteColor, amount = 14): string {
+  return `color-mix(in srgb, ${ZONE_PALETTE_HEX[color]} ${amount}%, var(--paper))`;
+}
+
 /** A zone's colour: its parent's palette pick, else the majority-sentiment colour. */
 export function zoneColorFor(root: NodeDoc | undefined, sentiment: Sentiment): string {
   return root?.zoneColor ? ZONE_PALETTE_HEX[root.zoneColor] : ZONE_COLORS[sentiment];

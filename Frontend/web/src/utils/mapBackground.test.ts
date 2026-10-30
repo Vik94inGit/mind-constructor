@@ -16,4 +16,11 @@ describe("mapBackgroundStyle", () => {
     expect(mapBackgroundStyle("dark").className).toBe("canvas-soft-dark");
     expect(mapBackgroundStyle("dots").className).toBe("");
   });
+
+  it("tints the paper softly with a picked colour, keeping the pattern", () => {
+    const tinted = mapBackgroundStyle("lined", "sage");
+    expect(tinted.style.backgroundColor).toBe("color-mix(in srgb, #6f9e74 14%, var(--paper))");
+    expect(tinted.style.backgroundImage).toBe(mapBackgroundStyle("lined").style.backgroundImage);
+    expect(mapBackgroundStyle("plain", null).style.backgroundColor).toBe("var(--paper)");
+  });
 });

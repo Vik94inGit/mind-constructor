@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
-import type { MapBackground } from "../types";
+import type { MapBackground, ZonePaletteColor } from "../types";
+import { softTint } from "./zoneStyle";
 
 /**
  * The canvas behind a map's nodes (Map.background), as styles for the canvas
@@ -8,7 +9,16 @@ import type { MapBackground } from "../types";
  * switches everything drawn on the canvas to dark colours, so cards, lines and
  * zone labels stay readable on it in the light theme too.
  */
-export function mapBackgroundStyle(background: MapBackground | null | undefined): { className: string; style: CSSProperties } {
+export function mapBackgroundStyle(
+  background: MapBackground | null | undefined,
+  color?: ZonePaletteColor | null,
+): { className: string; style: CSSProperties } {
+  const base = backgroundPattern(background);
+  // A picked colour (Map.backgroundColor) tints the paper softly, under the same pattern.
+  return color ? { ...base, style: { ...base.style, backgroundColor: softTint(color) } } : base;
+}
+
+function backgroundPattern(background: MapBackground | null | undefined): { className: string; style: CSSProperties } {
   switch (background ?? "dots") {
     case "plain":
       return { className: "", style: { backgroundColor: "var(--paper)" } };

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ZONE_PALETTE } from "./palette.js";
 
 export const NODE_TYPES = [
   "Problem",
@@ -69,8 +70,8 @@ export type NodeShape = (typeof NODE_SHAPES)[number];
 // colour. null on either keeps the default (no pattern / sentiment colour).
 export const ZONE_PATTERNS = ["dots", "stripes", "grid", "chess"] as const;
 export type ZonePattern = (typeof ZONE_PATTERNS)[number];
-export const ZONE_PALETTE = ["sand", "sage", "sky", "lavender", "rose", "slate"] as const;
-export type ZonePaletteColor = (typeof ZONE_PALETTE)[number];
+export { ZONE_PALETTE } from "./palette.js";
+export type { ZonePaletteColor } from "./palette.js";
 
 export const NodeSchema = new mongoose.Schema(
   {
@@ -127,6 +128,10 @@ export const NodeSchema = new mongoose.Schema(
         id: { type: String, required: true, maxlength: 40 },
         kind: { type: String, required: true, maxlength: 20 },
         dot: { type: Number, required: true, min: 0, max: 63 },
+        // The picture's own fill colour, from ZONE_PALETTE (every dot of a
+        // picture carries the same one; null: the picture's own colour).
+        // The only part that changes after creation (nodeAbl's pictureColor).
+        color: { type: String, enum: ZONE_PALETTE, default: null },
       },
       default: null,
     },

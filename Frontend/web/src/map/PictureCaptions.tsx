@@ -1,6 +1,7 @@
 import type { PictureGroup } from "../utils/pictures";
-import type { NodeDoc } from "../types";
+import type { NodeDoc, ZonePaletteColor } from "../types";
 import { useI18n } from "../i18n/I18nContext";
+import { SoftColorSwatches } from "./SoftColorSwatches";
 
 interface Props {
   pictures: PictureGroup[];
@@ -15,6 +16,7 @@ interface Props {
   canShrink: boolean;
   onResize: (direction: 1 | -1) => void;
   onMove: () => void;
+  onColor: (color: ZonePaletteColor | null) => void;
 }
 
 // Keeps a tap on a caption or the bar from reaching the canvas, which would
@@ -23,7 +25,8 @@ const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
 // Under each picture ("Draw a picture", utils/pictures.ts) a caption says how
 // much of it is drawn. Tapping it opens a small bar to make the whole picture
-// bigger or smaller, or to pick it up and move it as one
+// bigger or smaller, give it a soft background colour, or pick it up and move
+// it as one
 // (docs/gestures/picture-resize.md, hooks/usePictureEdit.ts). The caption
 // scales with the canvas; the bar keeps its size on screen.
 export function PictureCaptions({
@@ -38,6 +41,7 @@ export function PictureCaptions({
   canShrink,
   onResize,
   onMove,
+  onColor,
 }: Props) {
   const { t } = useI18n();
   const p = t.ui.pictures;
@@ -84,7 +88,10 @@ export function PictureCaptions({
               <button
                 type="button"
                 className="absolute z-[30] cursor-pointer whitespace-nowrap rounded-[14px] px-3 py-1 hover:bg-surface-2/80"
-                style={{ ...captionStyle, outline: isOpen ? `${2 / zoom}px solid ${g.def.color}` : undefined }}
+                style={{
+                  ...captionStyle,
+                  outline: isOpen ? `${2 / zoom}px solid ${g.def.color}` : undefined,
+                }}
                 title={p.edit.open}
                 aria-expanded={isOpen}
                 onPointerDown={stop}
@@ -111,6 +118,8 @@ export function PictureCaptions({
                 onResize={onResize}
                 onMove={onMove}
                 onClose={onClose}
+                color={g.color}
+                onColor={onColor}
               />
             )}
           </div>
@@ -129,6 +138,8 @@ function PictureBar({
   onResize,
   onMove,
   onClose,
+  color,
+  onColor,
 }: {
   x: number;
   y: number;
@@ -138,6 +149,8 @@ function PictureBar({
   onResize: (direction: 1 | -1) => void;
   onMove: () => void;
   onClose: () => void;
+  color: ZonePaletteColor | null;
+  onColor: (color: ZonePaletteColor | null) => void;
 }) {
   const { t } = useI18n();
   const e = t.ui.pictures.edit;
@@ -148,24 +161,48 @@ function PictureBar({
       role="toolbar"
       aria-label={e.bar}
       data-testid="picture-bar"
-      className="absolute z-[40] flex items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
-      style={{ left: x, top: y, transform: `translate(-50%, 0) scale(${1 / zoom})`, transformOrigin: "top center" }}
+      className="absolute z-[40] flex flex-col gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
+      style={{
+        left: x,
+        top: y,
+        transform: `translate(-50%, 0) scale(${1 / zoom})`,
+        transformOrigin: "top center",
+      }}
       onPointerDown={stop}
       onClick={stop}
       onDoubleClick={stop}
     >
-      <button type="button" className={`${btn} text-[1.2rem]`} aria-label={e.smaller} title={e.smaller} disabled={!canShrink} onClick={() => onResize(-1)}>
-        −
-      </button>
-      <button type="button" className={`${btn} text-[1.2rem]`} aria-label={e.bigger} title={e.bigger} disabled={!canGrow} onClick={() => onResize(1)}>
-        +
-      </button>
-      <button type="button" className={btn} onClick={onMove}>
-        {e.move}
-      </button>
-      <button type="button" className={`${btn} text-accent`} onClick={onClose}>
-        {e.close}
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className={`${btn} text-[1.2rem]`}
+          aria-label={e.smaller}
+          title={e.smaller}
+          disabled={!canShrink}
+          onClick={() => onResize(-1)}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className={`${btn} text-[1.2rem]`}
+          aria-label={e.bigger}
+          title={e.bigger}
+          disabled={!canGrow}
+          onClick={() => onResize(1)}
+        >
+          +
+        </button>
+        <button type="button" className={btn} onClick={onMove}>
+          {e.move}
+        </button>
+        <button type="button" className={`${btn} text-accent`} onClick={onClose}>
+          {e.close}
+        </button>
+      </div>
+      <div className="border-t border-line px-1 pt-1">
+        <SoftColorSwatches label={e.color} value={color} onPick={onColor} />
+      </div>
     </div>
   );
 }

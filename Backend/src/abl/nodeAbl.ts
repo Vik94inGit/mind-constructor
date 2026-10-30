@@ -56,6 +56,7 @@ const pictureSchema = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, "picture id must be 1-40 letters, digits, - or _"),
   kind: z.string().regex(/^[a-z]{1,20}$/, "picture kind must be 1-20 lowercase letters"),
   dot: z.number().int("picture dot must be a whole number").min(0).max(63),
+  color: z.enum(ZONE_PALETTE).nullish(),
 });
 
 // Node.order — a whole step number, 1..9999. null clears it (update only).
@@ -279,6 +280,9 @@ const updateNodeSchema = z
     zoneColor: z.enum(ZONE_PALETTE).nullish(),
     // 0..1 — null goes back to the default outline brightness.
     zoneEdge: z.number().min(0).max(1).nullish(),
+    // The fill colour of the picture this node is a dot of (Node.picture.color)
+    // — null goes back to the picture's own colour.
+    pictureColor: z.enum(ZONE_PALETTE).nullish(),
   })
   .refine((fields) => Object.values(fields).some((v) => v !== undefined), {
     error: "No fields to update",
@@ -322,6 +326,15 @@ export const updateNodeAbl = async (
       if (parent.mapId.toString() !== node.mapId.toString()) throw new CrossMapParentError();
       definedUpdates.parentId = parent._id;
     }
+  }
+
+  // Only a dot of a picture has a picture colour; it lives inside Node.picture.
+  if ("pictureColor" in definedUpdates) {
+    const node = await findNodeByPublicIdDao(publicNodeId);
+    if (!node) return null;
+    if (!node.picture) throw new ValidationError("node is not part of a picture");
+    definedUpdates["picture.color"] = definedUpdates.pictureColor;
+    delete definedUpdates.pictureColor;
   }
 
   if (typeof definedUpdates.zoneColor === "string") {

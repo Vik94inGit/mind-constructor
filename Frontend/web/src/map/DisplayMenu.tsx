@@ -4,8 +4,9 @@ import { useKeepOnScreen } from "../hooks/useKeepOnScreen";
 import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
 import type { ZoneLayout } from "../utils/zoneLayout";
 import { MAP_BACKGROUNDS } from "../types";
-import type { MapBackground } from "../types";
+import type { MapBackground, ZonePaletteColor } from "../types";
 import { mapBackgroundStyle } from "../utils/mapBackground";
+import { SoftColorSwatches } from "./SoftColorSwatches";
 import type { NodeType } from "../types";
 import type { TypeEmoji } from "../utils/emojiFace";
 import { TypeEmojiPicker } from "./TypeEmojiPicker";
@@ -25,6 +26,9 @@ interface Props {
   /** The map's canvas (Map.background) — only passed to the map's owner, the one who may change it. */
   background?: MapBackground | null;
   onPickBackground?: (background: MapBackground) => void;
+  /** The soft tint over the background (Map.backgroundColor), picked with it. */
+  backgroundColor?: ZonePaletteColor | null;
+  onPickBackgroundColor?: (color: ZonePaletteColor | null) => void;
   /** Enters presentation mode — folded into this same dropdown rather than
    *  its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
@@ -53,6 +57,8 @@ export function DisplayMenu({
   onPickZoneLayout,
   background,
   onPickBackground,
+  backgroundColor,
+  onPickBackgroundColor,
   onPresent,
   onTimeLapse,
   onClose,
@@ -148,7 +154,7 @@ export function DisplayMenu({
           </div>
           {MAP_BACKGROUNDS.map((b) => {
             const active = (background ?? "dots") === b;
-            const preview = mapBackgroundStyle(b);
+            const preview = mapBackgroundStyle(b, backgroundColor);
             return (
               <button
                 key={b}
@@ -170,6 +176,11 @@ export function DisplayMenu({
               </button>
             );
           })}
+          {onPickBackgroundColor && (
+            <div className="px-[0.7rem] py-[0.4rem]">
+              <SoftColorSwatches label={t.ui.zoneStyle.color} value={backgroundColor ?? null} onPick={onPickBackgroundColor} />
+            </div>
+          )}
         </>
       )}
       <div className="my-[0.15rem] border-t border-line" />

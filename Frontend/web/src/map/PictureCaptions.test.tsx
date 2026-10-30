@@ -33,6 +33,7 @@ function renderCaptions(written: number, overrides: Partial<Parameters<typeof Pi
     canShrink: false,
     onResize: vi.fn(),
     onMove: vi.fn(),
+    onColor: vi.fn(),
     ...overrides,
   };
   render(
@@ -76,5 +77,15 @@ describe("PictureCaptions", () => {
     expect(props.onMove).toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it("offers soft background colours, the picked one checked", () => {
+    const nodes = treeNodes(3).map((n) => ({ ...n, picture: { ...n.picture!, color: "sky" as const } }));
+    const props = renderCaptions(3, { openId: "p1", pictures: pictureGroups(nodes) });
+    expect(screen.getByRole("radio", { name: "Sky" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("radio", { name: "Rose" }));
+    expect(props.onColor).toHaveBeenCalledWith("rose");
+    fireEvent.click(screen.getByRole("radio", { name: "None" }));
+    expect(props.onColor).toHaveBeenLastCalledWith(null);
   });
 });

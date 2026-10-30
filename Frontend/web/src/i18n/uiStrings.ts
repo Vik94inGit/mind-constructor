@@ -64,7 +64,7 @@ export interface UiStrings {
     minimap: (percent: number) => string;
     failed: string;
     /** The bar a tap on a picture's caption opens (hooks/usePictureEdit.ts). */
-    edit: { open: string; bar: string; bigger: string; smaller: string; move: string; close: string; resizeFailed: string };
+    edit: { open: string; bar: string; bigger: string; smaller: string; move: string; close: string; color: string; resizeFailed: string };
   };
   contextMenu: {
     createBranch: string;
@@ -676,12 +676,13 @@ const en: UiStrings = {
     minimap: (percent) => `Pictures ${percent}% drawn`,
     failed: "Couldn't draw the picture.",
     edit: {
-      open: "Tap to make it bigger, smaller or move it",
+      open: "Tap to resize it, colour it or move it",
       bar: "Picture size and place",
       bigger: "Bigger",
       smaller: "Smaller",
       move: "Move",
       close: "Done",
+      color: "Background colour",
       resizeFailed: "Couldn't resize the picture.",
     },
   },
@@ -1296,12 +1297,13 @@ const cs: UiStrings = {
     minimap: (percent) => `Obrázky nakresleny z ${percent} %`,
     failed: "Obrázek se nepodařilo nakreslit.",
     edit: {
-      open: "Klepnutím obrázek zvětšíte, zmenšíte nebo přesunete",
+      open: "Klepnutím obrázek zvětšíte, zmenšíte, obarvíte nebo přesunete",
       bar: "Velikost a místo obrázku",
       bigger: "Větší",
       smaller: "Menší",
       move: "Přesunout",
       close: "Hotovo",
+      color: "Barva pozadí",
       resizeFailed: "Velikost obrázku se nepodařilo změnit.",
     },
   },
@@ -1915,12 +1917,13 @@ const uk: UiStrings = {
     minimap: (percent) => `Картинки намальовано на ${percent}%`,
     failed: "Не вдалося намалювати картинку.",
     edit: {
-      open: "Торкніться, щоб збільшити, зменшити або перемістити картинку",
+      open: "Торкніться, щоб змінити розмір, колір або перемістити картинку",
       bar: "Розмір і місце картинки",
       bigger: "Більше",
       smaller: "Менше",
       move: "Перемістити",
       close: "Готово",
+      color: "Колір фону",
       resizeFailed: "Не вдалося змінити розмір картинки.",
     },
   },
@@ -2537,12 +2540,13 @@ const ru: UiStrings = {
     minimap: (percent) => `Картинки нарисованы на ${percent}%`,
     failed: "Не удалось нарисовать картинку.",
     edit: {
-      open: "Нажмите, чтобы увеличить, уменьшить или переместить картинку",
+      open: "Нажмите, чтобы изменить размер, цвет или переместить картинку",
       bar: "Размер и место картинки",
       bigger: "Больше",
       smaller: "Меньше",
       move: "Переместить",
       close: "Готово",
+      color: "Цвет фона",
       resizeFailed: "Не удалось изменить размер картинки.",
     },
   },

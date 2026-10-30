@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ZONE_PALETTE } from "./palette.js";
 
 // What a map is for — picked when it is created, and the frontend seeds a
 // matching starter structure. Purely descriptive: nothing here is enforced.
@@ -72,6 +73,10 @@ export const MapSchema = new mongoose.Schema(
     kind: { type: String, enum: MAP_KINDS, default: null },
     // See MAP_BACKGROUNDS.
     background: { type: String, enum: MAP_BACKGROUNDS, default: null },
+    // A soft tint laid over the background, from the same calm palette zones
+    // use (Node.ZONE_PALETTE); the frontend mixes it with the paper colour so
+    // it stays muted. null (the default) keeps the plain paper.
+    backgroundColor: { type: String, enum: ZONE_PALETTE, default: null },
     // When the discussion on this map was finished (see abl/finishAbl.ts) —
     // null while it's still going. A finished map takes no new nodes,
     // attacks or shields until its owner reopens it.
