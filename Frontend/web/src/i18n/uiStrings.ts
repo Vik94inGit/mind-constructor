@@ -420,6 +420,10 @@ export interface UiStrings {
     changePicture: string;
     removePicture: string;
     pictureFailed: string;
+    /** The wallpaper's darker–lighter slider (Map.backgroundShade). */
+    shade: string;
+    darker: string;
+    lighter: string;
   };
   /** The one-time tip on a map with its main gestures (map/GestureHint.tsx). */
   gestureHint: { title: string; touch: string[]; mouse: string[]; gotIt: string };
@@ -1059,7 +1063,7 @@ const en: UiStrings = {
     fineTune: "Fine-tune",
   },
   zoneStyle: { pattern: "Pattern", color: "Colour", none: "None", auto: "Auto", autoHint: "Colour by sentiment", takenBy: (name) => `taken by ${name}`, edge: "Edge brightness", view: "Show zone as", patterns: { dots: "Dots", stripes: "Stripes", grid: "Grid", chess: "Chess" }, colors: { sand: "Sand", sage: "Sage", sky: "Sky", lavender: "Lavender", rose: "Rose", slate: "Slate" } },
-  mapBackground: { title: "Background", options: { dots: "Dot grid", plain: "Plain", lined: "Lined paper", dark: "Soft dark" }, picture: "Your picture…", changePicture: "Change picture…", removePicture: "Remove picture", pictureFailed: "Couldn't set the picture." },
+  mapBackground: { title: "Background", options: { dots: "Dot grid", plain: "Plain", lined: "Lined paper", dark: "Soft dark" }, picture: "Your picture…", changePicture: "Change picture…", removePicture: "Remove picture", pictureFailed: "Couldn't set the picture.", shade: "Picture brightness", darker: "Darker", lighter: "Lighter" },
   gestureHint: {
     title: "How to use the map",
     touch: [
@@ -1680,7 +1684,7 @@ const cs: UiStrings = {
     fineTune: "Doladit",
   },
   zoneStyle: { pattern: "Vzor", color: "Barva", none: "Žádný", auto: "Auto", autoHint: "Barva podle nálady", takenBy: (name) => `už má ${name}`, edge: "Jas okraje", view: "Zobrazit zónu jako", patterns: { dots: "Tečky", stripes: "Pruhy", grid: "Mřížka", chess: "Šachovnice" }, colors: { sand: "Písková", sage: "Šalvějová", sky: "Nebeská", lavender: "Levandulová", rose: "Růžová", slate: "Břidlicová" } },
-  mapBackground: { title: "Pozadí", options: { dots: "Tečkovaná mřížka", plain: "Čisté", lined: "Linkovaný papír", dark: "Jemně tmavé" }, picture: "Vlastní obrázek…", changePicture: "Změnit obrázek…", removePicture: "Odebrat obrázek", pictureFailed: "Obrázek se nepodařilo nastavit." },
+  mapBackground: { title: "Pozadí", options: { dots: "Tečkovaná mřížka", plain: "Čisté", lined: "Linkovaný papír", dark: "Jemně tmavé" }, picture: "Vlastní obrázek…", changePicture: "Změnit obrázek…", removePicture: "Odebrat obrázek", pictureFailed: "Obrázek se nepodařilo nastavit.", shade: "Jas obrázku", darker: "Tmavší", lighter: "Světlejší" },
   gestureHint: {
     title: "Jak pracovat s mapou",
     touch: [
@@ -2300,7 +2304,7 @@ const uk: UiStrings = {
     fineTune: "Точніше",
   },
   zoneStyle: { pattern: "Візерунок", color: "Колір", none: "Немає", auto: "Авто", autoHint: "Колір за настроєм", takenBy: (name) => `уже в ${name}`, edge: "Яскравість краю", view: "Показати зону як", patterns: { dots: "Крапки", stripes: "Смуги", grid: "Сітка", chess: "Шахи" }, colors: { sand: "Пісок", sage: "Шавлія", sky: "Небо", lavender: "Лаванда", rose: "Троянда", slate: "Графіт" } },
-  mapBackground: { title: "Фон", options: { dots: "Сітка з крапок", plain: "Чистий", lined: "Папір у лінійку", dark: "М’який темний" }, picture: "Своя картинка…", changePicture: "Змінити картинку…", removePicture: "Прибрати картинку", pictureFailed: "Не вдалося встановити картинку." },
+  mapBackground: { title: "Фон", options: { dots: "Сітка з крапок", plain: "Чистий", lined: "Папір у лінійку", dark: "М’який темний" }, picture: "Своя картинка…", changePicture: "Змінити картинку…", removePicture: "Прибрати картинку", pictureFailed: "Не вдалося встановити картинку.", shade: "Яскравість картинки", darker: "Темніше", lighter: "Світліше" },
   gestureHint: {
     title: "Як працювати з мапою",
     touch: [
@@ -2923,7 +2927,7 @@ const ru: UiStrings = {
     fineTune: "Точнее",
   },
   zoneStyle: { pattern: "Узор", color: "Цвет", none: "Нет", auto: "Авто", autoHint: "Цвет по настроению", takenBy: (name) => `уже у ${name}`, edge: "Яркость края", view: "Показать зону как", patterns: { dots: "Точки", stripes: "Полосы", grid: "Сетка", chess: "Шахматы" }, colors: { sand: "Песок", sage: "Шалфей", sky: "Небо", lavender: "Лаванда", rose: "Роза", slate: "Графит" } },
-  mapBackground: { title: "Фон", options: { dots: "Сетка из точек", plain: "Чистый", lined: "Бумага в линейку", dark: "Мягкий тёмный" }, picture: "Своя картинка…", changePicture: "Сменить картинку…", removePicture: "Убрать картинку", pictureFailed: "Не удалось установить картинку." },
+  mapBackground: { title: "Фон", options: { dots: "Сетка из точек", plain: "Чистый", lined: "Бумага в линейку", dark: "Мягкий тёмный" }, picture: "Своя картинка…", changePicture: "Сменить картинку…", removePicture: "Убрать картинку", pictureFailed: "Не удалось установить картинку.", shade: "Яркость картинки", darker: "Темнее", lighter: "Светлее" },
   gestureHint: {
     title: "Как работать с картой",
     touch: [

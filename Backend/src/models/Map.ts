@@ -82,6 +82,10 @@ export const MapSchema = new mongoose.Schema(
     // it under a veil of the paper colour so the nodes stay readable. ""
     // (the default) means none.
     backgroundImage: { type: String, default: "" },
+    // How much darker (below 0) or lighter (above 0) the picture is drawn,
+    // -100..100 — the frontend lays black or white over it by that much. 0
+    // (the default) leaves it as it is.
+    backgroundShade: { type: Number, min: -100, max: 100, default: 0 },
     // When the discussion on this map was finished (see abl/finishAbl.ts) —
     // null while it's still going. A finished map takes no new nodes,
     // attacks or shields until its owner reopens it.

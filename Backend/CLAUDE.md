@@ -256,7 +256,8 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `MAX_BACKGROUND_IMAGE_CHARS` = 400 000 chars) stores it in the image store as an `Image` with no
   `nodeId` and keeps its address; sending the same address keeps it, `""` removes it, and the picture
   it replaced is deleted. `GET /api/images/:imageId` serves a node-less picture to every member of
-  its map. The frontend veils it with the paper colour so it stays muted.
+  its map. The frontend veils it with the paper colour so it stays muted. **`Map.backgroundShade`**
+  (-100..100, default 0) draws that picture darker (below 0) or lighter (above 0), set the same way.
 - **Finishing a discussion** (`abl/finishAbl.ts`, `finishController.ts`; `Map.finishedAt`, `Map.finishAgreedBy`) —
   only the map's owner may finish (`POST /api/:mapId/finish`), and only fairly (`finishRule`): the newest
   node on the map is another member's or an imitated-opponent move (`Node.byOpponent`), or every other

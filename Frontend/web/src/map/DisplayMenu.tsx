@@ -33,6 +33,9 @@ interface Props {
   /** The owner's own wallpaper (Map.backgroundImage) — a file to upload, or null to remove it. */
   backgroundImage?: string;
   onPickBackgroundImage?: (file: File | null) => void;
+  /** How much darker (below 0) or lighter (above 0) the wallpaper is (Map.backgroundShade); save is false while the slider still moves. */
+  backgroundShade?: number;
+  onPickBackgroundShade?: (shade: number, save: boolean) => void;
   /** Enters presentation mode — folded into this same dropdown rather than
    *  its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
@@ -65,6 +68,8 @@ export function DisplayMenu({
   onPickBackgroundColor,
   backgroundImage,
   onPickBackgroundImage,
+  backgroundShade,
+  onPickBackgroundShade,
   onPresent,
   onTimeLapse,
   onClose,
@@ -226,6 +231,26 @@ export function DisplayMenu({
                 </button>
               )}
             </div>
+          )}
+          {onPickBackgroundShade && backgroundImage && (
+            // Darker to the left, lighter to the right; the map follows the
+            // slider, and the shade is saved once it's let go.
+            <label className="flex items-center gap-[0.4rem] px-[0.7rem] pb-[0.4rem] text-[0.75rem] text-ink-soft">
+              <span aria-hidden>{t.ui.mapBackground.darker}</span>
+              <input
+                type="range"
+                min={-100}
+                max={100}
+                step={10}
+                value={backgroundShade ?? 0}
+                aria-label={t.ui.mapBackground.shade}
+                className="min-w-0 flex-1 cursor-pointer accent-[var(--accent)]"
+                onChange={(e) => onPickBackgroundShade(Number(e.target.value), false)}
+                onPointerUp={(e) => onPickBackgroundShade(Number(e.currentTarget.value), true)}
+                onKeyUp={(e) => onPickBackgroundShade(Number(e.currentTarget.value), true)}
+              />
+              <span aria-hidden>{t.ui.mapBackground.lighter}</span>
+            </label>
           )}
         </>
       )}

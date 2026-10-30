@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
 import { shrinkImage } from "../utils/images";
@@ -103,6 +103,26 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
     }
   }
 
+  // How much darker or lighter the wallpaper is (Map.backgroundShade): shown
+  // at once while the slider moves, saved when it's let go (save).
+  const shadeBeforeSlide = useRef<number | null>(null);
+  async function setMapBackgroundShade(backgroundShade: number, save: boolean) {
+    if (!isOwner || !mapId) return;
+    if (shadeBeforeSlide.current === null) shadeBeforeSlide.current = map?.backgroundShade ?? 0;
+    setMap((prev) => (prev ? { ...prev, backgroundShade } : prev));
+    if (!save) return;
+    const before = shadeBeforeSlide.current;
+    shadeBeforeSlide.current = null;
+    if (backgroundShade === before) return;
+    setActionError(null);
+    try {
+      setMap(await mapsApi.updateMap(mapId, { backgroundShade }));
+    } catch (err) {
+      setMap((prev) => (prev ? { ...prev, backgroundShade: before } : prev));
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
+    }
+  }
+
   // "+" menu > Delete map (owner only): the map and everything on it, then
   // back to the dashboard.
   async function deleteThisMap() {
@@ -180,6 +200,7 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
     setMapBackground,
     setMapBackgroundColor,
     setMapBackgroundImage,
+    setMapBackgroundShade,
     deleteThisMap,
     exitDemo,
     finish: {
