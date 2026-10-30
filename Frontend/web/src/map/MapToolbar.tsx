@@ -161,6 +161,11 @@ export function MapToolbar({
   // The docked panel never covers the canvas, so it has no reason to collapse.
   const showAll = expanded || vertical;
 
+  // A menu open from the toolbar lifts it above the bottom-right corner's
+  // zoom and minimap (z-[45] too, later on the page), which otherwise cover
+  // the bottom of a long menu on a phone.
+  const layer = showAddMenu || showDisplayMenu || showSearch ? "z-[50]" : "z-[45]";
+
   return (
     <div
       className={
@@ -168,7 +173,7 @@ export function MapToolbar({
           ? "z-[45] flex h-full w-[4.75rem] shrink-0 flex-col items-center gap-1 border-r border-line bg-surface px-1 py-2 shadow-card"
           : // Wraps onto a second row rather than running off a phone's edge
             // (discussion mode adds the opponent, history and finish buttons).
-            "absolute top-3 left-3 z-[45] flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
+            `absolute top-3 left-3 ${layer} flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card`
       }
       role={vertical ? "navigation" : undefined}
     >

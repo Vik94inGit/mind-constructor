@@ -87,7 +87,7 @@ export function DisplayMenu({
     <div
       ref={ref}
       style={onScreen}
-      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex min-w-[210px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
+      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex max-h-[calc(100dvh-6rem)] min-w-[210px] flex-col gap-[0.15rem] overflow-y-auto rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
     >
       <button
         type="button"
