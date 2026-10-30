@@ -49,6 +49,8 @@ import type { NodeLinkItem } from "../map/NodeContextMenu";
 import { CanvasContextMenu } from "../map/CanvasContextMenu";
 import { PicturePicker } from "../map/PicturePicker";
 import { PictureLayer } from "../map/PictureLayer";
+import { PictureCaptions } from "../map/PictureCaptions";
+import { usePictureEdit } from "../hooks/usePictureEdit";
 import { pictureGroups } from "../utils/pictures";
 import { MiniMap } from "../map/MiniMap";
 import { PictureViewer } from "../map/PictureViewer";
@@ -1453,6 +1455,19 @@ export function MapPage() {
   const [picturePickerAt, setPicturePickerAt] = useState<{ x: number; y: number } | "view" | null>(null);
   // Every picture on the map (utils/pictures.ts), drawn on the canvas and the minimap.
   const pictures = useMemo(() => pictureGroups(visibleNodes), [visibleNodes]);
+  // A tap on a picture's caption opens its bar: bigger, smaller, or pick it up
+  // and move it as one (hooks/usePictureEdit.ts, docs/gestures/picture-resize.md).
+  const pictureEdit = usePictureEdit({
+    pictures: view === "cards" || timeLapse || presenting ? [] : pictures,
+    posFor,
+    upsertNode,
+    recordMove,
+    setMultiSelectIds,
+    setSelectedId,
+    setMoveMode,
+    setActionError,
+    errorMessage: t.ui.pictures.edit.resizeFailed,
+  });
   const { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText, drawPicture } = useNodeCreation({
     mapId,
     positions,
@@ -1923,6 +1938,22 @@ export function MapPage() {
                 />
               );
             })}
+
+            {view !== "cards" && (
+              <PictureCaptions
+                pictures={pictures}
+                posFor={posFor}
+                zoom={zoom}
+                canEdit={(g) => !timeLapse && !presenting && [...g.byDot.values()].every(canEditNode)}
+                openId={pictureEdit.openPicture?.id ?? null}
+                onOpen={pictureEdit.openPictureBar}
+                onClose={pictureEdit.closePictureBar}
+                canGrow={pictureEdit.canGrow}
+                canShrink={pictureEdit.canShrink}
+                onResize={(direction) => void pictureEdit.resizePicture(direction)}
+                onMove={pictureEdit.movePicture}
+              />
+            )}
 
             {/* Loading spinner on a zone that was just clicked — see
                 circleLoadingRootId. Sits at the zone's middle, counter-scaled

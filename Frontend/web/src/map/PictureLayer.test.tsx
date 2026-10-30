@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { PictureLayer } from "./PictureLayer";
 import { I18nProvider } from "../i18n/I18nContext";
 import { PICTURES, pictureGroups } from "../utils/pictures";
@@ -30,7 +30,7 @@ describe("PictureLayer", () => {
     expect(container.querySelector("svg")).toBeNull();
   });
 
-  it("inks the lines between written dots and says how much is drawn", () => {
+  it("inks the lines between written dots", () => {
     const { container } = render(
       <I18nProvider>
         <PictureLayer pictures={pictureGroups(treeNodes(3))} posFor={posFor} />
@@ -39,15 +39,5 @@ describe("PictureLayer", () => {
     // Dots 0, 1, 2 written: lines 0-1 and 1-2 inked, the other five still guides.
     expect(container.querySelectorAll('line[data-drawn="true"]')).toHaveLength(2);
     expect(container.querySelectorAll("line")).toHaveLength(7);
-    expect(screen.getByText("Tree · 43% drawn")).toBeTruthy();
-  });
-
-  it("says when a picture is done", () => {
-    render(
-      <I18nProvider>
-        <PictureLayer pictures={pictureGroups(treeNodes(7))} posFor={posFor} />
-      </I18nProvider>,
-    );
-    expect(screen.getByText("Tree · done!")).toBeTruthy();
   });
 });

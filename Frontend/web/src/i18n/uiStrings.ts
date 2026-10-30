@@ -63,6 +63,8 @@ export interface UiStrings {
     /** The minimap's corner badge. */
     minimap: (percent: number) => string;
     failed: string;
+    /** The bar a tap on a picture's caption opens (hooks/usePictureEdit.ts). */
+    edit: { open: string; bar: string; bigger: string; smaller: string; move: string; close: string; resizeFailed: string };
   };
   contextMenu: {
     createBranch: string;
@@ -673,6 +675,15 @@ const en: UiStrings = {
     done: (name) => `${name} · done!`,
     minimap: (percent) => `Pictures ${percent}% drawn`,
     failed: "Couldn't draw the picture.",
+    edit: {
+      open: "Tap to make it bigger, smaller or move it",
+      bar: "Picture size and place",
+      bigger: "Bigger",
+      smaller: "Smaller",
+      move: "Move",
+      close: "Done",
+      resizeFailed: "Couldn't resize the picture.",
+    },
   },
   contextMenu: {
     createBranch: "Create branch",
@@ -1284,6 +1295,15 @@ const cs: UiStrings = {
     done: (name) => `${name} · hotovo!`,
     minimap: (percent) => `Obrázky nakresleny z ${percent} %`,
     failed: "Obrázek se nepodařilo nakreslit.",
+    edit: {
+      open: "Klepnutím obrázek zvětšíte, zmenšíte nebo přesunete",
+      bar: "Velikost a místo obrázku",
+      bigger: "Větší",
+      smaller: "Menší",
+      move: "Přesunout",
+      close: "Hotovo",
+      resizeFailed: "Velikost obrázku se nepodařilo změnit.",
+    },
   },
   contextMenu: {
     createBranch: "Vytvořit větev",
@@ -1894,6 +1914,15 @@ const uk: UiStrings = {
     done: (name) => `${name} · готово!`,
     minimap: (percent) => `Картинки намальовано на ${percent}%`,
     failed: "Не вдалося намалювати картинку.",
+    edit: {
+      open: "Торкніться, щоб збільшити, зменшити або перемістити картинку",
+      bar: "Розмір і місце картинки",
+      bigger: "Більше",
+      smaller: "Менше",
+      move: "Перемістити",
+      close: "Готово",
+      resizeFailed: "Не вдалося змінити розмір картинки.",
+    },
   },
   contextMenu: {
     createBranch: "Створити гілку",
@@ -2507,6 +2536,15 @@ const ru: UiStrings = {
     done: (name) => `${name} · готово!`,
     minimap: (percent) => `Картинки нарисованы на ${percent}%`,
     failed: "Не удалось нарисовать картинку.",
+    edit: {
+      open: "Нажмите, чтобы увеличить, уменьшить или переместить картинку",
+      bar: "Размер и место картинки",
+      bigger: "Больше",
+      smaller: "Меньше",
+      move: "Переместить",
+      close: "Готово",
+      resizeFailed: "Не удалось изменить размер картинки.",
+    },
   },
   contextMenu: {
     createBranch: "Создать ветку",

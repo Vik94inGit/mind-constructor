@@ -109,6 +109,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   says how much of it is drawn ("Heart · 60% drawn", then "done!"), and the minimap draws the inked lines
   too with the percentage in its corner. The picture is placed whole where it doesn't cover anything,
   its dots never hang from one another (so no zone forms), and moving a dot bends the drawing with it.
+  Tapping the caption opens a small bar to treat the picture as one thing: **−** / **+** shrink or grow
+  the whole picture by 15% around its middle (never so small that two dots' cards touch, never off the
+  canvas; ↶ puts it back), **Move** picks every dot in Move mode so dragging any one moves the picture,
+  and **Done**, Escape or a tap elsewhere closes it ([sketch](../../docs/gestures/picture-resize.md),
+  `hooks/usePictureEdit.ts`, `map/PictureCaptions.tsx`).
   Each node knows its dot through `Node.picture`; the pictures themselves live in `src/utils/pictures.ts`
   (`map/PicturePicker.tsx`, `map/PictureLayer.tsx`).
 - **Text → nodes** — paste a text on the map itself, mark its pieces (by hand, or every line/sentence

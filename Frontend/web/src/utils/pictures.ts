@@ -167,8 +167,8 @@ const SEARCH_STEP = 60;
  * Where a picture's dots go: centered as near `desired` as the map allows,
  * fully on the canvas and with every dot clear of `obstacles` (whatever is
  * already on the map). The picture is never squeezed or bent to fit, so it
- * stays the picture; when nowhere is clear it is put at `desired`, kept on
- * the canvas.
+ * stays the picture; when nowhere is clear it goes where the fewest of its
+ * dots land on something, nearest `desired` among those.
  */
 export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacle[] = []): Pt[] {
   const unit = pictureDots(kind, { x: 0, y: 0 });
@@ -178,10 +178,13 @@ export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacl
   const maxY = CANVAS_H - EDGE - Math.max(...unit.map((p) => p.y));
   const clampTo = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
   const start = { x: clampTo(desired.x, minX, maxX), y: clampTo(desired.y, minY, maxY) };
-  const fits = (c: Pt) => unit.every((p) => clearOf({ x: c.x + p.x, y: c.y + p.y }, obstacles));
+  const blocked = (c: Pt) => unit.filter((p) => !clearOf({ x: c.x + p.x, y: c.y + p.y }, obstacles)).length;
   const shift = (c: Pt) => unit.map((p) => ({ x: Math.round(c.x + p.x), y: Math.round(c.y + p.y) }));
 
-  // Rings of candidate middles round the start, nearest first.
+  // Rings of candidate middles round the start, nearest first. A full map
+  // may have no clear spot at all; then the nearest spot with the fewest
+  // dots on something already there, rather than straight on top of it.
+  let best = { at: start, blocked: Infinity };
   const reach = Math.ceil(Math.max(CANVAS_W, CANVAS_H) / SEARCH_STEP);
   for (let r = 0; r <= reach; r++) {
     const ringPts: Pt[] = [];
@@ -194,10 +197,51 @@ export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacl
       }
     }
     ringPts.sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y));
-    const found = ringPts.find(fits);
-    if (found) return shift(found);
+    for (const c of ringPts) {
+      const n = blocked(c);
+      if (n === 0) return shift(c);
+      if (n < best.blocked) best = { at: c, blocked: n };
+    }
   }
-  return shift(start);
+  return shift(best.at);
+}
+
+/** How much one − / + changes a picture's size. */
+export const PICTURE_RESIZE_STEP = 1.15;
+
+/** Whether no two of these spots are closer than two node cards allow. */
+function cardsClear(pts: Pt[]): boolean {
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      if (Math.abs(pts[i].x - pts[j].x) < DOT_GAP.x && Math.abs(pts[i].y - pts[j].y) < DOT_GAP.y) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * A picture's dots `factor` times bigger (or smaller, under 1), around the
+ * middle of the box they fill. null when the new size can't be had: shrunk
+ * until two dots' cards would touch, or grown past the canvas. A picture whose
+ * dots were already crowded (moved there by hand) may still grow.
+ */
+export function resizePicture(pts: Pt[], factor: number): Pt[] | null {
+  if (pts.length === 0) return null;
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const out = pts.map((p) => ({ x: Math.round(cx + (p.x - cx) * factor), y: Math.round(cy + (p.y - cy) * factor) }));
+  if (factor < 1 && !cardsClear(out)) return null;
+  const nx = out.map((p) => p.x);
+  const ny = out.map((p) => p.y);
+  const w = Math.max(...nx) - Math.min(...nx);
+  const h = Math.max(...ny) - Math.min(...ny);
+  if (factor > 1 && (w > CANVAS_W - 2 * EDGE || h > CANVAS_H - 2 * EDGE)) return null;
+  // Slid back inside the canvas if growing pushed an edge out.
+  const dx = Math.max(0, EDGE - Math.min(...nx)) - Math.max(0, Math.max(...nx) - (CANVAS_W - EDGE));
+  const dy = Math.max(0, EDGE - Math.min(...ny)) - Math.max(0, Math.max(...ny) - (CANVAS_H - EDGE));
+  return out.map((p) => ({ x: p.x + dx, y: p.y + dy }));
 }
 
 export interface PictureGroup {
