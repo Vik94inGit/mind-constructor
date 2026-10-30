@@ -46,6 +46,8 @@ interface Props {
   onPickBackground?: (background: MapBackground) => void;
   backgroundColor?: ZonePaletteColor | null;
   onPickBackgroundColor?: (color: ZonePaletteColor | null) => void;
+  backgroundImage?: string;
+  onPickBackgroundImage?: (file: File | null) => void;
   /** Node search (see NodeSearch). */
   nodes: NodeDoc[];
   onLoadTexts: () => Promise<void>;
@@ -118,6 +120,8 @@ export function MapToolbar({
   onPickBackground,
   backgroundColor,
   onPickBackgroundColor,
+  backgroundImage,
+  onPickBackgroundImage,
   nodes,
   onLoadTexts,
   onSearchMatches,
@@ -302,6 +306,8 @@ export function MapToolbar({
                 onPickBackground={onPickBackground}
                 backgroundColor={backgroundColor}
                 onPickBackgroundColor={onPickBackgroundColor}
+                backgroundImage={backgroundImage}
+                onPickBackgroundImage={onPickBackgroundImage}
                 onPresent={() => {
                   setShowDisplayMenu(false);
                   onPresent();

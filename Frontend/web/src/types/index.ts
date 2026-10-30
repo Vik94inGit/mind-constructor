@@ -166,6 +166,8 @@ export interface MapDoc {
   background?: MapBackground | null;
   /** A soft tint over the background (Map.backgroundColor), from the zones' calm palette — null / absent: plain paper. */
   backgroundColor?: ZonePaletteColor | null;
+  /** The owner's own wallpaper (Map.backgroundImage): a stored picture's address, or a data URL while it uploads. "" / absent: none. */
+  backgroundImage?: string;
   /** When the owner finished the discussion (Map.finishedAt) — null / absent: still open. A finished map takes no new nodes, attacks or shields until reopened. */
   finishedAt?: string | null;
   /** Members other than the owner who agreed to finish (user ids) — see utils/finish.ts. */

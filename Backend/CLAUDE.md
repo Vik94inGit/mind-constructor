@@ -251,7 +251,12 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
 - **`Map.background`** — the canvas behind the nodes: `dots | plain | lined | dark` (`MAP_BACKGROUNDS`),
   `null` = the default dot grid. Owner-only, through the same `PATCH /api/:mapId` (`map:updated` reaches
   every member). **`Map.backgroundColor`** (`ZONE_PALETTE` or null) is a soft tint on top of it, set the
-  same way; the frontend mixes it into the paper colour so it stays muted.
+  same way; the frontend mixes it into the paper colour so it stays muted. **`Map.backgroundImage`** is the owner's own
+  wallpaper: `PATCH /api/:mapId { backgroundImage }` with a PNG/JPEG/WebP data URL (at most
+  `MAX_BACKGROUND_IMAGE_CHARS` = 400 000 chars) stores it in the image store as an `Image` with no
+  `nodeId` and keeps its address; sending the same address keeps it, `""` removes it, and the picture
+  it replaced is deleted. `GET /api/images/:imageId` serves a node-less picture to every member of
+  its map. The frontend veils it with the paper colour so it stays muted.
 - **Finishing a discussion** (`abl/finishAbl.ts`, `finishController.ts`; `Map.finishedAt`, `Map.finishAgreedBy`) —
   only the map's owner may finish (`POST /api/:mapId/finish`), and only fairly (`finishRule`): the newest
   node on the map is another member's or an imitated-opponent move (`Node.byOpponent`), or every other

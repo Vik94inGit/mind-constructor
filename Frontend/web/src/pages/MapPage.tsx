@@ -1494,7 +1494,7 @@ export function MapPage() {
 
   // The map's mode and background, finishing the discussion, deleting the map
   // — see hooks/useMapControls.ts.
-  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, deleteThisMap, exitDemo, finish } = useMapControls({
+  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, setMapBackgroundImage, deleteThisMap, exitDemo, finish } = useMapControls({
     map,
     setMap,
     nodes,
@@ -1598,7 +1598,7 @@ export function MapPage() {
   }
 
   const isDiscussionMode = discussionOn;
-  const canvasBackground = mapBackgroundStyle(map.background, map.backgroundColor);
+  const canvasBackground = mapBackgroundStyle(map.background, map.backgroundColor, map.backgroundImage);
   // Parents first (utils/nodePriority.ts): a node with a visible child paints
   // above the rest, every other child is faded until someone looks at it
   // (it, or its parent, is selected, it's in the chosen circle, being
@@ -1657,6 +1657,8 @@ export function MapPage() {
       onPickBackground={isOwner ? setMapBackground : undefined}
       backgroundColor={map.backgroundColor}
       onPickBackgroundColor={isOwner ? setMapBackgroundColor : undefined}
+      backgroundImage={map.backgroundImage}
+      onPickBackgroundImage={isOwner ? (file) => void setMapBackgroundImage(file) : undefined}
       nodes={visibleNodes}
       onLoadTexts={async () => {
         await ensureNodeText(visibleNodes.map((n) => n.nodeId));

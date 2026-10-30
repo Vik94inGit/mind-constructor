@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
+import { shrinkImage } from "../utils/images";
 import * as mapsApi from "../api/maps";
 import { ApiRequestError } from "../api/client";
 import { useConfirm } from "../context/ConfirmContext";
@@ -84,6 +85,24 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
     }
   }
 
+  // The owner's own wallpaper (Map.backgroundImage): the picked file shrunk
+  // like a node's picture (utils/images.ts), shown at once, and uploaded; null
+  // removes it.
+  async function setMapBackgroundImage(file: File | null) {
+    if (!isOwner || !mapId) return;
+    const before = map?.backgroundImage ?? "";
+    setActionError(null);
+    try {
+      const next = file ? await shrinkImage(file) : "";
+      if (next === before) return;
+      setMap((prev) => (prev ? { ...prev, backgroundImage: next } : prev));
+      setMap(await mapsApi.updateMap(mapId, { backgroundImage: next }));
+    } catch (err) {
+      setMap((prev) => (prev ? { ...prev, backgroundImage: before } : prev));
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.mapBackground.pictureFailed);
+    }
+  }
+
   // "+" menu > Delete map (owner only): the map and everything on it, then
   // back to the dashboard.
   async function deleteThisMap() {
@@ -160,6 +179,7 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
     toggleMapMode,
     setMapBackground,
     setMapBackgroundColor,
+    setMapBackgroundImage,
     deleteThisMap,
     exitDemo,
     finish: {

@@ -6,7 +6,8 @@ import mongoose from "mongoose";
 // (IMAGE_URL_PREFIX + imageId), so node documents, the map's node list and
 // every realtime node event stay small however many pictures a map holds.
 // Served by GET /api/images/:imageId (imageController.ts) to members of the
-// map who may see the node. Removed with its node (nodeDao.ts's cascade),
+// map who may see the node (or, for a map's background picture, to every
+// member of the map). Removed with its node (nodeDao.ts's cascade),
 // with its map (deleteMapDao), or as soon as the node stops pointing at it
 // (nodeAbl.ts's updateNodeAbl).
 export const IMAGE_URL_PREFIX = "/api/images/";
@@ -16,7 +17,9 @@ const ImageSchema = new mongoose.Schema(
   {
     imageId: { type: String, required: true, unique: true }, // public id, nanoid — same pattern as Map/Node/Edge
     mapId: { type: mongoose.Schema.Types.ObjectId, ref: "Map", required: true },
-    nodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", required: true },
+    // null for a map's own background picture (Map.backgroundImage), which
+    // belongs to the map rather than a node.
+    nodeId: { type: mongoose.Schema.Types.ObjectId, ref: "Node", default: null },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // who added it
     mime: { type: String, enum: IMAGE_MIME_TYPES, required: true },
     // Where the bytes are: the object's key in the file storage bucket
