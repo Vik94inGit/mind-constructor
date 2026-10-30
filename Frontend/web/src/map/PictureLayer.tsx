@@ -3,7 +3,6 @@ import { CANVAS_H, CANVAS_W } from "../utils/canvasLayout";
 import { pictureFills, pictureSegments } from "../utils/pictures";
 import type { PictureGroup } from "../utils/pictures";
 import type { NodeDoc } from "../types";
-import { useI18n } from "../i18n/I18nContext";
 
 interface Props {
   pictures: PictureGroup[];
@@ -12,12 +11,11 @@ interface Props {
 
 // The pictures on the map ("Draw a picture", utils/pictures.ts), drawn under
 // the nodes: a line between two dots is inked in the picture's colour once
-// both are written in and stays a faint dotted guide until then, a closed
-// shape fills in a little more with every dot drawn, and a caption under the
-// picture says how much of it is there. Lines follow the nodes' live spots,
-// so moving a dot bends the drawing with it.
+// both are written in and stays a faint dotted guide until then, and a closed
+// shape fills in a little more with every dot drawn. Lines follow the nodes'
+// live spots, so moving a dot bends the drawing with it. The caption that says
+// how much is there sits above the nodes (PictureCaptions.tsx).
 export const PictureLayer = memo(function PictureLayer({ pictures, posFor }: Props) {
-  const { t } = useI18n();
   if (pictures.length === 0) return null;
   return (
     <svg
@@ -26,11 +24,6 @@ export const PictureLayer = memo(function PictureLayer({ pictures, posFor }: Pro
       viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
     >
       {pictures.map((g) => {
-        const name = t.ui.pictures.names[g.kind];
-        const spots = [...g.byDot.values()].map(posFor);
-        const bottom = Math.max(...spots.map((p) => p.y));
-        const middle = (Math.min(...spots.map((p) => p.x)) + Math.max(...spots.map((p) => p.x))) / 2;
-        const done = g.filled === g.total;
         return (
           <g key={g.id} data-picture={g.kind} data-percent={g.percent}>
             {pictureFills(g).map((ns, i) => (
@@ -73,16 +66,6 @@ export const PictureLayer = memo(function PictureLayer({ pictures, posFor }: Pro
                 />
               );
             })}
-            <text
-              x={middle}
-              y={bottom + 150}
-              textAnchor="middle"
-              fontSize={26}
-              fontWeight={done ? 700 : 600}
-              fill={done ? g.def.color : "var(--color-ink-soft)"}
-            >
-              {done ? t.ui.pictures.done(name) : t.ui.pictures.progress(name, g.percent)}
-            </text>
           </g>
         );
       })}

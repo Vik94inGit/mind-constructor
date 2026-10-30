@@ -206,6 +206,44 @@ export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacl
   return shift(best.at);
 }
 
+/** How much one − / + changes a picture's size. */
+export const PICTURE_RESIZE_STEP = 1.15;
+
+/** Whether no two of these spots are closer than two node cards allow. */
+function cardsClear(pts: Pt[]): boolean {
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      if (Math.abs(pts[i].x - pts[j].x) < DOT_GAP.x && Math.abs(pts[i].y - pts[j].y) < DOT_GAP.y) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * A picture's dots `factor` times bigger (or smaller, under 1), around the
+ * middle of the box they fill. null when the new size can't be had: shrunk
+ * until two dots' cards would touch, or grown past the canvas. A picture whose
+ * dots were already crowded (moved there by hand) may still grow.
+ */
+export function resizePicture(pts: Pt[], factor: number): Pt[] | null {
+  if (pts.length === 0) return null;
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const out = pts.map((p) => ({ x: Math.round(cx + (p.x - cx) * factor), y: Math.round(cy + (p.y - cy) * factor) }));
+  if (factor < 1 && !cardsClear(out)) return null;
+  const nx = out.map((p) => p.x);
+  const ny = out.map((p) => p.y);
+  const w = Math.max(...nx) - Math.min(...nx);
+  const h = Math.max(...ny) - Math.min(...ny);
+  if (factor > 1 && (w > CANVAS_W - 2 * EDGE || h > CANVAS_H - 2 * EDGE)) return null;
+  // Slid back inside the canvas if growing pushed an edge out.
+  const dx = Math.max(0, EDGE - Math.min(...nx)) - Math.max(0, Math.max(...nx) - (CANVAS_W - EDGE));
+  const dy = Math.max(0, EDGE - Math.min(...ny)) - Math.max(0, Math.max(...ny) - (CANVAS_H - EDGE));
+  return out.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+}
+
 export interface PictureGroup {
   id: string;
   kind: PictureKind;

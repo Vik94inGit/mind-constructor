@@ -9,6 +9,7 @@ import {
   pictureFills,
   pictureGroups,
   pictureSegments,
+  resizePicture,
 } from "./pictures";
 import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import { makeNode } from "../test/fixtures";
@@ -128,5 +129,32 @@ describe("pictureGroups", () => {
     expect(g.percent).toBe(100);
     expect(pictureFills(g)).toHaveLength(1);
     expect(pictureFills(g)[0].map((n) => n.nodeId)).toEqual(["n0", "n1", "n2", "n3", "n4", "n5", "n6"]);
+  });
+});
+
+describe("resizePicture", () => {
+  const heart = pictureDots("heart", { x: 1200, y: 800 });
+
+  it("grows the picture round its middle, keeping its shape", () => {
+    const big = resizePicture(heart, 1.15)!;
+    expect(big).not.toBeNull();
+    const span = (pts: { x: number }[]) => Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x));
+    expect(span(big) / span(heart)).toBeCloseTo(1.15, 1);
+    const mid = (pts: { x: number }[]) => (Math.max(...pts.map((p) => p.x)) + Math.min(...pts.map((p) => p.x))) / 2;
+    expect(Math.abs(mid(big) - mid(heart))).toBeLessThanOrEqual(1);
+  });
+
+  it("won't shrink a picture already at its smallest, where cards would touch", () => {
+    expect(resizePicture(heart, 1 / 1.15)).toBeNull();
+    expect(resizePicture(resizePicture(heart, 1.5)!, 1 / 1.15)).not.toBeNull();
+  });
+
+  it("won't grow past the canvas, and slides a grown picture back inside it", () => {
+    expect(resizePicture(heart, 10)).toBeNull();
+    const nearEdge = pictureDots("heart", { x: 450, y: 800 });
+    for (const p of resizePicture(nearEdge, 1.3)!) {
+      expect(p.x).toBeGreaterThanOrEqual(120);
+      expect(p.x).toBeLessThanOrEqual(CANVAS_W - 120);
+    }
   });
 });
