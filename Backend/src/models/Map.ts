@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { ZONE_PALETTE } from "./Node.js";
+import { ZONE_PALETTE } from "./palette.js";
 
 // What a map is for — picked when it is created, and the frontend seeds a
 // matching starter structure. Purely descriptive: nothing here is enforced.

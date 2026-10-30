@@ -11,7 +11,7 @@ import {
 import { findUserByIdDao } from "../dao/userDao.js";
 import { parseOrThrow } from "./errors.js";
 import { createNodeAbl } from "./nodeAbl.js";
-import { ZONE_PALETTE } from "../models/Node.js";
+import { ZONE_PALETTE } from "../models/palette.js";
 import type { NodeType } from "../models/Node.js";
 import { MAP_BACKGROUNDS, MAP_KINDS } from "../models/Map.js";
 
