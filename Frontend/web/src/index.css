@@ -366,6 +366,18 @@ svg[data-replay] [data-reveal-zone] {
   #root {
     height: 100%;
   }
+  /* The page's own paper colour on the root too, with the theme's colour
+     scheme, so whatever the browser shows for a moment while the phone
+     keyboard opens or the map re-paints (the area behind the keyboard,
+     map tiles not drawn yet) is the paper, not the browser's default
+     white. */
+  html {
+    background: var(--color-paper);
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
   body {
     margin: 0;
     background: var(--color-paper);

@@ -58,8 +58,10 @@ export function CanvasFrame({
       <div
         // pan-x pan-y: one finger still scrolls the canvas natively, but the
         // browser doesn't pinch-zoom the page here — two fingers zoom the
-        // map instead (see useCanvasViewport).
-        className="h-full w-full touch-pan-x touch-pan-y overflow-auto [overscroll-behavior-x:none]"
+        // map instead (see useCanvasViewport). bg-paper: while iPhone/iPad
+        // Safari scrolls this for the opening keyboard, any part of it not
+        // painted yet shows this scroller's own background, white without one.
+        className="h-full w-full touch-pan-x touch-pan-y overflow-auto bg-paper [overscroll-behavior-x:none]"
         ref={wrapRef}
       >
       {/* Padded outer sizing/transform wrapper — canvasRef (the real
