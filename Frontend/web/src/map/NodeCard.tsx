@@ -381,13 +381,14 @@ export const NodeCard = memo(function NodeCard({
     : dragging
       ? "opacity-85"
       : muted
-        ? "opacity-16"
+        ? "node-fade-muted"
         : ghost
-          ? "opacity-45 hover:opacity-75"
+          ? "node-fade-ghost"
           : quiet
-            ? "opacity-50 hover:opacity-100"
+            ? "node-fade-quiet"
             : "";
-  const filterClass = muted ? "grayscale-[65%]" : "";
+  // The three fades (and muted's grayscale) are index.css's node-fade-*
+  // classes, scaled by how much fading the viewer wants (utils/nodeFade.ts).
   const cursorClass = readonly ? "cursor-default" : dragging ? "cursor-grabbing" : "cursor-grab";
   // Position updates (left/top, applied via inline style) need to be
   // instant while actively dragging — only once released does the
@@ -460,7 +461,6 @@ export const NodeCard = memo(function NodeCard({
     transitionClass,
     cursorClass,
     opacityClass,
-    filterClass,
     chaotic && "animate-node-chaos-drift",
     // A hovered dot's title (see the dotted branch below) sits above its neighbours.
     "has-[[data-dot]:hover]:z-[55]",

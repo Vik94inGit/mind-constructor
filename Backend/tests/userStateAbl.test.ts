@@ -61,6 +61,10 @@ describe("userStateAbl", () => {
 
     it("saves emoji first and the user's own emoji per node type", async () => {
       vi.mocked(updatePreferencesDao).mockResolvedValue({ preferences: {} } as never);
+      await updatePreferencesAbl({ nodeFade: 30 }, "u1");
+      expect(updatePreferencesDao).toHaveBeenLastCalledWith("u1", { nodeFade: 30 });
+      await expect(updatePreferencesAbl({ nodeFade: 101 }, "u1")).rejects.toThrow();
+
       await updatePreferencesAbl({ emojiUp: true, typeEmoji: { Problem: "🔥", Solution: "🌟" } }, "u1");
       expect(updatePreferencesDao).toHaveBeenCalledWith("u1", { emojiUp: true, typeEmoji: { Problem: "🔥", Solution: "🌟" } });
     });

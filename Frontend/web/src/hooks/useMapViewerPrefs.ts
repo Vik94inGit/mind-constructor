@@ -20,6 +20,8 @@ import { loadCompactView, loadReadingMode, saveCompactView, saveReadingMode } fr
 import type { ReadingMode } from "../utils/readingMode";
 import { loadEmojiFirst, loadTypeEmoji, saveEmojiFirst, saveTypeEmoji } from "../utils/emojiFace";
 import type { TypeEmoji } from "../utils/emojiFace";
+import { clampNodeFade, loadNodeFade, saveNodeFade } from "../utils/nodeFade";
+import type { NodeFade } from "../utils/nodeFade";
 import type { NodeType } from "../types";
 
 const SAVE_DELAY_MS = 800;
@@ -66,13 +68,23 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     saveTypeEmoji(next);
     savePreferences({ typeEmoji: next });
   }
+  // How strongly quiet nodes fade (utils/nodeFade.ts): follows the slider, and
+  // is saved once it's let go (save).
+  const [nodeFade, setNodeFadeState] = useState<NodeFade>(loadNodeFade);
+  function setNodeFade(fade: number, save: boolean) {
+    setNodeFadeState(fade);
+    if (!save) return;
+    saveNodeFade(fade);
+    savePreferences({ nodeFade: fade });
+  }
   // The signed-in user's saved choices, once they arrive.
   useEffect(() => {
     if (preferences?.readingMode) setReadingModeState(preferences.readingMode);
     if (preferences?.compactView !== undefined) setCompactViewState(preferences.compactView);
     if (preferences?.emojiUp !== undefined) setEmojiFirstState(preferences.emojiUp);
     if (preferences?.typeEmoji) setTypeEmojiState(preferences.typeEmoji);
-  }, [preferences?.readingMode, preferences?.compactView, preferences?.emojiUp, preferences?.typeEmoji]);
+    if (preferences?.nodeFade !== undefined) setNodeFadeState(clampNodeFade(preferences.nodeFade));
+  }, [preferences?.readingMode, preferences?.compactView, preferences?.emojiUp, preferences?.typeEmoji, preferences?.nodeFade]);
 
   // Nodes shown in their own reading mode instead of the map's (a chosen group
   // as puzzle cards, say) — per map, see utils/nodeDisplay.ts.
@@ -286,6 +298,8 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     toggleCompactView,
     emojiFirst,
     toggleEmojiFirst,
+    nodeFade,
+    setNodeFade,
     typeEmoji,
     setTypeEmoji,
     nodeDisplay,

@@ -100,6 +100,19 @@ describe("DisplayMenu background", () => {
   });
 });
 
+describe("DisplayMenu node fade", () => {
+  it("lets any viewer fade quiet nodes less, saved when the slider is let go", () => {
+    const onNodeFade = vi.fn();
+    renderMenu({ nodeFade: 30, onNodeFade });
+    const slider = screen.getByRole("slider", { name: TRANSLATIONS.en.ui.nodeFade.label });
+    expect(slider).toHaveValue("30");
+    fireEvent.change(slider, { target: { value: "0" } });
+    expect(onNodeFade).toHaveBeenLastCalledWith(0, false);
+    fireEvent.keyUp(slider, { key: "ArrowLeft" });
+    expect(onNodeFade).toHaveBeenLastCalledWith(30, true);
+  });
+});
+
 describe("DisplayMenu emoji for each type", () => {
   const types = TRANSLATIONS.en.ui.types;
 

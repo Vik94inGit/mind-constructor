@@ -110,6 +110,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   picture (`Map.backgroundShade`, -100..100; the map follows the slider and it's saved on release). Over a picture the icons get more contrast
   (`canvas-on-picture` in `src/index.css`): full-strength rims and a halo of the paper round each icon and
   zone name, and in the dark theme the type and zone colours come back bright instead of toned down.
+  Quiet nodes (a child no one is looking at, an unwritten ghost, the rest of the map behind a chosen node)
+  also fade much less over a picture. Every viewer can set the fade themselves with *Fade quiet nodes* in the
+  display menu, from none to full (`src/utils/nodeFade.ts`, saved per user as `preferences.nodeFade`).
 - **Draw a picture** — from its own toolbar button (the dotted star, one tap on a phone) or the "+" menu
   (both put it in the middle of the view), or the right-click menu (at the click point); then
   pick a heart, star, house, tree, fish or smile. Its dots arrive as numbered ghosts, like a

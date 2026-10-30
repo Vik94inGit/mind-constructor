@@ -48,6 +48,8 @@ const UserStateSchema = new mongoose.Schema(
       compactView: { type: Boolean },
       // Emoji face up on nodes that have one (their own, or their type's from typeEmoji); false or unset: the type's symbol up.
       emojiUp: { type: Boolean },
+      // How strongly quiet nodes fade on the canvas, 0 (not at all) to 100 (the full fade); unset: the app's own choice.
+      nodeFade: { type: Number, min: 0, max: 100 },
       // The old name for emojiUp, from when emoji first was the default and saved for everyone; no longer read.
       emojiFirst: { type: Boolean },
       // The user's own emoji for each node type (type -> emoji), over the app's defaults.

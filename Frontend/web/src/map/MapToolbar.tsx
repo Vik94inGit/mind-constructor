@@ -34,6 +34,8 @@ interface Props {
   compact: boolean;
   onToggleCompact: () => void;
   emojiFirst: boolean;
+  nodeFade?: number;
+  onNodeFade?: (fade: number, save: boolean) => void;
   onToggleEmojiFirst: () => void;
   /** The viewer's own emoji per type — see DisplayMenu. */
   typeEmoji?: TypeEmoji;
@@ -113,6 +115,8 @@ export function MapToolbar({
   compact,
   onToggleCompact,
   emojiFirst,
+  nodeFade,
+  onNodeFade,
   onToggleEmojiFirst,
   typeEmoji,
   onTypeEmoji,
@@ -301,6 +305,8 @@ export function MapToolbar({
                 compact={compact}
                 onToggleCompact={onToggleCompact}
                 emojiFirst={emojiFirst}
+                nodeFade={nodeFade}
+                onNodeFade={onNodeFade}
                 onToggleEmojiFirst={onToggleEmojiFirst}
                 typeEmoji={typeEmoji}
                 onTypeEmoji={onTypeEmoji}

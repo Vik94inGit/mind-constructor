@@ -17,6 +17,9 @@ interface Props {
   onToggleCompact: () => void;
   /** "Emoji first": every node shows an emoji face up (its own, or its type's), its type on the back. Off: symbols first. */
   emojiFirst: boolean;
+  /** How strongly quiet nodes fade, 0..100 (utils/nodeFade.ts); save is false while the slider still moves. */
+  nodeFade?: number;
+  onNodeFade?: (fade: number, save: boolean) => void;
   onToggleEmojiFirst: () => void;
   /** The viewer's own emoji per type (utils/emojiFace.ts), offered while emoji first is on. */
   typeEmoji?: TypeEmoji;
@@ -57,6 +60,8 @@ export function DisplayMenu({
   compact,
   onToggleCompact,
   emojiFirst,
+  nodeFade,
+  onNodeFade,
   onToggleEmojiFirst,
   typeEmoji,
   onTypeEmoji,
@@ -126,6 +131,29 @@ export function DisplayMenu({
         <span className="flex-1">{t.ui.emoji.first}</span>
         {emojiFirst && <span aria-hidden>✓</span>}
       </button>
+      {onNodeFade && nodeFade !== undefined && (
+        // How much the nodes no one is looking at fade: none at the left, the
+        // full fade at the right. Followed while sliding, saved on release.
+        <div className="px-[0.7rem] py-[0.35rem] text-[0.85rem] text-ink">
+          <div>{t.ui.nodeFade.label}</div>
+          <label className="mt-[0.2rem] flex items-center gap-[0.4rem] text-[0.75rem] text-ink-soft">
+            <span aria-hidden>{t.ui.nodeFade.off}</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={10}
+              value={nodeFade}
+              aria-label={t.ui.nodeFade.label}
+              className="min-w-0 flex-1 cursor-pointer accent-[var(--accent)]"
+              onChange={(e) => onNodeFade(Number(e.target.value), false)}
+              onPointerUp={(e) => onNodeFade(Number(e.currentTarget.value), true)}
+              onKeyUp={(e) => onNodeFade(Number(e.currentTarget.value), true)}
+            />
+            <span aria-hidden>{t.ui.nodeFade.full}</span>
+          </label>
+        </div>
+      )}
       {emojiFirst && typeEmoji && onTypeEmoji && (
         <>
           <div className="px-[0.7rem] pt-[0.2rem] text-[0.72rem] font-semibold tracking-wide text-ink-soft uppercase">

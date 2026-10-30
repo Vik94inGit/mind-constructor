@@ -49,20 +49,20 @@ describe("NodeCard", () => {
 
     it("fades a quiet child, but a stronger fade still wins", () => {
       const node = makeNode({ nodeId: "a", text: "hello" });
-      expect(root(renderNode({ node, quiet: true }).container).className).toContain("opacity-50");
+      expect(root(renderNode({ node, quiet: true }).container).className).toContain("node-fade-quiet");
       const muted = root(renderNode({ node, quiet: true, muted: true }).container).className;
-      expect(muted).toContain("opacity-16");
-      expect(muted).not.toContain("opacity-50");
+      expect(muted).toContain("node-fade-muted");
+      expect(muted).not.toContain("node-fade-quiet");
     });
 
     it("fades a ghost and captions it with its prompt until it's filled in", () => {
       const ghost = makeNode({ nodeId: "g", text: "", ghost: true, prompt: "What could go wrong?" });
       const faded = renderNode({ node: ghost });
-      expect(root(faded.container).className).toContain("opacity-45");
+      expect(root(faded.container).className).toContain("node-fade-ghost");
       expect(faded.getByText("What could go wrong?").className).toContain("italic");
       faded.unmount();
       const filled = renderNode({ node: { ...ghost, text: "The server", ghost: false } });
-      expect(root(filled.container).className).not.toContain("opacity-45");
+      expect(root(filled.container).className).not.toContain("node-fade-ghost");
       expect(filled.queryByText("What could go wrong?")).toBeNull();
     });
 
