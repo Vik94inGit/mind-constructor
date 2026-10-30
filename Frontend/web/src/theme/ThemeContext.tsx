@@ -5,6 +5,11 @@ export type Theme = "light" | "dark";
 
 const STORAGE_KEY = "mc_theme";
 
+// The paper colour of each theme (index.css --paper), for the theme-color
+// meta: Safari paints the strip round the page with it, seen while the
+// phone keyboard opens, so it follows the app's theme, not the phone's.
+export const THEME_COLOR: Record<Theme, string> = { light: "#f1e1cc", dark: "#12141b" };
+
 // Same source of truth index.html's own inline script already read once,
 // synchronously, before the first paint (see its own doc comment) — this
 // just has to agree with it, not repeat the OS-preference fallback logic
@@ -31,6 +36,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLOR[theme]);
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {

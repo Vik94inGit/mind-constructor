@@ -13,8 +13,12 @@
     />
     <!-- Installable app (see public/manifest.webmanifest and public/sw.js). -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#f1e1cc" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#12141b" media="(prefers-color-scheme: dark)" />
+    <!-- The paper colour of the app's own theme, set by the script below and
+         by ThemeProvider. iPhone/iPad Safari paints the strip round the page
+         with it, which shows for a moment while the keyboard opens; tied to
+         the phone's light/dark setting instead, a dark-theme map flashed
+         light there whenever the phone itself was in light mode. -->
+    <meta name="theme-color" content="#f1e1cc" />
     <!-- iPhone / iPad: "Add to Home Screen" opens it full screen, with this icon and name. -->
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -43,6 +47,8 @@
               ? "dark"
               : "light";
         document.documentElement.dataset.theme = theme;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "dark" ? "#12141b" : "#f1e1cc");
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
