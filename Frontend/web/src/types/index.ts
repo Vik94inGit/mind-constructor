@@ -164,6 +164,8 @@ export interface MapDoc {
   kind?: MapKind | null;
   /** The canvas behind the nodes (Map.background) — null / absent: the dot grid. Owner-only to change. */
   background?: MapBackground | null;
+  /** A soft tint over the background (Map.backgroundColor), from the zones' calm palette — null / absent: plain paper. */
+  backgroundColor?: ZonePaletteColor | null;
   /** When the owner finished the discussion (Map.finishedAt) — null / absent: still open. A finished map takes no new nodes, attacks or shields until reopened. */
   finishedAt?: string | null;
   /** Members other than the owner who agreed to finish (user ids) — see utils/finish.ts. */
@@ -201,7 +203,7 @@ export interface NodeDoc {
   /** True while the node has never been written in (see Backend's Node.ghost) — the canvas draws it faded until someone fills it. */
   ghost?: boolean;
   /** Which dot of a picture this node is (see Backend's Node.picture and utils/pictures.ts); null/absent for every other node. */
-  picture?: { id: string; kind: string; dot: number } | null;
+  picture?: { id: string; kind: string; dot: number; color?: ZonePaletteColor | null } | null;
   /** Optional step number (1..9999) for labeling a process's steps — see Backend's Node.order. null/absent means "not numbered". */
   order?: number | null;
   type: NodeType;

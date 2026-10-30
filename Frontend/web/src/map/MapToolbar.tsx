@@ -8,7 +8,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { AddMenu } from "./AddMenu";
 import { DisplayMenu } from "./DisplayMenu";
 import { NodeSearch } from "./NodeSearch";
-import type { MapBackground, NodeDoc, NodeType } from "../types";
+import type { MapBackground, NodeDoc, NodeType, ZonePaletteColor } from "../types";
 import type { ZoneLayout } from "../utils/zoneLayout";
 
 // Which commit this build is (Vercel fills VITE_VERCEL_GIT_COMMIT_SHA in on
@@ -44,6 +44,8 @@ interface Props {
   /** The map's canvas — see DisplayMenu. onPickBackground only for the map's owner. */
   background?: MapBackground | null;
   onPickBackground?: (background: MapBackground) => void;
+  backgroundColor?: ZonePaletteColor | null;
+  onPickBackgroundColor?: (color: ZonePaletteColor | null) => void;
   /** Node search (see NodeSearch). */
   nodes: NodeDoc[];
   onLoadTexts: () => Promise<void>;
@@ -114,6 +116,8 @@ export function MapToolbar({
   onPickZoneLayout,
   background,
   onPickBackground,
+  backgroundColor,
+  onPickBackgroundColor,
   nodes,
   onLoadTexts,
   onSearchMatches,
@@ -291,6 +295,8 @@ export function MapToolbar({
                 onPickZoneLayout={onPickZoneLayout}
                 background={background}
                 onPickBackground={onPickBackground}
+                backgroundColor={backgroundColor}
+                onPickBackgroundColor={onPickBackgroundColor}
                 onPresent={() => {
                   setShowDisplayMenu(false);
                   onPresent();

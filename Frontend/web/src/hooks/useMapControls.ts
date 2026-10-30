@@ -6,7 +6,7 @@ import { ApiRequestError } from "../api/client";
 import { useConfirm } from "../context/ConfirmContext";
 import { finishState } from "../utils/finish";
 import type { Translation } from "../i18n/translations";
-import type { MapBackground, MapDoc, NodeDoc } from "../types";
+import type { MapBackground, MapDoc, NodeDoc, ZonePaletteColor } from "../types";
 
 interface Params {
   map: MapDoc | null;
@@ -65,6 +65,21 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
       setMap(await mapsApi.updateMap(mapId, { background: next }));
     } catch (err) {
       setMap((prev) => (prev ? { ...prev, background: before } : prev));
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
+    }
+  }
+
+  // The soft tint over the canvas (Map.backgroundColor): saved the same way.
+  async function setMapBackgroundColor(backgroundColor: ZonePaletteColor | null) {
+    if (!isOwner || !mapId) return;
+    const before = map?.backgroundColor ?? null;
+    if (backgroundColor === before) return;
+    setActionError(null);
+    setMap((prev) => (prev ? { ...prev, backgroundColor } : prev));
+    try {
+      setMap(await mapsApi.updateMap(mapId, { backgroundColor }));
+    } catch (err) {
+      setMap((prev) => (prev ? { ...prev, backgroundColor: before } : prev));
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
     }
   }
@@ -144,6 +159,7 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
     isOwner,
     toggleMapMode,
     setMapBackground,
+    setMapBackgroundColor,
     deleteThisMap,
     exitDemo,
     finish: {

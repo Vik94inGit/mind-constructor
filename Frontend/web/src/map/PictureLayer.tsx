@@ -2,6 +2,7 @@ import { memo } from "react";
 import { CANVAS_H, CANVAS_W } from "../utils/canvasLayout";
 import { pictureFills, pictureSegments } from "../utils/pictures";
 import type { PictureGroup } from "../utils/pictures";
+import { ZONE_PALETTE_HEX } from "../utils/zoneStyle";
 import type { NodeDoc } from "../types";
 
 interface Props {
@@ -30,8 +31,11 @@ export const PictureLayer = memo(function PictureLayer({ pictures, posFor }: Pro
               <polygon
                 key={`fill-${i}`}
                 points={ns.map((n) => `${posFor(n).x},${posFor(n).y}`).join(" ")}
-                fill={g.def.color}
-                fillOpacity={0.02 + 0.14 * (g.filled / g.total)}
+                fill={g.color ? ZONE_PALETTE_HEX[g.color] : g.def.color}
+                // A picked colour is a muted background from the start, a
+                // little stronger as the dots fill in; its own colour only
+                // appears as the dots fill in.
+                fillOpacity={(g.color ? 0.14 : 0.02) + 0.14 * (g.filled / g.total)}
                 stroke="none"
               />
             ))}

@@ -100,6 +100,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+- **Map background** — the map's owner picks it in the display menu (the layers button): dot grid, plain,
+  lined paper or soft dark (`Map.background`), plus an optional soft colour from the zones' calm palette
+  (`Map.backgroundColor`), mixed into the paper so it stays muted (`softTint` in `src/utils/zoneStyle.ts`,
+  `src/utils/mapBackground.ts`, `src/map/SoftColorSwatches.tsx`). Zones pick their colour the same way.
 - **Draw a picture** — from its own toolbar button (the dotted star, one tap on a phone) or the "+" menu
   (both put it in the middle of the view), or the right-click menu (at the click point); then
   pick a heart, star, house, tree, fish or smile. Its dots arrive as numbered ghosts, like a
@@ -109,7 +113,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   says how much of it is drawn ("Heart · 60% drawn", then "done!"), and the minimap draws the inked lines
   too with the percentage in its corner. The picture is placed whole where it doesn't cover anything,
   its dots never hang from one another (so no zone forms), and moving a dot bends the drawing with it.
-  Tapping the caption opens a small bar to treat the picture as one thing: **−** / **+** shrink or grow
+  Tapping the caption opens a small bar to treat the picture as one thing: a row of soft colours gives
+  it a muted background fill (`Node.picture.color`, saved on every dot), **−** / **+** shrink or grow
   the whole picture by 15% around its middle (never so small that two dots' cards touch, never off the
   canvas; ↶ puts it back), **Move** picks every dot in Move mode so dragging any one moves the picture,
   and **Done**, Escape or a tap elsewhere closes it ([sketch](../../docs/gestures/picture-resize.md),

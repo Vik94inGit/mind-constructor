@@ -1,7 +1,7 @@
 import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import type { Obstacle } from "./canvasLayout";
 import { clearOf } from "./freeSpots";
-import type { NodeDoc } from "../types";
+import type { NodeDoc, ZonePaletteColor } from "../types";
 
 // "Draw a picture": a picture laid out on the map as ghost nodes, one per
 // dot, like a connect-the-dots page. Each dot's line to its neighbours is
@@ -255,6 +255,8 @@ export interface PictureGroup {
   total: number;
   /** 0..100, rounded. */
   percent: number;
+  /** The fill colour picked for it (Node.picture.color, the same on every dot), or null for its own. */
+  color: ZonePaletteColor | null;
 }
 
 /** A dot counts as drawn once its node has been written in (no longer a ghost). */
@@ -272,10 +274,11 @@ export function pictureGroups(nodes: NodeDoc[]): PictureGroup[] {
     if (p.dot < 0 || p.dot >= def.dots.length) continue;
     let g = groups.get(p.id);
     if (!g) {
-      g = { id: p.id, kind: p.kind, def, byDot: new Map(), filled: 0, total: def.dots.length, percent: 0 };
+      g = { id: p.id, kind: p.kind, def, byDot: new Map(), filled: 0, total: def.dots.length, percent: 0, color: null };
       groups.set(p.id, g);
     }
     if (!g.byDot.has(p.dot)) g.byDot.set(p.dot, n);
+    if (p.color && !g.color) g.color = p.color;
   }
   for (const g of groups.values()) {
     g.filled = [...g.byDot.values()].filter(isDotDrawn).length;

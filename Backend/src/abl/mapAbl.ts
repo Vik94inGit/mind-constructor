@@ -11,6 +11,7 @@ import {
 import { findUserByIdDao } from "../dao/userDao.js";
 import { parseOrThrow } from "./errors.js";
 import { createNodeAbl } from "./nodeAbl.js";
+import { ZONE_PALETTE } from "../models/Node.js";
 import type { NodeType } from "../models/Node.js";
 import { MAP_BACKGROUNDS, MAP_KINDS } from "../models/Map.js";
 
@@ -170,6 +171,8 @@ const updateMapSchema = z
     discussionMode: z.boolean().optional(),
     // See Map.MAP_BACKGROUNDS — null goes back to the default dot grid.
     background: z.enum(MAP_BACKGROUNDS).nullable().optional(),
+    // See Map.backgroundColor — null goes back to the plain paper.
+    backgroundColor: z.enum(ZONE_PALETTE).nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No fields to update",

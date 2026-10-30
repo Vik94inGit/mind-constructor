@@ -1494,7 +1494,7 @@ export function MapPage() {
 
   // The map's mode and background, finishing the discussion, deleting the map
   // — see hooks/useMapControls.ts.
-  const { isOwner, toggleMapMode, setMapBackground, deleteThisMap, exitDemo, finish } = useMapControls({
+  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, deleteThisMap, exitDemo, finish } = useMapControls({
     map,
     setMap,
     nodes,
@@ -1598,7 +1598,7 @@ export function MapPage() {
   }
 
   const isDiscussionMode = discussionOn;
-  const canvasBackground = mapBackgroundStyle(map.background);
+  const canvasBackground = mapBackgroundStyle(map.background, map.backgroundColor);
   // Parents first (utils/nodePriority.ts): a node with a visible child paints
   // above the rest, every other child is faded until someone looks at it
   // (it, or its parent, is selected, it's in the chosen circle, being
@@ -1655,6 +1655,8 @@ export function MapPage() {
       onPickZoneLayout={(layout) => setZoneLayout(MAP_ZONE_KEY, layout === "zones" ? null : layout)}
       background={map.background}
       onPickBackground={isOwner ? setMapBackground : undefined}
+      backgroundColor={map.backgroundColor}
+      onPickBackgroundColor={isOwner ? setMapBackgroundColor : undefined}
       nodes={visibleNodes}
       onLoadTexts={async () => {
         await ensureNodeText(visibleNodes.map((n) => n.nodeId));
@@ -1952,6 +1954,7 @@ export function MapPage() {
                 canShrink={pictureEdit.canShrink}
                 onResize={(direction) => void pictureEdit.resizePicture(direction)}
                 onMove={pictureEdit.movePicture}
+                onColor={(color) => void pictureEdit.setPictureColor(color)}
               />
             )}
 

@@ -59,3 +59,6 @@ dots. The bar keeps its size on screen at any zoom; the caption scales with the 
 of the drawing. Only someone who may edit every dot of the picture gets the bar; for anyone else
 the caption stays plain text. Code: `hooks/usePictureEdit.ts`, `map/PictureCaptions.tsx`,
 `resizePicture` in `utils/pictures.ts`.
+
+Later the same bar gained a row of soft colours for the picture's background fill (no new gesture:
+the colours are plain buttons inside the bar).

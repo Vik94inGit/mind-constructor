@@ -440,6 +440,18 @@ describe("nodeAbl", () => {
       await expect(updateNodeAbl("node1", "user1", { zoneColor: "#ff0000" })).rejects.toThrow(ValidationError);
     });
 
+    it("sets a picture dot's fill colour inside Node.picture, and refuses it on a node outside a picture", async () => {
+      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValueOnce({ nodeId: "node1", picture: { id: "p1", kind: "heart", dot: 0 } } as never);
+
+      await updateNodeAbl("node1", "user1", { pictureColor: "sky" });
+      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { "picture.color": "sky" });
+
+      vi.mocked(findNodeByPublicIdDao).mockResolvedValueOnce({ nodeId: "node1", picture: null } as never);
+      await expect(updateNodeAbl("node1", "user1", { pictureColor: "sky" })).rejects.toThrow(ValidationError);
+      await expect(updateNodeAbl("node1", "user1", { pictureColor: "teal" })).rejects.toThrow(ValidationError);
+    });
+
     it("passes a zone edge brightness from 0 to 1 through, null back to the default", async () => {
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
 

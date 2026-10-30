@@ -1,7 +1,7 @@
 import { apiRequest } from "./client";
 import * as offline from "../offline/sync";
 import { upsertBy } from "../utils/mapGraph";
-import type { Attack, AttackNodeType, NodeDoc, NodeType, Weapon } from "../types";
+import type { Attack, AttackNodeType, NodeDoc, NodeType, Weapon, ZonePaletteColor } from "../types";
 
 export async function listNodes(mapId: string): Promise<NodeDoc[]> {
   const nodes = await apiRequest<NodeDoc[]>(`/api/${mapId}/nodes`);
@@ -80,19 +80,27 @@ export async function createNode(
   return node;
 }
 
-export async function updateNode(nodeId: string, updates: Partial<NodeDoc>): Promise<NodeDoc> {
+/** What a node update may send: its own fields, plus a picture dot's fill colour (Node.picture.color). */
+export type NodeUpdate = Partial<NodeDoc> & { pictureColor?: ZonePaletteColor | null };
+
+export async function updateNode(nodeId: string, updates: NodeUpdate): Promise<NodeDoc> {
   const node = await apiRequest<NodeDoc>(`/api/nodes/${nodeId}`, {
     method: "PATCH",
     body: updates,
     offline: {
       // A drag sends a move per drop; offline, one request with the last position is enough.
       merge: true,
-      optimistic: () => ({
-        ...(offline.knownNode<NodeDoc>(nodeId) ?? ({ nodeId } as NodeDoc)),
-        ...updates,
-        ...(typeof updates.text === "string" ? { ghost: false } : {}),
-        updatedAt: new Date().toISOString(),
-      }),
+      optimistic: () => {
+        const { pictureColor, ...fields } = updates;
+        const known = offline.knownNode<NodeDoc>(nodeId) ?? ({ nodeId } as NodeDoc);
+        return {
+          ...known,
+          ...fields,
+          ...(typeof updates.text === "string" ? { ghost: false } : {}),
+          ...(pictureColor !== undefined && known.picture ? { picture: { ...known.picture, color: pictureColor } } : {}),
+          updatedAt: new Date().toISOString(),
+        };
+      },
     },
   });
   offline.rememberNodes([node]);

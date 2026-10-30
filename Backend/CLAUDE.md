@@ -220,11 +220,13 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `""` = none) is the question a frontend shows as the ghost's placeholder — map templates create
   ghosts with a prompt and no text or title. Both ride along on `GET /:mapId/nodes` like `title`:
   the stored flag is what lets a frontend fade a ghost without the lazy `text` backfill.
-- **`Node.picture`** — `{ id, kind, dot }` or null: which dot of a picture a node is, for nodes made by
+- **`Node.picture`** — `{ id, kind, dot, color }` or null: which dot of a picture a node is, for nodes made by
   the frontend's "Draw a picture" (`Frontend/web/src/utils/pictures.ts` owns the pictures and draws
   their lines between the dots as the ghosts are filled in). `id` groups one picture's dots, `kind`
   is 1-20 lowercase letters (the backend doesn't keep the list), `dot` 0..63. Set only on
-  `POST /api/nodes/:mapId`; rides along on the node list.
+  `POST /api/nodes/:mapId`; rides along on the node list. The one exception is `color`, the picture's
+  fill (`ZONE_PALETTE` or null), changed with `PATCH /api/nodes/:nodeId` `{ pictureColor }`, which is
+  refused on a node outside a picture; the frontend sends it to every dot.
 - **`Node.zoneName`** — an optional name (max 40 chars, `""` = none) for the zone a circle parent
   radiates. Set via `PATCH /api/nodes/:nodeId` (`zoneNameSchema` in `nodeAbl.ts`; an empty string
   clears it), owner-only like every node edit. A frontend shows it under the parent on the canvas and
@@ -248,7 +250,8 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   server-side `template` seeds (blank / single-problem / decision-tree / pro-con / demo) still work.
 - **`Map.background`** — the canvas behind the nodes: `dots | plain | lined | dark` (`MAP_BACKGROUNDS`),
   `null` = the default dot grid. Owner-only, through the same `PATCH /api/:mapId` (`map:updated` reaches
-  every member).
+  every member). **`Map.backgroundColor`** (`ZONE_PALETTE` or null) is a soft tint on top of it, set the
+  same way; the frontend mixes it into the paper colour so it stays muted.
 - **Finishing a discussion** (`abl/finishAbl.ts`, `finishController.ts`; `Map.finishedAt`, `Map.finishAgreedBy`) —
   only the map's owner may finish (`POST /api/:mapId/finish`), and only fairly (`finishRule`): the newest
   node on the map is another member's or an imitated-opponent move (`Node.byOpponent`), or every other

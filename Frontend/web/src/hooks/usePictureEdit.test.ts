@@ -70,6 +70,16 @@ describe("usePictureEdit", () => {
     expect(hook.result.current.openPicture).toBeNull();
   });
 
+  it("gives every dot the picked fill colour", async () => {
+    const nodes = star();
+    const { params, hook } = setup(nodes);
+    act(() => hook.result.current.openPictureBar("p1"));
+    await act(async () => hook.result.current.setPictureColor("sage"));
+    expect(nodesApi.updateNode).toHaveBeenCalledTimes(nodes.length);
+    expect(vi.mocked(nodesApi.updateNode).mock.calls.every(([, patch]) => (patch as { pictureColor?: string }).pictureColor === "sage")).toBe(true);
+    expect(params.upsertNode).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "s0", picture: expect.objectContaining({ color: "sage" }) }));
+  });
+
   it("puts the dots back and says so when saving fails", async () => {
     vi.mocked(nodesApi.updateNode).mockRejectedValueOnce(new Error("offline"));
     const nodes = star();

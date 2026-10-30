@@ -4,7 +4,7 @@ import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { resizePicture, PICTURE_RESIZE_STEP } from "../utils/pictures";
 import type { PictureGroup } from "../utils/pictures";
-import type { NodeDoc } from "../types";
+import type { NodeDoc, ZonePaletteColor } from "../types";
 
 type Pt = { x: number; y: number };
 
@@ -86,6 +86,23 @@ export function usePictureEdit({
     }
   }
 
+  // The picture's fill (Node.picture.color), saved on every dot so each one
+  // carries it, the way the dots already share the picture's id.
+  async function setColor(color: ZonePaletteColor | null) {
+    const g = open;
+    if (!g || g.color === color) return;
+    const dots = dotsOf(g);
+    setActionError(null);
+    dots.forEach((n) => upsertNode({ ...n, picture: n.picture ? { ...n.picture, color } : n.picture }));
+    try {
+      const saved = await Promise.all(dots.map((n) => nodesApi.updateNode(n.nodeId, { pictureColor: color })));
+      saved.forEach((n) => upsertNode(n));
+    } catch (err) {
+      dots.forEach((n) => upsertNode(n));
+      setActionError(err instanceof ApiRequestError ? err.message : errorMessage);
+    }
+  }
+
   // Picks every dot, in Move mode, so dragging any one moves the whole
   // picture along (the group drag in useNodeDragAndDrop).
   function moveWhole() {
@@ -104,5 +121,6 @@ export function usePictureEdit({
     canShrink: !!nextSize(-1),
     resizePicture: resize,
     movePicture: moveWhole,
+    setPictureColor: setColor,
   };
 }

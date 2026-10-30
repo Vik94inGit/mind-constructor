@@ -270,6 +270,17 @@ describe("mapAbl", () => {
       expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { background: null });
     });
 
+    it("accepts a soft background colour from the zone palette, null to clear it, and nothing else", async () => {
+      vi.mocked(updateMapDao).mockResolvedValue({ mapId: "pub123" } as never);
+
+      await updateMapAbl("pub123", "user1", { backgroundColor: "sage" });
+      expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { backgroundColor: "sage" });
+      await updateMapAbl("pub123", "user1", { backgroundColor: null });
+      expect(updateMapDao).toHaveBeenLastCalledWith("pub123", "user1", { backgroundColor: null });
+
+      await expect(updateMapAbl("pub123", "user1", { backgroundColor: "#ff0000" })).rejects.toThrow(ValidationError);
+    });
+
     it("rejects an unknown background", async () => {
       await expect(updateMapAbl("pub123", "user1", { background: "stars" })).rejects.toThrow(ValidationError);
       expect(updateMapDao).not.toHaveBeenCalled();
