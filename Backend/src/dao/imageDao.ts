@@ -9,7 +9,7 @@ type InternalId = mongoose.Types.ObjectId | string;
 // configured, otherwise in MongoDB — and returns the address a node keeps.
 export const createImageDao = async (fields: {
   mapId: InternalId;
-  nodeId: InternalId;
+  nodeId: InternalId | null;
   userId: InternalId;
   mime: string;
   data: Buffer;
@@ -67,4 +67,10 @@ export const deleteImagesByNodesDao = async (nodeIds: InternalId[]) => {
 
 export const deleteImagesByMapDao = async (mapId: InternalId) => {
   await deleteImages({ mapId });
+};
+
+// Deletes a map's background pictures (the ones with no node) except the one
+// it now shows, if any.
+export const deleteMapBackgroundImagesExceptDao = async (mapId: InternalId, keepImageId: string | null) => {
+  await deleteImages({ mapId, nodeId: null, ...(keepImageId ? { imageId: { $ne: keepImageId } } : {}) });
 };

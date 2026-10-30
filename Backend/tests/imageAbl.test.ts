@@ -2,9 +2,11 @@ import { describe, beforeEach, it, expect, vi } from "vitest";
 import { findImageDao, readImageDataDao } from "../src/dao/imageDao.js";
 import { findNodeByInternalIdDao, findNodeDao } from "../src/dao/nodeDao.js";
 import { getImageAbl } from "../src/abl/imageAbl.js";
+import { isMapMemberDao } from "../src/dao/mapsDao.js";
 
 vi.mock("../src/dao/imageDao.js", () => ({ findImageDao: vi.fn(), readImageDataDao: vi.fn() }));
 vi.mock("../src/dao/nodeDao.js", () => ({ findNodeByInternalIdDao: vi.fn(), findNodeDao: vi.fn() }));
+vi.mock("../src/dao/mapsDao.js", () => ({ isMapMemberDao: vi.fn() }));
 
 const bytes = Buffer.from([1, 2, 3]);
 
@@ -34,5 +36,14 @@ describe("getImageAbl", () => {
     expect(await getImageAbl("nope", "user1")).toBeNull();
     vi.mocked(findNodeByInternalIdDao).mockResolvedValueOnce(null as never);
     expect(await getImageAbl("img1", "user1")).toBeNull();
+  });
+
+  it("returns a map's background picture to any member of the map, and to nobody else", async () => {
+    vi.mocked(findImageDao).mockResolvedValue({ mime: "image/webp", nodeId: null, mapId: "m1", storageKey: null } as never);
+    vi.mocked(isMapMemberDao).mockResolvedValueOnce(true);
+    expect(await getImageAbl("bg1", "user1")).toEqual({ mime: "image/webp", data: bytes });
+    vi.mocked(isMapMemberDao).mockResolvedValueOnce(false);
+    expect(await getImageAbl("bg1", "stranger")).toBeNull();
+    expect(findNodeByInternalIdDao).not.toHaveBeenCalled();
   });
 });

@@ -104,6 +104,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   lined paper or soft dark (`Map.background`), plus an optional soft colour from the zones' calm palette
   (`Map.backgroundColor`), mixed into the paper so it stays muted (`softTint` in `src/utils/zoneStyle.ts`,
   `src/utils/mapBackground.ts`, `src/map/SoftColorSwatches.tsx`). Zones pick their colour the same way.
+  *Your picture…* sets the owner's own photo as the map's wallpaper (`Map.backgroundImage`): shrunk like a
+  node's picture, it covers the whole map under a veil of the paper colour (and the tint, if any) so it
+  stays soft behind the nodes; ✕ removes it.
 - **Draw a picture** — from its own toolbar button (the dotted star, one tap on a phone) or the "+" menu
   (both put it in the middle of the view), or the right-click menu (at the click point); then
   pick a heart, star, house, tree, fish or smile. Its dots arrive as numbered ghosts, like a

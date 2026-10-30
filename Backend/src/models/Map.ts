@@ -77,6 +77,11 @@ export const MapSchema = new mongoose.Schema(
     // use (Node.ZONE_PALETTE); the frontend mixes it with the paper colour so
     // it stays muted. null (the default) keeps the plain paper.
     backgroundColor: { type: String, enum: ZONE_PALETTE, default: null },
+    // A picture the owner uploaded as the map's wallpaper — a stored
+    // picture's address (models/Image.ts, with no node). The frontend draws
+    // it under a veil of the paper colour so the nodes stay readable. ""
+    // (the default) means none.
+    backgroundImage: { type: String, default: "" },
     // When the discussion on this map was finished (see abl/finishAbl.ts) —
     // null while it's still going. A finished map takes no new nodes,
     // attacks or shields until its owner reopens it.

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { MapBackground, ZonePaletteColor } from "../types";
 import { softTint } from "./zoneStyle";
+import { imageSrc } from "./images";
 
 /**
  * The canvas behind a map's nodes (Map.background), as styles for the canvas
@@ -12,11 +13,32 @@ import { softTint } from "./zoneStyle";
 export function mapBackgroundStyle(
   background: MapBackground | null | undefined,
   color?: ZonePaletteColor | null,
+  image?: string | null,
 ): { className: string; style: CSSProperties } {
   const base = backgroundPattern(background);
   // A picked colour (Map.backgroundColor) tints the paper softly, under the same pattern.
-  return color ? { ...base, style: { ...base.style, backgroundColor: softTint(color) } } : base;
+  const paper = color ? softTint(color) : "var(--paper)";
+  if (!image) return color ? { ...base, style: { ...base.style, backgroundColor: paper } } : base;
+  // The owner's own picture (Map.backgroundImage) fills the map, under a veil
+  // of the (tinted) paper so it stays muted and the nodes stay readable; the
+  // pattern still lies on top.
+  const veil = `color-mix(in srgb, ${paper} ${IMAGE_VEIL}%, transparent)`;
+  const layers = [base.style.backgroundImage, `linear-gradient(${veil}, ${veil})`, `url("${imageSrc(image)}")`].filter(Boolean);
+  const sizes = [base.style.backgroundImage ? (base.style.backgroundSize ?? "auto") : null, "auto", "cover"].filter(Boolean);
+  return {
+    className: base.className,
+    style: {
+      backgroundColor: paper,
+      backgroundImage: layers.join(", "),
+      backgroundSize: sizes.join(", "),
+      backgroundPosition: "center",
+      backgroundRepeat: base.style.backgroundImage ? "repeat, no-repeat, no-repeat" : "no-repeat",
+    },
+  };
 }
+
+/** How much of the paper lies over a background picture, in percent: enough to keep it soft. */
+export const IMAGE_VEIL = 60;
 
 function backgroundPattern(background: MapBackground | null | undefined): { className: string; style: CSSProperties } {
   switch (background ?? "dots") {

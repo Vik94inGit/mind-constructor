@@ -254,6 +254,8 @@ export const updateMapDao = async (
     members?: string[];
     discussionMode?: boolean;
     background?: string | null;
+    backgroundColor?: string | null;
+    backgroundImage?: string;
   },
 ) => {
   return await Map.findOneAndUpdate(

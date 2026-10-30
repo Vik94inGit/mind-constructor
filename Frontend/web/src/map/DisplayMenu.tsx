@@ -7,6 +7,7 @@ import { MAP_BACKGROUNDS } from "../types";
 import type { MapBackground, ZonePaletteColor } from "../types";
 import { mapBackgroundStyle } from "../utils/mapBackground";
 import { SoftColorSwatches } from "./SoftColorSwatches";
+import { imageSrc } from "../utils/images";
 import type { NodeType } from "../types";
 import type { TypeEmoji } from "../utils/emojiFace";
 import { TypeEmojiPicker } from "./TypeEmojiPicker";
@@ -29,6 +30,9 @@ interface Props {
   /** The soft tint over the background (Map.backgroundColor), picked with it. */
   backgroundColor?: ZonePaletteColor | null;
   onPickBackgroundColor?: (color: ZonePaletteColor | null) => void;
+  /** The owner's own wallpaper (Map.backgroundImage) — a file to upload, or null to remove it. */
+  backgroundImage?: string;
+  onPickBackgroundImage?: (file: File | null) => void;
   /** Enters presentation mode — folded into this same dropdown rather than
    *  its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
@@ -59,6 +63,8 @@ export function DisplayMenu({
   onPickBackground,
   backgroundColor,
   onPickBackgroundColor,
+  backgroundImage,
+  onPickBackgroundImage,
   onPresent,
   onTimeLapse,
   onClose,
@@ -87,7 +93,7 @@ export function DisplayMenu({
     <div
       ref={ref}
       style={onScreen}
-      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex min-w-[210px] flex-col gap-[0.15rem] rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
+      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex max-h-[calc(100dvh-6rem)] min-w-[210px] flex-col gap-[0.15rem] overflow-y-auto rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
     >
       <button
         type="button"
@@ -179,6 +185,46 @@ export function DisplayMenu({
           {onPickBackgroundColor && (
             <div className="px-[0.7rem] py-[0.4rem]">
               <SoftColorSwatches label={t.ui.zoneStyle.color} value={backgroundColor ?? null} onPick={onPickBackgroundColor} />
+            </div>
+          )}
+          {onPickBackgroundImage && (
+            <div className="flex items-center gap-1 px-[0.35rem] pb-[0.2rem]">
+              <label className="flex flex-1 cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.35rem] py-[0.4rem] text-[0.85rem] text-ink hover:bg-surface-2">
+                {backgroundImage ? (
+                  <span
+                    aria-hidden
+                    className="h-5 w-7 shrink-0 rounded-[4px] border border-line bg-cover bg-center"
+                    style={{ backgroundImage: `url("${imageSrc(backgroundImage)}")` }}
+                  />
+                ) : (
+                  <span aria-hidden className="flex h-5 w-7 shrink-0 items-center justify-center rounded-[4px] border border-dashed border-line text-ink-soft">
+                    +
+                  </span>
+                )}
+                <span className="flex-1">{backgroundImage ? t.ui.mapBackground.changePicture : t.ui.mapBackground.picture}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  aria-label={backgroundImage ? t.ui.mapBackground.changePicture : t.ui.mapBackground.picture}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) onPickBackgroundImage(file);
+                  }}
+                />
+              </label>
+              {backgroundImage && (
+                <button
+                  type="button"
+                  className="cursor-pointer rounded-[6px] px-[0.5rem] py-[0.4rem] text-[0.8rem] text-ink-soft hover:bg-surface-2"
+                  title={t.ui.mapBackground.removePicture}
+                  aria-label={t.ui.mapBackground.removePicture}
+                  onClick={() => onPickBackgroundImage(null)}
+                >
+                  ✕
+                </button>
+              )}
             </div>
           )}
         </>

@@ -23,4 +23,17 @@ describe("mapBackgroundStyle", () => {
     expect(tinted.style.backgroundImage).toBe(mapBackgroundStyle("lined").style.backgroundImage);
     expect(mapBackgroundStyle("plain", null).style.backgroundColor).toBe("var(--paper)");
   });
+
+  it("lays an uploaded picture under a veil of the paper, the pattern on top", () => {
+    const { style } = mapBackgroundStyle("dots", null, "data:image/webp;base64,AAAA");
+    const layers = String(style.backgroundImage);
+    expect(layers.indexOf("radial-gradient")).toBeLessThan(layers.indexOf("linear-gradient"));
+    expect(layers).toContain("color-mix(in srgb, var(--paper) 60%, transparent)");
+    expect(layers).toContain('url("data:image/webp;base64,AAAA")');
+    expect(style.backgroundSize).toBe("22px 22px, auto, cover");
+
+    const plain = mapBackgroundStyle("plain", "sky", "data:image/png;base64,BBBB").style;
+    expect(String(plain.backgroundImage).startsWith("linear-gradient(color-mix(in srgb, color-mix(in srgb, #5d8fcf 14%")).toBe(true);
+    expect(plain.backgroundSize).toBe("auto, cover");
+  });
 });

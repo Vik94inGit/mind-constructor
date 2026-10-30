@@ -34,6 +34,23 @@ describe("DisplayMenu background", () => {
     expect(onPickBackground).toHaveBeenCalledWith("lined");
   });
 
+  it("uploads the owner's own picture, and removes it", async () => {
+    const onPickBackgroundImage = vi.fn();
+    const file = new File(["x"], "sea.png", { type: "image/png" });
+    renderMenu({ onPickBackground: vi.fn(), onPickBackgroundImage });
+    await userEvent.upload(screen.getByLabelText(bg.picture), file);
+    expect(onPickBackgroundImage).toHaveBeenCalledWith(file);
+    expect(screen.queryByRole("button", { name: bg.removePicture })).not.toBeInTheDocument();
+  });
+
+  it("offers to change or remove a picture already set", async () => {
+    const onPickBackgroundImage = vi.fn();
+    renderMenu({ onPickBackground: vi.fn(), backgroundImage: "/api/images/abcdefgh", onPickBackgroundImage });
+    expect(screen.getByText(bg.changePicture)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: bg.removePicture }));
+    expect(onPickBackgroundImage).toHaveBeenCalledWith(null);
+  });
+
   it("shows no background choice to anyone else", () => {
     renderMenu({ background: "dark" });
     expect(screen.queryByText(bg.title)).not.toBeInTheDocument();

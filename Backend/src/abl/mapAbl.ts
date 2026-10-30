@@ -9,7 +9,9 @@ import {
   searchNodesDao,
 } from "../dao/mapsDao.js";
 import { findUserByIdDao } from "../dao/userDao.js";
-import { parseOrThrow } from "./errors.js";
+import { parseOrThrow, ValidationError } from "./errors.js";
+import { createImageDao, deleteMapBackgroundImagesExceptDao } from "../dao/imageDao.js";
+import { IMAGE_URL_PREFIX } from "../models/Image.js";
 import { createNodeAbl } from "./nodeAbl.js";
 import { ZONE_PALETTE } from "../models/palette.js";
 import type { NodeType } from "../models/Node.js";
@@ -24,6 +26,11 @@ export class ColorTakenError extends Error {}
 export class NotInviterError extends Error {}
 export class InviteeNotFoundError extends Error {}
 export class AlreadyMemberError extends Error {}
+
+// Map.backgroundImage — the frontend shrinks a picture to fit well under
+// this, the same cap as a node's pictures (nodeAbl.ts MAX_IMAGE_CHARS).
+export const MAX_BACKGROUND_IMAGE_CHARS = 400_000;
+const BACKGROUND_IMAGE_RE = /^(data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\/api\/images\/[A-Za-z0-9_-]{8,32})$/;
 
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const hexColor = (fieldName: string) =>
@@ -173,6 +180,17 @@ const updateMapSchema = z
     background: z.enum(MAP_BACKGROUNDS).nullable().optional(),
     // See Map.backgroundColor — null goes back to the plain paper.
     backgroundColor: z.enum(ZONE_PALETTE).nullable().optional(),
+    // See Map.backgroundImage: a picture as a data URL (stored on arrival),
+    // the stored address it already has (kept), or "" to remove it.
+    backgroundImage: z
+      .union([
+        z.literal(""),
+        z
+          .string()
+          .max(MAX_BACKGROUND_IMAGE_CHARS, "background image is too large")
+          .regex(BACKGROUND_IMAGE_RE, "background image must be a PNG, JPEG or WebP data URL"),
+      ])
+      .optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No fields to update",
@@ -184,7 +202,24 @@ export const updateMapAbl = async (
   input: unknown,
 ) => {
   const updates = parseOrThrow(updateMapSchema, input);
-  return await updateMapDao(publicMapId, userId, updates);
+  if (updates.backgroundImage === undefined) return await updateMapDao(publicMapId, userId, updates);
+
+  // A new background picture goes to the image store and the map keeps its
+  // address; only the owner may set it, checked before anything is stored.
+  const map = await getMapByIdDao(publicMapId, userId);
+  if (!map || map.ownerId.toString() !== userId.toString()) return null;
+  const ref = updates.backgroundImage;
+  if (ref.startsWith("data:")) {
+    const [, mime, base64] = /^data:(image\/[a-z]+);base64,(.*)$/.exec(ref) ?? [];
+    updates.backgroundImage = await createImageDao({ mapId: map._id, nodeId: null, userId, mime, data: Buffer.from(base64, "base64") });
+  } else if (ref !== "" && ref !== map.backgroundImage) {
+    throw new ValidationError("unknown picture");
+  }
+  const updated = await updateMapDao(publicMapId, userId, updates);
+  // The picture it showed before (if replaced or removed) is deleted.
+  const kept = updates.backgroundImage ? updates.backgroundImage.slice(IMAGE_URL_PREFIX.length) : null;
+  await deleteMapBackgroundImagesExceptDao(map._id, kept);
+  return updated;
 };
 
 const inviteUserSchema = z.object({

@@ -24,6 +24,7 @@ import {
 import { createNodeAbl } from "../src/abl/nodeAbl.js";
 import { findUserByIdDao } from "../src/dao/userDao.js";
 import { ValidationError } from "../src/abl/errors.js";
+import { createImageDao, deleteMapBackgroundImagesExceptDao } from "../src/dao/imageDao.js";
 
 vi.mock("../src/dao/mapsDao.js", () => ({
   createMapDao: vi.fn(),
@@ -45,6 +46,11 @@ vi.mock("../src/dao/userDao.js", () => ({
 
 vi.mock("../src/abl/nodeAbl.js", () => ({
   createNodeAbl: vi.fn(),
+}));
+
+vi.mock("../src/dao/imageDao.js", () => ({
+  createImageDao: vi.fn(),
+  deleteMapBackgroundImagesExceptDao: vi.fn(),
 }));
 
 describe("mapAbl", () => {
@@ -279,6 +285,36 @@ describe("mapAbl", () => {
       expect(updateMapDao).toHaveBeenLastCalledWith("pub123", "user1", { backgroundColor: null });
 
       await expect(updateMapAbl("pub123", "user1", { backgroundColor: "#ff0000" })).rejects.toThrow(ValidationError);
+    });
+
+    it("stores an uploaded background picture for the owner and drops the one it replaces", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1", ownerId: "user1", backgroundImage: "/api/images/oldPicture1" } as never);
+      vi.mocked(createImageDao).mockResolvedValue("/api/images/newPicture1");
+      vi.mocked(updateMapDao).mockResolvedValue({ mapId: "pub123" } as never);
+
+      await updateMapAbl("pub123", "user1", { backgroundImage: "data:image/jpeg;base64,AAAA" });
+      expect(createImageDao).toHaveBeenCalledWith(expect.objectContaining({ mapId: "m1", nodeId: null, userId: "user1", mime: "image/jpeg" }));
+      expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { backgroundImage: "/api/images/newPicture1" });
+      expect(deleteMapBackgroundImagesExceptDao).toHaveBeenCalledWith("m1", "newPicture1");
+    });
+
+    it("removes the background picture with an empty string", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1", ownerId: "user1", backgroundImage: "/api/images/oldPicture1" } as never);
+      vi.mocked(updateMapDao).mockResolvedValue({ mapId: "pub123" } as never);
+
+      await updateMapAbl("pub123", "user1", { backgroundImage: "" });
+      expect(createImageDao).not.toHaveBeenCalled();
+      expect(deleteMapBackgroundImagesExceptDao).toHaveBeenCalledWith("m1", null);
+    });
+
+    it("stores nothing for a member who isn't the owner, and refuses another map's picture", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1", ownerId: "owner", backgroundImage: "" } as never);
+      expect(await updateMapAbl("pub123", "user1", { backgroundImage: "data:image/png;base64,AAAA" })).toBeNull();
+      expect(createImageDao).not.toHaveBeenCalled();
+
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1", ownerId: "user1", backgroundImage: "" } as never);
+      await expect(updateMapAbl("pub123", "user1", { backgroundImage: "/api/images/someoneElses" })).rejects.toThrow(ValidationError);
+      await expect(updateMapAbl("pub123", "user1", { backgroundImage: "https://example.com/x.png" })).rejects.toThrow(ValidationError);
     });
 
     it("rejects an unknown background", async () => {
