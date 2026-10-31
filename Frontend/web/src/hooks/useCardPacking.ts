@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
-import { blockAspect, cardsOverlap, DESKTOP_ASPECT, PACK_GAP, packCardsAround, packNewCards } from "../utils/cardPack";
+import { BLOCK_ASPECT, cardsOverlap, PACK_GAP, packCardsAround, packNewCards } from "../utils/cardPack";
 import type { PackItem } from "../utils/cardPack";
 import { hasCardSpot, storedSpots } from "../utils/cardSpace";
 import { readingOrder } from "../utils/nodeOrder";
@@ -68,10 +68,8 @@ export function useCardPacking({
     return { id: n.nodeId, w: el.offsetWidth, h: el.offsetHeight };
   }
 
-  // The block takes the screen's shape on a desktop, a square on a phone.
-  function aspect(): number {
-    return typeof window === "undefined" || !window.innerHeight ? DESKTOP_ASPECT : blockAspect(window.innerWidth / window.innerHeight);
-  }
+  // A square block, on a desktop as on a phone.
+  const aspect = () => BLOCK_ASPECT;
 
   function centroid(ns: NodeDoc[]): Pt {
     const pts = ns.map(restingSpot);
