@@ -52,8 +52,10 @@ const PUZZLE_MAX_WIDTH = 240;
 const NO_TYPE_EMOJI: TypeEmoji = {};
 // A node's outline in its type's color, toned down so a map full of nodes
 // doesn't read as a field of bright rims.
+// --node-edge-mix: full strength over a picture background (index.css's
+// canvas-on-picture), where a half-see-through rim gets lost.
 export function softEdge(color: string): string {
-  return `color-mix(in srgb, ${color} 55%, transparent)`;
+  return `color-mix(in srgb, ${color} var(--node-edge-mix, 55%), transparent)`;
 }
 const PUZZLE_SELECTED_MAX_WIDTH = 180;
 // A puzzle card shows about this many characters of its text on the canvas
@@ -379,13 +381,14 @@ export const NodeCard = memo(function NodeCard({
     : dragging
       ? "opacity-85"
       : muted
-        ? "opacity-16"
+        ? "node-fade-muted"
         : ghost
-          ? "opacity-45 hover:opacity-75"
+          ? "node-fade-ghost"
           : quiet
-            ? "opacity-50 hover:opacity-100"
+            ? "node-fade-quiet"
             : "";
-  const filterClass = muted ? "grayscale-[65%]" : "";
+  // The three fades (and muted's grayscale) are index.css's node-fade-*
+  // classes, scaled by how much fading the viewer wants (utils/nodeFade.ts).
   const cursorClass = readonly ? "cursor-default" : dragging ? "cursor-grabbing" : "cursor-grab";
   // Position updates (left/top, applied via inline style) need to be
   // instant while actively dragging — only once released does the
@@ -458,7 +461,6 @@ export const NodeCard = memo(function NodeCard({
     transitionClass,
     cursorClass,
     opacityClass,
-    filterClass,
     chaotic && "animate-node-chaos-drift",
     // A hovered dot's title (see the dotted branch below) sits above its neighbours.
     "has-[[data-dot]:hover]:z-[55]",
@@ -1177,7 +1179,7 @@ export const NodeCard = memo(function NodeCard({
         // tier the same way the caption does, so it stays a constant size on
         // screen.
         <div
-          className="absolute top-full left-1/2 mt-[0.15rem] max-w-[10rem] overflow-hidden rounded-[3px] px-[0.3rem] text-[0.6rem] leading-[1.3] font-semibold tracking-[0.04em] text-ellipsis whitespace-nowrap uppercase"
+          className="canvas-halo-text absolute top-full left-1/2 mt-[0.15rem] max-w-[10rem] overflow-hidden rounded-[3px] px-[0.3rem] text-[0.6rem] leading-[1.3] font-semibold tracking-[0.04em] text-ellipsis whitespace-nowrap uppercase"
           style={{
             color: ZONE_COLORS[parentCrownSentiment!],
             transform: `translateX(-50%) scale(${1 / sizeMultiplier})`,

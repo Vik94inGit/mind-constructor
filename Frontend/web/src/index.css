@@ -129,6 +129,72 @@
   color: var(--ink);
 }
 
+/* A map with the owner's picture under it (Map.backgroundImage —
+   utils/mapBackground.ts): the icons have to stand out from a busy picture,
+   not just from the plain paper. Every icon's rim at full strength (softEdge
+   in NodeCard reads --node-edge-mix), and a halo of the paper round each icon
+   and the zone names, so they lift off whatever the picture has behind them. */
+.canvas-on-picture {
+  --node-edge-mix: 100%;
+}
+.canvas-on-picture .node-body {
+  box-shadow:
+    0 0 0 3px var(--paper),
+    0 0 14px 5px color-mix(in srgb, var(--paper) 85%, transparent);
+}
+.canvas-on-picture .node-body-triangle {
+  filter: drop-shadow(0 0 2px var(--paper)) drop-shadow(0 0 6px var(--paper));
+}
+.canvas-on-picture .canvas-halo-text {
+  text-shadow:
+    0 0 2px var(--paper),
+    0 0 4px var(--paper),
+    0 0 8px var(--paper);
+}
+/* How quiet nodes fade (NodeCard): a node behind a chosen one (muted), a
+   ghost not yet written in, a child no one is looking at. --node-fade (0..1)
+   is the viewer's own choice from the display menu (utils/nodeFade.ts);
+   without one the canvas picks: the full fade, or a light one over a
+   picture, where faded nodes sink into it. */
+.canvas-on-picture {
+  --node-fade-auto: 0.3;
+}
+.node-fade-muted {
+  opacity: calc(1 - 0.84 * var(--node-fade, var(--node-fade-auto, 1)));
+  filter: grayscale(calc(65% * var(--node-fade, var(--node-fade-auto, 1))));
+}
+.node-fade-ghost {
+  opacity: calc(1 - 0.55 * var(--node-fade, var(--node-fade-auto, 1)));
+}
+.node-fade-ghost:hover {
+  opacity: calc(1 - 0.25 * var(--node-fade, var(--node-fade-auto, 1)));
+}
+.node-fade-quiet {
+  opacity: calc(1 - 0.5 * var(--node-fade, var(--node-fade-auto, 1)));
+}
+.node-fade-quiet:hover {
+  opacity: 1;
+}
+
+/* In the dark theme (and on Soft dark) the type and zone colours are toned
+   down for the calm dark paper, which sinks them into a picture: over one
+   they come back bright, same hues. */
+:root[data-theme="dark"] .canvas-on-picture,
+.canvas-soft-dark.canvas-on-picture {
+  --ink-soft: #c9cfdc;
+  --n-problem: #f2875a;
+  --n-poption: #f0c35e;
+  --n-option: #8eb1f2;
+  --n-solution: #5ed3bf;
+  --n-success: #8cdc9f;
+  --n-fail: #f3828f;
+  --n-idea: #f6d04c;
+  --n-unknown: #bcc2cc;
+  --zone-positive: #73d48e;
+  --zone-negative: #f37c82;
+  --zone-neutral: #b4bac6;
+}
+
 @theme inline {
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);

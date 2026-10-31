@@ -135,6 +135,7 @@ import { FinishedBanner } from "../map/FinishedBanner";
 import { HistoryPanel } from "../map/HistoryPanel";
 import { NodeBurst } from "../map/NodeBurst";
 import { mapBackgroundStyle } from "../utils/mapBackground";
+import { autoNodeFade, nodeFadeStyle } from "../utils/nodeFade";
 import { MoveNoteModal } from "../dashboard/MoveNoteModal";
 import { findInbox, noteBranch } from "../utils/inbox";
 
@@ -221,6 +222,9 @@ export function MapPage() {
     // "Emoji first" (eye menu) and the viewer's emoji per type — see utils/emojiFace.ts.
     emojiFirst,
     toggleEmojiFirst,
+    // How strongly quiet nodes fade — see utils/nodeFade.ts.
+    nodeFade,
+    setNodeFade,
     typeEmoji,
     setTypeEmoji,
     nodeDisplay,
@@ -1494,7 +1498,7 @@ export function MapPage() {
 
   // The map's mode and background, finishing the discussion, deleting the map
   // — see hooks/useMapControls.ts.
-  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, setMapBackgroundImage, deleteThisMap, exitDemo, finish } = useMapControls({
+  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, setMapBackgroundImage, setMapBackgroundShade, deleteThisMap, exitDemo, finish } = useMapControls({
     map,
     setMap,
     nodes,
@@ -1598,7 +1602,8 @@ export function MapPage() {
   }
 
   const isDiscussionMode = discussionOn;
-  const canvasBackground = mapBackgroundStyle(map.background, map.backgroundColor, map.backgroundImage);
+  const pictureBackground = mapBackgroundStyle(map.background, map.backgroundColor, map.backgroundImage, map.backgroundShade);
+  const canvasBackground = { ...pictureBackground, style: { ...pictureBackground.style, ...nodeFadeStyle(nodeFade) } };
   // Parents first (utils/nodePriority.ts): a node with a visible child paints
   // above the rest, every other child is faded until someone looks at it
   // (it, or its parent, is selected, it's in the chosen circle, being
@@ -1649,6 +1654,8 @@ export function MapPage() {
       onToggleCompact={toggleCompactView}
       emojiFirst={emojiFirst}
       onToggleEmojiFirst={toggleEmojiFirst}
+      nodeFade={nodeFade ?? autoNodeFade(!!map.backgroundImage)}
+      onNodeFade={setNodeFade}
       typeEmoji={typeEmoji}
       onTypeEmoji={setTypeEmoji}
       zoneLayout={zoneLayouts[MAP_ZONE_KEY] ?? "zones"}
@@ -1659,6 +1666,8 @@ export function MapPage() {
       onPickBackgroundColor={isOwner ? setMapBackgroundColor : undefined}
       backgroundImage={map.backgroundImage}
       onPickBackgroundImage={isOwner ? (file) => void setMapBackgroundImage(file) : undefined}
+      backgroundShade={map.backgroundShade}
+      onPickBackgroundShade={isOwner ? (shade, save) => void setMapBackgroundShade(shade, save) : undefined}
       nodes={visibleNodes}
       onLoadTexts={async () => {
         await ensureNodeText(visibleNodes.map((n) => n.nodeId));

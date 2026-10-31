@@ -40,6 +40,8 @@ const preferencesSchema = z
     readingMode: z.enum(READING_MODES),
     compactView: z.boolean(),
     emojiUp: z.boolean(),
+    // How strongly quiet nodes fade, 0 (not at all) to 100 (the full fade).
+    nodeFade: z.number().int().min(0).max(100),
     // Still accepted from clients that predate emojiUp; nothing reads it.
     emojiFirst: z.boolean(),
     // Same rule as a node's emoji: no letters or digits, short — or

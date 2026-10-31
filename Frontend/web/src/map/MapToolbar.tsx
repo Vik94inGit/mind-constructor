@@ -34,6 +34,8 @@ interface Props {
   compact: boolean;
   onToggleCompact: () => void;
   emojiFirst: boolean;
+  nodeFade?: number;
+  onNodeFade?: (fade: number, save: boolean) => void;
   onToggleEmojiFirst: () => void;
   /** The viewer's own emoji per type — see DisplayMenu. */
   typeEmoji?: TypeEmoji;
@@ -48,6 +50,8 @@ interface Props {
   onPickBackgroundColor?: (color: ZonePaletteColor | null) => void;
   backgroundImage?: string;
   onPickBackgroundImage?: (file: File | null) => void;
+  backgroundShade?: number;
+  onPickBackgroundShade?: (shade: number, save: boolean) => void;
   /** Node search (see NodeSearch). */
   nodes: NodeDoc[];
   onLoadTexts: () => Promise<void>;
@@ -111,6 +115,8 @@ export function MapToolbar({
   compact,
   onToggleCompact,
   emojiFirst,
+  nodeFade,
+  onNodeFade,
   onToggleEmojiFirst,
   typeEmoji,
   onTypeEmoji,
@@ -122,6 +128,8 @@ export function MapToolbar({
   onPickBackgroundColor,
   backgroundImage,
   onPickBackgroundImage,
+  backgroundShade,
+  onPickBackgroundShade,
   nodes,
   onLoadTexts,
   onSearchMatches,
@@ -297,6 +305,8 @@ export function MapToolbar({
                 compact={compact}
                 onToggleCompact={onToggleCompact}
                 emojiFirst={emojiFirst}
+                nodeFade={nodeFade}
+                onNodeFade={onNodeFade}
                 onToggleEmojiFirst={onToggleEmojiFirst}
                 typeEmoji={typeEmoji}
                 onTypeEmoji={onTypeEmoji}
@@ -308,6 +318,8 @@ export function MapToolbar({
                 onPickBackgroundColor={onPickBackgroundColor}
                 backgroundImage={backgroundImage}
                 onPickBackgroundImage={onPickBackgroundImage}
+                backgroundShade={backgroundShade}
+                onPickBackgroundShade={onPickBackgroundShade}
                 onPresent={() => {
                   setShowDisplayMenu(false);
                   onPresent();

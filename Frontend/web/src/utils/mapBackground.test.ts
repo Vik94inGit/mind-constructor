@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapBackgroundStyle } from "./mapBackground";
+import { mapBackgroundStyle, shadeLayer } from "./mapBackground";
 
 describe("mapBackgroundStyle", () => {
   it("draws the dot grid when the map never picked a background", () => {
@@ -35,5 +35,27 @@ describe("mapBackgroundStyle", () => {
     const plain = mapBackgroundStyle("plain", "sky", "data:image/png;base64,BBBB").style;
     expect(String(plain.backgroundImage).startsWith("linear-gradient(color-mix(in srgb, color-mix(in srgb, #5d8fcf 14%")).toBe(true);
     expect(plain.backgroundSize).toBe("auto, cover");
+  });
+
+  it("darkens or lightens the picture over its veil, and leaves it as it is at 0", () => {
+    expect(shadeLayer(0)).toBeNull();
+    expect(shadeLayer(undefined)).toBeNull();
+    expect(shadeLayer(-50)).toBe("linear-gradient(color-mix(in srgb, #000 40%, transparent), color-mix(in srgb, #000 40%, transparent))");
+    expect(shadeLayer(100)).toContain("#fff 80%");
+    expect(shadeLayer(500)).toContain("#fff 80%");
+
+    const { style } = mapBackgroundStyle("dots", null, "data:image/webp;base64,AAAA", 30);
+    const layers = String(style.backgroundImage);
+    expect(layers.indexOf("#fff 24%")).toBeLessThan(layers.indexOf("var(--paper) 60%"));
+    expect(style.backgroundSize).toBe("22px 22px, auto, auto, cover");
+    expect(style.backgroundRepeat).toBe("repeat, no-repeat, no-repeat, no-repeat");
+    expect(mapBackgroundStyle("plain", null, "data:image/webp;base64,AAAA", -30).style.backgroundSize).toBe("auto, auto, cover");
+  });
+
+  it("marks a canvas with a picture for higher-contrast icons, and only then", () => {
+    expect(mapBackgroundStyle("dots", null, "data:image/webp;base64,AAAA").className).toBe("canvas-on-picture");
+    expect(mapBackgroundStyle("dark", null, "data:image/webp;base64,AAAA").className).toBe("canvas-soft-dark canvas-on-picture");
+    expect(mapBackgroundStyle("dots", "sage").className).toBe("");
+    expect(mapBackgroundStyle("dark").className).toBe("canvas-soft-dark");
   });
 });

@@ -191,6 +191,8 @@ const updateMapSchema = z
           .regex(BACKGROUND_IMAGE_RE, "background image must be a PNG, JPEG or WebP data URL"),
       ])
       .optional(),
+    // See Map.backgroundShade — negative darkens the picture, positive lightens it.
+    backgroundShade: z.number().int().min(-100).max(100).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No fields to update",

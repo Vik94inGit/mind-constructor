@@ -18,6 +18,8 @@ export interface Preferences {
   compactView?: boolean;
   /** Emoji face up on nodes that have one; false (the default): symbols first (utils/emojiFace.ts). */
   emojiUp?: boolean;
+  /** How strongly quiet nodes fade, 0..100 (utils/nodeFade.ts); unset: the app's own choice. */
+  nodeFade?: number;
   /** The user's own emoji per node type. */
   typeEmoji?: TypeEmoji;
 }

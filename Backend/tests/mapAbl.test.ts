@@ -287,6 +287,16 @@ describe("mapAbl", () => {
       await expect(updateMapAbl("pub123", "user1", { backgroundColor: "#ff0000" })).rejects.toThrow(ValidationError);
     });
 
+    it("accepts a picture shade from -100 (darker) to 100 (lighter), whole numbers only", async () => {
+      vi.mocked(updateMapDao).mockResolvedValue({ mapId: "pub123" } as never);
+
+      await updateMapAbl("pub123", "user1", { backgroundShade: -40 });
+      expect(updateMapDao).toHaveBeenLastCalledWith("pub123", "user1", { backgroundShade: -40 });
+
+      await expect(updateMapAbl("pub123", "user1", { backgroundShade: 101 })).rejects.toThrow(ValidationError);
+      await expect(updateMapAbl("pub123", "user1", { backgroundShade: 2.5 })).rejects.toThrow(ValidationError);
+    });
+
     it("stores an uploaded background picture for the owner and drops the one it replaces", async () => {
       vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1", ownerId: "user1", backgroundImage: "/api/images/oldPicture1" } as never);
       vi.mocked(createImageDao).mockResolvedValue("/api/images/newPicture1");

@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DisplayMenu } from "./DisplayMenu";
 import { I18nProvider } from "../i18n/I18nContext";
@@ -51,9 +52,64 @@ describe("DisplayMenu background", () => {
     expect(onPickBackgroundImage).toHaveBeenCalledWith(null);
   });
 
+  it("makes the picture darker or lighter, shown while sliding and saved on release", () => {
+    // The map follows the slider (MapPage passes the new shade back in).
+    const onPickBackgroundShade = vi.fn();
+    function Owner() {
+      const [shade, setShade] = useState(-30);
+      return (
+        <DisplayMenu
+          compact={false}
+          onToggleCompact={vi.fn()}
+          emojiFirst={false}
+          onToggleEmojiFirst={vi.fn()}
+          onPresent={vi.fn()}
+          onClose={vi.fn()}
+          onPickBackground={vi.fn()}
+          backgroundImage="/api/images/abcdefgh"
+          backgroundShade={shade}
+          onPickBackgroundShade={(next, save) => {
+            setShade(next);
+            onPickBackgroundShade(next, save);
+          }}
+        />
+      );
+    }
+    render(
+      <I18nProvider>
+        <Owner />
+      </I18nProvider>,
+    );
+    const slider = screen.getByRole("slider", { name: bg.shade });
+    expect(slider).toHaveValue("-30");
+    fireEvent.change(slider, { target: { value: "40" } });
+    expect(onPickBackgroundShade).toHaveBeenLastCalledWith(40, false);
+    expect(slider).toHaveValue("40");
+    fireEvent.pointerUp(slider);
+    expect(onPickBackgroundShade).toHaveBeenLastCalledWith(40, true);
+  });
+
+  it("has no shade slider without a picture", () => {
+    renderMenu({ onPickBackground: vi.fn(), onPickBackgroundShade: vi.fn() });
+    expect(screen.queryByRole("slider", { name: bg.shade })).not.toBeInTheDocument();
+  });
+
   it("shows no background choice to anyone else", () => {
     renderMenu({ background: "dark" });
     expect(screen.queryByText(bg.title)).not.toBeInTheDocument();
+  });
+});
+
+describe("DisplayMenu node fade", () => {
+  it("lets any viewer fade quiet nodes less, saved when the slider is let go", () => {
+    const onNodeFade = vi.fn();
+    renderMenu({ nodeFade: 30, onNodeFade });
+    const slider = screen.getByRole("slider", { name: TRANSLATIONS.en.ui.nodeFade.label });
+    expect(slider).toHaveValue("30");
+    fireEvent.change(slider, { target: { value: "0" } });
+    expect(onNodeFade).toHaveBeenLastCalledWith(0, false);
+    fireEvent.keyUp(slider, { key: "ArrowLeft" });
+    expect(onNodeFade).toHaveBeenLastCalledWith(30, true);
   });
 });
 
