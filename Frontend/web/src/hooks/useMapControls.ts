@@ -88,7 +88,7 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
   // The owner's own wallpaper (Map.backgroundImage): the picked file shrunk
   // like a node's picture (utils/images.ts), shown at once, and uploaded; null
   // removes it.
-  async function setMapBackgroundImage(file: File | null) {
+  async function setMapBackgroundImage(file: Blob | null) {
     if (!isOwner || !mapId) return;
     const before = map?.backgroundImage ?? "";
     setActionError(null);

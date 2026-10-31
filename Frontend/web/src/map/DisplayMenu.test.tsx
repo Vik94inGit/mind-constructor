@@ -52,6 +52,13 @@ describe("DisplayMenu background", () => {
     expect(onPickBackgroundImage).toHaveBeenCalledWith(null);
   });
 
+  it("offers to choose again which part of the picture is shown", async () => {
+    const onChoosePicturePart = vi.fn();
+    renderMenu({ onPickBackground: vi.fn(), backgroundImage: "/api/images/abcdefgh", onPickBackgroundImage: vi.fn(), onChoosePicturePart });
+    await userEvent.click(screen.getByRole("button", { name: bg.choosePart }));
+    expect(onChoosePicturePart).toHaveBeenCalled();
+  });
+
   it("makes the picture darker or lighter, shown while sliding and saved on release", () => {
     // The map follows the slider (MapPage passes the new shade back in).
     const onPickBackgroundShade = vi.fn();

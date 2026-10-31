@@ -177,4 +177,20 @@ describe("MapToolbar", () => {
       expect(screen.queryByText(t.map.toolbar.readingActual)).not.toBeInTheDocument();
     });
   });
+
+  it("asks which part of a new background picture to show before it is uploaded", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:picture");
+    URL.revokeObjectURL = vi.fn();
+    const onPickBackgroundImage = vi.fn();
+    const file = new File(["x"], "sea.png", { type: "image/png" });
+    renderToolbar({ isOwner: true, onPickBackground: vi.fn(), onPickBackgroundImage });
+    await userEvent.click(screen.getByTitle(t.map.toolbar.displayMenu));
+    await userEvent.upload(screen.getByLabelText(t.ui.mapBackground.picture), file);
+    expect(onPickBackgroundImage).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: t.ui.mapBackground.cropTitle })).toBeInTheDocument();
+    // The whole picture, untouched, goes up as it was picked.
+    await userEvent.click(screen.getByRole("button", { name: t.ui.mapBackground.cropUse }));
+    await vi.waitFor(() => expect(onPickBackgroundImage).toHaveBeenCalledWith(file));
+    expect(screen.queryByRole("dialog", { name: t.ui.mapBackground.cropTitle })).not.toBeInTheDocument();
+  });
 });

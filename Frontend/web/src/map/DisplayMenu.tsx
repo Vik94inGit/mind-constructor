@@ -35,7 +35,9 @@ interface Props {
   onPickBackgroundColor?: (color: ZonePaletteColor | null) => void;
   /** The owner's own wallpaper (Map.backgroundImage) — a file to upload, or null to remove it. */
   backgroundImage?: string;
-  onPickBackgroundImage?: (file: File | null) => void;
+  onPickBackgroundImage?: (file: Blob | null) => void;
+  /** Choose again which part of the picture already set is shown (map/PictureCropDialog.tsx). */
+  onChoosePicturePart?: () => void;
   /** How much darker (below 0) or lighter (above 0) the wallpaper is (Map.backgroundShade); save is false while the slider still moves. */
   backgroundShade?: number;
   onPickBackgroundShade?: (shade: number, save: boolean) => void;
@@ -73,6 +75,7 @@ export function DisplayMenu({
   onPickBackgroundColor,
   backgroundImage,
   onPickBackgroundImage,
+  onChoosePicturePart,
   backgroundShade,
   onPickBackgroundShade,
   onPresent,
@@ -259,6 +262,18 @@ export function DisplayMenu({
                 </button>
               )}
             </div>
+          )}
+          {onChoosePicturePart && backgroundImage && (
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.4rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
+              onClick={onChoosePicturePart}
+            >
+              <span aria-hidden className="flex h-5 w-7 shrink-0 items-center justify-center text-ink-soft">
+                ⛶
+              </span>
+              <span className="flex-1">{t.ui.mapBackground.choosePart}</span>
+            </button>
           )}
           {onPickBackgroundShade && backgroundImage && (
             // Darker to the left, lighter to the right; the map follows the
