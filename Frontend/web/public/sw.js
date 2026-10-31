@@ -5,7 +5,7 @@
 // changes waiting to be sent (src/offline/sync.ts).
 //
 // Bump VERSION to drop every old cached file on the next visit.
-const VERSION = "v3";
+const VERSION = "v4";
 const CACHE = `mc-${VERSION}`;
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 
@@ -91,7 +91,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Everything else (icons, the manifest): the cached copy now, a fresh one for next time.
+  // The manifest: the network's copy first. Android builds the installed app
+  // from it (its window colour among other things), and a cached copy handed
+  // over first kept an old one alive across a reinstall.
+  if (url.pathname === "/manifest.webmanifest") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
+    );
+    return;
+  }
+
+  // Everything else (icons): the cached copy now, a fresh one for next time.
   event.respondWith(
     caches.match(request).then((cached) => {
       const fresh = fetch(request)
