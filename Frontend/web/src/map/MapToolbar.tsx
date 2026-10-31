@@ -7,6 +7,8 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { AddMenu } from "./AddMenu";
 import { DisplayMenu } from "./DisplayMenu";
+import { PictureCropDialog } from "./PictureCropDialog";
+import { cropImage, pictureBlob } from "../utils/images";
 import { NodeSearch } from "./NodeSearch";
 import type { MapBackground, NodeDoc, NodeType, ZonePaletteColor } from "../types";
 import type { ZoneLayout } from "../utils/zoneLayout";
@@ -49,7 +51,8 @@ interface Props {
   backgroundColor?: ZonePaletteColor | null;
   onPickBackgroundColor?: (color: ZonePaletteColor | null) => void;
   backgroundImage?: string;
-  onPickBackgroundImage?: (file: File | null) => void;
+  /** A picture (already cut to the part the owner chose) to upload, or null to remove it. */
+  onPickBackgroundImage?: (file: Blob | null) => void;
   backgroundShade?: number;
   onPickBackgroundShade?: (shade: number, save: boolean) => void;
   /** Node search (see NodeSearch). */
@@ -157,6 +160,23 @@ export function MapToolbar({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showDisplayMenu, setShowDisplayMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  // A background picture waiting for the owner to choose the part of it to keep
+  // (PictureCropDialog): a newly picked file, or the picture already set.
+  const [cropFile, setCropFile] = useState<Blob | null>(null);
+  const pickBackgroundImage =
+    onPickBackgroundImage &&
+    ((file: Blob | null) => {
+      if (!file) return onPickBackgroundImage(null);
+      setShowDisplayMenu(false);
+      setCropFile(file);
+    });
+  const choosePictureAgain =
+    onPickBackgroundImage && backgroundImage
+      ? () => {
+          setShowDisplayMenu(false);
+          void pictureBlob(backgroundImage).then((blob) => blob && setCropFile(blob));
+        }
+      : undefined;
   const modeTitle = offline
     ? t.map.toolbar.discussionOffline
     : isDiscussionMode
@@ -317,7 +337,8 @@ export function MapToolbar({
                 backgroundColor={backgroundColor}
                 onPickBackgroundColor={onPickBackgroundColor}
                 backgroundImage={backgroundImage}
-                onPickBackgroundImage={onPickBackgroundImage}
+                onPickBackgroundImage={pickBackgroundImage}
+                onChoosePicturePart={choosePictureAgain}
                 backgroundShade={backgroundShade}
                 onPickBackgroundShade={onPickBackgroundShade}
                 onPresent={() => {
@@ -457,6 +478,20 @@ export function MapToolbar({
         >
           {t.ui.demo.exit}
         </button>
+      )}
+      {cropFile && onPickBackgroundImage && (
+        <PictureCropDialog
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onDone={(rect) => {
+            const file = cropFile;
+            setCropFile(null);
+            // A picture that can't be read is passed on as it is, so the upload reports it.
+            void cropImage(file, rect)
+              .catch(() => file)
+              .then((part) => onPickBackgroundImage(part));
+          }}
+        />
       )}
     </div>
   );

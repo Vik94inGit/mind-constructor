@@ -430,6 +430,14 @@ export interface UiStrings {
     shade: string;
     darker: string;
     lighter: string;
+    /** Choosing the part of the picture to keep (map/PictureCropDialog.tsx). */
+    choosePart: string;
+    cropTitle: string;
+    cropHint: string;
+    cropFrame: string;
+    cropCancel: string;
+    cropWhole: string;
+    cropUse: string;
   };
   /** The one-time tip on a map with its main gestures (map/GestureHint.tsx). */
   gestureHint: { title: string; touch: string[]; mouse: string[]; gotIt: string };
@@ -1081,7 +1089,7 @@ const en: UiStrings = {
   },
   zoneStyle: { pattern: "Pattern", color: "Colour", none: "None", auto: "Auto", autoHint: "Colour by sentiment", takenBy: (name) => `taken by ${name}`, edge: "Edge brightness", view: "Show zone as", patterns: { dots: "Dots", stripes: "Stripes", grid: "Grid", chess: "Chess" }, colors: { sand: "Sand", sage: "Sage", sky: "Sky", lavender: "Lavender", rose: "Rose", slate: "Slate" } },
   nodeFade: { label: "Fade quiet nodes", off: "None", full: "Full" },
-  mapBackground: { title: "Background", options: { dots: "Dot grid", plain: "Plain", lined: "Lined paper", dark: "Soft dark" }, picture: "Your picture…", changePicture: "Change picture…", removePicture: "Remove picture", pictureFailed: "Couldn't set the picture.", shade: "Picture brightness", darker: "Darker", lighter: "Lighter" },
+  mapBackground: { title: "Background", options: { dots: "Dot grid", plain: "Plain", lined: "Lined paper", dark: "Soft dark" }, picture: "Your picture…", changePicture: "Change picture…", removePicture: "Remove picture", pictureFailed: "Couldn't set the picture.", shade: "Picture brightness", darker: "Darker", lighter: "Lighter", choosePart: "Choose the part to show…", cropTitle: "Choose the part to show", cropHint: "Drag the frame to move it, drag a corner to resize it.", cropFrame: "The part kept", cropCancel: "Cancel", cropWhole: "Whole picture", cropUse: "Use this part" },
   gestureHint: {
     title: "How to use the map",
     touch: [
@@ -1714,7 +1722,7 @@ const cs: UiStrings = {
   },
   zoneStyle: { pattern: "Vzor", color: "Barva", none: "Žádný", auto: "Auto", autoHint: "Barva podle nálady", takenBy: (name) => `už má ${name}`, edge: "Jas okraje", view: "Zobrazit zónu jako", patterns: { dots: "Tečky", stripes: "Pruhy", grid: "Mřížka", chess: "Šachovnice" }, colors: { sand: "Písková", sage: "Šalvějová", sky: "Nebeská", lavender: "Levandulová", rose: "Růžová", slate: "Břidlicová" } },
   nodeFade: { label: "Ztlumit vedlejší uzly", off: "Vůbec", full: "Úplně" },
-  mapBackground: { title: "Pozadí", options: { dots: "Tečkovaná mřížka", plain: "Čisté", lined: "Linkovaný papír", dark: "Jemně tmavé" }, picture: "Vlastní obrázek…", changePicture: "Změnit obrázek…", removePicture: "Odebrat obrázek", pictureFailed: "Obrázek se nepodařilo nastavit.", shade: "Jas obrázku", darker: "Tmavší", lighter: "Světlejší" },
+  mapBackground: { title: "Pozadí", options: { dots: "Tečkovaná mřížka", plain: "Čisté", lined: "Linkovaný papír", dark: "Jemně tmavé" }, picture: "Vlastní obrázek…", changePicture: "Změnit obrázek…", removePicture: "Odebrat obrázek", pictureFailed: "Obrázek se nepodařilo nastavit.", shade: "Jas obrázku", darker: "Tmavší", lighter: "Světlejší", choosePart: "Vybrat část obrázku…", cropTitle: "Vyberte část, která se ukáže", cropHint: "Tažením rámeček posunete, tažením rohu změníte jeho velikost.", cropFrame: "Vybraná část", cropCancel: "Zrušit", cropWhole: "Celý obrázek", cropUse: "Použít tuto část" },
   gestureHint: {
     title: "Jak pracovat s mapou",
     touch: [
@@ -2346,7 +2354,7 @@ const uk: UiStrings = {
   },
   zoneStyle: { pattern: "Візерунок", color: "Колір", none: "Немає", auto: "Авто", autoHint: "Колір за настроєм", takenBy: (name) => `уже в ${name}`, edge: "Яскравість краю", view: "Показати зону як", patterns: { dots: "Крапки", stripes: "Смуги", grid: "Сітка", chess: "Шахи" }, colors: { sand: "Пісок", sage: "Шавлія", sky: "Небо", lavender: "Лаванда", rose: "Троянда", slate: "Графіт" } },
   nodeFade: { label: "Приглушувати другорядні вузли", off: "Ні", full: "Повністю" },
-  mapBackground: { title: "Фон", options: { dots: "Сітка з крапок", plain: "Чистий", lined: "Папір у лінійку", dark: "М’який темний" }, picture: "Своя картинка…", changePicture: "Змінити картинку…", removePicture: "Прибрати картинку", pictureFailed: "Не вдалося встановити картинку.", shade: "Яскравість картинки", darker: "Темніше", lighter: "Світліше" },
+  mapBackground: { title: "Фон", options: { dots: "Сітка з крапок", plain: "Чистий", lined: "Папір у лінійку", dark: "М’який темний" }, picture: "Своя картинка…", changePicture: "Змінити картинку…", removePicture: "Прибрати картинку", pictureFailed: "Не вдалося встановити картинку.", shade: "Яскравість картинки", darker: "Темніше", lighter: "Світліше", choosePart: "Вибрати частину картинки…", cropTitle: "Виберіть частину, яку показати", cropHint: "Тягніть рамку, щоб посунути її, тягніть кут, щоб змінити розмір.", cropFrame: "Вибрана частина", cropCancel: "Скасувати", cropWhole: "Уся картинка", cropUse: "Взяти цю частину" },
   gestureHint: {
     title: "Як працювати з мапою",
     touch: [
@@ -2981,7 +2989,7 @@ const ru: UiStrings = {
   },
   zoneStyle: { pattern: "Узор", color: "Цвет", none: "Нет", auto: "Авто", autoHint: "Цвет по настроению", takenBy: (name) => `уже у ${name}`, edge: "Яркость края", view: "Показать зону как", patterns: { dots: "Точки", stripes: "Полосы", grid: "Сетка", chess: "Шахматы" }, colors: { sand: "Песок", sage: "Шалфей", sky: "Небо", lavender: "Лаванда", rose: "Роза", slate: "Графит" } },
   nodeFade: { label: "Приглушать второстепенные узлы", off: "Нет", full: "Полностью" },
-  mapBackground: { title: "Фон", options: { dots: "Сетка из точек", plain: "Чистый", lined: "Бумага в линейку", dark: "Мягкий тёмный" }, picture: "Своя картинка…", changePicture: "Сменить картинку…", removePicture: "Убрать картинку", pictureFailed: "Не удалось установить картинку.", shade: "Яркость картинки", darker: "Темнее", lighter: "Светлее" },
+  mapBackground: { title: "Фон", options: { dots: "Сетка из точек", plain: "Чистый", lined: "Бумага в линейку", dark: "Мягкий тёмный" }, picture: "Своя картинка…", changePicture: "Сменить картинку…", removePicture: "Убрать картинку", pictureFailed: "Не удалось установить картинку.", shade: "Яркость картинки", darker: "Темнее", lighter: "Светлее", choosePart: "Выбрать часть картинки…", cropTitle: "Выберите часть, которую показать", cropHint: "Тяните рамку, чтобы сдвинуть её, тяните угол, чтобы изменить размер.", cropFrame: "Выбранная часть", cropCancel: "Отмена", cropWhole: "Вся картинка", cropUse: "Взять эту часть" },
   gestureHint: {
     title: "Как работать с картой",
     touch: [

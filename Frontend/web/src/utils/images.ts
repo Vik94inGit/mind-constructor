@@ -6,6 +6,8 @@
 // address instead (/api/images/…); imageSrc turns either kind into an <img> src.
 
 import { API_URL } from "../api/client";
+import { cropPixels, isFullCrop } from "./cropRect";
+import type { CropRect } from "./cropRect";
 
 /**
  * An <img> src for a node picture: a stored picture's address (/api/images/…)
@@ -124,6 +126,40 @@ export async function shrinkImage(file: Blob): Promise<string> {
     side = Math.round(side * 0.7);
   }
   throw new Error("image too large");
+}
+
+/**
+ * The part `rect` (utils/cropRect.ts) of the picture `file`, as a new picture
+ * no bigger than MAX_SIDE on its longest edge — what shrinkImage then makes
+ * small enough to store. The whole picture comes back as it is.
+ */
+export async function cropImage(file: Blob, rect: CropRect): Promise<Blob> {
+  if (isFullCrop(rect)) return file;
+  const img = await loadImage(file);
+  const { sx, sy, sw, sh } = cropPixels(rect, img.naturalWidth, img.naturalHeight);
+  const k = fitScale(sw, sh, MAX_SIDE);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sw * k));
+  canvas.height = Math.max(1, Math.round(sh * k));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no canvas");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("no picture"))), "image/jpeg", 0.92),
+  );
+}
+
+/** A stored picture (or a data URL) as a file again, to crop it anew. null when it can't be read. */
+export async function pictureBlob(ref: string): Promise<Blob | null> {
+  const url = await pictureDataUrl(ref);
+  if (!url) return null;
+  try {
+    return await (await fetch(url)).blob();
+  } catch {
+    return null;
+  }
 }
 
 /** Mirrors the backend's MAX_ICON_IMAGE_CHARS. */

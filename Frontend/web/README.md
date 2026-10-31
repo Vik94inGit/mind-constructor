@@ -106,7 +106,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   `src/utils/mapBackground.ts`, `src/map/SoftColorSwatches.tsx`). Zones pick their colour the same way.
   *Your picture…* sets the owner's own photo as the map's wallpaper (`Map.backgroundImage`): shrunk like a
   node's picture, it covers the whole map under a veil of the paper colour (and the tint, if any) so it
-  stays soft behind the nodes; ✕ removes it. A *Darker – Lighter* slider under it lays black or white over the
+  stays soft behind the nodes; ✕ removes it. Before a picked photo goes up, a full-screen frame over it asks
+  which part to show (`src/map/PictureCropDialog.tsx`, `src/utils/cropRect.ts`): drag inside the frame to move
+  it, drag a corner to resize it (mouse or finger alike), *Whole picture* resets it, *Use this part* cuts it
+  out (`cropImage` in `src/utils/images.ts`) and uploads only that; *Choose the part to show…* opens the same
+  frame again on the picture already set. A *Darker – Lighter* slider under it lays black or white over the
   picture (`Map.backgroundShade`, -100..100; the map follows the slider and it's saved on release). Over a picture the icons get more contrast
   (`canvas-on-picture` in `src/index.css`): full-strength rims and a halo of the paper round each icon and
   zone name, and in the dark theme the type and zone colours come back bright instead of toned down.
