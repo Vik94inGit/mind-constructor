@@ -20,6 +20,15 @@ export const PACK_GAP = 14;
 export const DESKTOP_ASPECT = 1.6;
 
 /**
+ * The block's shape for a screen of this shape (width over height): as wide
+ * as a wide screen, but never narrower than a square, so a phone gets a square
+ * block of cards side by side rather than one long column.
+ */
+export function blockAspect(screenAspect: number): number {
+  return Number.isFinite(screenAspect) && screenAspect > 1 ? screenAspect : 1;
+}
+
+/**
  * Each card's center, laid out in `items`' order left to right in rows that
  * wrap where the block takes about the screen's shape (`aspect`, width over
  * height), the block's top-left corner at `topLeft`. A row is as tall as its

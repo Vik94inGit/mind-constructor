@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
-import { cardsOverlap, DESKTOP_ASPECT, PACK_GAP, packCardsAround, packNewCards } from "../utils/cardPack";
+import { blockAspect, cardsOverlap, DESKTOP_ASPECT, PACK_GAP, packCardsAround, packNewCards } from "../utils/cardPack";
 import type { PackItem } from "../utils/cardPack";
 import { hasCardSpot, storedSpots } from "../utils/cardSpace";
 import { readingOrder } from "../utils/nodeOrder";
@@ -68,9 +68,9 @@ export function useCardPacking({
     return { id: n.nodeId, w: el.offsetWidth, h: el.offsetHeight };
   }
 
-  // The block takes the screen's shape: wide on a desktop, tall on a phone.
+  // The block takes the screen's shape on a desktop, a square on a phone.
   function aspect(): number {
-    return typeof window === "undefined" || !window.innerHeight ? DESKTOP_ASPECT : window.innerWidth / window.innerHeight;
+    return typeof window === "undefined" || !window.innerHeight ? DESKTOP_ASPECT : blockAspect(window.innerWidth / window.innerHeight);
   }
 
   function centroid(ns: NodeDoc[]): Pt {

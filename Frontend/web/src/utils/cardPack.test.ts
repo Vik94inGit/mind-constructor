@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundsOf, cardsOverlap, packCards, packCardsAround, packNewCards } from "./cardPack";
+import { blockAspect, boundsOf, cardsOverlap, packCards, packCardsAround, packNewCards } from "./cardPack";
 import type { PackItem } from "./cardPack";
 
 const card = (id: string, w = 100, h = 60): PackItem => ({ id, w, h });
@@ -69,11 +69,23 @@ describe("packNewCards", () => {
 });
 
 describe("packCards on a phone", () => {
-  it("stacks the cards into a tall block", () => {
-    const items = Array.from({ length: 8 }, (_, i) => card(`c${i}`));
-    const at = packCards(items, { x: 0, y: 0 }, 10, 0.5);
+  it("lays the cards in a square block, not one column", () => {
+    const items = Array.from({ length: 9 }, (_, i) => card(`c${i}`));
+    const at = packCards(items, { x: 0, y: 0 }, 10, blockAspect(390 / 844));
     const box = boundsOf(items, at)!;
-    expect(box.maxY - box.minY).toBeGreaterThan(box.maxX - box.minX);
+    const xs = new Set([...at.values()].map((p) => p.x));
+    expect(xs.size).toBeGreaterThanOrEqual(3);
+    const ratio = (box.maxX - box.minX) / (box.maxY - box.minY);
+    expect(ratio).toBeGreaterThan(0.6);
+    expect(ratio).toBeLessThan(2.5);
+  });
+});
+
+describe("blockAspect", () => {
+  it("keeps a wide screen's shape and makes a tall one square", () => {
+    expect(blockAspect(1.6)).toBe(1.6);
+    expect(blockAspect(0.46)).toBe(1);
+    expect(blockAspect(NaN)).toBe(1);
   });
 });
 

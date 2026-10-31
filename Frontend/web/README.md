@@ -69,7 +69,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   its emoji, when emoji come first). Opening the cards view on a map whose saved card spots lie on
   each other lays every card close again, once. Cards that have no spot of their own yet are laid
   close together in reading order (each top idea, then its branch), in a block shaped like the
-  screen, under the cards already placed; your own cards' spots are saved, someone else's are laid
+  screen (a square on a phone, never one long column), under the cards already placed; your own cards' spots are saved, someone else's are laid
   out just for you (`utils/cardPack.ts`, `hooks/useCardPacking.ts`). Drag any two side by side to
   compare them; *Lay the cards close* in the eye menu packs them all again. No quick-add ghosts ring a card; instead your selected card has a + button on its bottom edge
   that starts a branch just under it, clear of the cards around (`cardGlue.ts` `spotBelow`). Each card's fill color can be changed in
