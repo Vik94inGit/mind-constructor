@@ -16,25 +16,20 @@ type Pt = { x: number; y: number };
 /** The room left between two cards. */
 export const PACK_GAP = 14;
 
-/** The block's shape, width over height: the screen's, so the cards fill it. */
-export const DESKTOP_ASPECT = 1.6;
-
 /**
- * The block's shape for a screen of this shape (width over height): as wide
- * as a wide screen, but never narrower than a square, so a phone gets a square
- * block of cards side by side rather than one long column.
+ * The block's shape, width over height: a square on every screen, a phone's
+ * and a desktop's alike, so the cards sit side by side in a compact block
+ * rather than one long column or a wide strip.
  */
-export function blockAspect(screenAspect: number): number {
-  return Number.isFinite(screenAspect) && screenAspect > 1 ? screenAspect : 1;
-}
+export const BLOCK_ASPECT = 1;
 
 /**
  * Each card's center, laid out in `items`' order left to right in rows that
- * wrap where the block takes about the screen's shape (`aspect`, width over
- * height), the block's top-left corner at `topLeft`. A row is as tall as its
+ * wrap where the block takes about the shape `aspect` (width over
+ * height, a square by default), the block's top-left corner at `topLeft`. A row is as tall as its
  * tallest card; cards in it hang from its top edge.
  */
-export function packCards(items: PackItem[], topLeft: Pt, gap = PACK_GAP, aspect = DESKTOP_ASPECT): Map<string, Pt> {
+export function packCards(items: PackItem[], topLeft: Pt, gap = PACK_GAP, aspect = BLOCK_ASPECT): Map<string, Pt> {
   const out = new Map<string, Pt>();
   if (items.length === 0) return out;
   const area = items.reduce((sum, it) => sum + (it.w + gap) * (it.h + gap), 0);
@@ -59,7 +54,7 @@ export function packCards(items: PackItem[], topLeft: Pt, gap = PACK_GAP, aspect
 }
 
 /** The block `packCards` makes, centered on `center`. */
-export function packCardsAround(items: PackItem[], center: Pt, gap = PACK_GAP, aspect = DESKTOP_ASPECT): Map<string, Pt> {
+export function packCardsAround(items: PackItem[], center: Pt, gap = PACK_GAP, aspect = BLOCK_ASPECT): Map<string, Pt> {
   const at = packCards(items, { x: 0, y: 0 }, gap, aspect);
   const box = boundsOf(items, at);
   if (!box) return at;
@@ -101,7 +96,7 @@ export function packNewCards(
   placedAt: Map<string, Pt>,
   center: Pt,
   gap = PACK_GAP,
-  aspect = DESKTOP_ASPECT,
+  aspect = BLOCK_ASPECT,
 ): Map<string, Pt> {
   const box = boundsOf(placed, placedAt);
   if (!box) return packCardsAround(fresh, center, gap, aspect);
