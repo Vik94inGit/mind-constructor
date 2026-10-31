@@ -1916,6 +1916,8 @@ export function MapPage() {
                     (childIsQuiet(node) || (zoneMutedIds.has(node.nodeId) && selectedId !== node.nodeId))
                   }
                   hideCaption={hiddenChildCaptionIds.has(node.nodeId) && inlineEditId !== node.nodeId}
+                  // The time-lapse's newest node reads up to 5 rows at its icon.
+                  replayCaption={timeLapseStep !== null && timeLapseNodes[timeLapseStep - 1]?.nodeId === node.nodeId}
                   dropHighlight={
                     puzzleConnect?.overId === node.nodeId
                       ? puzzleConnect.valid

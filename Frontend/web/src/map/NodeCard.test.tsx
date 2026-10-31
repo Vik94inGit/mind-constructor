@@ -73,6 +73,13 @@ describe("NodeCard", () => {
       shown.unmount();
       expect(renderNode({ node, hideCaption: true }).queryByText("caption text")).toBeNull();
     });
+
+    it("shows the time-lapse's newest node up to 5 rows at its icon, even where its caption would be left out", () => {
+      const node = makeNode({ nodeId: "a", title: "Rent", text: "Rent went up again" });
+      const { container } = renderNode({ node, hideCaption: true, replayCaption: true });
+      const caption = container.querySelector(".line-clamp-5");
+      expect(caption?.textContent).toBe("Rent Rent went up again");
+    });
   });
 
   describe("shape", () => {

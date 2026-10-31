@@ -115,6 +115,8 @@ interface Props {
   quiet?: boolean;
   /** This node's caption would lie over a parent's caption, so it's left out. */
   hideCaption?: boolean;
+  /** The node the time-lapse has just brought back: its caption shows its title and text, up to 5 rows, whatever else would hide it. */
+  replayCaption?: boolean;
   /** How many nodes are currently packed into this one (MapPage's packedCountByContainer) — undefined/0 renders no badge. See the corner-badge markup below. */
   packedCount?: number;
   /** Auto-pack (utils/autoPack.ts): how many nodes this parent has tucked in — a "+N" pill on its right that opens them again (onUnfold). */
@@ -190,6 +192,7 @@ export const NodeCard = memo(function NodeCard({
   isParent,
   quiet,
   hideCaption,
+  replayCaption = false,
   packedCount,
   foldedCount,
   onUnfold,
@@ -339,7 +342,8 @@ export const NodeCard = memo(function NodeCard({
   const puzzle = (readingMode === "puzzle" || (mixed && !!parentCrownSentiment)) && !inlineEditing;
   const iconText = readingMode === "iconText";
   const showCaption =
-    !hideCaption && !puzzle && (mixed || iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle);
+    (replayCaption && !puzzle) ||
+    (!hideCaption && !puzzle && (mixed || iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle));
   // What the caption says: the node's own title if it has one, otherwise the
   // start of its text (the line-clamp on the chip is what cuts it off, so
   // "first words" needs no separate truncation here).
@@ -1154,9 +1158,9 @@ export const NodeCard = memo(function NodeCard({
           // than the spacing getNodeMinDist() budgets for (CAPTION_WIDTH),
           // and wide enough to run into its own children. The chip stays
           // CAPTION_WIDTH on screen at every size.
-          className={`absolute top-full left-1/2 ${isNamedZone && !puzzle && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] ${ghostPrompt ? "font-normal text-ink-soft italic" : "font-medium text-ink"} ${iconText ? "line-clamp-4 break-words" : mixed ? "truncate whitespace-nowrap" : "line-clamp-2 break-words"}`}
+          className={`absolute top-full left-1/2 ${isNamedZone && !puzzle && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] ${ghostPrompt ? "font-normal text-ink-soft italic" : "font-medium text-ink"} ${replayCaption ? "z-10 line-clamp-5 break-words" : iconText ? "line-clamp-4 break-words" : mixed ? "truncate whitespace-nowrap" : "line-clamp-2 break-words"}`}
           style={{
-            width: iconText ? ICON_TEXT_CAPTION_WIDTH : CAPTION_WIDTH,
+            width: iconText || replayCaption ? ICON_TEXT_CAPTION_WIDTH : CAPTION_WIDTH,
             // translateX(-50%) centers it under the icon (left-1/2 puts its
             // left edge there); scale undoes the size tier, about its top
             // center so it doesn't drift sideways or up into the icon.
@@ -1164,7 +1168,7 @@ export const NodeCard = memo(function NodeCard({
             transformOrigin: "50% 0",
           }}
         >
-          {iconText && trimmedTitle && node.text ? (
+          {(iconText || replayCaption) && trimmedTitle && node.text ? (
             <>
               <span className="font-semibold">{trimmedTitle}</span> {node.text}
             </>
