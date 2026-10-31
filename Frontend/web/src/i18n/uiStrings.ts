@@ -54,6 +54,10 @@ export interface UiStrings {
     entry: string;
     title: string;
     hint: string;
+    /** The picker's two groups: one picture per node type, and pictures just for fun. */
+    forTypes: string;
+    forTypesHint: string;
+    forFun: string;
     names: Record<PictureKind, string>;
     /** The question every dot of the picture asks, as its ghost's prompt. */
     questions: Record<PictureKind, string>;
@@ -676,8 +680,19 @@ const en: UiStrings = {
     entry: "Draw a picture…",
     title: "Draw a picture",
     hint: "Its dots arrive as empty thoughts. Write in two neighbours and the line between them draws itself, until the whole picture is there.",
-    names: { heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
+    forTypes: "For a kind of thought",
+    forTypesHint: "Each one's dots arrive as thoughts of that kind.",
+    forFun: "Just for fun",
+    names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
     questions: {
+      bulb: "What idea lights up?",
+      stop: "What is stopping you?",
+      warning: "What could go wrong here?",
+      key: "What could unlock it?",
+      fork: "Which way could you go?",
+      flag: "What have you already managed?",
+      cloud: "What didn't work out?",
+      question: "What are you not sure about yet?",
       heart: "What do you love?",
       star: "What do you want to reach?",
       house: "What makes you feel at home?",
@@ -1298,8 +1313,19 @@ const cs: UiStrings = {
     entry: "Nakreslit obrázek…",
     title: "Nakreslit obrázek",
     hint: "Jeho body přijdou jako prázdné myšlenky. Vyplň dvě sousední a čára mezi nimi se nakreslí sama, dokud nebude celý obrázek hotový.",
-    names: { heart: "Srdce", star: "Hvězda", house: "Dům", tree: "Strom", fish: "Ryba", smile: "Úsměv" },
+    forTypes: "Pro druh myšlenky",
+    forTypesHint: "Jeho body přijdou jako myšlenky toho druhu.",
+    forFun: "Jen pro radost",
+    names: { bulb: "Žárovka", stop: "Stopka", warning: "Výstraha", key: "Klíč", fork: "Rozcestí", flag: "Vlajka", cloud: "Dešťový mrak", question: "Otazník", heart: "Srdce", star: "Hvězda", house: "Dům", tree: "Strom", fish: "Ryba", smile: "Úsměv" },
     questions: {
+      bulb: "Jaký nápad se rozsvítil?",
+      stop: "Co tě zastavuje?",
+      warning: "Co by tu mohlo selhat?",
+      key: "Co by to mohlo odemknout?",
+      fork: "Kudy by ses mohl vydat?",
+      flag: "Co se ti už podařilo?",
+      cloud: "Co nevyšlo?",
+      question: "Čím si ještě nejsi jistý?",
       heart: "Co máš rád/a?",
       star: "Čeho chceš dosáhnout?",
       house: "Díky čemu se cítíš jako doma?",
@@ -1919,8 +1945,19 @@ const uk: UiStrings = {
     entry: "Намалювати картинку…",
     title: "Намалювати картинку",
     hint: "Її точки з’являться як порожні думки. Заповни дві сусідні, і лінія між ними намалюється сама, поки не буде вся картинка.",
-    names: { heart: "Серце", star: "Зірка", house: "Будинок", tree: "Дерево", fish: "Риба", smile: "Усмішка" },
+    forTypes: "Для виду думки",
+    forTypesHint: "Її точки з’являться як думки цього виду.",
+    forFun: "Просто для радості",
+    names: { bulb: "Лампочка", stop: "Знак «Стоп»", warning: "Попередження", key: "Ключ", fork: "Роздоріжжя", flag: "Прапор", cloud: "Дощова хмара", question: "Знак питання", heart: "Серце", star: "Зірка", house: "Будинок", tree: "Дерево", fish: "Риба", smile: "Усмішка" },
     questions: {
+      bulb: "Яка ідея засвітилася?",
+      stop: "Що тебе зупиняє?",
+      warning: "Що тут може піти не так?",
+      key: "Що могло б це відімкнути?",
+      fork: "Куди можна піти?",
+      flag: "Що тобі вже вдалося?",
+      cloud: "Що не вийшло?",
+      question: "У чому ти ще не впевнений?",
       heart: "Що ти любиш?",
       star: "Чого ти хочеш досягти?",
       house: "Що дає тобі відчуття дому?",
@@ -2543,8 +2580,19 @@ const ru: UiStrings = {
     entry: "Нарисовать картинку…",
     title: "Нарисовать картинку",
     hint: "Её точки появятся как пустые мысли. Заполни две соседние, и линия между ними нарисуется сама, пока не будет вся картинка.",
-    names: { heart: "Сердце", star: "Звезда", house: "Дом", tree: "Дерево", fish: "Рыба", smile: "Улыбка" },
+    forTypes: "Для вида мысли",
+    forTypesHint: "Её точки появятся как мысли этого вида.",
+    forFun: "Просто для радости",
+    names: { bulb: "Лампочка", stop: "Знак «Стоп»", warning: "Предупреждение", key: "Ключ", fork: "Развилка", flag: "Флаг", cloud: "Дождевая туча", question: "Знак вопроса", heart: "Сердце", star: "Звезда", house: "Дом", tree: "Дерево", fish: "Рыба", smile: "Улыбка" },
     questions: {
+      bulb: "Какая идея зажглась?",
+      stop: "Что тебя останавливает?",
+      warning: "Что здесь может пойти не так?",
+      key: "Что могло бы это открыть?",
+      fork: "Куда можно пойти?",
+      flag: "Что тебе уже удалось?",
+      cloud: "Что не получилось?",
+      question: "В чём ты ещё не уверен?",
       heart: "Что ты любишь?",
       star: "Чего ты хочешь достичь?",
       house: "Что даёт тебе чувство дома?",

@@ -1,6 +1,7 @@
 import { Modal } from "../components/Modal";
 import { useI18n } from "../i18n/I18nContext";
-import { PICTURES, PICTURE_KINDS, pictureDots } from "../utils/pictures";
+import { FUN_PICTURE_KINDS, PICTURES, TYPE_PICTURE_KINDS, pictureDots } from "../utils/pictures";
+import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import type { PictureKind } from "../utils/pictures";
 
 interface Props {
@@ -79,28 +80,46 @@ export function PictureThumb({ kind, size = BOX }: { kind: PictureKind; size?: n
   );
 }
 
+const THUMB = 72;
+
 // "Draw a picture" (utils/pictures.ts): the pictures to choose from. Picking
 // one lays its dots out on the map as ghosts (useNodeCreation's drawPicture).
+// The first group has one picture per node type (a bulb for an Idea, a stop
+// sign for a Problem…), whose dots arrive as thoughts of that type; the
+// second is pictures just for fun, whose dots are Ideas.
 export function PicturePicker({ onPick, onClose }: Props) {
   const { t } = useI18n();
   const p = t.ui.pictures;
+  const tile = (kind: PictureKind) => {
+    const type = PICTURES[kind].type;
+    return (
+      <button
+        key={kind}
+        type="button"
+        className="flex cursor-pointer flex-col items-center gap-0.5 rounded-card border border-line bg-surface p-1.5 text-[0.75rem] leading-tight text-ink hover:bg-surface-2"
+        onClick={() => onPick(kind)}
+        title={p.questions[kind]}
+        data-picture={kind}
+      >
+        <PictureThumb kind={kind} size={THUMB} />
+        <span className="text-center font-semibold">{p.names[kind]}</span>
+        {type && (
+          <span className="flex items-center gap-1 text-center text-[0.7rem] text-ink-soft">
+            <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: NODE_TYPE_COLORS[type] }} />
+            {t.ui.types[type]}
+          </span>
+        )}
+      </button>
+    );
+  };
   return (
     <Modal title={p.title} onClose={onClose}>
-      <p className="mb-4 text-[0.85rem] text-ink-soft">{p.hint}</p>
-      <div className="grid grid-cols-3 gap-2">
-        {PICTURE_KINDS.map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            className="flex cursor-pointer flex-col items-center gap-1 rounded-card border border-line bg-surface p-2 text-[0.8rem] text-ink hover:bg-surface-2"
-            onClick={() => onPick(kind)}
-            title={p.questions[kind]}
-          >
-            <PictureThumb kind={kind} />
-            <span className="font-semibold">{p.names[kind]}</span>
-          </button>
-        ))}
-      </div>
+      <p className="mb-3 text-[0.85rem] text-ink-soft">{p.hint}</p>
+      <h3 className="mb-0.5 text-[0.85rem] font-semibold text-ink">{p.forTypes}</h3>
+      <p className="mb-2 text-[0.75rem] text-ink-soft">{p.forTypesHint}</p>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{TYPE_PICTURE_KINDS.map(tile)}</div>
+      <h3 className="mb-2 mt-4 text-[0.85rem] font-semibold text-ink">{p.forFun}</h3>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{FUN_PICTURE_KINDS.map(tile)}</div>
       <div className="mt-4 flex justify-end">
         <button type="button" className="cursor-pointer rounded-[6px] px-3 py-1.5 text-[0.85rem] text-ink-soft hover:bg-surface-2" onClick={onClose}>
           {t.ui.common.cancel}

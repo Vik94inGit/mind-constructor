@@ -115,8 +115,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   display menu, from none to full (`src/utils/nodeFade.ts`, saved per user as `preferences.nodeFade`).
 - **Draw a picture** — from its own toolbar button (the dotted star, one tap on a phone) or the "+" menu
   (both put it in the middle of the view), or the right-click menu (at the click point); then
-  pick a heart, star, house, tree, fish or smile. Its dots arrive as numbered ghosts, like a
-  connect-the-dots page, each asking the picture's question ("What do you love?"). Write in two
+  pick one. The first group has a picture for each node type, and its dots arrive as thoughts of
+  that type: a bulb (Idea), a stop sign (Problem), a warning triangle (Problematic option), a key
+  (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail) and a question mark
+  (unknown). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
+  Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking the picture's
+  question ("What is stopping you?", "What do you love?"). Write in two
   neighbouring dots and the line between them is inked in the picture's colour; until then it is a faint
   dotted guide, and a closed shape fills in a little more with every dot. A caption under the picture
   says how much of it is drawn ("Heart · 60% drawn", then "done!"), and the minimap draws the inked lines

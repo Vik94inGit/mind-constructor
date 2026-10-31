@@ -8,7 +8,7 @@ import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import { layoutTemplate, MAP_KIND_ROOTS } from "../utils/templates";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import { sleep } from "../utils/sleep";
-import { layoutPicture, newPictureId } from "../utils/pictures";
+import { layoutPicture, newPictureId, pictureNodeType } from "../utils/pictures";
 import type { PictureKind } from "../utils/pictures";
 import { piecesParentsFirst } from "../utils/textSplit";
 import type { Translation } from "../i18n/translations";
@@ -277,14 +277,17 @@ export function useNodeCreation({
 
   // "Draw a picture" (utils/pictures.ts): the picture's dots as ghosts, one
   // node per dot, centered as near `desired` as the map has room for. Each
-  // ghost asks the picture's question, numbered like a connect-the-dots page;
-  // none hangs from another, so a picture never makes a zone.
+  // ghost asks the picture's question, numbered like a connect-the-dots page,
+  // and is the node type the picture stands for (a bulb's dots are Ideas, a
+  // stop sign's Problems; a picture for fun is Ideas); none hangs from
+  // another, so a picture never makes a zone.
   async function drawPicture(kind: PictureKind, desired: Pt) {
     if (!mapId) return;
     setActionError(null);
     const dots = layoutPicture(kind, desired, [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()]);
     const id = newPictureId();
     const question = t.ui.pictures.questions[kind];
+    const type = pictureNodeType(kind);
     setSelectedId(null);
     setMultiSelectIds(new Set());
     // The whole picture in view before its first dot lands, so it is seen being dotted out.
@@ -294,7 +297,7 @@ export function useNodeCreation({
         const node = await nodesApi.createNode(mapId, {
           text: "",
           prompt: `${dot + 1}. ${question}`,
-          type: "Idea",
+          type,
           x: dots[dot].x,
           y: dots[dot].y,
           parentId: null,

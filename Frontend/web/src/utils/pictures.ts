@@ -1,7 +1,7 @@
 import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import type { Obstacle } from "./canvasLayout";
 import { clearOf } from "./freeSpots";
-import type { NodeDoc, ZonePaletteColor } from "../types";
+import type { NodeDoc, NodeType, ZonePaletteColor } from "../types";
 
 // "Draw a picture": a picture laid out on the map as ghost nodes, one per
 // dot, like a connect-the-dots page. Each dot's line to its neighbours is
@@ -13,7 +13,12 @@ import type { NodeDoc, ZonePaletteColor } from "../types";
 
 type Pt = { x: number; y: number };
 
-export const PICTURE_KINDS = ["heart", "star", "house", "tree", "fish", "smile"] as const;
+// One picture for each node type (a bulb for an Idea, a stop sign for a
+// Problem…), whose dots arrive as ghosts of that type, then the pictures
+// drawn just for fun, whose dots are Ideas.
+export const TYPE_PICTURE_KINDS = ["bulb", "stop", "warning", "key", "fork", "flag", "cloud", "question"] as const;
+export const FUN_PICTURE_KINDS = ["heart", "star", "house", "tree", "fish", "smile"] as const;
+export const PICTURE_KINDS = [...TYPE_PICTURE_KINDS, ...FUN_PICTURE_KINDS] as const;
 export type PictureKind = (typeof PICTURE_KINDS)[number];
 
 export interface PictureDef {
@@ -23,6 +28,8 @@ export interface PictureDef {
   paths: number[][];
   /** The ink the drawn lines take. */
   color: string;
+  /** The node type this picture stands for; its dots are made as that type. Absent: a picture for fun, made of Ideas. */
+  type?: NodeType;
 }
 
 function ring(count: number, radius: number, startDeg: number): Pt[] {
@@ -35,6 +42,129 @@ function ring(count: number, radius: number, startDeg: number): Pt[] {
 const loop = (count: number, from = 0) => [...Array.from({ length: count }, (_, i) => from + i), from];
 
 export const PICTURES: Record<PictureKind, PictureDef> = {
+  bulb: {
+    // The glass round the top, then the screw base under its neck.
+    dots: [
+      { x: -0.35, y: 0.35 },
+      { x: -0.7, y: -0.05 },
+      { x: -0.75, y: -0.55 },
+      { x: -0.35, y: -0.95 },
+      { x: 0.35, y: -0.95 },
+      { x: 0.75, y: -0.55 },
+      { x: 0.7, y: -0.05 },
+      { x: 0.35, y: 0.35 },
+      { x: 0.35, y: 0.95 },
+      { x: -0.35, y: 0.95 },
+    ],
+    paths: [loop(10), [0, 7]],
+    color: "#e7a614",
+    type: "Idea",
+  },
+  stop: {
+    // An octagon, flat on top like the road sign.
+    dots: ring(8, 1, -112.5),
+    paths: [loop(8)],
+    color: "#d93a3a",
+    type: "Problem",
+  },
+  warning: {
+    // A warning triangle with an exclamation stroke inside.
+    dots: [
+      { x: 0, y: -1 },
+      { x: 0.55, y: -0.05 },
+      { x: 1.05, y: 0.85 },
+      { x: 0, y: 0.85 },
+      { x: -1.05, y: 0.85 },
+      { x: -0.55, y: -0.05 },
+      { x: 0, y: -0.45 },
+      { x: 0, y: 0.3 },
+    ],
+    paths: [loop(6), [6, 7]],
+    color: "#e08a00",
+    type: "Problematic option",
+  },
+  key: {
+    // A round bow on the left, the shaft to the right and one tooth.
+    dots: [
+      ...ring(6, 0.55, 0).map((p) => ({ x: p.x - 0.55, y: p.y })),
+      { x: 0.6, y: 0 },
+      { x: 1.2, y: 0 },
+      { x: 1.2, y: 0.5 },
+      { x: 0.6, y: 0.5 },
+    ],
+    paths: [loop(6), [0, 6, 7, 8], [6, 9]],
+    color: "#1f9d8a",
+    type: "Solution",
+  },
+  fork: {
+    // A road that splits two ways.
+    dots: [
+      { x: 0, y: 1 },
+      { x: 0, y: 0.35 },
+      { x: -0.5, y: -0.2 },
+      { x: -1, y: -0.8 },
+      { x: 0.5, y: -0.2 },
+      { x: 1, y: -0.8 },
+    ],
+    paths: [
+      [0, 1, 2, 3],
+      [1, 4, 5],
+    ],
+    color: "#7a5cd6",
+    type: "Option",
+  },
+  flag: {
+    // A flag planted on the ground: the pole, its pennant and the ground.
+    dots: [
+      { x: -0.6, y: 1 },
+      { x: -0.6, y: 0.3 },
+      { x: -0.6, y: -0.3 },
+      { x: -0.6, y: -1 },
+      { x: 0.9, y: -0.65 },
+      { x: -1.2, y: 1 },
+      { x: 0, y: 1 },
+    ],
+    paths: [
+      [0, 1, 2],
+      [2, 3, 4, 2],
+      [5, 0, 6],
+    ],
+    color: "#2f9e5b",
+    type: "Success",
+  },
+  cloud: {
+    // A rain cloud: its bumpy top, a flat bottom and two streaks of rain.
+    dots: [
+      { x: -1, y: 0.25 },
+      { x: -0.85, y: -0.35 },
+      { x: -0.3, y: -0.65 },
+      { x: 0.25, y: -0.85 },
+      { x: 0.8, y: -0.45 },
+      { x: 1, y: 0.25 },
+      { x: 0.4, y: 0.25 },
+      { x: -0.4, y: 0.25 },
+      { x: -0.6, y: 0.95 },
+      { x: 0.2, y: 0.95 },
+    ],
+    paths: [loop(8), [7, 8], [6, 9]],
+    color: "#6b7a90",
+    type: "Fail",
+  },
+  question: {
+    // A question mark: the hook, then its dot on its own.
+    dots: [
+      { x: -0.6, y: -0.4 },
+      { x: -0.35, y: -0.95 },
+      { x: 0.3, y: -1 },
+      { x: 0.7, y: -0.5 },
+      { x: 0.3, y: 0 },
+      { x: 0, y: 0.4 },
+      { x: 0, y: 1 },
+    ],
+    paths: [[0, 1, 2, 3, 4, 5]],
+    color: "#8a8f98",
+    type: "unknown",
+  },
   heart: {
     dots: [
       { x: 0, y: -0.45 },
@@ -123,6 +253,16 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
 
 export function isPictureKind(kind: unknown): kind is PictureKind {
   return typeof kind === "string" && (PICTURE_KINDS as readonly string[]).includes(kind);
+}
+
+/** The node type a picture's dots are made as: its own type, or Idea for a picture drawn for fun. */
+export function pictureNodeType(kind: PictureKind): NodeType {
+  return PICTURES[kind].type ?? "Idea";
+}
+
+/** The picture that stands for a node type (a bulb for an Idea, a stop sign for a Problem…). */
+export function pictureForType(type: NodeType): PictureKind {
+  return TYPE_PICTURE_KINDS.find((k) => PICTURES[k].type === type) ?? "bulb";
 }
 
 // Two dots must sit at least this far apart on one axis or the other, so the
