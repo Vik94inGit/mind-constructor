@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   PICTURES,
+  FUN_PICTURE_KINDS,
   PICTURE_KINDS,
+  TYPE_PICTURE_KINDS,
   isPictureKind,
+  pictureForType,
+  pictureNodeType,
   layoutPicture,
   overallPercent,
   pictureDots,
@@ -13,6 +17,7 @@ import {
 } from "./pictures";
 import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import { makeNode } from "../test/fixtures";
+import { NODE_TYPES } from "../types";
 import type { NodeDoc } from "../types";
 
 function dotNode(id: string, dot: number, written: boolean, kind = "tree", pictureId = "p1"): NodeDoc {
@@ -37,6 +42,21 @@ describe("PICTURES", () => {
         expect(clear, `${kind} dots ${i} and ${j}`).toBe(true);
       }
     }
+  });
+
+  it("has one picture for each node type, made of that type", () => {
+    expect(TYPE_PICTURE_KINDS.map((k) => PICTURES[k].type).sort()).toEqual([...NODE_TYPES].sort());
+    for (const type of NODE_TYPES) expect(pictureNodeType(pictureForType(type))).toBe(type);
+    expect(pictureForType("Idea")).toBe("bulb");
+    expect(pictureForType("Problem")).toBe("stop");
+  });
+
+  it("makes a picture for fun of Ideas", () => {
+    for (const kind of FUN_PICTURE_KINDS) expect(pictureNodeType(kind)).toBe("Idea");
+  });
+
+  it("keeps every kind a valid Node.picture.kind (1-20 lowercase letters)", () => {
+    for (const kind of PICTURE_KINDS) expect(kind).toMatch(/^[a-z]{1,20}$/);
   });
 
   it("knows its own kinds only", () => {

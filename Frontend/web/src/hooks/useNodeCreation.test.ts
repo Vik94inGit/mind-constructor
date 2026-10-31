@@ -72,6 +72,17 @@ describe("useNodeCreation", () => {
     expect(params.upsertNode).toHaveBeenCalledTimes(PICTURES.star.dots.length);
   });
 
+  it("makes a type's picture of that type: a stop sign's dots are Problems", async () => {
+    const { result } = setup();
+    await act(() => result.current.drawPicture("stop", { x: 1200, y: 800 }));
+    const calls = vi.mocked(nodesApi.createNode).mock.calls.map((c) => c[1]);
+    expect(calls).toHaveLength(PICTURES.stop.dots.length);
+    calls.forEach((c) => {
+      expect(c).toMatchObject({ type: "Problem", picture: { kind: "stop" } });
+      expect(c.prompt).toContain(TRANSLATIONS.en.ui.pictures.questions.stop);
+    });
+  });
+
   it("does nothing without a pending node", async () => {
     const { result } = setup(null);
     await act(() => result.current.confirmPendingCreate("Hello", "Option"));
