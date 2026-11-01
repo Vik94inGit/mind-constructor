@@ -78,7 +78,10 @@ function leftToRight(indexById: Map<string, number>) {
 // decorator nodes and anything the map owner has hidden from members before
 // this ever runs, since a presentation is for showing, not for drag/attack
 // bookkeeping or a branch deliberately kept out of sight.
-export function computeSlideOrder(nodes: NodeDoc[]): NodeDoc[] {
+// Every root and every node with children, in the order they head their
+// part of the show (an isFirstNode root first, then by when they were
+// made), with each one's children sorted left to right.
+function slideParents(nodes: NodeDoc[]) {
   const { indexById, childrenByParent, roots } = buildForest(nodes);
   const order = leftToRight(indexById);
   for (const list of childrenByParent.values()) list.sort(order);
@@ -88,6 +91,11 @@ export function computeSlideOrder(nodes: NodeDoc[]): NodeDoc[] {
   const parents = nodes
     .filter((n) => rootIds.has(n.nodeId) || childrenByParent.has(n.nodeId))
     .sort((a, b) => leads(a) - leads(b) || created(a, b));
+  return { parents, childrenByParent };
+}
+
+export function computeSlideOrder(nodes: NodeDoc[]): NodeDoc[] {
+  const { parents, childrenByParent } = slideParents(nodes);
 
   const out: NodeDoc[] = [];
   const shown = new Set<string>();
@@ -102,6 +110,27 @@ export function computeSlideOrder(nodes: NodeDoc[]): NodeDoc[] {
   }
   for (const n of nodes) show(n);
   return out;
+}
+
+/** One slide: a parent and the children hanging from it (none for a lone root). */
+export interface SlideGroup {
+  node: NodeDoc;
+  children: NodeDoc[];
+}
+
+// The slides a presentation steps through: one per parent, in
+// the order computeSlideOrder takes its parents in, each carrying its
+// children left to right — parent and children, then the next parent and
+// its children. A
+// child that is itself a parent shows on its parent's slide and again,
+// heading its own, when its turn comes. A root with no children is a slide
+// on its own. Nodes a corrupt parent loop kept off every slide get one each.
+export function computeSlideGroups(nodes: NodeDoc[]): SlideGroup[] {
+  const { parents, childrenByParent } = slideParents(nodes);
+  const groups = parents.map((node) => ({ node, children: childrenByParent.get(node.nodeId) ?? [] }));
+  const onSlide = new Set(groups.flatMap((g) => [g.node.nodeId, ...g.children.map((c) => c.nodeId)]));
+  for (const n of nodes) if (!onSlide.has(n.nodeId)) groups.push({ node: n, children: [] });
+  return groups;
 }
 
 // Presentation-mode column/row spacing — same COLUMN formula

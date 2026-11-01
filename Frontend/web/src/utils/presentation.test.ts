@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeGeometrizedPositions, computeSlideOrder } from "./presentation";
+import { computeGeometrizedPositions, computeSlideGroups, computeSlideOrder } from "./presentation";
 import { makeNode } from "../test/fixtures";
 
 const ids = (nodes: { nodeId: string }[]) => nodes.map((n) => n.nodeId);
@@ -30,6 +30,32 @@ describe("computeSlideOrder", () => {
   it("still shows nodes caught in a parent loop", () => {
     const nodes = [makeNode({ nodeId: "p", parentId: "q" }), makeNode({ nodeId: "q", parentId: "p" })];
     expect(ids(computeSlideOrder(nodes)).sort()).toEqual(["p", "q"]);
+  });
+});
+
+describe("computeSlideGroups", () => {
+  const groups = (nodes: Parameters<typeof computeSlideGroups>[0]) =>
+    computeSlideGroups(nodes).map((g) => [g.node.nodeId, ids(g.children)]);
+
+  it("makes one slide per parent with its children left to right, then the next parent", () => {
+    const nodes = [
+      makeNode({ nodeId: "root", createdAt: "2026-01-01T00:00:00Z", x: 500 }),
+      makeNode({ nodeId: "right", parentId: "root", createdAt: "2026-01-02T00:00:00Z", x: 800 }),
+      makeNode({ nodeId: "left", parentId: "root", createdAt: "2026-01-03T00:00:00Z", x: 200 }),
+      makeNode({ nodeId: "right-kid", parentId: "right", createdAt: "2026-01-04T00:00:00Z", x: 800 }),
+      makeNode({ nodeId: "left-kid", parentId: "left", createdAt: "2026-01-05T00:00:00Z", x: 200 }),
+    ];
+    expect(groups(nodes)).toEqual([
+      ["root", ["left", "right"]],
+      ["right", ["right-kid"]],
+      ["left", ["left-kid"]],
+    ]);
+  });
+
+  it("gives a lone root its own slide, and keeps nodes in a parent loop", () => {
+    expect(groups([makeNode({ nodeId: "solo" })])).toEqual([["solo", []]]);
+    const loop = groups([makeNode({ nodeId: "p", parentId: "q" }), makeNode({ nodeId: "q", parentId: "p" })]);
+    expect([...new Set(loop.flatMap(([id, kids]) => [id, ...kids]))].sort()).toEqual(["p", "q"]);
   });
 });
 

@@ -598,7 +598,7 @@ export function MapPage() {
     presenting,
     slideIndex,
     setSlideIndex,
-    slideNodes,
+    slideGroups,
     geometrizeBlend,
     enterPresentation,
     exitPresentation,
@@ -1531,7 +1531,7 @@ export function MapPage() {
     presenting,
     exitPresentation,
     setSlideIndex,
-    slideCount: slideNodes.length,
+    slideCount: slideGroups.length,
     drawMode,
     drawPointCount: drawPoints.length,
     undoDrawPoint,
@@ -2153,10 +2153,15 @@ export function MapPage() {
 
           {presenting && (
             <PresentationOverlay
-              slides={slideNodes}
-              index={Math.min(slideIndex, Math.max(0, slideNodes.length - 1))}
+              slides={slideGroups}
+              index={Math.min(slideIndex, Math.max(0, slideGroups.length - 1))}
               onIndexChange={setSlideIndex}
               onExit={exitPresentation}
+              onOpenNode={(id) => {
+                exitPresentation();
+                setSelectedId(id);
+                centerOnNode(id);
+              }}
             />
           )}
         </div>
