@@ -37,18 +37,22 @@ describe("computeSlideGroups", () => {
   const groups = (nodes: Parameters<typeof computeSlideGroups>[0]) =>
     computeSlideGroups(nodes).map((g) => [g.node.nodeId, ids(g.children)]);
 
-  it("makes one slide per parent with its children left to right, then the next parent", () => {
+  it("walks a parent, then its own children one by one (theirs straight after), then the next tree", () => {
     const nodes = [
       makeNode({ nodeId: "root", createdAt: "2026-01-01T00:00:00Z", x: 500 }),
       makeNode({ nodeId: "right", parentId: "root", createdAt: "2026-01-02T00:00:00Z", x: 800 }),
       makeNode({ nodeId: "left", parentId: "root", createdAt: "2026-01-03T00:00:00Z", x: 200 }),
       makeNode({ nodeId: "right-kid", parentId: "right", createdAt: "2026-01-04T00:00:00Z", x: 800 }),
       makeNode({ nodeId: "left-kid", parentId: "left", createdAt: "2026-01-05T00:00:00Z", x: 200 }),
+      makeNode({ nodeId: "other", createdAt: "2026-01-06T00:00:00Z" }),
     ];
     expect(groups(nodes)).toEqual([
       ["root", ["left", "right"]],
-      ["right", ["right-kid"]],
       ["left", ["left-kid"]],
+      ["left-kid", []],
+      ["right", ["right-kid"]],
+      ["right-kid", []],
+      ["other", []],
     ]);
   });
 
