@@ -55,7 +55,8 @@ const defaultTransport: Transport = async (events, keepalive) => {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       keepalive,
-      body: JSON.stringify({ events }),
+      // Its own clock now, so the server can correct for a clock that's off.
+      body: JSON.stringify({ events, sentAt: new Date().toISOString() }),
     });
     if (res.ok) return "sent";
     // Signed out, or a batch the server won't take: sending it again won't help.

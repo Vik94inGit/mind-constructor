@@ -58,7 +58,19 @@ describe("recordUsageAbl", () => {
     ]);
   });
 
-  it("drops events too old or from the future, and marks a demo account", async () => {
+  it("moves events onto the server's clock when the browser's clock is off", async () => {
+    // The browser's clock is an hour ahead: its "now" is 13:00.
+    await recordUsageAbl(
+      user,
+      { sentAt: "2026-11-01T13:00:00.000Z", events: [{ name: "think_started", at: "2026-11-01T12:59:00.000Z" }] },
+      now,
+    );
+    expect(inserted()).toEqual([
+      { name: "think_started", props: undefined, at: new Date("2026-11-01T11:59:00.000Z"), day: "2026-11-01" },
+    ]);
+  });
+
+  it("drops events too old or unreadable, counts future ones as now, and marks a demo account", async () => {
     await recordUsageAbl(
       { _id: "demo1", isDemo: true },
       {
@@ -72,6 +84,7 @@ describe("recordUsageAbl", () => {
       now,
     );
     expect(insertUsageEventsDao).toHaveBeenCalledWith("demo1", true, [
+      { name: "app_opened", props: undefined, at: now, day: "2026-11-01" },
       { name: "app_opened", props: undefined, at: now, day: "2026-11-01" },
     ]);
   });

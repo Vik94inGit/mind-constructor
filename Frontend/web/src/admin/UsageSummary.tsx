@@ -3,6 +3,7 @@ import * as usageApi from "../api/usage";
 import type { UsageSummary as Summary } from "../api/usage";
 import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
+import { browserOptedOut } from "../utils/usage";
 
 const WINDOWS = [7, 30, 90] as const;
 
@@ -70,6 +71,9 @@ export function UsageSummary() {
         </div>
       </div>
 
+      {browserOptedOut() && (
+        <div className="mb-3 rounded-lg bg-accent-soft px-[0.9rem] py-[0.6rem] text-[0.82rem] text-accent-ink">{s.optedOut}</div>
+      )}
       {error && <div className="mb-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>}
       {!summary && !error && <div className="p-6 text-center text-ink-soft">{s.loading}</div>}
 
