@@ -42,9 +42,10 @@ export const USAGE_EVENTS = Object.keys(EVENT_PROPS) as UsageEventName[];
 
 export const MAX_EVENTS_PER_REQUEST = 50;
 // A browser may send events it kept while offline, but nothing older than a
-// week, nor from the future (allowing for a slightly fast clock).
+// week. Its clock may be off: `sentAt` (its clock when sending) lets each
+// event's time be moved onto the server's clock, and anything still in the
+// future counts as now.
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_AHEAD_MS = 5 * 60 * 1000;
 
 const LABEL = /^[A-Za-z0-9_-]{1,32}$/;
 
@@ -55,6 +56,7 @@ const eventSchema = z.object({
 });
 const recordSchema = z.object({
   events: z.array(eventSchema).min(1).max(MAX_EVENTS_PER_REQUEST),
+  sentAt: z.union([z.string(), z.number()]).optional(),
 });
 
 const isKnown = (name: string): name is UsageEventName => Object.hasOwn(EVENT_PROPS, name);
@@ -71,12 +73,20 @@ const cleanProps = (name: UsageEventName, props: Record<string, unknown> | undef
   return Object.keys(out).length > 0 ? out : undefined;
 };
 
-const eventTime = (at: string | number | undefined, now: Date) => {
+// How far the browser's clock is behind the server's (negative: ahead).
+const clockSkew = (sentAt: string | number | undefined, now: Date) => {
+  if (sentAt === undefined) return 0;
+  const t = new Date(sentAt).getTime();
+  return Number.isNaN(t) ? 0 : now.getTime() - t;
+};
+
+const eventTime = (at: string | number | undefined, now: Date, skew: number) => {
   if (at === undefined) return now;
-  const time = new Date(at);
-  const t = time.getTime();
-  if (Number.isNaN(t) || t > now.getTime() + MAX_AHEAD_MS || t < now.getTime() - MAX_AGE_MS) return null;
-  return t > now.getTime() ? now : time;
+  const raw = new Date(at).getTime();
+  if (Number.isNaN(raw)) return null;
+  const t = raw + skew;
+  if (t < now.getTime() - MAX_AGE_MS) return null;
+  return t > now.getTime() ? now : new Date(t);
 };
 
 export const utcDay = (date: Date) => date.toISOString().slice(0, 10);
@@ -89,11 +99,12 @@ export const recordUsageAbl = async (
   input: unknown,
   now: Date = new Date(),
 ) => {
-  const { events } = parseOrThrow(recordSchema, input);
+  const { events, sentAt } = parseOrThrow(recordSchema, input);
+  const skew = clockSkew(sentAt, now);
   const rows = [];
   for (const e of events) {
     if (!isKnown(e.name)) continue;
-    const at = eventTime(e.at, now);
+    const at = eventTime(e.at, now, skew);
     if (!at) continue;
     rows.push({ name: e.name, props: cleanProps(e.name, e.props), at, day: utcDay(at) });
   }

@@ -600,6 +600,8 @@ export interface UiStrings {
       hint: string;
       days: (n: number) => string;
       includeDemo: string;
+      /** This browser asks not to be tracked, so nothing done in it is counted. */
+      optedOut: string;
       loading: string;
       failed: string;
       today: string;
@@ -1277,6 +1279,7 @@ const en: UiStrings = {
       hint: "Counted from what signed-in people do, never what their thoughts say. Browsers that ask not to be tracked are left out.",
       days: (n) => `Last ${n} days`,
       includeDemo: "Include demo accounts",
+      optedOut: "This browser asks sites not to track it (Do Not Track or Global Privacy Control), so nothing you do in it is counted. Turn that setting off, or use another browser, to see your own activity here.",
       loading: "Loading usage…",
       failed: "Couldn't load usage",
       today: "Active today",
@@ -1964,6 +1967,7 @@ const cs: UiStrings = {
       hint: "Počítá se, co přihlášení lidé dělají, nikdy co jejich myšlenky říkají. Prohlížeče, které žádají nesledovat, se nepočítají.",
       days: (n) => `Posledních ${n} dní`,
       includeDemo: "Včetně demo účtů",
+      optedOut: "Tento prohlížeč žádá weby, aby ho nesledovaly (Do Not Track nebo Global Privacy Control), takže nic, co v něm děláte, se nepočítá. Vypněte toto nastavení nebo použijte jiný prohlížeč, abyste tu viděli svou aktivitu.",
       loading: "Načítám používání…",
       failed: "Používání se nepodařilo načíst",
       today: "Aktivní dnes",
@@ -2654,6 +2658,7 @@ const uk: UiStrings = {
       hint: "Рахується, що роблять увійшовші люди, ніколи не те, що кажуть їхні думки. Браузери, які просять не відстежувати, не враховуються.",
       days: (n) => `Останні ${n} днів`,
       includeDemo: "Разом з демо-акаунтами",
+      optedOut: "Цей браузер просить сайти не відстежувати його (Do Not Track або Global Privacy Control), тож нічого з того, що ви в ньому робите, не враховується. Вимкніть це налаштування або скористайтеся іншим браузером, щоб побачити тут свою активність.",
       loading: "Завантажую використання…",
       failed: "Не вдалося завантажити використання",
       today: "Активні сьогодні",
@@ -3344,6 +3349,7 @@ const ru: UiStrings = {
       hint: "Считается, что делают вошедшие люди, никогда не то, что говорят их мысли. Браузеры, которые просят не отслеживать, не учитываются.",
       days: (n) => `Последние ${n} дней`,
       includeDemo: "Вместе с демо-аккаунтами",
+      optedOut: "Этот браузер просит сайты не отслеживать его (Do Not Track или Global Privacy Control), поэтому ничего из того, что вы в нём делаете, не учитывается. Выключите эту настройку или используйте другой браузер, чтобы увидеть здесь свою активность.",
       loading: "Загружаю использование…",
       failed: "Не удалось загрузить использование",
       today: "Активны сегодня",
