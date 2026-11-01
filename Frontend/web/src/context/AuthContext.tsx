@@ -4,6 +4,7 @@ import * as authApi from "../api/auth";
 import { clearReadCache, setOfflineUser } from "../offline/sync";
 import { disconnectSocket } from "../api/socket";
 import type { User } from "../types";
+import { flushUsage, setUsageUser, track } from "../utils/usage";
 
 interface AuthContextValue {
   user: User | null;
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // offline/sync.ts).
   const setUser = useCallback((next: User | null) => {
     setOfflineUser(next?._id ?? null);
+    setUsageUser(next?._id ?? null);
     setUserState(next);
   }, []);
 
@@ -49,26 +51,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     setUser(await authApi.login(email, password));
+    track({ name: "signed_in", props: { method: "password" } });
   }, []);
 
   const register = useCallback(async (username: string, email: string, password: string) => {
     setUser(await authApi.register(username, email, password));
+    track({ name: "signed_up", props: { method: "password" } });
   }, []);
 
   // One entry point for both "sign in with Google" and "register with
   // Google" — same as the backend's single POST /api/auth/google (see
   // googleAuthAbl's own doc comment), there's no separate flow here either.
   const loginWithGoogle = useCallback(async (idToken: string) => {
-    setUser(await authApi.googleLogin(idToken));
+    const signedIn = await authApi.googleLogin(idToken);
+    setUser(signedIn);
+    // A first Google sign-in makes the account and picks a username for them.
+    track({ name: signedIn.usernameConfirmed === false ? "signed_up" : "signed_in", props: { method: "google" } });
   }, []);
 
   const tryDemo = useCallback(async () => {
     const { user: demoUser, mapId } = await authApi.tryDemo();
     setUser(demoUser);
+    track({ name: "demo_started" });
     return mapId;
   }, []);
 
   const logout = useCallback(async () => {
+    await flushUsage();
     await authApi.logout();
     disconnectSocket();
     // What this browser kept of their maps isn't for whoever signs in next.

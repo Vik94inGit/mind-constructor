@@ -582,6 +582,31 @@ export interface UiStrings {
     deleteConfirm: (username: string) => string;
     wipeConfirm: string;
     wipeConfirmAgain: string;
+    /** The usage numbers above the user list (admin/UsageSummary.tsx). */
+    usage: {
+      title: string;
+      hint: string;
+      days: (n: number) => string;
+      includeDemo: string;
+      loading: string;
+      failed: string;
+      today: string;
+      week: string;
+      month: string;
+      returning: string;
+      users: string;
+      newUsers: string;
+      maps: string;
+      nodes: string;
+      dailyTitle: string;
+      dayTip: (day: string, users: number, events: number) => string;
+      event: string;
+      times: string;
+      people: string;
+      none: string;
+      /** A readable name per event; an unknown one shows as sent. */
+      events: Record<string, string>;
+    };
   };
 }
 
@@ -1225,6 +1250,51 @@ const en: UiStrings = {
     deleteConfirm: (u) => `Delete ${u}? This deletes every map they own.`,
     wipeConfirm: "Wipe the ENTIRE database — all users, maps and nodes? This cannot be undone.",
     wipeConfirmAgain: "Are you absolutely sure? Type-of-no-return confirmation #2.",
+    usage: {
+      title: "How the app is used",
+      hint: "Counted from what signed-in people do, never what their thoughts say. Browsers that ask not to be tracked are left out.",
+      days: (n) => `Last ${n} days`,
+      includeDemo: "Include demo accounts",
+      loading: "Loading usage…",
+      failed: "Couldn't load usage",
+      today: "Active today",
+      week: "Active, 7 days",
+      month: "Active, 30 days",
+      returning: "Came back another day",
+      users: "Accounts",
+      newUsers: "New accounts",
+      maps: "Maps made",
+      nodes: "Nodes made",
+      dailyTitle: "People active each day",
+      dayTip: (d, u, e) => `${d}: ${u} ${u === 1 ? "person" : "people"}, ${e} actions`,
+      event: "What they did",
+      times: "Times",
+      people: "People",
+      none: "Nothing recorded yet.",
+      events: {
+        app_opened: "Opened the app",
+        page_viewed: "Opened a page",
+        signed_up: "Signed up",
+        signed_in: "Signed in",
+        demo_started: "Tried the demo",
+        quick_note_added: "Added a quick note",
+        map_created: "Made a map",
+        node_created: "Added a node",
+        search_used: "Searched",
+        think_started: "Started Think it through",
+        think_finished: "Finished Think it through",
+        feeling_set: "Marked a feeling",
+        checked_in: "Checked in how they feel",
+        text_split: "Split text into nodes",
+        picture_drawn: "Drew a picture",
+        view_changed: "Picked a view",
+        map_shared: "Shared a map",
+        node_attacked: "Attacked a node",
+        node_protected: "Protected a node",
+        map_finished: "Finished a discussion",
+        replay_played: "Played the replay",
+      },
+    },
   },
 };
 
@@ -1857,6 +1927,51 @@ const cs: UiStrings = {
     deleteConfirm: (u) => `Smazat ${u}? Smaže se každá mapa, kterou vlastní.`,
     wipeConfirm: "Vymazat CELOU databázi — všechny uživatele, mapy a uzly? Nelze vrátit zpět.",
     wipeConfirmAgain: "Opravdu si jste zcela jistí? Potvrzení bez návratu č. 2.",
+    usage: {
+      title: "Jak se aplikace používá",
+      hint: "Počítá se, co přihlášení lidé dělají, nikdy co jejich myšlenky říkají. Prohlížeče, které žádají nesledovat, se nepočítají.",
+      days: (n) => `Posledních ${n} dní`,
+      includeDemo: "Včetně demo účtů",
+      loading: "Načítám používání…",
+      failed: "Používání se nepodařilo načíst",
+      today: "Aktivní dnes",
+      week: "Aktivní, 7 dní",
+      month: "Aktivní, 30 dní",
+      returning: "Vrátili se jiný den",
+      users: "Účty",
+      newUsers: "Nové účty",
+      maps: "Vytvořené mapy",
+      nodes: "Vytvořené uzly",
+      dailyTitle: "Aktivní lidé po dnech",
+      dayTip: (d, u, e) => `${d}: ${u} ${csPlural(u, "člověk", "lidé", "lidí")}, ${e} akcí`,
+      event: "Co dělali",
+      times: "Kolikrát",
+      people: "Lidé",
+      none: "Zatím nic zaznamenáno.",
+      events: {
+        app_opened: "Otevřeli aplikaci",
+        page_viewed: "Otevřeli stránku",
+        signed_up: "Zaregistrovali se",
+        signed_in: "Přihlásili se",
+        demo_started: "Vyzkoušeli demo",
+        quick_note_added: "Přidali rychlou poznámku",
+        map_created: "Vytvořili mapu",
+        node_created: "Přidali uzel",
+        search_used: "Hledali",
+        think_started: "Začali Promyslet",
+        think_finished: "Dokončili Promyslet",
+        feeling_set: "Označili pocit",
+        checked_in: "Zapsali, jak se cítí",
+        text_split: "Rozdělili text na uzly",
+        picture_drawn: "Nakreslili obrázek",
+        view_changed: "Vybrali pohled",
+        map_shared: "Sdíleli mapu",
+        node_attacked: "Zaútočili na uzel",
+        node_protected: "Ochránili uzel",
+        map_finished: "Ukončili diskusi",
+        replay_played: "Pustili záznam",
+      },
+    },
   },
 };
 
@@ -2492,6 +2607,51 @@ const uk: UiStrings = {
     deleteConfirm: (u) => `Видалити ${u}? Буде видалено кожну мапу, якою він володіє.`,
     wipeConfirm: "Очистити ВСЮ базу даних — усіх користувачів, мапи та вузли? Цю дію не можна скасувати.",
     wipeConfirmAgain: "Ви абсолютно впевнені? Підтвердження без повернення № 2.",
+    usage: {
+      title: "Як користуються застосунком",
+      hint: "Рахується, що роблять увійшовші люди, ніколи не те, що кажуть їхні думки. Браузери, які просять не відстежувати, не враховуються.",
+      days: (n) => `Останні ${n} днів`,
+      includeDemo: "Разом з демо-акаунтами",
+      loading: "Завантажую використання…",
+      failed: "Не вдалося завантажити використання",
+      today: "Активні сьогодні",
+      week: "Активні, 7 днів",
+      month: "Активні, 30 днів",
+      returning: "Повернулися іншого дня",
+      users: "Акаунти",
+      newUsers: "Нові акаунти",
+      maps: "Створено мап",
+      nodes: "Створено вузлів",
+      dailyTitle: "Активні люди щодня",
+      dayTip: (d, u, e) => `${d}: ${u} ${slavicPlural(u, "людина", "людини", "людей")}, ${e} дій`,
+      event: "Що робили",
+      times: "Разів",
+      people: "Людей",
+      none: "Поки нічого не записано.",
+      events: {
+        app_opened: "Відкрили застосунок",
+        page_viewed: "Відкрили сторінку",
+        signed_up: "Зареєструвалися",
+        signed_in: "Увійшли",
+        demo_started: "Спробували демо",
+        quick_note_added: "Додали швидку нотатку",
+        map_created: "Створили мапу",
+        node_created: "Додали вузол",
+        search_used: "Шукали",
+        think_started: "Почали Обміркувати",
+        think_finished: "Завершили Обміркувати",
+        feeling_set: "Позначили почуття",
+        checked_in: "Записали, як почуваються",
+        text_split: "Розділили текст на вузли",
+        picture_drawn: "Намалювали малюнок",
+        view_changed: "Обрали вигляд",
+        map_shared: "Поділилися мапою",
+        node_attacked: "Атакували вузол",
+        node_protected: "Захистили вузол",
+        map_finished: "Завершили дискусію",
+        replay_played: "Переглянули повтор",
+      },
+    },
   },
 };
 
@@ -3127,6 +3287,51 @@ const ru: UiStrings = {
     deleteConfirm: (u) => `Удалить ${u}? Будут удалены все карты, которыми он владеет.`,
     wipeConfirm: "Очистить ВСЮ базу данных — всех пользователей, карты и узлы? Это действие нельзя отменить.",
     wipeConfirmAgain: "Вы абсолютно уверены? Подтверждение без возврата № 2.",
+    usage: {
+      title: "Как пользуются приложением",
+      hint: "Считается, что делают вошедшие люди, никогда не то, что говорят их мысли. Браузеры, которые просят не отслеживать, не учитываются.",
+      days: (n) => `Последние ${n} дней`,
+      includeDemo: "Вместе с демо-аккаунтами",
+      loading: "Загружаю использование…",
+      failed: "Не удалось загрузить использование",
+      today: "Активны сегодня",
+      week: "Активны, 7 дней",
+      month: "Активны, 30 дней",
+      returning: "Вернулись в другой день",
+      users: "Аккаунты",
+      newUsers: "Новые аккаунты",
+      maps: "Создано карт",
+      nodes: "Создано узлов",
+      dailyTitle: "Активные люди по дням",
+      dayTip: (d, u, e) => `${d}: ${u} ${slavicPlural(u, "человек", "человека", "человек")}, ${e} действий`,
+      event: "Что делали",
+      times: "Раз",
+      people: "Людей",
+      none: "Пока ничего не записано.",
+      events: {
+        app_opened: "Открыли приложение",
+        page_viewed: "Открыли страницу",
+        signed_up: "Зарегистрировались",
+        signed_in: "Вошли",
+        demo_started: "Попробовали демо",
+        quick_note_added: "Добавили быструю заметку",
+        map_created: "Создали карту",
+        node_created: "Добавили узел",
+        search_used: "Искали",
+        think_started: "Начали Обдумать",
+        think_finished: "Закончили Обдумать",
+        feeling_set: "Отметили чувство",
+        checked_in: "Записали, как себя чувствуют",
+        text_split: "Разделили текст на узлы",
+        picture_drawn: "Нарисовали картинку",
+        view_changed: "Выбрали вид",
+        map_shared: "Поделились картой",
+        node_attacked: "Атаковали узел",
+        node_protected: "Защитили узел",
+        map_finished: "Завершили дискуссию",
+        replay_played: "Посмотрели повтор",
+      },
+    },
   },
 };
 

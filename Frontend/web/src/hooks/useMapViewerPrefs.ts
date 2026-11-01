@@ -23,6 +23,7 @@ import type { TypeEmoji } from "../utils/emojiFace";
 import { clampNodeFade, loadNodeFade, saveNodeFade } from "../utils/nodeFade";
 import type { NodeFade } from "../utils/nodeFade";
 import type { NodeType } from "../types";
+import { track } from "../utils/usage";
 
 const SAVE_DELAY_MS = 800;
 
@@ -147,6 +148,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   // The viewer's own feeling per thought — see utils/feeling.ts.
   const [feelings, setFeelings] = useState<Feelings>(() => loadFeelings(mapId));
   function setFeeling(nodeId: string, feeling: Feeling | null) {
+    if (feeling) track({ name: "feeling_set" });
     setFeelings((prev) => {
       const next = withFeeling(prev, nodeId, feeling);
       saveFeelings(mapId, next);

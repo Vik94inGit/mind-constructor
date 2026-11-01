@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Navbar } from "./components/Navbar";
 import { OfflineBanner } from "./components/OfflineBanner";
@@ -9,6 +9,7 @@ import { ProtectedRoute, AdminRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { pageName, track } from "./utils/usage";
 
 // The map editor, the guided flow, text splitting and admin load only when
 // first opened, so signing in, the dashboard and a quick note start without
@@ -30,6 +31,7 @@ export default function App() {
   // A first Google sign-in picked a username for them — offer to change it
   // once (see UsernameModal). Demo accounts are never asked.
   const offerUsername = !!user && user.usernameConfirmed === false && !user.isDemo;
+  usePageViews(location.pathname, user?._id ?? null);
 
   return (
     <div className="flex h-full flex-col">
@@ -60,4 +62,19 @@ export default function App() {
       {offerUsername && <UsernameModal onClose={() => {}} />}
     </div>
   );
+}
+
+// Which pages people open, for the admin page's usage numbers (utils/usage.ts):
+// the first one a signed-in visit lands on counts as opening the app.
+function usePageViews(pathname: string, userId: string | null) {
+  const opened = useRef<string | null>(null);
+  const page = pageName(pathname);
+  useEffect(() => {
+    if (!userId) return;
+    if (opened.current !== userId) {
+      opened.current = userId;
+      track({ name: "app_opened", props: { page } });
+    }
+    track({ name: "page_viewed", props: { page } });
+  }, [page, userId]);
 }

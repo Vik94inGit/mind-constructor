@@ -8,6 +8,7 @@ import { useConfirm } from "../context/ConfirmContext";
 import { finishState } from "../utils/finish";
 import type { Translation } from "../i18n/translations";
 import type { MapBackground, MapDoc, NodeDoc, ZonePaletteColor } from "../types";
+import { track } from "../utils/usage";
 
 interface Params {
   map: MapDoc | null;
@@ -189,7 +190,11 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
     }
     if (!(await confirm(fs.confirm))) return;
     setSiegeOpen(false);
-    void runFinish(() => mapsApi.finishMap(mapId));
+    void runFinish(async () => {
+      const res = await mapsApi.finishMap(mapId);
+      track({ name: "map_finished" });
+      return res;
+    });
   }
   // The finished banner's Reopen (owner only).
   const reopen = isOwner && mapId ? () => void runFinish(() => mapsApi.reopenMap(mapId)) : undefined;

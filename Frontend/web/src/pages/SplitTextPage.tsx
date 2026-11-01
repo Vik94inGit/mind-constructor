@@ -21,6 +21,7 @@ import { useDraftSync } from "../hooks/useDraftSync";
 import { StepHeader, StepNav } from "../think/StepChrome";
 import { MessageText, SelectionPicker, TypePicker, useTapMarking } from "../think/TextMarking";
 import { useConfirm } from "../context/ConfirmContext";
+import { track } from "../utils/usage";
 
 // "Text → map": the whole text becomes the map's main node; pieces of it,
 // marked by tapping where each starts and ends and given a type, become the
@@ -95,6 +96,7 @@ export function SplitTextPage() {
       );
       clearSplitDraft(userId);
       discardServerDraft();
+      track({ name: "text_split" });
       navigate(`/maps/${map.mapId}`);
     } catch (err) {
       setError(err instanceof ApiRequestError ? `${ts.error} (${err.message})` : ts.error);

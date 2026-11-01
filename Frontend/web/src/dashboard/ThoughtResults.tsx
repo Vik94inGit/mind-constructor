@@ -4,6 +4,7 @@ import * as mapsApi from "../api/maps";
 import type { ThoughtHit } from "../api/maps";
 import { useI18n } from "../i18n/I18nContext";
 import { NodeTypeIcon } from "../map/NodeTypeIcon";
+import { track } from "../utils/usage";
 
 const MIN_QUERY = 2;
 const DEBOUNCE_MS = 250;
@@ -29,6 +30,7 @@ export function useThoughtSearch(query: string) {
         .searchThoughts(q)
         .then((found) => {
           if (stale) return;
+          track({ name: "search_used", props: { found: found.length > 0 ? "yes" : "no" } });
           setHits(found);
           setFailed(false);
         })

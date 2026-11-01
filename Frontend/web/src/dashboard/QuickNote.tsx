@@ -7,6 +7,7 @@ import { ApiRequestError } from "../api/client";
 import { addQuickNote } from "../utils/inbox";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
 import type { MapDoc } from "../types";
+import { track } from "../utils/usage";
 
 // A box on the dashboard for a thought that has no map yet: it goes to the
 // Inbox map (utils/inbox.ts) in one step. The installed app's "Quick note"
@@ -28,6 +29,7 @@ export function QuickNote({ maps, autoFocus, onSaved }: { maps: MapDoc[]; autoFo
     setError(null);
     try {
       const { map, created } = await addQuickNote(note, maps, user._id, s.inboxName);
+      track({ name: "quick_note_added" });
       setText("");
       setSaved(map);
       onSaved(map, created);

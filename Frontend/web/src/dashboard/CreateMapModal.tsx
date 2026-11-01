@@ -7,6 +7,7 @@ import { ApiRequestError } from "../api/client";
 import type { MapDoc, MapKind } from "../types";
 import { seedMapKind } from "../utils/seedMap";
 import { useI18n } from "../i18n/I18nContext";
+import { track } from "../utils/usage";
 
 // Mirrors the backend's MAP_TEMPLATES keys (see abl/mapAbl.ts) — the
 // label/description pairs shown in CreateMapModal's "Starting point"
@@ -34,6 +35,7 @@ export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; on
     try {
       const map = await mapsApi.createMap({ name, ownerColor, color, kind, discussionMode });
       await seedMapKind(map.mapId, kind, t.ui.templates.nodes);
+      track({ name: "map_created", props: { template: kind } });
       onCreated(map);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.dashboard.createModal.error);

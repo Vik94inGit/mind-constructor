@@ -4,6 +4,7 @@ import { CheckInForm, EMPTY_CHECK_IN } from "../components/CheckInForm";
 import type { CheckInValue } from "../components/CheckInForm";
 import { FEELING_EMOJI, checkInEntry, checkInShift, loadAfterSkipped, saveAfterSkipped, shouldAskAfter } from "../utils/feeling";
 import type { CheckIn } from "../utils/feeling";
+import { track } from "../utils/usage";
 
 const btn =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-[0.35rem] text-[0.8rem] font-semibold transition-[background-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50";
@@ -68,6 +69,7 @@ export function CheckInPrompt({
               onClick={() => {
                 if (!value.feeling) return;
                 const next = { before, after: checkInEntry(value.feeling, value.strength) };
+                track({ name: "checked_in", props: { moment: "after" } });
                 onSave(next);
                 setSaved(next);
               }}
