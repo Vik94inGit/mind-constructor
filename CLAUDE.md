@@ -90,8 +90,10 @@ npm run build        # tsc -b && vite build
   once the server is back (temporary `local_…` ids swapped for real ones); `public/sw.js` caches the
   app shell.
 - **`i18n/`** — English, Czech, Ukrainian, Russian. Every user-visible string goes through
-  `translations.ts` / `uiStrings.ts` / `siegeStrings.ts` / `thinkStrings.ts` in all four languages;
-  stored values (node types etc.) stay English.
+  `translations.ts` / `uiStrings.ts` / `siegeStrings.ts` / `thinkStrings.ts` / `feelingStrings.ts`
+  (each holds the shape and the English) and `locales/<cs|uk|ru>.ts` (that language's copy of all
+  five, loaded only when picked: `loadTranslation`); add a new string in all four. Stored values
+  (node types etc.) stay English.
 - Per-browser view preferences (card fills, locked blocks, minimap) live in
   `localStorage`; anything that should follow the user across devices goes through `/api/state`
   (`context/UserStateContext.tsx`).

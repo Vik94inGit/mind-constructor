@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { LANGUAGES, TRANSLATIONS } from "./translations";
+import { LANGUAGES, TRANSLATIONS, loadTranslation } from "./translations";
 import type { Language, Translation } from "./translations";
 
 const STORAGE_KEY = "mc_language";
@@ -40,6 +40,23 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>(getInitialLanguage);
+  // The strings on screen. Only English is in the main bundle; another
+  // language loads as its own small file (cached for offline by sw.js like
+  // every built file). While it loads the previous language stays up, and
+  // on the very first load nothing renders for that moment, so a Czech
+  // user never sees a flash of English.
+  const [shown, setShown] = useState<Translation | null>(language === "en" ? TRANSLATIONS.en : null);
+
+  useEffect(() => {
+    let current = true;
+    loadTranslation(language)
+      .then((t) => current && setShown(t))
+      // Offline with that language never fetched: English rather than nothing.
+      .catch(() => current && setShown((prev) => prev ?? TRANSLATIONS.en));
+    return () => {
+      current = false;
+    };
+  }, [language]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -51,8 +68,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
   }, [language]);
 
+  if (!shown) return null;
   return (
-    <I18nContext.Provider value={{ language, setLanguage, t: TRANSLATIONS[language] }}>
+    <I18nContext.Provider value={{ language, setLanguage, t: shown }}>
       {children}
     </I18nContext.Provider>
   );
