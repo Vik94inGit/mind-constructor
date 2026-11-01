@@ -1,4 +1,3 @@
-import { Request, Response } from "express";
 import {
   deleteMapDao,
   getNodesByMapDao,
@@ -26,88 +25,37 @@ import {
 } from "../abl/circleAbl.js";
 import { computeAttackIndicatorsAbl } from "../abl/attackIndicatorAbl.js";
 import { broadcastToMap, notifyUser } from "../realtime/io.js";
-import { handleAblError } from "./errorHandling.js";
+import { authed, fail, isIdList, param } from "./errorHandling.js";
+
+const mapNotFound = (res: Parameters<typeof fail>[0]) => fail(res, 404, "Map not found");
 
 // ========== CREATE MAP ==========
-export const createMap = async (req: Request, res: Response) => {
-  try {
-    // owner comes from the authenticated user
-    const ownerId = req.user?._id;
-
-    if (!ownerId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-
-    const newMap = await createMapAbl(req.body, ownerId);
-
-    return res.status(201).json(newMap);
-  } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Internal Server Error",
-      logLabel: "createMap",
-    });
-  }
-};
+// The owner is the authenticated user.
+export const createMap = authed("createMap", async (req, res, userId) => {
+  const newMap = await createMapAbl(req.body, userId);
+  return res.status(201).json(newMap);
+});
 
 // ========== SET MY COLOR ON THIS MAP ==========
 // Called by the owner right after creating a map is covered by createMap's
 // ownerColor — this is for choosing/changing a color later, and for anyone
 // who was invited rather than the one who created the map.
-export const setMyMapColor = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-    const userId = req.user?._id;
-
-    if (!userId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-
-    const map = await setMapColorAbl(resolvedMapId, userId, req.body);
-
-    if (!map) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
+export const setMyMapColor = authed(
+  "setMyMapColor",
+  async (req, res, userId) => {
+    const map = await setMapColorAbl(param(req, "mapId"), userId, req.body);
+    if (!map) return mapNotFound(res);
     return res.status(200).json({ success: true, map });
-  } catch (error) {
-    return handleAblError(
-      res,
-      error,
-      [
-        [
-          ColorTakenError,
-          409,
-          "That color is already taken by another member of this map",
-        ],
-      ],
-      { message: "Internal Server Error", logLabel: "setMyMapColor" },
-    );
-  }
-};
+  },
+  { errors: [[ColorTakenError, 409, "That color is already taken by another member of this map"]] },
+);
 
 // ========== INVITE USER ==========
-export const inviteUserToMap = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-    const currentUserId = req.user?._id;
-
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-
-    const result = await inviteUserToMapAbl(resolvedMapId, req.body, currentUserId);
-
-    if (!result) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
+export const inviteUserToMap = authed(
+  "inviteUserToMap",
+  async (req, res, userId) => {
+    const result = await inviteUserToMapAbl(param(req, "mapId"), req.body, userId);
+    if (!result) return mapNotFound(res);
 
     // Lets the invitee's open tabs show the map straight away, without a
     // reload — see io.ts's notifyUser.
@@ -117,341 +65,135 @@ export const inviteUserToMap = async (req: Request, res: Response) => {
       invitedBy: req.user!.username,
     });
 
-    return res.status(200).json({
-      success: true,
-      map: result.map,
-    });
-  } catch (error) {
-    return handleAblError(
-      res,
-      error,
-      [
-        [NotInviterError, 403, "Only the map's owner can invite people"],
-        [InviteeNotFoundError, 404, "User not found"],
-        [AlreadyMemberError, 409, "Already a member of this map"],
-      ],
-      { message: "Server error", logLabel: "inviteUserToMap" },
-    );
-  }
-};
+    return res.status(200).json({ success: true, map: result.map });
+  },
+  {
+    errors: [
+      [NotInviterError, 403, "Only the map's owner can invite people"],
+      [InviteeNotFoundError, 404, "User not found"],
+      [AlreadyMemberError, 409, "Already a member of this map"],
+    ],
+    message: "Server error",
+  },
+);
 
-export const getMapById = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const currentUserId = req.user?._id;
-
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-
-    const map = await getMapByIdDao(resolvedMapId, currentUserId);
-
-    if (!map) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
+export const getMapById = authed(
+  "getMapById",
+  async (req, res, userId) => {
+    const map = await getMapByIdDao(param(req, "mapId"), userId);
+    if (!map) return mapNotFound(res);
     return res.status(200).json({ success: true, map });
-  } catch (error) {
-    return handleAblError(res, error, [], { message: "Server error", logLabel: "getMapById" });
-  }
-};
-// C
+  },
+  { message: "Server error" },
+);
 
 // GET /api/?filter=owned — filter comes from the query string, not the body:
 // GET requests carrying a body have no defined meaning in HTTP and plenty of
 // real infrastructure (proxies, CDNs, some HTTP clients) silently drops it.
-export const getAllMaps = async (req: Request, res: Response) => {
-  try {
-    const currentUserId = req.user?._id;
-
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-
-    const maps = await getMapsAbl(currentUserId, req.query.filter);
+export const getAllMaps = authed(
+  "getAllMaps",
+  async (req, res, userId) => {
+    const maps = await getMapsAbl(userId, req.query.filter);
     return res.status(200).json({ success: true, maps });
-  } catch (error) {
-    return handleAblError(res, error, [], { message: "Server error", logLabel: "getAllMaps" });
-  }
-};
+  },
+  { message: "Server error" },
+);
 
 // ========== SEARCH ACROSS ALL THOUGHTS ==========
 // GET /api/search?q=… — see searchNodesAbl.
-export const searchNodes = async (req: Request, res: Response) => {
-  try {
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res.status(401).json({ success: false, error: "Not authenticated" });
-    }
-    const results = await searchNodesAbl(currentUserId, { q: req.query.q });
+export const searchNodes = authed(
+  "searchNodes",
+  async (req, res, userId) => {
+    const results = await searchNodesAbl(userId, { q: req.query.q });
     return res.status(200).json({ success: true, results });
-  } catch (error) {
-    return handleAblError(res, error, [], { message: "Server error", logLabel: "searchNodes" });
-  }
-};
+  },
+  { message: "Server error" },
+);
 
-// map.controller.ts
-
-export const getMapSummary = async (req: Request, res: Response) => {
-  try {
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const { mapId } = req.params;
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-
-    const summary = await getMapSummaryDao(resolvedMapId, currentUserId);
-
-    if (!summary) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
+export const getMapSummary = authed(
+  "getMapSummary",
+  async (req, res, userId) => {
+    const summary = await getMapSummaryDao(param(req, "mapId"), userId);
+    if (!summary) return mapNotFound(res);
     // summary already carries the public `mapId` — no need to echo it back
     // separately (and definitely not under the key `_id`, which it isn't).
-    return res.status(200).json({
-      success: true,
-      ...summary,
-    });
-  } catch (error) {
-    return handleAblError(res, error, [], { message: "Server error", logLabel: "getMapSummary" });
-  }
-};
+    return res.status(200).json({ success: true, ...summary });
+  },
+  { message: "Server error" },
+);
 
-export const getNodesByMap = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-    const nodes = await getNodesByMapDao(resolvedMapId, currentUserId);
-
-    if (nodes === null) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
-    return res.status(200).json(nodes);
-  } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Internal Server Error",
-      logLabel: "getNodesByMap",
-    });
-  }
-};
+export const getNodesByMap = authed("getNodesByMap", async (req, res, userId) => {
+  const nodes = await getNodesByMapDao(param(req, "mapId"), userId);
+  if (nodes === null) return mapNotFound(res);
+  return res.status(200).json(nodes);
+});
 
 // Backfills the `text` getNodesByMap's own listing deliberately omits (see
 // getNodesByMapDao's doc comment) — POST, not GET, since the id list can be
 // arbitrarily long and doesn't belong in a query string. Body: { nodeIds }.
-export const getNodesText = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-    const { nodeIds } = req.body as { nodeIds?: unknown };
-    if (!Array.isArray(nodeIds) || nodeIds.length === 0 || !nodeIds.every((id) => typeof id === "string")) {
-      return res
-        .status(400)
-        .json({ success: false, error: "nodeIds must be a non-empty array of strings" });
-    }
+export const getNodesText = authed("getNodesText", async (req, res, userId) => {
+  const { nodeIds } = req.body as { nodeIds?: unknown };
+  if (!isIdList(nodeIds)) return fail(res, 400, "nodeIds must be a non-empty array of strings");
 
-    const text = await getNodesTextDao(resolvedMapId, currentUserId, nodeIds);
-    if (text === null) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
+  const text = await getNodesTextDao(param(req, "mapId"), userId, nodeIds);
+  if (text === null) return mapNotFound(res);
+  return res.status(200).json({ success: true, text });
+});
 
-    return res.status(200).json({ success: true, text });
-  } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Internal Server Error",
-      logLabel: "getNodesText",
-    });
-  }
-};
+export const updateMap = authed("updateMap", async (req, res, userId) => {
+  const mapId = param(req, "mapId");
+  const updatedMap = await updateMapAbl(mapId, userId, req.body);
+  if (!updatedMap) return mapNotFound(res);
 
-export const updateMap = async (req: Request, res: Response) => {
-  try {
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const { mapId } = req.params;
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
+  broadcastToMap(mapId, "map:updated", { map: updatedMap });
+  return res.status(200).json({ success: true, map: updatedMap });
+});
 
-    const updatedMap = await updateMapAbl(resolvedMapId, currentUserId, req.body);
-
-    if (!updatedMap) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
-    broadcastToMap(resolvedMapId, "map:updated", { map: updatedMap });
-
-    return res.status(200).json({ success: true, map: updatedMap });
-  } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Internal Server Error",
-      logLabel: "updateMap",
-    });
-  }
-};
-
-export const deleteMap = async (req: Request, res: Response) => {
-  try {
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const { mapId } = req.params;
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-    const result = await deleteMapDao(resolvedMapId, currentUserId);
-
-    return res.status(200).json({
-      success: true,
-      message: `Deleted map and related nodes`,
-      result,
-    });
-  } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Internal Server Error",
-      logLabel: "deleteMap",
-    });
-  }
-};
+export const deleteMap = authed("deleteMap", async (req, res, userId) => {
+  const result = await deleteMapDao(param(req, "mapId"), userId);
+  return res.status(200).json({ success: true, message: `Deleted map and related nodes`, result });
+});
 
 // ========== LIST EDGES ==========
-export const getEdgesByMap = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-    const edges = await getEdgesByMapDao(resolvedMapId, currentUserId);
-
-    if (edges === null) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
-    return res.status(200).json(edges);
-  } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Internal Server Error",
-      logLabel: "getEdgesByMap",
-    });
-  }
-};
+export const getEdgesByMap = authed("getEdgesByMap", async (req, res, userId) => {
+  const edges = await getEdgesByMapDao(param(req, "mapId"), userId);
+  if (edges === null) return mapNotFound(res);
+  return res.status(200).json(edges);
+});
 
 // ========== ATTACK INDICATORS (computed, not persisted) ==========
-export const getMapAttackIndicators = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
-
-    const result = await computeAttackIndicatorsAbl(resolvedMapId, currentUserId, req.query);
-
-    if (!result) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
-    return res.status(200).json({ success: true, ...result });
-  } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Internal Server Error",
-      logLabel: "getMapAttackIndicators",
-    });
-  }
-};
+export const getMapAttackIndicators = authed("getMapAttackIndicators", async (req, res, userId) => {
+  const result = await computeAttackIndicatorsAbl(param(req, "mapId"), userId, req.query);
+  if (!result) return mapNotFound(res);
+  return res.status(200).json({ success: true, ...result });
+});
 
 // ========== SELECT A CIRCLE ==========
 // Locks the circle's member nodes (a frontend layout/physics loop should
 // treat that as "don't move me") and remembers the choice on the Map.
-export const selectMapCircle = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
+export const selectMapCircle = authed(
+  "selectMapCircle",
+  async (req, res, userId) => {
+    const mapId = param(req, "mapId");
+    const result = await selectCircleAbl(mapId, userId, req.body);
+    if (!result) return mapNotFound(res);
 
-    const result = await selectCircleAbl(resolvedMapId, currentUserId, req.body);
-
-    if (!result) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
-    broadcastToMap(resolvedMapId, "circle:selected", { selectedCircle: result.selectedCircle });
+    broadcastToMap(mapId, "circle:selected", { selectedCircle: result.selectedCircle });
     return res.status(200).json({ success: true, ...result });
-  } catch (error) {
-    return handleAblError(
-      res,
-      error,
-      [
-        [
-          CircleNotFoundError,
-          404,
-          "Circle not found — the graph may have changed since it was computed",
-        ],
-      ],
-      { message: "Internal Server Error", logLabel: "selectMapCircle" },
-    );
-  }
-};
+  },
+  {
+    errors: [
+      [CircleNotFoundError, 404, "Circle not found — the graph may have changed since it was computed"],
+    ],
+  },
+);
 
 // ========== DESELECT THE CIRCLE ==========
-export const deselectMapCircle = async (req: Request, res: Response) => {
-  try {
-    const { mapId } = req.params;
-    const currentUserId = req.user?._id;
-    if (!currentUserId) {
-      return res
-        .status(401)
-        .json({ success: false, error: "Not authenticated" });
-    }
-    const resolvedMapId = Array.isArray(mapId) ? mapId[0] : mapId;
+export const deselectMapCircle = authed("deselectMapCircle", async (req, res, userId) => {
+  const mapId = param(req, "mapId");
+  const result = await deselectCircleAbl(mapId, userId);
+  if (!result) return mapNotFound(res);
 
-    const result = await deselectCircleAbl(resolvedMapId, currentUserId);
-
-    if (!result) {
-      return res.status(404).json({ success: false, error: "Map not found" });
-    }
-
-    broadcastToMap(resolvedMapId, "circle:deselected", { selectedCircle: null });
-    return res.status(200).json({ success: true, ...result });
-  } catch (error) {
-    return handleAblError(res, error, [], {
-      message: "Internal Server Error",
-      logLabel: "deselectMapCircle",
-    });
-  }
-};
+  broadcastToMap(mapId, "circle:deselected", { selectedCircle: null });
+  return res.status(200).json({ success: true, ...result });
+});

@@ -3,7 +3,7 @@
 // then walk the caller's own list of domain-specific error classes, then fall
 // back to console.error(...) + 500. Every controller still imports its own
 // error classes from its own ABL module and passes them in via `mappings`.
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { MapFinishedError, ValidationError } from "../abl/errors.js";
 
 // The JSON body an error mapping produces — always includes `success: false`
@@ -50,3 +50,52 @@ export function handleAblError(
   console.error(`${fallback.logLabel} error:`, error);
   return res.status(fallback.status ?? 500).json({ success: false, error: fallback.message });
 }
+
+// ---------------------------------------------------------------------------
+// Controller plumbing. Every protected route runs `protect` first, so
+// req.user is always set by the time an action runs; `authed` still answers
+// 401 if it isn't (a route registered without `protect` by mistake), then
+// runs the action with the caller's id and sends any thrown error through
+// handleAblError. That removes the same try/catch and login check from every
+// action.
+
+export interface AuthedOptions {
+  /** Domain errors this action maps to a status (see handleAblError). */
+  errors?: ErrorMapping[];
+  /** The 500 message when nothing else matched. */
+  message?: string;
+}
+
+export function authed<P = Request["params"]>(
+  logLabel: string,
+  action: (req: Request<P>, res: Response, userId: string) => unknown,
+  { errors = [], message = "Internal Server Error" }: AuthedOptions = {},
+) {
+  return async (req: Request<P>, res: Response) => {
+    const userId = req.user?._id;
+    if (!userId) return fail(res, 401, "Not authenticated");
+    try {
+      return await action(req, res, userId);
+    } catch (error) {
+      return handleAblError(res, error, errors, { message, logLabel });
+    }
+  };
+}
+
+/** `{ success: false, error }` with the given status. */
+export const fail = (res: Response, status: number, error: string) =>
+  res.status(status).json({ success: false, error });
+
+/** A route param as one string (Express types allow a string array). */
+export const param = (req: { params: unknown }, name: string): string => {
+  const value = (req.params as Record<string, string | string[]>)[name];
+  return Array.isArray(value) ? value[0] : value;
+};
+
+/** The public map id off a doc whose mapId was populated, or null. */
+export const publicMapIdOf = (doc: { mapId?: unknown } | null | undefined): string | null =>
+  (doc?.mapId as { mapId?: string } | null | undefined)?.mapId ?? null;
+
+/** True for a non-empty array of strings (bulk id lists in request bodies). */
+export const isIdList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.length > 0 && value.every((id) => typeof id === "string");
