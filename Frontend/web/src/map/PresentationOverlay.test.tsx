@@ -56,8 +56,8 @@ describe("PresentationOverlay", () => {
   it("opens a child's own slide when its card is tapped, and goes back up from Under", () => {
     const { onIndexChange } = setup();
     fireEvent.click(screen.getByText("Buy train tickets"));
-    // trip, hotel, cheap, train: the hotel's own child comes before the next sibling.
-    expect(onIndexChange).toHaveBeenLastCalledWith(3);
+    // trip, hotel, train, cheap: all of the trip's children before the hotel's own.
+    expect(onIndexChange).toHaveBeenLastCalledWith(2);
     fireEvent.click(screen.getByText("Book a hotel"));
     expect(onIndexChange).toHaveBeenLastCalledWith(1);
   });

@@ -120,21 +120,31 @@ export interface SlideGroup {
 
 // The slides a presentation steps through: one per node, each carrying the
 // children hanging from it (left to right, as cards the viewer can tap to
-// jump to). The order walks each tree depth first: a parent, then its own
-// children one by one — each child's own children straight after it — and
-// only then the next parent. Trees come in computeSlideOrder's root order
-// (an isFirstNode root first, then by when they were made). Nodes a corrupt
-// parent loop kept out of every tree are walked last, so each still shows once.
+// jump to). The order goes level by level within each tree: a parent, then
+// all of its own children one after another, then the next parent — the
+// first of those children that has children of its own — and its children,
+// and so on, so a parent's children are never interrupted by a grandchild.
+// Trees come in computeSlideOrder's root order (an isFirstNode root first,
+// then by when they were made). Nodes a corrupt parent loop kept out of
+// every tree are walked last, so each still shows once.
 export function computeSlideGroups(nodes: NodeDoc[]): SlideGroup[] {
   const { parents, childrenByParent, rootIds } = slideParents(nodes);
   const groups: SlideGroup[] = [];
   const shown = new Set<string>();
-  const walk = (node: NodeDoc) => {
-    if (shown.has(node.nodeId)) return;
-    shown.add(node.nodeId);
-    const children = childrenByParent.get(node.nodeId) ?? [];
-    groups.push({ node, children });
-    for (const c of children) walk(c);
+  const walk = (start: NodeDoc) => {
+    if (shown.has(start.nodeId)) return;
+    shown.add(start.nodeId);
+    const queue = [start];
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      const children = childrenByParent.get(node.nodeId) ?? [];
+      groups.push({ node, children });
+      for (const c of children) {
+        if (shown.has(c.nodeId)) continue;
+        shown.add(c.nodeId);
+        queue.push(c);
+      }
+    }
   };
   for (const root of parents.filter((p) => rootIds.has(p.nodeId))) walk(root);
   for (const n of nodes) walk(n);
