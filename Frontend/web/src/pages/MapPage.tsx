@@ -139,6 +139,7 @@ import { mapBackgroundStyle } from "../utils/mapBackground";
 import { autoNodeFade, nodeFadeStyle } from "../utils/nodeFade";
 import { MoveNoteModal } from "../dashboard/MoveNoteModal";
 import { findInbox, noteBranch } from "../utils/inbox";
+import { feature } from "../utils/usage";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -406,6 +407,7 @@ export function MapPage() {
   // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.
   const [minimapShown, setMinimapShown] = useState<boolean>(loadMinimapShown);
   function toggleMinimap() {
+    feature("minimap");
     setMinimapShown((v) => {
       saveMinimapShown(!v);
       return !v;

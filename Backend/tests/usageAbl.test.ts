@@ -5,6 +5,7 @@ import {
   countReturningUsersDao,
   dailyActivityDao,
   eventTotalsDao,
+  featureTotalsDao,
   insertUsageEventsDao,
 } from "../src/dao/usageDao.js";
 import { getUsageSummaryAbl, MAX_EVENTS_PER_REQUEST, recordUsageAbl } from "../src/abl/usageAbl.js";
@@ -16,6 +17,7 @@ vi.mock("../src/dao/usageDao.js", () => ({
   countReturningUsersDao: vi.fn(),
   dailyActivityDao: vi.fn(),
   eventTotalsDao: vi.fn(),
+  featureTotalsDao: vi.fn(),
   countCreatedDao: vi.fn(),
 }));
 
@@ -48,6 +50,7 @@ describe("recordUsageAbl", () => {
           { name: "made_up_event" },
           { name: "node_created", props: { type: "Problem", text: "my secret thought" } },
           { name: "view_changed", props: { view: "my secret thought" } },
+          { name: "feature_used", props: { feature: "pack" } },
         ],
       },
       now,
@@ -55,6 +58,7 @@ describe("recordUsageAbl", () => {
     expect(inserted()).toEqual([
       { name: "node_created", props: { type: "Problem" }, at: now, day: "2026-11-01" },
       { name: "view_changed", props: undefined, at: now, day: "2026-11-01" },
+      { name: "feature_used", props: { feature: "pack" }, at: now, day: "2026-11-01" },
     ]);
   });
 
@@ -104,7 +108,11 @@ describe("getUsageSummaryAbl", () => {
     vi.mocked(countActiveUsersDao).mockResolvedValue(3);
     vi.mocked(countReturningUsersDao).mockResolvedValue(2);
     vi.mocked(dailyActivityDao).mockResolvedValue([{ day: "2026-10-31", users: 2, events: 9 }]);
-    vi.mocked(eventTotalsDao).mockResolvedValue([{ name: "app_opened", count: 9, users: 2 }]);
+    vi.mocked(eventTotalsDao).mockResolvedValue([
+      { name: "app_opened", count: 9, users: 2 },
+      { name: "feature_used", count: 4, users: 1 },
+    ]);
+    vi.mocked(featureTotalsDao).mockResolvedValue([{ name: "pack", count: 4, users: 1 }]);
     vi.mocked(countCreatedDao).mockResolvedValue({ users: 10, newUsers: 1, maps: 4, nodes: 20 });
   });
 
@@ -118,6 +126,8 @@ describe("getUsageSummaryAbl", () => {
     ]);
     expect(s.active).toEqual({ today: 3, week: 3, month: 3, returning: 2 });
     expect(s.created.maps).toBe(4);
+    expect(s.events).toEqual([{ name: "app_opened", count: 9, users: 2 }]);
+    expect(s.features).toEqual([{ name: "pack", count: 4, users: 1 }]);
     expect(s.includeDemo).toBe(false);
     expect(countActiveUsersDao).toHaveBeenCalledWith(new Date("2026-11-01T00:00:00.000Z"), false);
   });

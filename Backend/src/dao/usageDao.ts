@@ -47,6 +47,16 @@ export const eventTotalsDao = async (since: Date, includeDemo: boolean) => {
   ]);
 };
 
+// Per feature (feature_used events) from `since`: how often, and by how many people.
+export const featureTotalsDao = async (since: Date, includeDemo: boolean) => {
+  return await UsageEvent.aggregate<{ name: string; count: number; users: number }>([
+    { $match: { name: "feature_used", "props.feature": { $exists: true }, at: { $gte: since }, ...demoFilter(includeDemo) } },
+    { $group: { _id: "$props.feature", count: { $sum: 1 }, users: { $addToSet: "$userId" } } },
+    { $project: { _id: 0, name: "$_id", count: 1, users: { $size: "$users" } } },
+    { $sort: { count: -1 } },
+  ]);
+};
+
 // People active on at least two different days from `since` (they came back).
 export const countReturningUsersDao = async (since: Date, includeDemo: boolean) => {
   const rows = await UsageEvent.aggregate<{ n: number }>([

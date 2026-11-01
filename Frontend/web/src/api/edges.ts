@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 import * as offline from "../offline/sync";
 import { upsertBy } from "../utils/mapGraph";
 import type { EdgeDoc, EdgeSentiment } from "../types";
+import { feature } from "../utils/usage";
 
 export async function listEdges(mapId: string): Promise<EdgeDoc[]> {
   return apiRequest<EdgeDoc[]>(`/api/${mapId}/edges`);
@@ -11,6 +12,7 @@ export async function createEdge(
   mapId: string,
   input: { fromNodeId: string; toNodeId: string; sentiment?: EdgeSentiment },
 ): Promise<EdgeDoc> {
+  feature("link_nodes");
   const localId = offline.newLocalId();
   return apiRequest<EdgeDoc>(`/api/edges/${mapId}`, {
     method: "POST",

@@ -1,6 +1,7 @@
 import { apiRequest } from "./client";
 import * as offline from "../offline/sync";
 import type { FolderDoc } from "../types";
+import { feature } from "../utils/usage";
 
 type ListPayload = { success: boolean; folders: FolderDoc[] };
 const LIST = "/api/folders";
@@ -13,6 +14,7 @@ export async function listFolders(): Promise<FolderDoc[]> {
 }
 
 export async function createFolder(name: string): Promise<FolderDoc> {
+  feature("folders");
   const localId = offline.newLocalId();
   const res = await apiRequest<{ success: boolean; folder: FolderDoc }>(LIST, {
     method: "POST",
@@ -60,6 +62,7 @@ export async function deleteFolder(folderId: string) {
 
 /** Puts a map in one of your folders, or back at the top level with null. */
 export async function moveMapToFolder(mapId: string, folderId: string | null) {
+  feature("folders");
   return apiRequest<{ success: boolean; mapId: string; folderId: string | null }>(`/api/folders/maps/${mapId}`, {
     method: "PATCH",
     body: { folderId },

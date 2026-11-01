@@ -9,6 +9,8 @@ export interface UsageSummary {
   created: { users: number; newUsers: number; maps: number; nodes: number };
   daily: { day: string; users: number; events: number }[];
   events: { name: string; count: number; users: number }[];
+  /** Per feature in utils/usage.ts FEATURES (only the ones used at all). */
+  features?: { name: string; count: number; users: number }[];
 }
 
 /** Admin only: how the app was used over the last `days` days. Always fresh, never the offline copy. */

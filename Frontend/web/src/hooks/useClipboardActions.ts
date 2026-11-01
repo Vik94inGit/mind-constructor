@@ -9,6 +9,7 @@ import { avoidOverlap, nodeObstacles, pickNonOverlappingPosition } from "../util
 import type { NodeGroup, Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import type { Translation } from "../i18n/translations";
 import type { EdgeDoc, NodeDoc } from "../types";
+import { feature } from "../utils/usage";
 
 type Pt = { x: number; y: number };
 
@@ -76,6 +77,7 @@ export function useClipboardActions({
 }: Params) {
   // `pickIds` null = every node on the map.
   async function copyNodes(pickIds: string[] | null) {
+    feature("copy_paste");
     if (!mapId) return;
     // Awaited, not read straight off `n.text` — a marquee/long-press pick
     // never necessarily opened any of these nodes first, so their real text
@@ -202,6 +204,7 @@ export function useClipboardActions({
   // connections among them. `at` (a canvas point, from the canvas menu's
   // "Paste here") puts the group's middle there.
   async function pasteClipboard(at?: Pt) {
+    feature("copy_paste");
     const clipboard = readNodeClipboard();
     if (!mapId) return;
     if (!clipboard) {

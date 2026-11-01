@@ -1,12 +1,14 @@
 import { apiRequest } from "./client";
 import * as offline from "../offline/sync";
 import type { LineDoc } from "../types";
+import { feature } from "../utils/usage";
 
 export async function listLines(mapId: string): Promise<LineDoc[]> {
   return apiRequest<LineDoc[]>(`/api/${mapId}/lines`);
 }
 
 export async function createLine(mapId: string, points: { x: number; y: number }[]): Promise<LineDoc> {
+  feature("draw_line");
   const localId = offline.newLocalId();
   return apiRequest<LineDoc>(`/api/lines/${mapId}`, {
     method: "POST",

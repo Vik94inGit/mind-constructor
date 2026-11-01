@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as nodesApi from "../api/nodes";
 import type { NodeDoc } from "../types";
 import { nodeRefId } from "../utils/nodeType";
+import { feature } from "../utils/usage";
 
 // Undo for moves on the map: every drag records where its nodes were before
 // (their icon spot, puzzle-card spot and parent), and undo puts the last one
@@ -63,6 +64,7 @@ export function useMoveUndo({ nodes, upsertNode, setActionError, errorMessage, k
   }, []);
 
   const undo = useCallback(async () => {
+    feature("undo");
     const step = stack.current.pop();
     setDepth(stack.current.length);
     if (!step) return;

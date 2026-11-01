@@ -5,6 +5,7 @@ import {
   countReturningUsersDao,
   dailyActivityDao,
   eventTotalsDao,
+  featureTotalsDao,
   insertUsageEventsDao,
 } from "../dao/usageDao.js";
 import { parseOrThrow } from "./errors.js";
@@ -35,6 +36,8 @@ export const EVENT_PROPS = {
   node_protected: [],
   map_finished: [],
   replay_played: [],
+  // Every other feature, by name (Frontend/web/src/utils/usage.ts FEATURES).
+  feature_used: ["feature"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type UsageEventName = keyof typeof EVENT_PROPS;
@@ -130,13 +133,14 @@ export const getUsageSummaryAbl = async (query: unknown, now: Date = new Date())
   const since = new Date(todayStart.getTime() - (days - 1) * DAY_MS);
   const ago = (n: number) => new Date(now.getTime() - n * DAY_MS);
 
-  const [today, week, month, returning, daily, events, created] = await Promise.all([
+  const [today, week, month, returning, daily, events, features, created] = await Promise.all([
     countActiveUsersDao(todayStart, includeDemo),
     countActiveUsersDao(ago(7), includeDemo),
     countActiveUsersDao(ago(30), includeDemo),
     countReturningUsersDao(since, includeDemo),
     dailyActivityDao(since, includeDemo),
     eventTotalsDao(since, includeDemo),
+    featureTotalsDao(since, includeDemo),
     countCreatedDao(since, includeDemo),
   ]);
 
@@ -155,6 +159,7 @@ export const getUsageSummaryAbl = async (query: unknown, now: Date = new Date())
     active: { today, week, month, returning },
     created,
     daily: series,
-    events,
+    events: events.filter((e) => e.name !== "feature_used"),
+    features,
   };
 };

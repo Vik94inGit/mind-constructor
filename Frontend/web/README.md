@@ -280,12 +280,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   `npm run admin:promote` in `Backend/`, never through the app itself). Block/unblock/delete
   users, wipe the database. Above the user list, **How the app is used**: people active today, in
   7 and 30 days, people who came back another day, new accounts, maps and nodes made, a bar of
-  people active each day, and a table of what they did (last 7, 30 or 90 days, demo accounts left
+  people active each day, **every feature, least used first** (unused ones flagged, so unpopular features stand out; `src/admin/featureRows.ts`), and a table of what they did (last 7, 30 or 90 days, demo accounts left
   out unless ticked; `src/admin/UsageSummary.tsx`).
 - **Usage numbers** — `src/utils/usage.ts` `track()` notes what a signed-in person does (opened the
   app or a page, signed up or in, quick note, map or node made, search, Think it through started
   and finished, a feeling or check-in, text split, picture drawn, view picked, map shared, attack,
-  protect, discussion finished, replay played). Only the event's name and a short label (a node
+  protect, discussion finished, replay played), plus every other feature through `feature()` (one `feature_used` event per feature in `FEATURES`, counted once per 3 seconds: editing, styling, zones, moving, linking, packing, folders, history, presentation, copy/paste, undo, export, minimap and more; add new features there). Only the event's name and a short label (a node
   type, a view) are sent, never a thought's text; events are batched and sent every few seconds
   and when the tab is hidden, kept for a while if offline. Browsers with Global Privacy Control
   or Do Not Track on send nothing.
