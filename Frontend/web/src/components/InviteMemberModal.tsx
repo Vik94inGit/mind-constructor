@@ -5,6 +5,7 @@ import { Modal } from "./Modal";
 import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
 import type { MapDoc, UserSearchResult } from "../types";
+import { track } from "../utils/usage";
 
 // How long typing has to pause before the search goes out — one request per
 // word typed, not one per keystroke.
@@ -67,6 +68,7 @@ export function InviteMemberModal({
     setBusyId(user._id);
     try {
       const updated = await mapsApi.inviteMember(map.mapId, user._id);
+      track({ name: "map_shared" });
       setSuccess(t.ui.invite.invited(user.username));
       // Now a member, so no longer someone to invite.
       setResults((prev) => prev?.filter((u) => u._id !== user._id) ?? null);

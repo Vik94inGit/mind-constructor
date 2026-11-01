@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import * as mapsApi from "../api/maps";
 import type { MapAttack, NodeDoc } from "../types";
+import { track } from "../utils/usage";
 
 type Pt = { x: number; y: number };
 
@@ -52,6 +53,7 @@ export function useTimeLapse({
     [setTimeLapse],
   );
   function startTimeLapse() {
+    track({ name: "replay_played" });
     onStart();
     setTimeLapse({ step: 0, playing: true });
     // In a discussion the replay also shows the fight: who was hit, and when.

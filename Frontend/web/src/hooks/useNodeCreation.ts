@@ -13,6 +13,7 @@ import type { PictureKind } from "../utils/pictures";
 import { piecesParentsFirst } from "../utils/textSplit";
 import type { Translation } from "../i18n/translations";
 import type { MapKind, NodeDoc, NodeType } from "../types";
+import { track } from "../utils/usage";
 
 type Pt = { x: number; y: number };
 
@@ -162,6 +163,7 @@ export function useNodeCreation({
       let node = await nodesApi.createNode(mapId, { text, type, x, y, parentId, ...(emoji ? { emoji } : {}), ...(prompt ? { prompt } : {}) });
       // Pictures added while writing it (NewNodePanel) go on once it exists.
       if (images.length) node = await nodesApi.updateNode(node.nodeId, { images });
+      track({ name: "node_created", props: { type } });
       upsertNode(node);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
       // The text was written in NewNodePanel already, so nothing opens
@@ -285,6 +287,7 @@ export function useNodeCreation({
     if (!mapId) return;
     setActionError(null);
     const dots = layoutPicture(kind, desired, [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()]);
+    track({ name: "picture_drawn" });
     const id = newPictureId();
     const question = t.ui.pictures.questions[kind];
     const type = pictureNodeType(kind);

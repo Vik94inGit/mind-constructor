@@ -24,6 +24,7 @@ import { ImagesSection } from "./nodePanel/ImagesSection";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
 import { moveRovingFocus } from "../utils/roving";
 import { MAX_NODE_IMAGES, imageFilesFrom, makeCardImage, makeIconImage, shrinkImage } from "../utils/images";
+import { track } from "../utils/usage";
 
 // A bottom sheet overlaying the canvas, at every screen size — not just
 // this panel's own ✕, tapping empty canvas closes it too (MapPage's own
@@ -752,6 +753,7 @@ export function NodePanel({
     setError(null);
     try {
       const res = await nodesApi.attackNode(node.nodeId, weapon, { type: effectiveAttackType, text: attackText.trim() });
+      track({ name: "node_attacked", props: { weapon } });
       onAttacked(res.node, res.weaponNode, weapon, res.healedParent, res.blocked, res.protector);
       // Landing an attack — blocked or not — creates a real node (the
       // weapon node carrying the attacker's own objection); closing here
@@ -774,6 +776,7 @@ export function NodePanel({
     setError(null);
     try {
       const res = await nodesApi.protectNode(node.nodeId, { type: protectType, text: protectText.trim() });
+      track({ name: "node_protected" });
       onProtected(res.protectionNode, res.healedNode);
       // Same "close after creating a node" reasoning as handleAttack above.
       onClose();

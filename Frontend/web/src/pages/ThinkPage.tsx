@@ -12,6 +12,7 @@ import { WriteStep } from "../think/WriteStep";
 import { ShapeStep } from "../think/ShapeStep";
 import { BuildStep } from "../think/BuildStep";
 import { useConfirm } from "../context/ConfirmContext";
+import { track } from "../utils/usage";
 
 // "Think it through": a guided path from a thought in someone's head to a map
 // on the canvas, built to get people writing rather than configuring.
@@ -75,6 +76,11 @@ export function ThinkPage() {
   const setThoughts = (fn: (ts: Thought[]) => Thought[]) => setDraft((d) => ({ ...d, thoughts: fn(d.thoughts) }));
   const goTo = (step: number) => {
     if (step === 3 && !name.trim()) setName(suggestMapName(draft.center));
+    // Past the first question: they've started thinking something through.
+    if (draft.step === 0 && step === 1) {
+      track({ name: "think_started" });
+      if (draft.checkIn) track({ name: "checked_in", props: { moment: "before" } });
+    }
     update({ step });
     window.scrollTo({ top: 0 });
   };
@@ -101,6 +107,7 @@ export function ThinkPage() {
       );
       clearDraft(userId);
       discardServerDraft();
+      track({ name: "think_finished" });
       navigate(`/maps/${map.mapId}`);
     } catch (err) {
       setError(err instanceof ApiRequestError ? `${tt.build.error} (${err.message})` : tt.build.error);

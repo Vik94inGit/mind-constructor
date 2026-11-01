@@ -5,6 +5,7 @@ import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
 import type { User } from "../types";
 import { useConfirm } from "../context/ConfirmContext";
+import { UsageSummary } from "../admin/UsageSummary";
 
 export function AdminPage() {
   const confirm = useConfirm();
@@ -84,6 +85,8 @@ export function AdminPage() {
           {t.ui.admin.wipe}
         </button>
       </div>
+
+      <UsageSummary />
 
       {error && (
         <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>

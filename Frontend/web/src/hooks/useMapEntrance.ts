@@ -5,6 +5,7 @@ import { currentView, loadRememberedView, rememberView, VIEW_PROMPT_MIN_NODES } 
 import type { MapView } from "../utils/viewPrompt";
 import type { ReadingMode } from "../utils/readingMode";
 import type { NodeDoc } from "../types";
+import { track } from "../utils/usage";
 
 interface Params {
   mapId: string | undefined;
@@ -74,6 +75,7 @@ export function useMapEntrance({
   const currentViewRef = useRef<MapView>("map");
   currentViewRef.current = view;
   function chooseView(next: MapView) {
+    track({ name: "view_changed", props: { view: next } });
     setViewPromptOpen(false);
     rememberView(next);
     showView(next);

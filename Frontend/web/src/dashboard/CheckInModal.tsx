@@ -8,6 +8,7 @@ import { FEELING_EMOJI, checkInEntry } from "../utils/feeling";
 import type { CheckIn, CheckInEntry } from "../utils/feeling";
 import type { MapDoc } from "../types";
 import { primaryBtn, secondaryBtn } from "./FolderModal";
+import { track } from "../utils/usage";
 
 // "How do you feel now?" from a map's menu on the dashboard: the after of the
 // map's check-in (utils/feeling.ts), for a map whose canvas prompt was waved
@@ -36,6 +37,7 @@ export function CheckInModal({
     setError(null);
     try {
       await stateApi.saveMapViewState(map.mapId, { checkIn });
+      track({ name: "checked_in", props: { moment: "after" } });
       onSaved(checkIn);
     } catch {
       setError(tf.checkInFailed);
