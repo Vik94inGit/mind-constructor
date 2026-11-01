@@ -19,12 +19,21 @@ import {
   CannotActOnSelfError,
   UserNotFoundError,
 } from "../src/abl/userAbl.js";
+import { deleteManyNodesDao } from "../src/dao/nodeDao.js";
+import { deleteUserContentDao, listNodeIdsByUserDao } from "../src/dao/userContentDao.js";
 
 vi.mock("../src/dao/userDao.js", () => ({
   findUserByIdDao: vi.fn(),
   deleteUserDao: vi.fn(),
   setUserBlockedDao: vi.fn(),
   searchUsersDao: vi.fn(),
+}));
+vi.mock("../src/dao/nodeDao.js", () => ({
+  deleteManyNodesDao: vi.fn(),
+}));
+vi.mock("../src/dao/userContentDao.js", () => ({
+  listNodeIdsByUserDao: vi.fn(),
+  deleteUserContentDao: vi.fn(),
 }));
 vi.mock("../src/dao/mapsDao.js", () => ({
   listMapsByOwnerDao: vi.fn(),
@@ -100,8 +109,10 @@ describe("userAbl", () => {
       expect(deleteUserDao).not.toHaveBeenCalled();
     });
 
-    it("deletes owned maps, unlinks other memberships, then deletes the user", async () => {
+    it("deletes owned maps, their nodes elsewhere and the rest of their data, then the user", async () => {
       vi.mocked(findUserByIdDao).mockResolvedValue({ _id: "user1" } as never);
+      vi.mocked(listNodeIdsByUserDao).mockResolvedValue(["n1", "n2"]);
+      vi.mocked(deleteManyNodesDao).mockResolvedValue([{}, {}] as never);
       vi.mocked(listMapsByOwnerDao).mockResolvedValue([
         { mapId: "mapA" },
         { mapId: "mapB" },
@@ -114,9 +125,11 @@ describe("userAbl", () => {
 
       expect(deleteMapDao).toHaveBeenCalledWith("mapA", "user1");
       expect(deleteMapDao).toHaveBeenCalledWith("mapB", "user1");
+      expect(deleteManyNodesDao).toHaveBeenCalledWith(["n1", "n2"], "user1");
+      expect(deleteUserContentDao).toHaveBeenCalledWith("user1");
       expect(removeUserFromMapsDao).toHaveBeenCalledWith("user1");
       expect(deleteUserDao).toHaveBeenCalledWith("user1");
-      expect(result).toEqual({ deletedUserId: "user1", deletedOwnedMaps: 2 });
+      expect(result).toEqual({ deletedUserId: "user1", deletedOwnedMaps: 2, deletedNodes: 2 });
     });
   });
 

@@ -60,6 +60,11 @@ export const deleteNodeImagesExceptDao = async (nodeId: InternalId, keepImageIds
   await deleteImages({ nodeId, imageId: { $nin: keepImageIds } });
 };
 
+// Every picture one user added, wherever it is (an admin deleting the account).
+export const deleteImagesByUserDao = async (userId: InternalId) => {
+  await deleteImages({ userId });
+};
+
 export const deleteImagesByNodesDao = async (nodeIds: InternalId[]) => {
   if (nodeIds.length === 0) return;
   await deleteImages({ nodeId: { $in: nodeIds } });
