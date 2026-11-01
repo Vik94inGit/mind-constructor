@@ -70,6 +70,23 @@ describe("NodePanel", () => {
     expect(screen.getByText("Claim")).toBeInTheDocument();
   });
 
+  it("offers Split into nodes right under the text, on what's typed there", async () => {
+    const user = userEvent.setup();
+    vi.mocked(nodesApi.updateNode).mockResolvedValue(makeNode({ nodeId: "a", text: "The claim. A reason." }));
+    const onSplitText = vi.fn();
+    renderPanel({ onSplitText });
+    const box = screen.getByDisplayValue("The claim");
+    await user.type(box, ". A reason.");
+    await user.click(screen.getByRole("button", { name: en.ui.textNodes.splitEntry }));
+    expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { text: "The claim. A reason." });
+    expect(onSplitText).toHaveBeenCalledWith("The claim. A reason.");
+  });
+
+  it("has no Split into nodes when the node can't be split", () => {
+    renderPanel();
+    expect(screen.queryByRole("button", { name: en.ui.textNodes.splitEntry })).toBeNull();
+  });
+
   it("saves edited text on Enter and closes", async () => {
     const user = userEvent.setup();
     const updated = makeNode({ nodeId: "a", text: "New claim" });

@@ -52,15 +52,13 @@ interface Props {
   onStartPack: () => void;
   onStartChoose: () => void;
   onExtractText: () => void;
-  /** Cut this node's text into smaller nodes hanging from it (map/TextToNodesModal.tsx's split mode); absent when it can't be split. */
-  onSplitText?: () => void;
   onClose: () => void;
 }
 
 // NodePanel's "Modify" tab: health, what a weapon/shield points at, the
 // owner's title/zone name/step number/size/zone/symbol controls, branch
 // visibility, choosing and packing, and this node's links.
-export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutcome, busy, target, protectedTarget, protectors, connectedEdges, nodeById, titleDraft, setTitleDraft, zoneNameDraft, setZoneNameDraft, orderDraft, setOrderDraft, onTitleSave, onSetEmoji, onToggleEmojiStill, onZoneNameSave, onOrderSave, onToggleHidden, onSetSize, onSetZone, onSetShape, onSetSymbol, onDeleteEdge, onSelectNode, onEdit, onStartPack, onStartChoose, onExtractText, onSplitText, onClose }: Props) {
+export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutcome, busy, target, protectedTarget, protectors, connectedEdges, nodeById, titleDraft, setTitleDraft, zoneNameDraft, setZoneNameDraft, orderDraft, setOrderDraft, onTitleSave, onSetEmoji, onToggleEmojiStill, onZoneNameSave, onOrderSave, onToggleHidden, onSetSize, onSetZone, onSetShape, onSetSymbol, onDeleteEdge, onSelectNode, onEdit, onStartPack, onStartChoose, onExtractText, onClose }: Props) {
   const { t } = useI18n();
   return (
     <div className="mt-4">
@@ -384,16 +382,6 @@ export function ModifyTab({ node, isCreator, isMapOwner, isClusterParent, isOutc
           >
             {t.ui.node.chooseNodes}
           </button>
-          {onSplitText && (
-            <button
-              className="mt-2 inline-flex w-full cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={onSplitText}
-              disabled={busy}
-              title={t.ui.textNodes.splitEntryTitle}
-            >
-              {t.ui.textNodes.splitEntry}
-            </button>
-          )}
         </div>
       )}
       {connectedEdges.length === 0 ? (
