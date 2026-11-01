@@ -31,7 +31,7 @@ export function PresentationOverlay({ slides, index, onIndexChange, onExit }: Pr
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-surface">
-      <div className="flex items-center justify-between px-5 py-3">
+      <div className="flex items-center justify-between px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
         <span className="text-[0.85rem] text-ink-soft">{t.ui.presentation.slideCount(index + 1, slides.length)}</span>
         <button
           type="button"
@@ -49,8 +49,15 @@ export function PresentationOverlay({ slides, index, onIndexChange, onExit }: Pr
           in the same column) get pushed past the viewport instead, with
           nothing to scroll them back into view. Classic flexbox scrolling
           gotcha, not a text-wrapping issue — neither text element below has
-          any truncate/line-clamp/overflow-hidden of its own. */}
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-8 py-6 text-center">
+          any truncate/line-clamp/overflow-hidden of its own.
+          The centering is my-auto on an inner column, not justify-center
+          here: justify-center pushes a slide taller than the screen out
+          past *both* edges, and the part above the top (the "Under …" line,
+          the icon) can't be scrolled back to — on a phone a long node lost
+          its whole upper row. my-auto centers a short slide the same way
+          and lets a long one start at the top and scroll. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-8 py-6 text-center" data-slide-body>
+        <div className="my-auto flex flex-col items-center gap-6">
         {/* The node's own type icon, large — a slide used to be text-only
             (type name + headline), which read as flat compared to the
             crowned, colored icons the same node wears on the canvas. */}
@@ -79,9 +86,10 @@ export function PresentationOverlay({ slides, index, onIndexChange, onExit }: Pr
             title-less node just shows its text as the headline itself,
             same "title, else text" precedent NodeCard's own caption uses. */}
         {node.title && <p className="max-w-[700px] text-[1.15rem] text-ink-soft">{node.text}</p>}
+        </div>
       </div>
 
-      <div className="flex items-center justify-center gap-4 px-5 py-6">
+      <div className="flex items-center justify-center gap-4 px-5 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
           disabled={atStart}
