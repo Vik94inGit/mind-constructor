@@ -12,6 +12,7 @@ import { TypePicker } from "./TypePicker";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeShape, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { usePanelSheet } from "./nodePanel/usePanelSheet";
+import { useNodeImages } from "./nodePanel/useNodeImages";
 import type { Feeling } from "../utils/feeling";
 import { InfoTab } from "./nodePanel/InfoTab";
 import type { CardLook } from "./nodePanel/InfoTab";
@@ -23,59 +24,16 @@ import { HistoryTab } from "./nodePanel/HistoryTab";
 import { ImagesSection } from "./nodePanel/ImagesSection";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
 import { moveRovingFocus } from "../utils/roving";
-import { MAX_NODE_IMAGES, imageFilesFrom, makeCardImage, makeIconImage, shrinkImage } from "../utils/images";
 import { track } from "../utils/usage";
 
-// A bottom sheet overlaying the canvas, at every screen size — not just
-// this panel's own ✕, tapping empty canvas closes it too (MapPage's own
-// onClick), same as a native sheet dismisses on a tap outside it. Used to
-// switch to an inline right-hand sidebar at `sm` and up; moved off that in
-// favor of always keeping the canvas full-width and the node's text
-// anchored to the bottom of the view, on any device.
-//
-// max-h caps this at roughly a third of the viewport on desktop (not the
-// 75dvh this started at) — on a phone-height screen a sheet that tall left
-// almost nothing for the canvas above it: the just-selected node (and its
-// quick-add ghosts) routinely landed *behind* the sheet, and every other
-// node in that bottom stretch became physically untappable, since the
-// sheet is opaque and always paints above the canvas. Half on mobile
-// instead (below Tailwind's `sm` = MapPage's own 640px isMobileViewport
-// cutoff) — a phone's shorter screen needs more of it for a sheet worth
-// reading, and centerOnNode still parks the chosen node in the half left
-// above it. Was 2/3 (leaving only a third clear) until that turned out too
-// tight for QuickAddGhosts' own ring: the node ended up sitting right
-// against this sheet's edge, so the ring's own bottom half got clamped
-// there and rendered invisibly underneath it (opaque, z-46, above the
-// ghosts' z-33) — see panelReserveFrac's own doc comment for the full
-// story. These 1/3 and 1/2 figures are shared with MapPage — see its
-// own panelReserveFrac() doc comment for why they have to match:
-// MapPage's centerOnNode reserves exactly this much room when parking the
-// chosen node above the sheet, and viewportBounds reserves it too when
-// clamping where a new node/ghost is allowed to land, so a mismatch here
-// would put either of those back to guessing at how tall this sheet
-// actually gets.
-//
-// max-h uses `dvh` (dynamic viewport height), not the plain `vh` this
-// started with — on a real phone browser (address bar sliding in/out as the
-// page scrolls, unlike any desktop resize or devtools device emulation)
-// `vh` is defined against the *largest* the viewport could be with that
-// chrome hidden, not what's actually visible right now. A `bottom-0` fixed
-// sheet sized off that would size and anchor itself against space that may
-// not exist on screen at that moment, landing partly or entirely off the
-// visible viewport instead of the bottom this is supposed to dock to.
-// `dvh` tracks the real, current visual viewport instead.
-//
-// z-[46]: above the minimap/zoom-controls cluster (z-[45]) on purpose — this
-// panel is a full-width sheet covering the bottom of the screen anyway, so
-// letting the minimap float on top of it (the old z-40, *below* z-45) just
-// left a visible fragment of map poking out over the panel's own content
-// instead of the panel's content actually covering it. Still below a real
-// modal (Modal.tsx, z-50), which should stay on top of everything,
-// this panel included.
-// Docked to the bottom, at half the screen (panelReserveFrac), so it opens
-// under the node: the chosen node is centered in the half left above it
-// (centerOnNode). The content scrolls inside; the resize handle stays pinned
-// to the sheet's top edge.
+// A bottom sheet over the canvas at every screen size; tapping empty canvas
+// closes it too (MapPage's onClick). Docked at half the screen so it opens
+// under the node: MapPage's centerOnNode parks the chosen node in the half
+// left above it, and viewportBounds keeps new nodes and ghosts out of it, so
+// that half (panelReserveFrac) must match the h-[50dvh] here. `dvh`, not
+// `vh`: on a phone, `vh` counts space behind the sliding address bar. z-[46]
+// sits above the minimap cluster (z-45) and below a real modal (z-50). The
+// content scrolls inside; the resize handle stays pinned to the top edge.
 const PANEL_CLASS =
   "fixed inset-x-0 bottom-0 z-[46] flex h-[50dvh] w-full flex-col rounded-t-2xl border-t border-line bg-surface shadow-[var(--shadow-card)]";
 
@@ -255,44 +213,11 @@ export function NodePanel({
   // auto-clears, same pattern the mobile-focused parts of this file already
   // favor over a persistent status line for a one-off confirmation.
   const [copied, setCopied] = useState(false);
-  // Relying on the textarea's native CSS resize handle (a small drag grip
-  // in its own bottom-right corner) for the Info tab's own text box would
-  // be easy to miss (no visible affordance beyond that grip), wouldn't
-  // work via touch on most mobile browsers, and wouldn't exist at all for
-  // a non-owner (their read-only view is a plain div, which CSS resize
-  // doesn't apply to). This is an explicit, always-visible, works-
-  // everywhere substitute instead: expanded drops
-  // the box's own height cap entirely (letting it grow to fit the whole
-  // text) instead of scrolling internally within a fixed 40vh — the panel
-  // itself already scrolls (see PANEL_CLASS), so a long text just makes
-  // the sheet itself taller/scrollable rather than needing its own nested
-  // scrollbar.
+  // The Info tab's "show all" toggle: lifts the text box's height cap so it
+  // grows to fit (the sheet scrolls instead), since a textarea's own resize
+  // grip is easy to miss, doesn't work by touch and a non-owner's read-only
+  // text has none.
   const [expanded, setExpanded] = useState(false);
-
-  // The node's pictures. The map's node list leaves them out (like text), so
-  // unless this node already carries them (it was just edited here, or came
-  // in over the socket) they're fetched with the single node on open. null
-  // while that fetch is in flight.
-  const [images, setImages] = useState<string[] | null>(node.images ?? null);
-  useEffect(() => {
-    if (node.images) {
-      setImages(node.images);
-      return;
-    }
-    let cancelled = false;
-    setImages(null);
-    nodesApi
-      .getNode(node.nodeId)
-      .then((full) => !cancelled && setImages(full.images ?? []))
-      .catch(() => !cancelled && setImages([]));
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node.nodeId]);
-  useEffect(() => {
-    if (node.images) setImages(node.images);
-  }, [node.images]);
 
   // Dragging the sheet off its bottom dock and resizing it — see
   // usePanelSheet.
@@ -364,18 +289,19 @@ export function NodePanel({
   ];
   const [tab, setTab] = useState<Tab>("info");
   const tabIdBase = useId();
+  const { images, add: handleAddImages, remove: handleRemoveImage, setAs: setImageAs, onPanelPaste } = useNodeImages({
+    node,
+    canEdit: isCreator,
+    t,
+    run,
+    setError,
+    onUpdated,
+    onPasted: () => setTab("info"),
+  });
 
-  // A <textarea>'s own rendered height is CSS/rows-driven, not content-
-  // driven — removing max-height above (the `expanded` class swap) doesn't
-  // by itself make the box taller, it only lifts the *cap*, same way
-  // dropping a `max-width` doesn't widen an element that was never asked
-  // to grow in the first place. This is the actual growing: set to its own
-  // scrollHeight (the height its content would need with no scrollbar) the
-  // moment expanded turns on, and again on every keystroke while it stays
-  // on, so typing more keeps growing the box instead of re-introducing an
-  // inner scrollbar. Collapsing goes back to the height the panel resize
-  // gave it, or clears the inline height so the CSS class's own
-  // rows/min-height takes back over.
+  // Lifting the cap doesn't grow a textarea by itself: while expanded it is
+  // set to its scrollHeight on every keystroke; collapsing goes back to the
+  // height the panel resize gave it, or to the CSS default.
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -423,18 +349,9 @@ export function NodePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.nodeId]);
 
-  // Backfills textDraft once this node's real text actually arrives (see
-  // MapPage's ensureNodeText/lazy text loading) — the reset-on-node-change
-  // effect above only runs when node.nodeId itself changes, so it seeds
-  // textDraft from whatever node.text was at the *moment this panel opened*
-  // ("" for a node whose text hasn't been fetched yet), and never revisits
-  // it again for this same node. Without this, opening a node before its
-  // text has loaded left the textarea permanently blank even after the
-  // real text landed in props a moment later. Gated on textDraft still
-  // being "" so this never overwrites anything the owner's already typed
-  // (or already deliberately cleared) since opening the panel — it's a
-  // one-time catch-up for the lazy-load case, not a live sync with
-  // whatever the node's text is right now.
+  // The node's text may arrive after the panel opened (it's lazy-loaded, see
+  // MapPage's ensureNodeText): fill the draft in once, unless something has
+  // been typed since.
   useEffect(() => {
     if (node.text !== "" && textDraft === "") setTextDraft(node.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -459,263 +376,58 @@ export function NodePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFocusText, node.nodeId]);
 
-  // Owner-only, like every node edit. Each picture is shrunk first (see
-  // utils/images.ts); the whole list is then saved in one PATCH.
-  async function saveImages(next: string[]) {
-    const updated = await nodesApi.updateNode(node.nodeId, { images: next });
-    setImages(updated.images ?? next);
-    onUpdated(updated);
-  }
-
-  async function handleAddImages(files: File[]) {
-    if (!isCreator || images === null) return;
-    const room = MAX_NODE_IMAGES - images.length;
-    if (room <= 0) {
-      setError(t.ui.images.limit(MAX_NODE_IMAGES));
-      return;
-    }
+  // Every action below: busy while it runs, its error (or `fallback`) shown
+  // in the sheet if it throws. Resolves false when it failed, so a caller
+  // that closes the panel afterwards (Enter) can leave it open, error showing.
+  async function run(fallback: string, action: () => Promise<unknown>): Promise<boolean> {
     setBusy(true);
     setError(null);
     try {
-      const added: string[] = [];
-      for (const file of files.slice(0, room)) {
-        try {
-          added.push(await shrinkImage(file));
-        } catch {
-          setError(t.ui.images.tooLarge);
-        }
-      }
-      if (files.length > room) setError(t.ui.images.limit(MAX_NODE_IMAGES));
-      if (added.length) await saveImages([...images, ...added]);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.images.failed);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // A screenshot pasted while this panel is open lands on the node even when
-  // nothing in the panel has focus (the usual case: a node was just clicked
-  // on the canvas). A paste inside the panel is already handled by its own
-  // onPaste below, and one into some other text field is left to it.
-  const addImagesRef = useRef(handleAddImages);
-  addImagesRef.current = handleAddImages;
-  useEffect(() => {
-    if (!isCreator) return;
-    function onDocumentPaste(e: ClipboardEvent) {
-      if (e.defaultPrevented) return;
-      const target = e.target instanceof HTMLElement ? e.target : null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-      const files = imageFilesFrom(e.clipboardData);
-      if (files.length === 0) return;
-      e.preventDefault();
-      setTab("info");
-      void addImagesRef.current(files);
-    }
-    document.addEventListener("paste", onDocumentPaste);
-    return () => document.removeEventListener("paste", onDocumentPaste);
-  }, [isCreator]);
-
-  async function handleRemoveImage(index: number) {
-    if (!isCreator || images === null) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await saveImages(images.filter((_, i) => i !== index));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.images.failed);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Owner-only (same as text/type edits) — a manual annotation over the
-  // badge's symbol, not a rewrite of the node's own claim.
-  async function handleSetSymbol(symbolOverride: SymbolOverride | null) {
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await nodesApi.updateNode(node.nodeId, { symbolOverride });
-      onUpdated(updated);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.symbol);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Enter (no Shift) in the textarea below — same updateNode call
-  // handleSetSymbol already uses, just for `text` instead of
-  // `symbolOverride`. A no-op (not an error) on empty/unchanged text, same
-  // as the canvas's own inline editor's resolveInlineEdit does.
-  // Resolves true unless the save failed, so a caller that closes the panel
-  // afterwards (Enter) can leave it open, error showing, when it did.
-  async function handleTextSave(): Promise<boolean> {
-    const trimmed = textDraft.trim();
-    if (!trimmed || trimmed === node.text) {
-      setTextDraft(node.text);
-      return true;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await nodesApi.updateNode(node.nodeId, { text: trimmed });
-      onUpdated(updated);
+      await action();
       return true;
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.text);
+      setError(err instanceof ApiRequestError ? err.message : fallback);
       return false;
     } finally {
       setBusy(false);
     }
   }
+  // Owner-only, like every node edit: one PATCH, the server's node passed up.
+  const patch = (updates: nodesApi.NodeUpdate, fallback: string) =>
+    run(fallback, async () => onUpdated(await nodesApi.updateNode(node.nodeId, updates)));
 
-  // Empty is a valid save here (unlike text): it clears the title, sending
-  // the canvas back to showing the start of the text. A no-op if unchanged.
-  async function handleToggleHidden() {
-    setBusy(true);
-    setError(null);
-    try {
-      onUpdated(await nodesApi.setBranchHidden(node.nodeId, !node.hiddenFromMembers));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.zone);
-    } finally {
-      setBusy(false);
+  // A text field saved on Enter/blur: a no-op (and the draft reset) when
+  // unchanged. Empty text is a no-op too, like the canvas's inline editor;
+  // an empty title or zone name clears it.
+  function saveField(field: "text" | "title" | "zoneName", draft: string, reset: (v: string) => void, fallback: string) {
+    const current = node[field] ?? "";
+    const trimmed = draft.trim();
+    if (trimmed === current || (field === "text" && !trimmed)) {
+      reset(current);
+      return Promise.resolve(true);
     }
+    return patch({ [field]: trimmed }, fallback);
   }
-
-  async function handleZoneNameSave(): Promise<boolean> {
-    const trimmed = zoneNameDraft.trim();
-    if (trimmed === (node.zoneName ?? "")) {
-      setZoneNameDraft(node.zoneName ?? "");
-      return true;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await nodesApi.updateNode(node.nodeId, { zoneName: trimmed });
-      onUpdated(updated);
-      return true;
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.zone);
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleTitleSave(): Promise<boolean> {
-    const trimmed = titleDraft.trim();
-    if (trimmed === (node.title ?? "")) {
-      setTitleDraft(node.title ?? "");
-      return true;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await nodesApi.updateNode(node.nodeId, { title: trimmed });
-      onUpdated(updated);
-      return true;
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.title);
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Owner-only, like every node edit — "" removes the emoji.
-  // The header's type picker (TypePicker).
-  async function handleSetType(type: NodeType) {
-    setBusy(true);
-    setError(null);
-    try {
-      onUpdated(await nodesApi.updateNode(node.nodeId, { type }));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.type);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // A picture as the node's icon: a small square cut from it (makeIconImage),
-  // or null to go back to the type's symbol. A picture is the icon or the
-  // card, never both, so choosing the icon takes the card off.
-  async function handleSetIcon(index: number | null) {
-    const src = index == null ? "" : images?.[index];
-    if (src == null) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const iconImage = src ? await makeIconImage(src) : "";
-      onUpdated(await nodesApi.updateNode(node.nodeId, iconImage ? { iconImage, cardImage: "" } : { iconImage }));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.images.iconFailed);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // A picture as a card on the map (makeCardImage), or null to take it off.
-  // Choosing the card takes the picture icon off (see handleSetIcon).
-  async function handleSetCard(index: number | null) {
-    const src = index == null ? "" : images?.[index];
-    if (src == null) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const cardImage = src ? await makeCardImage(src) : "";
-      onUpdated(await nodesApi.updateNode(node.nodeId, cardImage ? { cardImage, iconImage: "" } : { cardImage }));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.images.iconFailed);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // `still`: keep the emoji face up, never turning over (NodeDoc.emojiStill).
-  async function handleSetEmoji(emoji: string, still?: boolean) {
-    setBusy(true);
-    setError(null);
-    try {
-      onUpdated(await nodesApi.updateNode(node.nodeId, still === undefined ? { emoji } : { emojiStill: still }));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.emoji.failed);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const handleTextSave = () => saveField("text", textDraft, setTextDraft, t.ui.errors.text);
+  const handleTitleSave = () => saveField("title", titleDraft, setTitleDraft, t.ui.errors.title);
+  const handleZoneNameSave = () => saveField("zoneName", zoneNameDraft, setZoneNameDraft, t.ui.errors.zone);
 
   // A blank field clears the step number; anything else has to be a whole
   // number from 1 to 9999 (the backend's own bounds). No-op if unchanged.
   async function handleOrderSave(): Promise<boolean> {
-    const trimmed = orderDraft.trim();
     const current = node.order ?? null;
+    const trimmed = orderDraft.trim();
     const next = trimmed === "" ? null : Number(trimmed);
     if (next !== null && (!Number.isInteger(next) || next < 1 || next > 9999)) {
       setError(t.ui.errors.order);
       setOrderDraft(current !== null ? String(current) : "");
       return false;
     }
-    if (next === current) return true;
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await nodesApi.updateNode(node.nodeId, { order: next });
-      onUpdated(updated);
-      return true;
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.order);
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    return next === current ? true : patch({ order: next }, t.ui.errors.order);
   }
 
-  // Copies the node's own real text (not textDraft — this should work
-  // identically for a non-owner, who has no draft at all) to the clipboard.
-  // Everyone can do this, not just the owner — reading/reusing a node's
-  // text isn't an edit.
+  // Copies the node's real text (not the draft, so it works the same for a
+  // non-owner) — reading a node's text isn't an edit, so anyone may.
   async function handleCopyText() {
     try {
       await navigator.clipboard.writeText(node.text);
@@ -726,133 +438,42 @@ export function NodePanel({
     }
   }
 
-  async function handleDelete() {
-    setBusy(true);
-    try {
-      await onDelete(node);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.delete);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleTemplate(kind: TemplateKind) {
-    setBusy(true);
-    setError(null);
-    try {
+  const handleDelete = () => run(t.ui.errors.delete, () => onDelete(node));
+  const handleTemplate = (kind: TemplateKind) =>
+    run(t.ui.templates.failed, async () => {
       await onApplyTemplate(kind);
       onClose();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.templates.failed);
-    } finally {
-      setBusy(false);
-    }
-  }
+    });
 
+  // Landing an attack (blocked or not) or a shield creates a real node, so
+  // the panel closes like every other node-creating action.
   async function handleAttack(weapon: Weapon) {
     if (!attackText.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
+    await run(t.ui.errors.attack, async () => {
       const res = await nodesApi.attackNode(node.nodeId, weapon, { type: effectiveAttackType, text: attackText.trim() });
       track({ name: "node_attacked", props: { weapon } });
       onAttacked(res.node, res.weaponNode, weapon, res.healedParent, res.blocked, res.protector);
-      // Landing an attack — blocked or not — creates a real node (the
-      // weapon node carrying the attacker's own objection); closing here
-      // matches every other node-creating action in this panel (Protect
-      // below, Pack's own confirm in MapPage) instead of leaving the panel
-      // sitting open on whatever was just acted on.
       onClose();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.attack);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  // Owner-of-the-*target*-only (protectNodeAbl enforces this server-side
-  // too) — creates a protection node aimed at this node.
+  // Only the target's owner may (protectNodeAbl enforces it too).
   async function handleProtect() {
     if (!protectText.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
+    await run(t.ui.errors.protect, async () => {
       const res = await nodesApi.protectNode(node.nodeId, { type: protectType, text: protectText.trim() });
       track({ name: "node_protected" });
       onProtected(res.protectionNode, res.healedNode);
-      // Same "close after creating a node" reasoning as handleAttack above.
       onClose();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.protect);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  // Owner-of-the-*member*-only (unpackNodeAbl enforces this server-side
-  // too) — a member unpacking itself back out doesn't require the
-  // container's own owner at all, same as any other single-node edit.
-  async function handleUnpack(memberId: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await nodesApi.unpackNode(memberId);
-      onUnpacked(res.node);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.unpack);
-    } finally {
-      setBusy(false);
-    }
-  }
+  // The member's own owner may unpack it, without the container's owner.
+  const handleUnpack = (memberId: string) =>
+    run(t.ui.errors.unpack, async () => onUnpacked((await nodesApi.unpackNode(memberId)).node));
 
-  // Owner-only (same as text/type edits) — packAbl.ts's own auto-bump is
-  // the common path to a non-1 size; this is the manual override. Reset
-  // pins at tier 1 explicitly rather than clearing back to "untouched," so
-  // it can never silently re-bump on a later pack — see Node.sizeTier's own
-  // doc comment.
-  async function handleSetSize(tier: SizeTier) {
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await nodesApi.updateNode(node.nodeId, { sizeTier: tier });
-      onUpdated(updated);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.size);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Owner-only (same as text/type edits) — a manually-chosen zone ring
-  // around just this node, independent of the automatic circle/nodeGroups
-  // detection. null explicitly removes it, same nullish contract
-  // symbolOverride already uses.
-  async function handleSetZone(manualZone: ManualZoneColor | null) {
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await nodesApi.updateNode(node.nodeId, { manualZone });
-      onUpdated(updated);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.zone);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Owner-only, like the size — the node's outline on the map. null goes
-  // back to the usual circle.
-  async function handleSetShape(shape: NodeShape | null) {
-    setBusy(true);
-    setError(null);
-    try {
-      onUpdated(await nodesApi.updateNode(node.nodeId, { shape }));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.shape);
-    } finally {
-      setBusy(false);
-    }
+  async function handleToggleHidden() {
+    await run(t.ui.errors.zone, async () => onUpdated(await nodesApi.setBranchHidden(node.nodeId, !node.hiddenFromMembers)));
   }
 
   async function handleDeleteEdge(edgeId: string) {
@@ -890,14 +511,7 @@ export function NodePanel({
       data-node-panel
       // A screenshot pasted anywhere in the panel (the text field included)
       // lands on the node as a picture; pasting plain text is left alone.
-      onPaste={(e) => {
-        if (!isCreator) return;
-        const files = imageFilesFrom(e.clipboardData);
-        if (files.length === 0) return;
-        e.preventDefault();
-        setTab("info");
-        void handleAddImages(files);
-      }}
+      onPaste={onPanelPaste}
       style={{
         ...(dragOffset.x || dragOffset.y ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined),
         // Overrides PANEL_CLASS's own responsive max-height cap the moment
@@ -910,13 +524,8 @@ export function NodePanel({
       }}
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-3">
-      {/* Grip handle — the only way to drag this sheet off its default
-          bottom dock (see dragOffset/onGripPointerDown above). A dedicated
-          strip rather than making the whole header draggable, so the tab
-          buttons and ✕ right below it stay plain clickable/tappable targets
-          instead of every pointerdown on them being swallowed as a drag
-          attempt. touch-none: without it a touch-drag here scrolls/bounces
-          the page underneath instead of moving the sheet. */}
+      {/* Grip: the only way to drag the sheet off its dock, kept apart so the
+          tabs and ✕ stay plain tap targets. touch-none stops the page scrolling. */}
       <div
         className="-mx-5 mb-2 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
         onPointerDown={onGripPointerDown}
@@ -924,17 +533,8 @@ export function NodePanel({
       >
         <div className="h-[0.28rem] w-[2.5rem] rounded-full bg-line" aria-hidden />
       </div>
-      {/* Type/byline and the tabs now share one row instead of stacking as
-          two — freeing up a whole row of this panel's own limited height
-          (capped at 34dvh/50dvh — see PANEL_CLASS) means the actual node
-          text (the Info tab's content, or whichever tab is open) shows up
-          a beat sooner, closer to "at a glance" instead of behind a header
-          that was mostly just chrome. flex-wrap: on a narrow phone with
-          every tab present (Attack/Protect/Pack/History all at once) this
-          can still wrap to a second line — the tabs themselves already
-          handle that gracefully (see their own flex-wrap), this just lets
-          the icon/byline join that same wrap instead of always claiming a
-          fixed-height row of their own. */}
+      {/* Type, byline and tabs share one row (wrapping on a narrow phone), so
+          the node's text shows up sooner. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line pb-[0.7rem]">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex flex-shrink-0 items-center gap-[0.4rem]">
@@ -944,7 +544,7 @@ export function NodePanel({
                 value={node.type}
                 types={node.isWeapon || node.isProtection ? ATTACK_NODE_TYPES : NODE_TYPES}
                 disabled={busy}
-                onChange={(type) => void handleSetType(type)}
+                onChange={(type) => void patch({ type }, t.ui.errors.type)}
               />
             ) : (
               <div
@@ -1058,11 +658,11 @@ export function NodePanel({
               canEdit={isCreator}
               busy={busy}
               onAdd={(files) => void handleAddImages(files)}
-              onRemove={(i) => void handleRemoveImage(i)}
+              onRemove={handleRemoveImage}
               iconImage={node.iconImage}
-              onSetIcon={isCreator ? (i) => void handleSetIcon(i) : undefined}
+              onSetIcon={isCreator ? (i) => setImageAs("iconImage", i) : undefined}
               cardImage={node.cardImage}
-              onSetCard={isCreator ? (i) => void handleSetCard(i) : undefined}
+              onSetCard={isCreator ? (i) => setImageAs("cardImage", i) : undefined}
               extra={
                 isCreator && !textLocked ? (
                   <span
@@ -1098,15 +698,15 @@ export function NodePanel({
           orderDraft={orderDraft}
           setOrderDraft={setOrderDraft}
           onTitleSave={handleTitleSave}
-          onSetEmoji={(emoji) => void handleSetEmoji(emoji)}
-          onToggleEmojiStill={() => void handleSetEmoji(node.emoji ?? "", !node.emojiStill)}
+          onSetEmoji={(emoji) => void patch({ emoji }, t.ui.emoji.failed)}
+          onToggleEmojiStill={() => void patch({ emojiStill: !node.emojiStill }, t.ui.emoji.failed)}
           onZoneNameSave={handleZoneNameSave}
           onOrderSave={handleOrderSave}
           onToggleHidden={handleToggleHidden}
-          onSetSize={handleSetSize}
-          onSetZone={handleSetZone}
-          onSetShape={(shape) => void handleSetShape(shape)}
-          onSetSymbol={handleSetSymbol}
+          onSetSize={(sizeTier) => patch({ sizeTier }, t.ui.errors.size)}
+          onSetZone={(manualZone) => patch({ manualZone }, t.ui.errors.zone)}
+          onSetShape={(shape) => void patch({ shape }, t.ui.errors.shape)}
+          onSetSymbol={(symbolOverride) => patch({ symbolOverride }, t.ui.errors.symbol)}
           onDeleteEdge={handleDeleteEdge}
           onSelectNode={onSelectNode}
           onEdit={onEdit}
