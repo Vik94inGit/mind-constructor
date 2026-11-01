@@ -4,7 +4,7 @@ import { ApiRequestError } from "../api/client";
 import { ViewerTypeFace } from "./TypeFace";
 import type { NodeType } from "../types";
 import type { TextNodesPlan } from "../hooks/useNodeCreation";
-import { addPiece, autoPieces } from "../utils/textSplit";
+import { addPiece, autoPieces, textWithoutPieces } from "../utils/textSplit";
 import type { TextPiece } from "../utils/textSplit";
 import { newThoughtId } from "../utils/thoughtFlow";
 import { btnGhost, btnPrimary, inputCls } from "../think/thinkStyles";
@@ -19,6 +19,12 @@ interface Props {
   onClose: () => void;
   /** Nodes already on the map that the main node or a piece can hang from (a piece hanging from one is placed beside it). */
   mapNodes?: { id: string; label: string }[];
+  /**
+   * Split mode: cut a node already on the map into smaller ones. Its text is
+   * the text to mark (no writing step), the node itself is the main node the
+   * pieces hang from, and it can keep only what no piece took.
+   */
+  splitNode?: { nodeId: string; text: string };
 }
 
 // "Text → nodes", right on the map (the canvas right-click menu): the same
@@ -30,12 +36,16 @@ interface Props {
 //      off as its own bubble), or cut the text up by lines/sentences in one go.
 //   3. Only when the map has no room for every new node: say how many fit,
 //      and let the user choose which pieces to pack into the main node.
-export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }: Props) {
+// With `splitNode` it starts at step 2 on that node's own text (node panel →
+// Modify → "Split into nodes", or the node's right-click / long-press menu).
+export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [], splitNode }: Props) {
   const { t } = useI18n();
   const s = t.ui.textNodes;
-  const [step, setStep] = useState<"write" | "mark" | "pack">("write");
-  const [text, setText] = useState("");
-  const [withRoot, setWithRoot] = useState(true);
+  const [step, setStep] = useState<"write" | "mark" | "pack">(splitNode ? "mark" : "write");
+  const [text, setText] = useState(splitNode?.text ?? "");
+  const [withRoot, setWithRoot] = useState(!splitNode);
+  // Split mode: the node keeps only what no piece took.
+  const [takeOut, setTakeOut] = useState(true);
   const [rootType, setRootType] = useState<NodeType>("Problem");
   const [pieces, setPieces] = useState<TextPiece[]>([]);
   // A node on the map the main node hangs from; "" for none.
@@ -50,7 +60,14 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
   // A piece hanging from a node already on the map goes beside that node,
   // not on one of the spots around the click.
   const onMap = new Set(mapNodes.map((n) => n.id));
-  const spotPieces = pieces.filter((p) => !p.parentId || !onMap.has(p.parentId));
+  if (splitNode) onMap.add(splitNode.nodeId);
+  // In split mode a piece hanging from nothing hangs from the node being split.
+  const parentOf = (p: TextPiece) => p.parentId ?? splitNode?.nodeId;
+  const spotPieces = pieces.filter((p) => {
+    const parent = parentOf(p);
+    return !parent || !onMap.has(parent);
+  });
+  const leftover = splitNode ? textWithoutPieces(text, pieces) : "";
   const needed = (root: boolean) => (root ? 1 : 0) + spotPieces.length;
 
   function markAs(type: NodeType) {
@@ -74,9 +91,10 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
           rootType,
           withRoot: root,
           rootParentId: root && rootParentId ? rootParentId : null,
-          pieces: pieces.map((p) => ({ id: p.id, text: text.slice(p.start, p.end), type: p.type, parentId: p.parentId })),
+          pieces: pieces.map((p) => ({ id: p.id, text: text.slice(p.start, p.end), type: p.type, parentId: parentOf(p) })),
           packed: pack,
           spots: at,
+          ...(splitNode && { splitNode: { nodeId: splitNode.nodeId, text: takeOut && leftover ? leftover : null } }),
         },
         (done, total) => setProgress({ done, total }),
       );
@@ -127,7 +145,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
         className="relative flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[720px] flex-col overflow-hidden rounded-card border border-line bg-surface shadow-card"
       >
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-          <h2 className="m-0 text-[1.1rem] font-bold">{step === "pack" ? s.overflowTitle : s.title}</h2>
+          <h2 className="m-0 text-[1.1rem] font-bold">{step === "pack" ? s.overflowTitle : splitNode ? s.splitTitle : s.title}</h2>
           <button
             type="button"
             className="cursor-pointer rounded-md border-0 bg-transparent px-2 py-1 text-ink-soft hover:bg-surface-2"
@@ -183,7 +201,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
 
           {step === "mark" && (
             <>
-              <p className="mt-0 mb-3 text-[0.85rem] text-ink-soft">{s.markHint}</p>
+              <p className="mt-0 mb-3 text-[0.85rem] text-ink-soft">{splitNode ? s.splitHint : s.markHint}</p>
               <div className="mb-3 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -201,6 +219,9 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
                 </button>
               </div>
               <section className="rounded-card border border-line bg-surface-2 p-3">
+                {splitNode && (
+                  <div className="mb-2 text-[0.78rem] font-semibold text-ink-soft">{s.thisNode}</div>
+                )}
                 {withRoot && (
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-[0.78rem] font-semibold text-ink-soft">
                     <ViewerTypeFace type={rootType} size={15} />
@@ -215,7 +236,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
                   onTapWord={tapWord}
                   onChange={setPieces}
                   className="max-h-[42dvh] overflow-y-auto"
-                  mainLabel={withRoot ? t.split.mainNode : t.split.noParent}
+                  mainLabel={splitNode ? s.thisNode : withRoot ? t.split.mainNode : t.split.noParent}
                   mapNodes={mapNodes}
                 />
               </section>
@@ -225,6 +246,23 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
                 </div>
               )}
               <p className="mt-3 mb-0 text-[0.85rem] font-semibold text-ink-soft">{t.split.pieces(pieces.length)}</p>
+              {splitNode && pieces.length > 0 && (
+                <>
+                  <label className="mt-3 flex cursor-pointer items-start gap-2 text-[0.85rem]">
+                    <input
+                      type="checkbox"
+                      className="mt-[0.2rem]"
+                      checked={takeOut && !!leftover}
+                      disabled={!leftover}
+                      onChange={(e) => setTakeOut(e.target.checked)}
+                    />
+                    <span>{s.takeOut}</span>
+                  </label>
+                  <p className="mt-1 mb-0 ml-6 text-[0.8rem] text-ink-soft">
+                    {!leftover ? s.nothingLeft : takeOut ? s.keeps(leftover) : s.keepsAll}
+                  </p>
+                </>
+              )}
             </>
           )}
 
@@ -260,7 +298,8 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
                 </>
               ) : (
                 <div className="flex flex-wrap items-center gap-3">
-                  <p className="m-0 text-[0.85rem] text-ink-soft">{s.packNeedsRoot}</p>
+                  <p className="m-0 text-[0.85rem] text-ink-soft">{splitNode ? s.noRoom : s.packNeedsRoot}</p>
+                  {!splitNode && (
                   <button
                     type="button"
                     className={btnGhost}
@@ -271,6 +310,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
                   >
                     {s.useRoot}
                   </button>
+                  )}
                 </div>
               )}
             </>
@@ -279,7 +319,7 @@ export function TextToNodesModal({ findSpots, onCreate, onClose, mapNodes = [] }
 
         <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
           <div>
-            {step !== "write" && (
+            {step !== "write" && !(splitNode && step === "mark") && (
               <button
                 type="button"
                 className={btnGhost}

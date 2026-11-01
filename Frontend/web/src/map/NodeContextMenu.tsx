@@ -41,6 +41,8 @@ interface Props {
   onDelete: () => void;
   onChoose: () => void;
   onAttack: () => void;
+  /** Owner only, a node with text to cut up: "Split into nodes" (map/TextToNodesModal.tsx's split mode). */
+  onSplit?: () => void;
   /** Owner only: this node is locked (utils/blockLock.ts) — the menu offers Unlock instead of Lock. */
   blockLocked?: boolean;
   onToggleBlockLock?: () => void;
@@ -90,6 +92,7 @@ export function NodeContextMenu({
   onDelete,
   onChoose,
   onAttack,
+  onSplit,
   onClose,
   blockLocked = false,
   onToggleBlockLock,
@@ -143,7 +146,7 @@ export function NodeContextMenu({
   const puzzleItemCount = !puzzle ? 0 : puzzle.detached ? 1 : puzzle.assembled ? 2 : 0;
   const showLinks = isOwner && links.length > 0;
   const rootItemCount =
-    (isOwner ? 5 + (onToggleBlockLock ? 1 : 0) + puzzleItemCount + (showLinks ? 1 : 0) : 0) +
+    (isOwner ? 5 + (onSplit ? 1 : 0) + (onToggleBlockLock ? 1 : 0) + puzzleItemCount + (showLinks ? 1 : 0) : 0) +
     (zoneLayout ? 1 : 0) +
     (feeling ? 1 : 0) +
     (canAttack ? 1 : 0);
@@ -189,6 +192,17 @@ export function NodeContextMenu({
           <button className={item} onClick={onChoose}>
             {t.ui.contextMenu.choose}
           </button>
+          {onSplit && (
+            <button
+              className={item}
+              onClick={() => {
+                onSplit();
+                onClose();
+              }}
+            >
+              {t.ui.textNodes.splitEntry}
+            </button>
+          )}
           {showLinks && (
             <button className={item} onClick={() => setMode("links")}>
               {t.ui.contextMenu.unlink} ›

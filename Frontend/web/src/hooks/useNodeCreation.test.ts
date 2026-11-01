@@ -7,7 +7,7 @@ import { TRANSLATIONS } from "../i18n/translations";
 import { FULL_CANVAS_BOUNDS } from "../utils/canvasLayout";
 import type { NodeDoc } from "../types";
 
-vi.mock("../api/nodes", () => ({ createNode: vi.fn(), packNodes: vi.fn() }));
+vi.mock("../api/nodes", () => ({ createNode: vi.fn(), packNodes: vi.fn(), updateNode: vi.fn() }));
 import * as nodesApi from "../api/nodes";
 vi.mock("../utils/sleep", () => ({ sleep: () => Promise.resolve() }));
 import { PICTURES } from "../utils/pictures";
@@ -162,5 +162,41 @@ describe("useNodeCreation", () => {
     expect(calls[2]).toMatchObject({ text: "Child", parentId: "n2", x: 500 });
     // Beside the map node it hangs from, not on a spot.
     expect(calls[3]).toMatchObject({ text: "Beside", parentId: "old", x: 900, y: 900 });
+  });
+
+  it("splits a node: its pieces hang beside it, then it keeps only what's left", async () => {
+    vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, body) => makeNode({ nodeId, ...body }) as NodeDoc);
+    const { result, params } = setup();
+    params.positions.set("old", { x: 900, y: 900 });
+    await act(() =>
+      result.current.createFromText({
+        text: "Trip\nhotel",
+        rootType: "Problem",
+        withRoot: false,
+        pieces: [{ id: "a", text: "hotel", type: "Option", parentId: "old" }],
+        packed: new Set(),
+        spots: [],
+        splitNode: { nodeId: "old", text: "Trip" },
+      }),
+    );
+    expect(vi.mocked(nodesApi.createNode).mock.calls[0][1]).toMatchObject({ text: "hotel", parentId: "old", x: 900, y: 900 });
+    expect(nodesApi.updateNode).toHaveBeenCalledWith("old", { text: "Trip" });
+    expect(params.upsertNode).toHaveBeenLastCalledWith(expect.objectContaining({ nodeId: "old", text: "Trip" }));
+  });
+
+  it("leaves the split node's text alone when it keeps all of it", async () => {
+    const { result } = setup();
+    await act(() =>
+      result.current.createFromText({
+        text: "a b",
+        rootType: "Problem",
+        withRoot: false,
+        pieces: [{ id: "a", text: "b", type: "Option", parentId: "old" }],
+        packed: new Set(),
+        spots: [],
+        splitNode: { nodeId: "old", text: null },
+      }),
+    );
+    expect(nodesApi.updateNode).not.toHaveBeenCalled();
   });
 });

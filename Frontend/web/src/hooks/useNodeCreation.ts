@@ -52,6 +52,11 @@ export interface TextNodesPlan {
   pieces: { id: string; text: string; type: NodeType; parentId?: string }[];
   packed: Set<string>;
   spots: Pt[];
+  /**
+   * Splitting a node already on the map: its pieces hang from it, and when
+   * `text` is a string the node keeps only that (what no piece took).
+   */
+  splitNode?: { nodeId: string; text: string | null };
 }
 
 // applyTemplate's own reveal pace — long enough that each node in a growing
@@ -386,6 +391,9 @@ export function useNodeCreation({
       const res = await nodesApi.packNodes(rootId, packedIds);
       upsertNode(res.container);
       res.members.forEach(upsertNode);
+    }
+    if (plan.splitNode?.text) {
+      upsertNode(await nodesApi.updateNode(plan.splitNode.nodeId, { text: plan.splitNode.text }));
     }
     setMultiSelectIds(new Set());
     setSelectedId(null);
