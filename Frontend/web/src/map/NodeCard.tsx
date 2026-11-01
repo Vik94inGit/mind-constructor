@@ -2,20 +2,17 @@ import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { NODE_TYPE_COLORS, ZONE_COLORS, cycleAttackNodeType, cycleNodeType } from "../utils/nodeType";
 import type { Sentiment } from "../utils/nodeType";
-import { FEELING_COLOR, FEELING_EMOJI } from "../utils/feeling";
 import type { Feeling } from "../utils/feeling";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
-import type { OutcomeType } from "./OutcomeBadge";
 import { NodeCrown } from "./NodeCrown";
 import { NodeWings } from "./NodeWings";
-import { KnightHelmet } from "./KnightHelmet";
-import { NodeTypeIcon } from "./NodeTypeIcon";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
-import { NodeFlipIcon } from "./NodeFlipIcon";
 import { nodeEmojiFace } from "../utils/emojiFace";
 import type { TypeEmoji } from "../utils/emojiFace";
-import { ShapeContent, shapeBodyClass, shapeRoundClass } from "./nodeShape";
+import { shapeRoundClass } from "./nodeShape";
 import { StickerCard } from "./StickerCard";
+import { NodeBadges } from "./nodeCard/NodeBadges";
+import { NodeFace } from "./nodeCard/NodeFace";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
 import { CAPTION_WIDTH, nodeZoomScale } from "../utils/canvasLayout";
 import { useI18n } from "../i18n/I18nContext";
@@ -36,27 +33,12 @@ import type { ChompMove } from "../utils/pacman";
 import type { ReadingMode } from "../utils/readingMode";
 
 
-// OutcomeBadge is just a symbol now (see its own doc comment) — sized
-// close to NodeTypeIcon's own 21px so an outcome-type node and an
-// "unknown" one read as the same *kind* of glyph inside the same bordered
-// circle, just a filled bold shape instead of a thin-stroke line icon.
-// (Both this and NodeTypeIcon's size prop below are 0.8x their original
-// 32/26 — see MapPage's getNodeMinDist for the matching spacing shrink.)
-const OUTCOME_BADGE_SIZE = 26;
-
 // Reading modes (see utils/readingMode.ts). A puzzle card is as wide
 // as its text wants up to this — far past the 148px caption chip, since the
 // point of the mode is reading whole nodes — and only a selected node
 // (whose ghost ring and panel already surround it) is held to the compact one.
 const PUZZLE_MAX_WIDTH = 240;
 const NO_TYPE_EMOJI: TypeEmoji = {};
-// A node's outline in its type's color, toned down so a map full of nodes
-// doesn't read as a field of bright rims.
-// --node-edge-mix: full strength over a picture background (index.css's
-// canvas-on-picture), where a half-see-through rim gets lost.
-export function softEdge(color: string): string {
-  return `color-mix(in srgb, ${color} var(--node-edge-mix, 55%), transparent)`;
-}
 const PUZZLE_SELECTED_MAX_WIDTH = 180;
 // A puzzle card shows about this many characters of its text on the canvas
 // (a node holds up to 1000); the rest scrolls inside the card. At the card's
@@ -222,14 +204,9 @@ export const NodeCard = memo(function NodeCard({
   const { t } = useI18n();
   const particlesRef = useRef<HTMLDivElement | null>(null);
 
-  // Fires once, the instant a freshly-created node mounts — every type gets
-  // the burst, not just Success/Fail. NodeCard stays mounted across
-  // re-renders (stable `key`), so this never replays on later updates, and
-  // never fires at all for nodes that were already on the map when it loaded.
-  // Every non-"unknown" type is now an outcome badge (see OutcomeBadge.tsx)
-  // — halo-ring types read as the positive framing, horns-ring as negative.
-  // Deliberately off the node's *persisted* type, not the live edit draft
-  // below — the burst is a one-time creation effect, unrelated to editing.
+  // Once, when a newly created node mounts (the card keeps a stable key, so
+  // never again, and never for nodes already on the map when it loaded): a
+  // burst in the colors of its persisted type's halo or horns.
   const burstRing = ringKindFor(node.type);
 
   useEffect(() => {
@@ -256,56 +233,26 @@ export const NodeCard = memo(function NodeCard({
     el.style.height = `${el.scrollHeight}px`;
   }, [draftText, inlineEditing]);
 
-  // A circle's own root/parent (parentCrownSentiment set) always renders at
-  // the biggest size tier, overriding whatever node.sizeTier actually is —
-  // display-only, never persisted (unlike packAbl's own auto-bump on first
-  // pack, this never writes anything back), so it doesn't fight a manual
-  // PATCH the way that persisted auto-bump takes care to avoid clobbering
-  // either. "This is what the circle radiates from" already gets the crown
-  // badge and its own small ring (see below); sizing it up too makes that
-  // reading hold at a glance before either decoration even registers.
+  // A circle's parent always draws at the biggest size tier (display only,
+  // never saved), so "what the circle radiates from" holds at a glance.
   const isCircleParent = !!parentCrownSentiment;
   // The circle parent at the top of a tree wears the crown; a circle parent
   // that itself hangs from another node is a variant of it and wears a helmet.
   const isVariantParent = isCircleParent && !!node.parentId;
   const isNamedZone = isCircleParent && !!node.zoneName;
-  // The outer positioning div's own footprint needs to grow with the
-  // node's size tier too, not just its visual content (see
-  // inverseScaleStyle below) — otherwise a 130% node's wider icon/caption
-  // would visually spill out of a hit-target box that never actually grew,
-  // leaving the extra 30% unclickable/unhoverable.
+  // The positioning box grows with the size tier too, so a bigger node's
+  // icon and caption stay clickable.
   const sizeMultiplier = nodeSizeMultiplier(node, isCircleParent, compact);
   const style: CSSProperties = { left: x, top: y, width: 74 * sizeMultiplier };
 
-  // A weapon/attack node carries a real type now (Problem/Problematic
-  // option/Fail — the attacker's actual objection), so it renders through
-  // the exact same icon+ring+caption markup as any other node, with a
-  // small weapon badge added below to mark where it came from — same
-  // horns framing any other node of that type gets, fitting for an attack.
-  // While editing, the icon reflects the live draft type (so cycling it is
-  // actually visible); otherwise it's just the node's real type.
+  // An attack node has a real type and draws like any other node; while
+  // editing, the icon shows the live draft type.
   const displayType = inlineEditing ? draftType : node.type;
   const ring = ringKindFor(displayType);
   const isOutcome = !!ring;
-  // In a circle (groupSentiment set — a node with 2+ direct parentId-
-  // children, or one of those children) but not the one currently chosen
-  // (node.locked) — the "unchosen circle" case: free to drift. A node in no
-  // circle at all, or in the chosen one, or mid-drag, stays put — once a
-  // circle is stabilized there's nothing left to click out to, so freezing
-  // it there for good is exactly what's wanted, not just "until next drag".
-  // Same "nothing to click out to" reasoning applies one level down, per
-  // node: once *this* node is the one chosen (selected, panel open) or
-  // being typed into (inlineEditing), it stops drifting too, circle
-  // stabilized or not — reading or editing a node that keeps sliding out
-  // from under the cursor/panel is exactly the annoyance stabilizing a
-  // whole circle was already meant to avoid. Weapon nodes never carry a
-  // groupSentiment (they're never anyone's parentId child), so this never
-  // applies to one. A circle's own root/parent is excluded outright, chosen
-  // circle or not — "what the circle radiates from" reads as a stable
-  // anchor at a glance, same reasoning as its own size bump above, and
-  // every child already orbits *around* wherever the root currently sits,
-  // so a drifting root would drag the whole zone's own centroid along with
-  // it instead of giving the children something fixed to gather around.
+  // A member of a circle that isn't the chosen one drifts. Nothing drifts that
+  // is in no circle, in the chosen one, a circle's parent (the anchor its
+  // children gather around), being dragged, selected or edited.
   const chaotic =
     !!groupSentiment &&
     !isCircleParent &&
@@ -317,69 +264,34 @@ export const NodeCard = memo(function NodeCard({
     // Puzzle cards hold still, so pieces clicked together stay fitted.
     !(readingMode === "puzzle" && !dotted);
   const readonly = !canDrag;
-  // Captions are hidden by default now — a whole map's worth of text
-  // labels competing for attention read as clutter, same reasoning
-  // healthVisibilityClass's own doc comment already gives for hiding every
-  // node's health ring until it's the one thing being looked at. A circle's
-  // own root/parent keeps its caption regardless (parentCrownSentiment is
-  // only ever set for one), so a map at rest still reads as a set of named
-  // clusters radiating from labeled parents, not a field of anonymous
-  // icons. A node in no circle at all (groupSentiment unset — a lone node,
-  // or one whose parent has only the one child) keeps its caption too:
-  // there's no zone around it to say what it is, so its own text is the
-  // only thing that can, and a member inside a circle has its zone (and
-  // the circle's parent's title) doing that job instead. Once a circle
-  // becomes the chosen one (inChosenCircle, keyed off map.selectedCircle),
-  // every one of its members shows its caption too — studying a cluster up
-  // close is exactly when every member's own text actually matters.
-  // Reading modes override that: "icons + text" shows every node's text; the
-  // puzzle cards have no caption at all, the card *is* the node. The mixed
-  // mode draws only a circle's parent as a card and every other node as an
-  // icon with a one-line cut of its text, so a map reads as a few named
-  // pieces with their members around them. A node mid-edit falls back to the icon +
-  // input either way (see `puzzle`).
+  // Captions show for a circle's parent, a node in no circle (nothing else
+  // says what it is) and every member of the chosen circle; other members let
+  // their zone speak. "Icons + text" shows every caption; puzzle cards have
+  // none (the card is the node); the mixed mode draws only a circle's parent
+  // as a card. A node being edited goes back to icon + input.
   const mixed = readingMode === "mixed";
   const puzzle = (readingMode === "puzzle" || (mixed && !!parentCrownSentiment)) && !inlineEditing;
   const iconText = readingMode === "iconText";
   const showCaption =
     (replayCaption && !puzzle) ||
     (!hideCaption && !puzzle && (mixed || iconText || !groupSentiment || !!parentCrownSentiment || !!inChosenCircle));
-  // What the caption says: the node's own title if it has one, otherwise the
-  // start of its text (the line-clamp on the chip is what cuts it off, so
-  // "first words" needs no separate truncation here).
-  // A ghost (a node no one has written in yet — see NodeDoc.ghost) shows
-  // its prompt instead, in a quieter style, until it's filled in.
+  // The caption: the title, else the start of the text (the chip's
+  // line-clamp cuts it), else a ghost's prompt in a quieter style.
   const ghost = !!node.ghost && !node.text?.trim();
   const ghostPrompt = ghost && !node.title?.trim() ? (node.prompt?.trim() ?? "") : "";
   const captionLabel = node.title?.trim() || node.text || ghostPrompt;
-  // An icon drawn with no caption shows its text in a small label on hover
-  // instead (the same label a zoomed-out dot shows) — so a quiet map can still
-  // be read node by node. Not while selected or editing: the panel and the
-  // edit input already show it.
+  // An icon with no caption shows its text in a small label on hover (not
+  // while selected or editing). Mounted only while hovered.
   const hoverLabel = !showCaption && !puzzle && !selected && !inlineEditing;
-  // Mounted only while hovered, so a map of quiet icons doesn't carry a
-  // hidden label per node.
   const [hovered, setHovered] = useState(false);
   const requestText = () => {
     if (!node.text) onHoverText?.();
   };
   const trimmedTitle = node.title?.trim() ?? "";
   const healthPct = Math.max(0, Math.min(100, node.health));
-  // Opacity/cursor each have one property multiple states could set — CSS
-  // cascade resolves that per-property, not per-modifier, so it's resolved
-  // the same way here: state precedence follows the order these would be
-  // declared in a stylesheet (later declaration wins when more than one
-  // state applies at once), not which condition happens to be checked
-  // first. defeated > dragging > muted for opacity; readonly > dragging for
-  // cursor. Filter (grayscale) is muted's alone — nothing else ever touched
-  // that property, so it doesn't participate in the opacity precedence at all.
-  // muted's own numbers pushed further down (was opacity-32/grayscale-35%)
-  // — the chosen node and its quick-add ghosts are meant to be the one
-  // clear center of attention on screen while they're up; everything else
-  // needs to properly recede, not just slightly fade.
-  // A ghost sits between muted and quiet: faded until someone writes in it,
-  // then it eases up to full (the slower opacity transition below).
-  // quiet (a child no one is looking at) ranks last: any stronger fade wins.
+  // One opacity per node, by precedence: defeated > dragging > muted > ghost >
+  // quiet. The fades are index.css's node-fade-* classes, scaled by how much
+  // fading the viewer wants (utils/nodeFade.ts).
   const opacityClass = node.defeated
     ? "opacity-55"
     : dragging
@@ -391,74 +303,27 @@ export const NodeCard = memo(function NodeCard({
           : quiet
             ? "node-fade-quiet"
             : "";
-  // The three fades (and muted's grayscale) are index.css's node-fade-*
-  // classes, scaled by how much fading the viewer wants (utils/nodeFade.ts).
   const cursorClass = readonly ? "cursor-default" : dragging ? "cursor-grabbing" : "cursor-grab";
-  // Position updates (left/top, applied via inline style) need to be
-  // instant while actively dragging — only once released does the
-  // transform itself (used by the chaotic-drift/fly-in animations, and by
-  // a released circle's "drifts back to its real spot" ease) get a
-  // transition at all.
-  //
-  // `[transition:...]` (an arbitrary CSS *property*), not Tailwind's own
-  // `transition-[...]` utility — that utility only ever sets
-  // `transition-property`, which only accepts bare property names. Handing
-  // it "opacity 0.15s ease" (property+duration+easing together) makes that
-  // one declaration invalid, so the browser drops it and transition-property
-  // falls back to its initial value: `all`. With that, this element's
-  // `left`/`top` — updated via inline style on every pointer-move while
-  // dragging — started transitioning too instead of jumping instantly,
-  // which is exactly what read as "drag has a delay". Root cause, not
-  // guessed: confirmed via computed style (`transitionProperty: "all"`)
-  // before this fix.
+  // left/top must follow the pointer instantly while dragging; only the
+  // transform (drift, fly-in, easing back) is transitioned after release.
+  // Written as `[transition:...]`: Tailwind's transition-[...] only sets
+  // transition-property, so a value with durations was dropped and fell back to
+  // `all`, which animated left/top and made drags lag.
   const transitionClass = dragging
     ? "[transition:opacity_0.15s_ease,filter_0.15s_ease]"
     : "[transition:opacity_0.5s_ease,filter_0.15s_ease,transform_1.8s_cubic-bezier(0.4,0,0.2,1)]";
-  // Single resolution point for this node's own stacking, same reasoning as
-  // opacityClass/cursorClass above — exactly one z-index utility ever
-  // applies, never two stacked in the same class list (whichever Tailwind
-  // happened to generate first in the stylesheet would silently win over
-  // the other otherwise). z-31 baseline keeps every node (and the
-  // quick-add ghosts/pending-create card, z-33) painting *above*
-  // MapPage's full-screen NodePanel backdrop (z-30) — added there to dim
-  // the canvas and close the panel on an outside tap, which without this
-  // otherwise also swallows every tap meant for a node, a ghost, or the
-  // pending-create input while a node is selected. A parent sits one layer over the rest (z-32), so a child's icon or caption never paints over its parent's
-  // icon or caption; a dragged node (z-33) is above everything.
+  // Exactly one z-index: z-31 keeps nodes above the panel backdrop (z-30), a
+  // parent sits one layer up (z-32) so its children never paint over it, and a
+  // dragged node (z-33) is above everything.
   const zIndexClass = dragging ? "z-[33]" : isParent ? "z-[32]" : "z-[31]";
   const classes = [
-    // Plain `transform: translate(-50%, -50%)` via an arbitrary value, not
-    // Tailwind's -translate-x-1/2 utility — Tailwind v4's translate
-    // utilities set the separate CSS `translate` property, not `transform`.
-    // That's harmless on its own, but this element's chaotic-drift and
-    // weapon-fly-in keyframes (registered in index.css) both write a raw
-    // `transform: translate(...)`, and `translate`/`transform` are
-    // independent properties that both apply and compose — so with the
-    // Tailwind utility, an animated node would get centered twice (once by
-    // each property), landing it visibly offset from its real x/y. Writing
-    // the plain property here instead means only one thing is ever doing
-    // the centering, matching what the animations' own keyframes assume.
-    //
-    // touch-none (touch-action: none): without it, starting a drag with a
-    // finger on a phone is ambiguous to the browser between "the page's JS
-    // is handling this pointer sequence" and "the user is panning the
-    // scrollable canvas wrapper" — the browser is free to take over as a
-    // native scroll (canceling the drag with a pointercancel) the moment it
-    // sees touch movement, even though onPointerDown already called
-    // setPointerCapture. That's what made dragging a node on a phone just
-    // scroll the canvas out from under your finger instead. touch-none
-    // opts this element out of that native gesture so the pointermove
-    // handler in MapPage's onNodePointerDown gets every event instead.
-    // Only a node that will really drag (canDrag: move mode is on, or it is
-    // part of a selection) takes the finger that way; any other node lets a
-    // swipe that starts on it pan the map like the empty canvas does.
-    // pointer-events-none: this box is 74px wide and as tall as icon +
-    // caption. If it took every click inside it, with nodes (and their wide
-    // captions) packed around a circle's parent, the zone drawn *underneath*
-    // them would be covered almost end to end and effectively unclickable.
-    // Only the icon circle takes the pointer (pointer-events-auto on it
-    // below); the handlers stay on this div and still fire, by bubbling up
-    // from that circle.
+    // Centered with a plain `transform`, not Tailwind's translate utility (which
+    // sets the separate `translate` property and would compose with the drift and
+    // fly-in keyframes, centering twice). touch-none only on a node that will
+    // drag, so the browser doesn't take the finger as a pan; any other node lets
+    // a swipe pan the map. pointer-events-none: only the icon takes the pointer
+    // (handlers still fire by bubbling), so packed captions don't cover the zone
+    // underneath.
     "group pointer-events-none absolute flex w-[74px] [transform:translate(-50%,-50%)] select-none [-webkit-touch-callout:none] flex-col items-center",
     canDrag && "touch-none",
     zIndexClass,
@@ -516,84 +381,38 @@ export const NodeCard = memo(function NodeCard({
   };
 
 
-  // celebrate fires exactly once, the moment a weapon node lands from its
-  // attack — same contract regular nodes use for their particle burst on
-  // creation, borrowed here for "fly in from a direction, then spark on
-  // impact" instead. NodeCard's stable key means the class only ever
-  // applies once, so the CSS animation only ever plays once too.
+  // A weapon node flies in once when it lands (celebrate), from its target's
+  // direction, or a hashed one if the target is gone, then sparks.
   const flying = node.isWeapon && !!celebrate;
   const flightStyle = flying
     ? (() => {
-        // Prefer the real target-relative direction (see flightVector's own
-        // doc comment) — the random hash fallback only ever fires if a
-        // target can't be resolved (deleted mid-flight, say).
         const { x: fx, y: fy } = flightVector ?? flightOffset(node.nodeId);
         return { "--fly-x": `${fx}px`, "--fly-y": `${fy}px` } as CSSProperties;
       })()
     : undefined;
 
-  // Health only ever shows for the chosen (selected) node — every other
-  // node keeps it hidden, circle membership or not: a whole map's worth of
-  // health rings all visible at once read as noise, and a circle's own
-  // halo/horns backdrop already communicates its members' status anyway.
-  // Applies uniformly to every node type — this div's own ring is health's
-  // one and only home. In Personal mode (discussionMode explicitly false —
-  // see MapPage's isDiscussionMode) it never shows at all, selected or
-  // not: health is a combat concept, meaningless once combat's own
-  // controls are hidden for solo organizing. `discussionMode` defaults to
-  // true (not false) when omitted, matching MapPage's own "undefined means
-  // Discussion" contract.
+  // Health shows only on the selected node, and never on a Personal map (it's
+  // a combat idea). discussionMode undefined means Discussion.
   const showHealth = discussionMode !== false && selected;
   // A Personal map is a calm place to think: no halo/horns, wings or crown
   // badge — just the node's own icon and text.
   const calm = discussionMode === false;
 
-  // Ring is a conic-gradient read off CSS custom properties, so the health
-  // sweep and its color are just two variables — no per-type CSS needed.
-  // Normally `background` is set right here (not a class), for the same
-  // reason the two custom properties are — this whole value only ever
-  // varies per-instance.
-  //
-  // When hidden it's deliberately left unset instead: an inline style
-  // always wins over a class, hover included, so putting the real gradient
-  // there would make it impossible for a group-hover class below to reveal
-  // it only on hover. The two custom properties stay inline either way — a
-  // class-based rule can still read them via var(), cascade only decides
-  // who wins for the *background* property itself.
-  // transparent, not var(--surface-2) — filling the "used up" portion of
-  // this ring (past the health-colored arc) with gray would read as a
-  // distinct gray zone sitting between the badge's own dark fill and its
-  // colored outline. Transparent instead means the ring only ever shows
-  // the *actual* health-colored arc; the "missing" health is communicated
-  // by that arc simply being shorter, not by a second, separately-colored
-  // fill for what isn't there.
+  // The health ring is a conic gradient over two custom properties. When hidden
+  // the background is left unset (an inline style would beat any class). The
+  // missing part is transparent, so only the health arc itself shows.
   const healthGradient =
     "conic-gradient(var(--ring-color, var(--success)) calc(var(--health, 100) * 3.6deg), transparent 0deg)";
   const ringStyle: CSSProperties = {
     "--health": Math.max(0, Math.min(100, node.health)),
     "--ring-color": node.defeated ? "var(--danger)" : "var(--success)",
     ...(showHealth ? { background: healthGradient } : {}),
-    // No separate dashed circle-membership outline any more — the group
-    // backdrop's own color already says which circle (if any) a node
-    // belongs to, and the spotlight dim/full-opacity split says whether
-    // it's the chosen one, so a per-node ring here was a third, redundant
-    // way of saying the same two things. Selection is still its own
-    // distinct signal (this is the one you clicked), so it keeps its ring —
-    // multiSelected gets the same accent color but dashed, so a group
-    // selection reads as "several of these, together" rather than each
-    // member looking like the one singly-selected node.
+    // Selected: a solid accent outline; part of a group selection: dashed.
     outline: selected ? "2px solid var(--accent)" : multiSelected ? "2px dashed var(--accent)" : undefined,
     outlineOffset: 2,
   } as CSSProperties;
-  // Invisible until selected, then a plain fade-in — no hover reveal: that
-  // would let every node's health show one at a time on hover, still a
-  // whole map's worth of rings competing for attention as the cursor
-  // passed over them. Selecting a node is already the map's one "I'm
-  // looking at this one specifically" signal (see the outline above), so
-  // health rides along with that instead of its own separate trigger.
-  // Falling back to a flat bg-surface-2 fill instead of nothing would read
-  // as a plain gray circle sitting around every node's icon rather than
-  // "nothing to see here, select it if you want it".
+  // Invisible until selected, then a fade-in (no hover reveal, which would
+  // light up rings one by one across the map).
   const healthVisibilityClass = "bg-transparent transition-[background] duration-150 ease-[ease]";
 
   const chaosCss = chaotic ? chaosStyle(node.nodeId) : undefined;
@@ -622,13 +441,8 @@ export const NodeCard = memo(function NodeCard({
       } as CSSProperties)
     : undefined;
 
-  // One glow effect wins when more than one could apply at once — same
-  // precedence a stylesheet would give them by declaration order: a
-  // drag-drop highlight (valid/invalid) beats the plain inline-editing glow,
-  // which in turn beats the persistent unsolved-problem pulse — both of
-  // those are transient, in-the-moment states, so they should visibly take
-  // over rather than compete with a pulse that's just sitting there the
-  // whole time this node has no real proposal against it.
+  // One glow wins: a drop highlight, then the inline-editing glow, then the
+  // unsolved-problem pulse.
   const ringStateClass =
     dropHighlight === "valid"
       ? "[--drop-glow:var(--success)] shadow-[0_0_0_5px_color-mix(in_srgb,var(--drop-glow)_45%,transparent)] animate-drop-target-pulse"
@@ -640,17 +454,8 @@ export const NodeCard = memo(function NodeCard({
             ? "animate-unsolved-pulse"
             : "";
 
-  // Every node gets the same plain border, outcome types included, in the
-  // outline it was given (circle by default, see map/nodeShape.tsx) —
-  // OutcomeBadge is just a symbol (no ring of its own any more; its own
-  // halo/horns "crown" decoration is drawn separately, see above).
-  // under-fire (indicator) wins over the type's own color when both could
-  // apply, decided in JS rather than CSS: a Tailwind class (border-danger)
-  // here would lose to the *unconditional* inline `borderColor` a few
-  // lines down every time — an inline style always beats a class for the
-  // same CSS property, so a class-based red under-fire border could never
-  // actually render, indicator or not. Deciding the color in JS instead
-  // means whichever one applies is really what gets set.
+  // The border color is decided here, not by a class (the inline borderColor
+  // would beat it): under fire, then a check/cross override, then the type.
   const circleBorderColor = indicator
     ? "var(--danger)"
     : node.symbolOverride === "check"
@@ -659,33 +464,11 @@ export const NodeCard = memo(function NodeCard({
         ? ZONE_COLORS.negative
         : NODE_TYPE_COLORS[displayType];
 
-  // Counter-scales this node's own visual content against MapPage's canvas
-  // zoom when zoomed in, so icons/captions stay a constant size on screen and
-  // only the canvas's own spacing (everything's x/y) grows. Zoomed out they
-  // shrink with the canvas instead, so they never pile onto each other (see
-  // nodeZoomScale). Applied on its own inner wrapper (see the JSX below) rather
-  // than folded into this element's own `classes`/`style` transform,
-  // specifically because that outer transform isn't always this element's
-  // own inline style to begin with — the chaotic-drift and weapon-fly-in
-  // *keyframe animations* (registered in index.css) each set `transform`
-  // directly while they're playing, which fully replaces the computed
-  // transform value rather than composing with it. Baking a zoom
-  // counter-scale into that same property would make it vanish for the
-  // exact duration of either animation, popping the node to the "wrong"
-  // (zoom-scaled) size and back. A separate inner element's own transform
-  // is never touched by either keyframe, so it stays in effect regardless
-  // of what the outer positioning div's transform is doing at any moment.
-  // sizeMultiplier folded in here (not into the outer div's own transform,
-  // for the same reason 1/zoom already lives here and not there — see this
-  // comment block above) — this is the one wrapper NodeCrown/NodeWings/the
-  // ring/OutcomeBadge all already scale through together, so composing the
-  // size tier's multiplier into the same scale() keeps everything
-  // proportional automatically instead of needing separately-tuned numbers.
-  // The cards view is the exception: there every card is a sticker on the
-  // board, in the canvas's own units, so it grows and shrinks with the zoom —
-  // that's what lets cards glue edge to edge and keep from overlapping at
-  // any zoom (utils/cardGlue.ts). A zone parent drawn as a card in the mixed
-  // view stays one size on screen, like the icons around it.
+  // Counter-scales the node's content against the canvas zoom (constant size
+  // when zoomed in, shrinking when zoomed out, nodeZoomScale) times its size
+  // tier. On its own inner wrapper because the drift and fly-in keyframes own
+  // the outer transform. Cards in the cards view are stickers in canvas units
+  // and scale with the zoom instead (utils/cardGlue.ts).
   const canvasCard = puzzle && readingMode === "puzzle";
   const inverseScaleStyle: CSSProperties = { transform: canvasCard ? "none" : `scale(${sizeMultiplier * nodeZoomScale(zoom)})` };
 
@@ -714,19 +497,9 @@ export const NodeCard = memo(function NodeCard({
       }}
       title={hoverLabel || dotted ? undefined : node.text}
     >
-      {/* See inverseScaleStyle's own comment above for why this is a
-          separate element from the outer positioning div rather than
-          folded into its own transform. */}
-      {/* relative: the title/edit input/link label below are absolutely
-          positioned off the bottom of the icon (top-full), *not* stacked
-          under it in normal flow. In flow they made this whole block —
-          and so the outer div that translate(-50%,-50%) centers on the
-          node's x/y — icon-plus-title tall, which pushed the icon itself
-          up off that point by half the title's height (~15px). A node with
-          no title showing sat exactly on its x/y and one with a title
-          didn't, so a circle's parent (the one node that always shows its
-          title) never looked centered in its own zone. With only the icon
-          in flow, x/y is the icon's center for every node, always. */}
+      {/* relative: the caption, edit input and labels hang off the icon's bottom
+      (top-full) rather than in flow, so a node's x/y is always its icon's
+      center, captioned or not. */}
       <div className="relative flex w-full flex-col items-center" style={inverseScaleStyle}>
       {!!foldedCount && !dotted && (
         // Auto-packed: the branch tucked into this parent. The right middle
@@ -767,10 +540,7 @@ export const NodeCard = memo(function NodeCard({
         </div>
       ) : (
       <>
-      {/* pointer-events-auto: the one part of this node that takes the
-          pointer (the outer div is pointer-events-none — see its class
-          list). Handlers all live on that outer div and reach it by
-          bubbling from here. */}
+      {/* The one part of the node that takes the pointer; handlers are on the outer div. */}
       <div
         className={`pointer-events-auto relative ${puzzle || showPictureCard ? "" : "h-[48px] w-[48px]"}`}
         onPointerEnter={(e) => {
@@ -790,122 +560,23 @@ export const NodeCard = memo(function NodeCard({
             {captionLabel}
           </div>
         )}
-        {indicator && (
-          <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
-            {indicator.incomingNegativeEdges}
-          </div>
-        )}
-        {/* Step number (Node.order) — a small pill on the icon's left edge, for
-            describing a process by labeling nodes 1, 2, 3… The other corners
-            are taken (indicator top-right, crown top-left, pack count
-            bottom-right, shield bottom-left), so this takes the left middle. */}
-        {node.order != null && (
-          <div
-            className="absolute top-1/2 -left-3 z-[6] flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border-2 border-surface bg-accent px-1 text-[0.65rem] leading-none font-bold text-white"
-            title={t.ui.node.orderBadge(node.order)}
-          >
-            {node.order}
-          </div>
-        )}
-        {/* The viewer's own feeling — the right middle (the left middle has
-            the step number), tinted in the feeling's color. */}
-        {feeling && (
-          <div
-            className="absolute top-1/2 -right-3 z-[6] flex h-[1.4rem] w-[1.4rem] -translate-y-1/2 items-center justify-center rounded-full border-2 text-[0.8rem] leading-none"
-            style={{ borderColor: FEELING_COLOR[feeling], background: `color-mix(in srgb, ${FEELING_COLOR[feeling]} 22%, var(--surface, #fff))` }}
-            title={t.ui.feelings.badge(t.ui.feelings.names[feeling])}
-            data-testid="feeling-badge"
-          >
-            {/* Keyed by the feeling, so each new one pops in. */}
-            <span key={feeling} aria-hidden="true" className="inline-block animate-feeling-pop">
-              {FEELING_EMOJI[feeling]}
-            </span>
-            <span className="sr-only">{t.ui.feelings.badge(t.ui.feelings.names[feeling])}</span>
-          </div>
-        )}
-        {/* Packed-member count — bottom-right corner (the indicator badge
-            above already claims top-right) so both can show at once
-            without overlapping. bg-accent, not bg-danger: this isn't a
-            combat signal, just "N nodes folded in here." */}
-        {!!packedCount && (
-          <div className="absolute -right-2 -bottom-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-accent text-[0.65rem] font-bold text-white">
-            {packedCount}
-          </div>
-        )}
-        {/* Circle parent/root marker — a node with 2+ direct parentId-
-            children (MapPage's nodeGroups) gets a small crown badge,
-            colored by the same positive/negative majority vote that colors
-            its own zone backdrop — "this node is what the circle radiates
-            from," at a glance. Independent of NodeCrown just below (every
-            outcome-type node's own halo/horns framing, parent or not).
-            A crown (top of a tree) or a knight's helm (a variant parent) on a
-            small surface-colored chip ringed in the circle's color, so it
-            stands out against whatever the canvas has behind it. Top-left
-            corner. */}
-        {parentCrownSentiment && !calm && (
-          <div
-            className="absolute -top-2.5 -left-2.5 flex h-[1.45rem] w-[1.45rem] items-center justify-center rounded-full border-[1.5px] bg-surface text-[0.8rem] leading-none"
-            style={{ color: ZONE_COLORS[parentCrownSentiment], borderColor: ZONE_COLORS[parentCrownSentiment] }}
-            title={(isVariantParent ? t.ui.node.variantParent : t.ui.node.circleParent)(t.ui.sentiments[parentCrownSentiment])}
-          >
-            {isVariantParent ? <KnightHelmet size={17} sentiment={parentCrownSentiment} /> : "👑"}
-          </div>
-        )}
-        {hiddenBranch && (
-          <div
-            className="absolute top-1/2 -left-3 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-full border border-line bg-surface text-ink-soft"
-            title={t.ui.visibility.badge}
-          >
-            <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M1.5 8 C3.2 4.8 5.4 3.4 8 3.4 C10.6 3.4 12.8 4.8 14.5 8 C12.8 11.2 10.6 12.6 8 12.6 C5.4 12.6 3.2 11.2 1.5 8 Z" stroke="currentColor" strokeWidth="1.3" fill="none" />
-              <circle cx="8" cy="8" r="1.9" fill="currentColor" />
-              <path d="M2.5 13.5 L13.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </div>
-        )}
-        {/* Protection nodes always carry this badge, active attacker or
-            not — the user's own "if attacking node absent, protect is just
-            a usual node but with shield" case. Bottom-left corner: the
-            indicator badge claims top-right, the pack-count badge claims
-            bottom-right. The only shield decoration: a separate
-            bow-and-emblem overlay on top of an actively defending
-            protection node would be redundant clutter, since the node
-            itself already sits right on the attack's own arrow path (see
-            MapPage's positions memo). */}
-        {/* The imitated opponent's move (the opponent's turn, SiegePanel) —
-            a small flag on the top edge (every corner is taken) so the two
-            sides read apart. */}
-        {node.byOpponent && (
-          <div
-            className="absolute -top-2.5 left-1/2 z-[6] flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] text-white"
-            title={t.ui.siege.finish.opponentMove}
-          >
-            ⚑
-          </div>
-        )}
-        {node.isProtection && (
-          <div className="absolute -bottom-2 -left-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-surface text-[0.7rem]">
-            🛡️
-          </div>
-        )}
-        {/* Halo/horns — see NodeCrown's own doc comment; shared with
-            QuickAddGhosts so a ghost previews this too, not just the bare
-            symbol. */}
+        <NodeBadges
+          node={node}
+          indicator={indicator}
+          feeling={feeling}
+          packedCount={packedCount}
+          parentCrownSentiment={parentCrownSentiment}
+          isVariantParent={isVariantParent}
+          hiddenBranch={hiddenBranch}
+          calm={calm}
+        />
+        {/* Halo/horns (NodeCrown), shared with QuickAddGhosts. */}
         {!puzzle && !showPictureCard && !calm && (!compact || triumphant) && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}
-        {/* Wings — see NodeWings's own doc comment for why this is a
-            separate, never-resized overlay rather than living inside
-            OutcomeBadge. Placed before the bordered circle below in DOM
-            order (both z-index:auto) so the circle paints over the
-            wings' own base, same "flanking the head, not stamped on top
-            of it" look the wings always had. */}
+        {/* Wings, before the circle in DOM order so the circle paints over their base. */}
         {!puzzle && !showPictureCard && !calm && (!compact || triumphant) && (
           <NodeWings type={displayType} show={selected || triumphant} symbolOverride={node.symbolOverride} />
         )}
-        {/* No weapon-type badge here — which weapon landed shows via the
-            pointer MapPage draws between this node and its target (see
-            the weapon-mark <g> there), not a corner label: an attack node
-            otherwise renders exactly like any other node of its type, and
-            the pointer alone carries "this is an attack, aimed at that". */}
+        {/* No weapon badge: the pointer MapPage draws to the target says it's an attack. */}
         <div className="pointer-events-none absolute inset-0 z-[5] overflow-visible" ref={particlesRef} />
         {puzzle ? (
           // Puzzle cards: no icon — a jigsaw piece with the node's whole
@@ -1020,86 +691,17 @@ export const NodeCard = memo(function NodeCard({
           style={chompMouthStyle ? { ...ringStyle, ...chompMouthStyle } : ringStyle}
           title={showHealth || hoverLabel ? undefined : t.ui.node.selectToSeeHealth}
         >
-          {inlineEditing ? (
-            <button
-              type="button"
-              className={`flex h-full w-full cursor-pointer items-center justify-center p-0 font-[inherit] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_35%,transparent)] ${shapeBodyClass(node.shape)}`}
-              style={{ borderColor: softEdge(circleBorderColor) }}
-              title={t.ui.node.clickToChangeType}
-              aria-label={`${t.ui.types[displayType]} — ${t.ui.node.clickToChangeType}`}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                setDraftType(node.isWeapon ? cycleAttackNodeType : cycleNodeType);
-              }}
-            >
-              <ShapeContent shape={node.shape} color={circleBorderColor}>
-                {isOutcome ? (
-                  <OutcomeBadge
-                    type={displayType as OutcomeType}
-                    size={OUTCOME_BADGE_SIZE}
-                    symbolOverride={node.symbolOverride}
-                  />
-                ) : (
-                  <NodeTypeIcon type={displayType} size={21} />
-                )}
-              </ShapeContent>
-            </button>
-          ) : (
-            <div
-              // bg-[var(--node-fill)], not bg-surface: a node's own inner
-              // circle reads as the "artwork" (type color border + icon/
-              // symbol) sitting on top of it, and this stays a fixed,
-              // deliberately-chosen backdrop (black in dark mode, a light
-              // brown/tan in light — see index.css's own --node-fill
-              // comment) rather than whatever --surface happens to be for
-              // the rest of the app's chrome at the moment — unlike the
-              // panel/toolbar chrome, this was never meant to blend into
-              // the page background. Same value QuickAddGhosts' own ghost
-              // fill uses, so a ghost previews a real node's actual look
-              // instead of a differently-colored stand-in.
-              className={`flex h-full w-full items-center justify-center ${shapeBodyClass(node.shape)}`}
-              style={{ borderColor: softEdge(circleBorderColor) }}
-            >
-              {(() => {
-                // A picture icon (NodeDoc.iconImage) stands in for the type's
-                // symbol; the ring's color still says the type. A node with a
-                // picture card shows that picture only, never an icon too.
-                const typeFace = node.iconImage && !node.cardImage ? (
-                  <img src={imageSrc(node.iconImage)} alt="" className={`h-full w-full ${shapeRoundClass(node.shape)} object-cover`} draggable={false} />
-                ) : isOutcome ? (
-                  <OutcomeBadge
-                    type={displayType as OutcomeType}
-                    size={OUTCOME_BADGE_SIZE}
-                    symbolOverride={node.symbolOverride}
-                  />
-                ) : (
-                  <NodeTypeIcon type={displayType} size={21} />
-                );
-                // With an emoji the icon is a two-sided card that turns over
-                // once when the node is chosen (see NodeFlipIcon).
-                // In emoji first a node without its own emoji wears its
-                // type's, and a still one never turns (utils/emojiFace.ts).
-                const face = nodeEmojiFace(node, emojiFirst, typeEmoji);
-                return (
-                  <ShapeContent shape={node.shape} color={circleBorderColor}>
-                    {face.emoji ? (
-                      <NodeFlipIcon
-                        typeFace={typeFace}
-                        emoji={face.emoji}
-                        emojiFirst={face.emojiUp}
-                        selected={selected}
-                        flipToken={flipToken}
-                        still={!face.flips}
-                      />
-                    ) : (
-                      typeFace
-                    )}
-                  </ShapeContent>
-                );
-              })()}
-            </div>
-          )}
+          <NodeFace
+            node={node}
+            displayType={displayType}
+            color={circleBorderColor}
+            editing={!!inlineEditing}
+            onCycleType={() => setDraftType(node.isWeapon ? cycleAttackNodeType : cycleNodeType)}
+            emojiFirst={emojiFirst}
+            typeEmoji={typeEmoji}
+            selected={selected}
+            flipToken={flipToken}
+          />
         </div>
         )}
       </div>
@@ -1133,31 +735,10 @@ export const NodeCard = memo(function NodeCard({
         />
       ) : selected || !showCaption || !captionLabel ? null : (
         <div
-          // bg-surface + rounded + a touch of horizontal padding: without
-          // it, an edge line, another node's chaotic drift, a zone polygon
-          // — anything rendered behind this caption (this whole overlay
-          // SVG sits below NodeCard in z-index, so it's always something
-          // behind, never in front) would show straight through a plain
-          // transparent text block, visually cutting through the caption
-          // and making it harder to read wherever it happened to cross. An
-          // opaque chip behind the text stops that regardless of what's
-          // actually back there, rather than trying to keep every other
-          // layer clear of wherever captions might land.
-          //
-          // CAPTION_WIDTH wide (twice the node's own 74px), still two rows —
-          // roughly twice as much of the title fits as before. items-center
-          // on the parent column centers a child wider than it, so this
-          // overhangs the node evenly on both sides. Not pointer-enabled
-          // (the whole node div isn't — see its own class list): a caption
-          // is only ever read, and a wide chip that also swallowed clicks
-          // sat right on top of whatever zone the node belongs to.
-          //
-          // scale(1/sizeMultiplier): this sits inside the wrapper that
-          // scales the whole node by its size tier, so without undoing that
-          // a circle's parent (always 130%) got a 192px caption — wider
-          // than the spacing getNodeMinDist() budgets for (CAPTION_WIDTH),
-          // and wide enough to run into its own children. The chip stays
-          // CAPTION_WIDTH on screen at every size.
+          // An opaque chip, so lines and zones behind don't cut through the text.
+          // CAPTION_WIDTH wide, overhanging the node evenly, and not clickable so it
+          // doesn't cover the zone. scale(1/sizeMultiplier) undoes the size tier, so a
+          // circle's parent doesn't get a caption wide enough to run into its children.
           className={`absolute top-full left-1/2 ${isNamedZone && !puzzle && !compact ? "mt-[1.3rem]" : "mt-[0.6rem]"} rounded-[3px] bg-surface px-[0.2rem] text-center text-[0.68rem] leading-[1.3] ${ghostPrompt ? "font-normal text-ink-soft italic" : "font-medium text-ink"} ${replayCaption ? "z-10 line-clamp-5 break-words" : iconText ? "line-clamp-4 break-words" : mixed ? "truncate whitespace-nowrap" : "line-clamp-2 break-words"}`}
           style={{
             width: iconText || replayCaption ? ICON_TEXT_CAPTION_WIDTH : CAPTION_WIDTH,
