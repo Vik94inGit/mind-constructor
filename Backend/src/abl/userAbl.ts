@@ -16,6 +16,8 @@ import {
   removeUserFromMapsDao,
   getMapByIdDao,
 } from "../dao/mapsDao.js";
+import { deleteManyNodesDao } from "../dao/nodeDao.js";
+import { deleteUserContentDao, listNodeIdsByUserDao } from "../dao/userContentDao.js";
 import { parseOrThrow } from "./errors.js";
 
 export class CannotActOnSelfError extends Error {}
@@ -52,18 +54,23 @@ export const adminDeleteUserAbl = async (targetUserId: string, adminId: string) 
     await deleteMapDao(map.mapId, targetUserId);
   }
 
-  // 2. Remove them from every other map they were just a member of.
+  // 2. Delete every node they added to someone else's map, one by one so
+  //    each node's own cascade runs (its links, children's parent link,
+  //    protection, packing — see nodeDao.ts cascadeAfterNodeDeleted).
+  const nodeIds = await listNodeIdsByUserDao(targetUserId);
+  const deletedNodes = nodeIds.length > 0 ? (await deleteManyNodesDao(nodeIds, targetUserId)).length : 0;
+
+  // 3. Everything else of theirs: links, lines, attacks, history entries,
+  //    pictures, folders, saved state, drafts and usage events.
+  await deleteUserContentDao(targetUserId);
+
+  // 4. Remove them from every other map they were a member of.
   await removeUserFromMapsDao(targetUserId);
 
-  // 3. Delete the account itself.
-  //    NOTE: nodes this user created on maps they *don't* own are
-  //    deliberately left as-is — deleting someone else's shared discussion
-  //    because one contributor was removed would be more destructive than
-  //    helpful. Their `userId` reference on those nodes becomes dangling;
-  //    `.populate("userId", "username")` will resolve it to `null`.
+  // 5. Delete the account itself.
   await deleteUserDao(targetUserId);
 
-  return { deletedUserId: targetUserId, deletedOwnedMaps: ownedMaps.length };
+  return { deletedUserId: targetUserId, deletedOwnedMaps: ownedMaps.length, deletedNodes };
 };
 
 const searchUsersSchema = z.object({

@@ -1266,7 +1266,7 @@ const en: UiStrings = {
     block: "Block",
     unblock: "Unblock",
     delete: "Delete",
-    deleteConfirm: (u) => `Delete ${u}? This deletes every map they own.`,
+    deleteConfirm: (u) => `Delete ${u}? This deletes everything they made: their maps, their nodes and links on other maps, folders, drafts and pictures.`,
     wipeConfirm: "Wipe the ENTIRE database — all users, maps and nodes? This cannot be undone.",
     wipeConfirmAgain: "Are you absolutely sure? Type-of-no-return confirmation #2.",
     usage: {
@@ -1952,7 +1952,7 @@ const cs: UiStrings = {
     block: "Zablokovat",
     unblock: "Odblokovat",
     delete: "Smazat",
-    deleteConfirm: (u) => `Smazat ${u}? Smaže se každá mapa, kterou vlastní.`,
+    deleteConfirm: (u) => `Smazat ${u}? Smaže se vše, co vytvořili: jejich mapy, jejich uzly a spojení na cizích mapách, složky, koncepty a obrázky.`,
     wipeConfirm: "Vymazat CELOU databázi — všechny uživatele, mapy a uzly? Nelze vrátit zpět.",
     wipeConfirmAgain: "Opravdu si jste zcela jistí? Potvrzení bez návratu č. 2.",
     usage: {
@@ -2641,7 +2641,7 @@ const uk: UiStrings = {
     block: "Заблокувати",
     unblock: "Розблокувати",
     delete: "Видалити",
-    deleteConfirm: (u) => `Видалити ${u}? Буде видалено кожну мапу, якою він володіє.`,
+    deleteConfirm: (u) => `Видалити ${u}? Буде видалено все, що створено: їхні мапи, вузли та зв'язки на чужих мапах, папки, чернетки й зображення.`,
     wipeConfirm: "Очистити ВСЮ базу даних — усіх користувачів, мапи та вузли? Цю дію не можна скасувати.",
     wipeConfirmAgain: "Ви абсолютно впевнені? Підтвердження без повернення № 2.",
     usage: {
@@ -3330,7 +3330,7 @@ const ru: UiStrings = {
     block: "Заблокировать",
     unblock: "Разблокировать",
     delete: "Удалить",
-    deleteConfirm: (u) => `Удалить ${u}? Будут удалены все карты, которыми он владеет.`,
+    deleteConfirm: (u) => `Удалить ${u}? Будет удалено всё, что создано: их карты, узлы и связи на чужих картах, папки, черновики и изображения.`,
     wipeConfirm: "Очистить ВСЮ базу данных — всех пользователей, карты и узлы? Это действие нельзя отменить.",
     wipeConfirmAgain: "Вы абсолютно уверены? Подтверждение без возврата № 2.",
     usage: {
