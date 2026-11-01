@@ -291,7 +291,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
                 </span>
               </div>
               <div
-                className={`pointer-events-none absolute left-1/2 top-full -translate-x-1/2 rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] text-[0.62rem] leading-[1.2] font-semibold whitespace-nowrap text-ink shadow-card transition-opacity duration-500 ${
+                className={`pointer-events-none absolute left-1/2 top-full -translate-x-1/2 rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] text-[0.62rem] leading-[1.2] font-semibold whitespace-nowrap text-ink shadow-card transition-opacity duration-500 will-change-[opacity] ${
                   step % n === i ? "opacity-100" : "opacity-0"
                 }`}
                 style={{ marginTop: 4 * k, transform: `scale(${k})`, transformOrigin: "50% 0" }}
@@ -398,9 +398,14 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
                 behind it. whitespace-nowrap: these sit close enough together
                 around the ring that a wrapped two-line label would start
                 overlapping its neighbors', worse than one line running a
-                little wide. */}
+                little wide. will-change-[opacity] keeps each name on its own
+                layer for good: otherwise every fade promoted and dropped a
+                layer, the browser re-drew the scaled ghosts around it, and the
+                ghosts that weren't fading jumped by a fraction of a pixel
+                (the Problem ghost's horns twitched as the other names came
+                and went). Same on the emoji ring. */}
             <div
-              className={`pointer-events-none absolute left-1/2 top-full flex -translate-x-1/2 flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card transition-opacity duration-500 ease-in-out ${
+              className={`pointer-events-none absolute left-1/2 top-full flex -translate-x-1/2 flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card transition-opacity duration-500 will-change-[opacity] ease-in-out ${
                 armedType === type || labelIndex === i ? "opacity-100" : "opacity-0"
               }`}
               style={{ marginTop: 4.8 * k, transform: `scale(${k})`, transformOrigin: "50% 0" }}
