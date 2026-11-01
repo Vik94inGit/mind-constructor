@@ -61,12 +61,14 @@ interface Props {
   onDropImages?: (files: File[]) => void;
   /** Saves the text, then opens the previous (-1) or next (1) node — the arrow keys at either end of the text. */
   onStepNode?: (dir: -1 | 1) => void;
+  /** "Split into nodes" on this node's text (map/TextToNodesModal.tsx's split mode); absent when it can't be split. */
+  onSplitText?: (text: string) => void;
 }
 
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode, onSplitText }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   return (
@@ -161,7 +163,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
         )}
         {imagesSection}
       </div>
-      <div className="mt-2 flex items-center gap-[0.5rem]">
+      <div className="mt-2 flex flex-wrap items-center gap-[0.5rem]">
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => setExpanded((v) => !v)}
@@ -183,6 +185,23 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
         >
           {copied ? t.ui.common.copied : t.ui.common.copy}
         </button>
+        {onSplitText && (
+          <button
+            type="button"
+            data-split-node
+            className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+            title={t.ui.textNodes.splitEntryTitle}
+            // Keeps the text box from blurring (its blur saves and disables
+            // the buttons mid-tap, losing the click); the click saves instead,
+            // so the split cuts up what's on screen.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() =>
+              void onTextSave().then((ok) => ok && onSplitText((isCreator && !textLocked && textDraft.trim()) || node.text))
+            }
+          >
+            {t.ui.textNodes.splitEntry}
+          </button>
+        )}
         {isCreator && (
           <button
             className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"

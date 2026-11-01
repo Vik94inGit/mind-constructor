@@ -997,9 +997,9 @@ export function MapPage() {
     return isOwnNode(node) && !node.isWeapon && !node.isProtection && canSplitText(node.text ?? "");
   }
 
-  function openSplit(node: NodeDoc) {
+  function openSplit(node: NodeDoc, text = node.text) {
     setInlineEditId(null);
-    setSplitNode({ nodeId: node.nodeId, text: node.text });
+    setSplitNode({ nodeId: node.nodeId, text });
     setTextNodesAt(positions.get(node.nodeId) ?? { x: node.x ?? 0, y: node.y ?? 0 });
   }
 
@@ -2367,7 +2367,7 @@ export function MapPage() {
                 onUnpacked={(unpacked) => upsertNode(unpacked)}
                 isClusterParent={circleRootSentimentByNode.has(selectedNode.nodeId)}
                 onExtractText={() => extractClusterText(selectedNode.nodeId)}
-                onSplitText={canSplitNode(selectedNode) ? () => openSplit(selectedNode) : undefined}
+                onSplitText={canSplitNode(selectedNode) ? (text) => openSplit(selectedNode, text) : undefined}
               />
             </>
           )

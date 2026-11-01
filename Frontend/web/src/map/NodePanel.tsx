@@ -142,7 +142,7 @@ interface Props {
   /** Asks MapPage to open a text export scoped to this node's own cluster — plus, recursively, any cluster rooted at one of its children (see MapPage's collectClusterSubtree). Only ever called when isClusterParent is true. */
   onExtractText: () => void;
   /** Opens "Split into nodes" on this node; absent when its text can't be split (a weapon, a shield, one word). */
-  onSplitText?: () => void;
+  onSplitText?: (text: string) => void;
   /** Set while this node is drawn as a puzzle card: its fill (the viewer's own, see utils/cardFill.ts) and how to change it. */
   cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
   /** The viewer's own feeling about this thought (utils/feeling.ts) and how to change it — anyone may, it's only theirs. */
@@ -1046,6 +1046,7 @@ export function NodePanel({
           copied={copied}
           templateKind={templateKind}
           onTextSave={handleTextSave}
+          onSplitText={onSplitText}
           onStepNode={onStepNode}
           onCopyText={handleCopyText}
           onDelete={handleDelete}
@@ -1112,7 +1113,6 @@ export function NodePanel({
           onStartPack={onStartPack}
           onStartChoose={onStartChoose}
           onExtractText={onExtractText}
-          onSplitText={onSplitText}
           onClose={onClose}
         />
       )}

@@ -145,7 +145,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   type the way the viewer's nodes do: its emoji in emoji first, else its symbol (`map/TypeFace.tsx`).
   See `src/map/TextToNodesModal.tsx`.
 - **Split into nodes** — cut one of your own nodes into smaller ones: *✂ Split into nodes…* in the
-  node panel's Modify tab (phone and desktop) or in the node's right-click / long-press menu. It opens
+  node panel's Info tab, right under the text (phone and desktop), or in the node's right-click / long-press menu. It opens
   the same marking step on the node's own text; each piece becomes a node hanging from it, placed
   beside it. By default the node keeps only the text no piece took (`utils/textSplit.ts`
   `textWithoutPieces`), or the whole text when that box is unticked or nothing would be left.
