@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useRadialBlend } from "./useRadialBlend";
 import type { CanvasModeAction, Pt } from "./useCanvasMode";
-import { computeSlideOrder, computeGeometrizedPositions } from "../utils/presentation";
+import { computeSlideGroups, computeSlideOrder, computeGeometrizedPositions } from "../utils/presentation";
 import { collectDescendants } from "../utils/mapGraph";
 import type { NodeDoc } from "../types";
 
@@ -85,6 +85,11 @@ export function usePresentation({
     return computeSlideOrder(eligible);
   }, [presenting, visibleNodes, hiddenBranchIds, presentationScopeIds]);
 
+  // What the overlay steps through: one slide per parent, with its children
+  // on the same slide (utils/presentation.ts computeSlideGroups). slideIndex
+  // counts these.
+  const slideGroups = useMemo(() => computeSlideGroups(slideNodes), [slideNodes]);
+
   const geometrizedPositions = useMemo(
     () => (presenting && slideNodes.length > 0 ? computeGeometrizedPositions(slideNodes) : null),
     [presenting, slideNodes],
@@ -104,12 +109,12 @@ export function usePresentation({
   // see its own doc comment) is the right primitive here since there's no
   // single stored position to key off during the glide.
   useEffect(() => {
-    if (!presenting || slideNodes.length === 0) return;
-    const current = slideNodes[Math.min(slideIndex, slideNodes.length - 1)];
+    if (!presenting || slideGroups.length === 0) return;
+    const current = slideGroups[Math.min(slideIndex, slideGroups.length - 1)].node;
     const p = posFor(current);
     centerOnPoint(p.x, p.y);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presenting, slideIndex, slideNodes, geometrizeBlend.blend]);
+  }, [presenting, slideIndex, slideGroups, geometrizeBlend.blend]);
 
   // Guards an empty selection (nothing eligible to present) rather than
   // entering a blank slideshow; computes the eligible set eagerly, on the
@@ -163,6 +168,7 @@ export function usePresentation({
     slideIndex,
     setSlideIndex,
     slideNodes,
+    slideGroups,
     geometrizeBlend,
     enterPresentation,
     exitPresentation,
