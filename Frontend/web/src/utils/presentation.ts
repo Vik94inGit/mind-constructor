@@ -91,7 +91,7 @@ function slideParents(nodes: NodeDoc[]) {
   const parents = nodes
     .filter((n) => rootIds.has(n.nodeId) || childrenByParent.has(n.nodeId))
     .sort((a, b) => leads(a) - leads(b) || created(a, b));
-  return { parents, childrenByParent };
+  return { parents, childrenByParent, rootIds };
 }
 
 export function computeSlideOrder(nodes: NodeDoc[]): NodeDoc[] {
@@ -118,18 +118,26 @@ export interface SlideGroup {
   children: NodeDoc[];
 }
 
-// The slides a presentation steps through: one per parent, in
-// the order computeSlideOrder takes its parents in, each carrying its
-// children left to right — parent and children, then the next parent and
-// its children. A
-// child that is itself a parent shows on its parent's slide and again,
-// heading its own, when its turn comes. A root with no children is a slide
-// on its own. Nodes a corrupt parent loop kept off every slide get one each.
+// The slides a presentation steps through: one per node, each carrying the
+// children hanging from it (left to right, as cards the viewer can tap to
+// jump to). The order walks each tree depth first: a parent, then its own
+// children one by one — each child's own children straight after it — and
+// only then the next parent. Trees come in computeSlideOrder's root order
+// (an isFirstNode root first, then by when they were made). Nodes a corrupt
+// parent loop kept out of every tree are walked last, so each still shows once.
 export function computeSlideGroups(nodes: NodeDoc[]): SlideGroup[] {
-  const { parents, childrenByParent } = slideParents(nodes);
-  const groups = parents.map((node) => ({ node, children: childrenByParent.get(node.nodeId) ?? [] }));
-  const onSlide = new Set(groups.flatMap((g) => [g.node.nodeId, ...g.children.map((c) => c.nodeId)]));
-  for (const n of nodes) if (!onSlide.has(n.nodeId)) groups.push({ node: n, children: [] });
+  const { parents, childrenByParent, rootIds } = slideParents(nodes);
+  const groups: SlideGroup[] = [];
+  const shown = new Set<string>();
+  const walk = (node: NodeDoc) => {
+    if (shown.has(node.nodeId)) return;
+    shown.add(node.nodeId);
+    const children = childrenByParent.get(node.nodeId) ?? [];
+    groups.push({ node, children });
+    for (const c of children) walk(c);
+  };
+  for (const root of parents.filter((p) => rootIds.has(p.nodeId))) walk(root);
+  for (const n of nodes) walk(n);
   return groups;
 }
 

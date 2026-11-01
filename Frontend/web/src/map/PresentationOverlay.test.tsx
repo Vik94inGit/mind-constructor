@@ -34,13 +34,13 @@ describe("PresentationOverlay", () => {
       expect.stringContaining("Book a hotel"),
       expect.stringContaining("Buy train tickets"),
     ]);
-    expect(screen.getByText(en.ui.presentation.slideCount(1, 2))).toBeInTheDocument();
+    expect(screen.getByText(en.ui.presentation.slideCount(1, 4))).toBeInTheDocument();
   });
 
   it("goes on to the next parent and its children, naming the parent above", () => {
     setup(1);
     expect(screen.getByRole("heading", { name: "Book a hotel" })).toBeInTheDocument();
-    expect(screen.getByText(en.ui.presentation.under("Weekend trip"))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(en.ui.presentation.under("Weekend trip")))).toBeInTheDocument();
     expect(screen.getByRole("listitem")).toHaveTextContent("Find a cheap one");
   });
 
@@ -51,5 +51,20 @@ describe("PresentationOverlay", () => {
     const train = screen.getAllByRole("listitem")[1];
     fireEvent.click(within(train).getByRole("button", { name: en.ui.presentation.showOnMap }));
     expect(onOpenNode).toHaveBeenLastCalledWith("train");
+  });
+
+  it("opens a child's own slide when its card is tapped, and goes back up from Under", () => {
+    const { onIndexChange } = setup();
+    fireEvent.click(screen.getByText("Buy train tickets"));
+    // trip, hotel, cheap, train: the hotel's own child comes before the next sibling.
+    expect(onIndexChange).toHaveBeenLastCalledWith(3);
+    fireEvent.click(screen.getByText("Book a hotel"));
+    expect(onIndexChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it("goes back up to the parent's slide", () => {
+    const { onIndexChange } = setup(1);
+    fireEvent.click(screen.getByText(new RegExp(en.ui.presentation.under("Weekend trip"))));
+    expect(onIndexChange).toHaveBeenLastCalledWith(0);
   });
 });

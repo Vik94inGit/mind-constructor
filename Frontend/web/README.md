@@ -322,9 +322,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   this browser. A zone fades in just after the node that made it (its parent's second child), so the
   nodes come first and the zones they form follow (`src/map/TimeLapseBar.tsx`, `src/hooks/useTimeLapse.ts`).
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
-  slides, with the canvas tidied into an org chart. Each slide is one parent with its children on it
-  as cards, left to right as they sit on the canvas; the parents come in the order they were made, and
-  a slide whose parent hangs from another names it above. The parent and every child have a
+  slides, with the canvas tidied into an org chart. Each node gets a slide, with its children on it as
+  cards, left to right as they sit on the canvas; tapping a card opens that child's slide, and the
+  *Under …* line goes back up to the parent's. The show walks a parent, then its own children one by
+  one (each child's own children straight after it), then the next parent. The node and every child have a
   **Show on map** link that closes the presentation and opens that node on the map
   (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
