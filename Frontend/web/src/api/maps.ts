@@ -1,6 +1,7 @@
 import { apiRequest, ApiRequestError } from "./client";
 import * as offline from "../offline/sync";
 import type { MapAttack, MapDoc, NodeRevisionDoc, MapKind, MapTemplate, NodeType, SelectedCircle } from "../types";
+import { feature } from "../utils/usage";
 
 export type MapFilter = "all" | "owned" | "shared";
 
@@ -98,6 +99,11 @@ export async function updateMap(
   mapId: string,
   updates: Partial<Pick<MapDoc, "name" | "color" | "discussionMode" | "background" | "backgroundColor" | "backgroundImage" | "backgroundShade">>,
 ) {
+  if ("name" in updates || "color" in updates) feature("rename_map");
+  if ("discussionMode" in updates) feature("discussion_mode");
+  if ("background" in updates || "backgroundColor" in updates || "backgroundImage" in updates || "backgroundShade" in updates) {
+    feature("map_background");
+  }
   const res = await apiRequest<{ success: boolean; map: MapDoc }>(`/api/${mapId}`, {
     method: "PATCH",
     body: updates,
@@ -120,6 +126,7 @@ export async function updateMap(
 }
 
 export async function deleteMap(mapId: string) {
+  feature("delete_map");
   return apiRequest<{ success: boolean; message: string }>(`/api/${mapId}`, {
     method: "DELETE",
     offline: {
@@ -172,6 +179,7 @@ export async function getAttackIndicators(mapId: string, threshold = 3) {
 // root's public nodeId — the backend recomputes membership from current
 // parentId links rather than trusting a client-supplied node list.
 export async function selectCircle(mapId: string, rootId: string): Promise<SelectedCircle> {
+  feature("circles");
   const res = await apiRequest<{ success: boolean; selectedCircle: SelectedCircle }>(
     `/api/${mapId}/circles/select`,
     { method: "POST", body: { rootId } },

@@ -4,6 +4,7 @@ import type { UsageSummary as Summary } from "../api/usage";
 import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
 import { browserOptedOut } from "../utils/usage";
+import { featureRows } from "./featureRows";
 
 const WINDOWS = [7, 30, 90] as const;
 
@@ -88,6 +89,7 @@ export function UsageSummary() {
             ))}
           </div>
           <DailyChart summary={summary} />
+          <FeatureTable summary={summary} />
           <EventTable summary={summary} />
         </>
       )}
@@ -159,6 +161,51 @@ function EventTable({ summary }: { summary: Summary }) {
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function FeatureTable({ summary }: { summary: Summary }) {
+  const { t } = useI18n();
+  const s = t.ui.admin.usage;
+  const rows = featureRows(summary);
+  const th = "border-b border-line bg-surface-2 px-[0.85rem] py-[0.5rem] text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase";
+  return (
+    <div className="mb-4">
+      <h3 className="mt-0 mb-[0.2rem] text-[0.95rem] font-bold">{s.featuresTitle}</h3>
+      <p className="mt-0 mb-2 text-[0.8rem] text-ink-soft">{s.featuresHint}</p>
+      <div className="max-h-[28rem] overflow-auto rounded-card border border-line">
+        <table className="w-full bg-surface" style={{ borderCollapse: "collapse" }}>
+          <thead className="sticky top-0">
+            <tr>
+              <th className={`${th} text-left`}>{s.feature}</th>
+              <th className={`${th} text-right`}>{s.times}</th>
+              <th className={`${th} text-right`}>{s.people}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const label = (r.kind === "event" ? s.events[r.name] : s.features[r.name]) ?? r.name;
+              const cell = `px-[0.85rem] py-[0.4rem] text-[0.85rem]${i === rows.length - 1 ? "" : " border-b border-line"}`;
+              const unused = r.count === 0;
+              return (
+                <tr key={r.key}>
+                  <td className={`${cell}${unused ? " text-ink-soft" : ""}`}>
+                    {label}
+                    {unused && (
+                      <span className="ml-2 rounded-[5px] bg-danger-bg px-[0.4rem] py-[0.1rem] text-[0.68rem] font-bold text-danger">
+                        {s.neverUsed}
+                      </span>
+                    )}
+                  </td>
+                  <td className={`${cell} text-right tabular-nums`}>{r.count}</td>
+                  <td className={`${cell} text-right tabular-nums`}>{r.users}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

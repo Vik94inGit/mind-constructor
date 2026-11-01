@@ -5,6 +5,7 @@ import { ApiRequestError } from "../api/client";
 import { NEEDS_OWN_CASTLE, STRATEGIES, planMove } from "../utils/siege";
 import type { Hold, Strategy } from "../utils/siege";
 import type { NodeDoc } from "../types";
+import { feature } from "../utils/usage";
 
 interface Props {
   holds: (Hold & { name: string })[];
@@ -55,6 +56,7 @@ export function SiegePanel({ holds, nodes, onAttacked, onProtected, onFocus, onS
   }
 
   async function makeMove() {
+    feature("opponent_turn");
     const move = planMove(active, targetId, attacker || null, nodes);
     if (!move) {
       setMessage({ tone: "error", text: s.nothing });

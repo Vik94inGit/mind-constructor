@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { useI18n } from "../i18n/I18nContext";
 import { buildTreeExport } from "../utils/textExport";
 import type { NodeDoc } from "../types";
+import { feature } from "../utils/usage";
 
 interface Props {
   mapName: string;
@@ -21,6 +22,7 @@ export function ExportTextModal({ mapName, nodes, positions, onClose }: Props) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const text = buildTreeExport(nodes, positions);
+  useEffect(() => feature("export"), []);
 
   // Same pattern NodePanel's own Copy button already uses — a transient
   // confirmation on success, a real error message (not a silent no-op) if

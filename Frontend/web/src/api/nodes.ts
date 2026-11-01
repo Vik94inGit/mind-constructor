@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 import * as offline from "../offline/sync";
 import { upsertBy } from "../utils/mapGraph";
 import type { Attack, AttackNodeType, NodeDoc, NodeType, Weapon, ZonePaletteColor } from "../types";
+import { feature, type Feature } from "../utils/usage";
 
 export async function listNodes(mapId: string): Promise<NodeDoc[]> {
   const nodes = await apiRequest<NodeDoc[]>(`/api/${mapId}/nodes`);
@@ -83,7 +84,30 @@ export async function createNode(
 /** What a node update may send: its own fields, plus a picture dot's fill colour (Node.picture.color). */
 export type NodeUpdate = Partial<NodeDoc> & { pictureColor?: ZonePaletteColor | null };
 
+// Which feature a node change is, by the fields it sends (moves aren't: see moveNodes).
+const NODE_FIELD_FEATURES: Record<string, Feature> = {
+  text: "edit_text",
+  title: "title",
+  type: "change_type",
+  shape: "node_style",
+  sizeTier: "node_style",
+  symbolOverride: "node_style",
+  emoji: "node_style",
+  color: "node_style",
+  order: "reorder",
+  images: "node_pictures",
+  zoneName: "zones",
+  manualZone: "zones",
+  zoneStyle: "zones",
+  zoneColor: "zones",
+  parentId: "change_parent",
+};
+
 export async function updateNode(nodeId: string, updates: NodeUpdate): Promise<NodeDoc> {
+  for (const key of Object.keys(updates)) {
+    const used = NODE_FIELD_FEATURES[key];
+    if (used) feature(used);
+  }
   const node = await apiRequest<NodeDoc>(`/api/nodes/${nodeId}`, {
     method: "PATCH",
     body: updates,
@@ -114,6 +138,7 @@ export type NodeMove = { nodeId: string } & Pick<Partial<NodeDoc>, "x" | "y" | "
 // magnet), saved in one request instead of one per node. Only the caller's
 // own nodes move; the rest are left out of the answer.
 export async function moveNodes(moves: NodeMove[]): Promise<NodeDoc[]> {
+  feature("move_nodes");
   const nodes = await apiRequest<NodeDoc[]>(`/api/nodes`, {
     method: "PATCH",
     body: { moves },
@@ -135,6 +160,7 @@ export async function moveNodes(moves: NodeMove[]): Promise<NodeDoc[]> {
 // on the node it used to defend in one lump sum (see Backend's
 // deleteNodeDao). null otherwise.
 export async function deleteNode(nodeId: string) {
+  feature("delete_nodes");
   return apiRequest<{ success: boolean; deletedId: string; damagedProtectedNode: NodeDoc | null }>(
     `/api/nodes/${nodeId}`,
     {
@@ -151,6 +177,7 @@ export async function deleteNode(nodeId: string) {
 // (or that's already gone) is silently skipped server-side rather than
 // failing the whole batch, so `deleted` may be shorter than `nodeIds`.
 export async function deleteManyNodes(nodeIds: string[]) {
+  feature("delete_nodes");
   return apiRequest<{
     success: boolean;
     deleted: { deletedId: string; damagedProtectedNode: NodeDoc | null }[];
@@ -220,6 +247,7 @@ export async function protectNode(
 // eligibility regardless of what the picker already filtered client-side
 // (see packAbl.ts's packNodesAbl).
 export async function packNodes(containerId: string, nodeIds: string[]) {
+  feature("pack");
   return apiRequest<{ success: boolean; container: NodeDoc; members: NodeDoc[] }>(
     `/api/nodes/${containerId}/pack`,
     { method: "POST", body: { nodeIds } },
@@ -237,6 +265,7 @@ export async function unpackNode(nodeId: string) {
 // The map's owner hides or shows a branch (this node and everything hanging
 // from it) for the map's invited members.
 export async function setBranchHidden(nodeId: string, hidden: boolean): Promise<NodeDoc> {
+  feature("hide_branch");
   const res = await apiRequest<{ success: boolean; node: NodeDoc }>(`/api/nodes/${nodeId}/visibility`, {
     method: "POST",
     body: { hidden },

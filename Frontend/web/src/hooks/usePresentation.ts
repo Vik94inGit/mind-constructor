@@ -5,6 +5,7 @@ import type { CanvasModeAction, Pt } from "./useCanvasMode";
 import { computeSlideGroups, computeSlideOrder, computeGeometrizedPositions } from "../utils/presentation";
 import { collectDescendants } from "../utils/mapGraph";
 import type { NodeDoc } from "../types";
+import { feature } from "../utils/usage";
 
 interface Params {
   visibleNodes: NodeDoc[];
@@ -126,6 +127,7 @@ export function usePresentation({
   // "nodes or zones" choice the canvas' own selection tools already offer,
   // reused here rather than inventing a separate picker.
   function enterPresentation() {
+    feature("presentation");
     const scopeIds =
       multiSelectIds.size > 0
         ? multiSelectIds

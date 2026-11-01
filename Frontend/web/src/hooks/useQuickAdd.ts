@@ -7,7 +7,7 @@ import type { ViewportBounds } from "../utils/canvasLayout";
 import type { Translation } from "../i18n/translations";
 import type { PendingCreate } from "./useNodeCreation";
 import type { NodeDoc, NodeType } from "../types";
-import { track } from "../utils/usage";
+import { feature, track } from "../utils/usage";
 
 type Pt = { x: number; y: number };
 
@@ -90,6 +90,7 @@ export function useQuickAdd({
     try {
       const node = await nodesApi.createNode(mapId, { text: "", type, x: placed.x, y: placed.y, parentId: parent.nodeId });
       track({ name: "node_created", props: { type } });
+      feature("quick_add");
       upsertNode(node);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
     } catch (err) {

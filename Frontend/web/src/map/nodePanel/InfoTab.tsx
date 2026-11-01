@@ -12,6 +12,7 @@ import { CARD_FONT_MAX, CARD_FONT_MIN, CARD_SHAPES } from "../../types";
 import type { CardShape } from "../../types";
 import { useI18n } from "../../i18n/I18nContext";
 import type { NodeDoc } from "../../types";
+import { feature } from "../../utils/usage";
 
 export type CardLookPatch = Pick<Partial<NodeDoc>, "cardW" | "cardH" | "cardFont" | "cardShape">;
 /** A card's own look, for its owner to change (Node.cardFont/cardShape/cardW/cardH). */
@@ -246,7 +247,10 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
               data-swap-parent
               className="cursor-pointer rounded-md border border-line px-2 py-[0.2rem] text-[0.75rem] font-semibold text-ink hover:bg-surface-2"
               title={t.ui.canvas.swapWithParentHint}
-              onClick={onSwapWithParent}
+              onClick={() => {
+                feature("swap_parent");
+                onSwapWithParent();
+              }}
             >
               ⇅ {t.ui.canvas.swapWithParent}
             </button>

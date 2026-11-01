@@ -27,7 +27,61 @@ export type UsageEvent =
   | { name: "node_attacked"; props?: { weapon?: string } }
   | { name: "node_protected" }
   | { name: "map_finished" }
-  | { name: "replay_played" };
+  | { name: "replay_played" }
+  | { name: "feature_used"; props: { feature: Feature } };
+
+/**
+ * Every other feature, counted as one "feature_used" event with its name, so
+ * the admin page can list each one, unused ones included, least used first.
+ * Add a feature here (and its label in uiStrings' admin.usage.features) when
+ * it ships.
+ */
+export const FEATURES = [
+  "edit_text",
+  "title",
+  "change_type",
+  "node_style",
+  "reorder",
+  "node_pictures",
+  "zones",
+  "change_parent",
+  "swap_parent",
+  "move_nodes",
+  "delete_nodes",
+  "link_nodes",
+  "draw_line",
+  "pack",
+  "hide_branch",
+  "circles",
+  "map_background",
+  "discussion_mode",
+  "rename_map",
+  "delete_map",
+  "folders",
+  "history",
+  "presentation",
+  "copy_paste",
+  "undo",
+  "export",
+  "minimap",
+  "opponent_turn",
+  "quick_add",
+] as const;
+export type Feature = (typeof FEATURES)[number];
+
+// One gesture can fire the same feature many times in a row (a drag's
+// moves, typing): within this window it counts once.
+const FEATURE_REPEAT_MS = 3000;
+const lastFeatureAt = new Map<Feature, number>();
+
+/** Notes that the signed-in user used a feature. */
+export function feature(name: Feature) {
+  const now = Date.now();
+  const last = lastFeatureAt.get(name);
+  if (last !== undefined && now - last < FEATURE_REPEAT_MS) return;
+  lastFeatureAt.set(name, now);
+  track({ name: "feature_used", props: { feature: name } });
+}
 
 interface Queued {
   name: string;
@@ -141,6 +195,7 @@ export function resetUsage() {
   queue = [];
   signedIn = false;
   sending = false;
+  lastFeatureAt.clear();
 }
 
 /** What a route is called in the numbers: never the map's own id. */

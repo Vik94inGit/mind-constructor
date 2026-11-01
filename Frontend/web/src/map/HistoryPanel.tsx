@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import * as mapsApi from "../api/maps";
 import type { NodeRevisionDoc, NodeType } from "../types";
+import { feature } from "../utils/usage";
 
 interface Props {
   mapId: string;
@@ -26,6 +27,7 @@ export function HistoryPanel({ mapId, liveIds, onShow, onExit }: Props) {
 
   useEffect(() => {
     let alive = true;
+    feature("history");
     mapsApi
       .getMapHistory(mapId)
       .then((r) => alive && setRows(r))
