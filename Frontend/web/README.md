@@ -144,6 +144,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   sees how many do and chooses which pieces to pack into the main node. Its type buttons show each
   type the way the viewer's nodes do: its emoji in emoji first, else its symbol (`map/TypeFace.tsx`).
   See `src/map/TextToNodesModal.tsx`.
+- **Split into nodes** — cut one of your own nodes into smaller ones: *✂ Split into nodes…* in the
+  node panel's Modify tab (phone and desktop) or in the node's right-click / long-press menu. It opens
+  the same marking step on the node's own text; each piece becomes a node hanging from it, placed
+  beside it. By default the node keeps only the text no piece took (`utils/textSplit.ts`
+  `textWithoutPieces`), or the whole text when that box is unticked or nothing would be left.
 - **Pictures on nodes** — the node panel's Info tab shows the text and its pictures in one box, like
   a post: screenshots pasted with Ctrl+V, images dropped on the box or picked with its 🖼️ button land
   under the text; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in

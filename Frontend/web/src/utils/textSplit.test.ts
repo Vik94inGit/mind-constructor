@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addPiece,
   autoPieces,
+  canSplitText,
   parentCandidates,
   piecesParentsFirst,
   removePiece,
@@ -9,6 +10,7 @@ import {
   spanBetween,
   splitToThoughtDraft,
   textSegments,
+  textWithoutPieces,
   trimRange,
   wordRanges,
 } from "./textSplit";
@@ -135,5 +137,42 @@ describe("piece parents", () => {
     const pieces = setPieceParent([piece("a", 0, 5), piece("b", 6, 11)], "b", "a");
     const draft = splitToThoughtDraft({ name: "", text: "hello world", rootType: "Problem", pieces, step: 1 });
     expect(draft.thoughts.map((t) => t.parentId)).toEqual(["root", "a"]);
+  });
+});
+
+describe("textWithoutPieces", () => {
+  const cut = (text: string, ...parts: string[]) =>
+    textWithoutPieces(
+      text,
+      parts.map((part) => ({ start: text.indexOf(part), end: text.indexOf(part) + part.length })),
+    );
+
+  it("keeps the sentences no piece took", () => {
+    expect(cut("Buy milk. Call mom. Fix the car.", "Call mom.")).toBe("Buy milk. Fix the car.");
+  });
+
+  it("drops lines that were taken whole", () => {
+    expect(cut("Trip\nbook hotel\npack bags", "book hotel", "pack bags")).toBe("Trip");
+  });
+
+  it("tidies a comma left hanging", () => {
+    expect(cut("Apples, pears, plums", "Apples")).toBe("pears, plums");
+    expect(cut("Apples, pears, plums", "plums")).toBe("Apples, pears");
+  });
+
+  it("is empty when the pieces take everything", () => {
+    expect(cut("One. Two.", "One.", "Two.")).toBe("");
+  });
+
+  it("is the text itself, trimmed, with no pieces", () => {
+    expect(textWithoutPieces("  just this  ", [])).toBe("just this");
+  });
+});
+
+describe("canSplitText", () => {
+  it("needs at least two words", () => {
+    expect(canSplitText("one")).toBe(false);
+    expect(canSplitText("   ")).toBe(false);
+    expect(canSplitText("one two")).toBe(true);
   });
 });

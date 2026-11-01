@@ -36,6 +36,7 @@ import type { CanvasNodeActions } from "../map/CanvasNodeCard";
 import { NodePanel } from "../map/NodePanel";
 import { PackPickerPanel } from "../map/PackPickerPanel";
 import { TextToNodesModal } from "../map/TextToNodesModal";
+import { canSplitText } from "../utils/textSplit";
 import { findFreeSpots } from "../utils/freeSpots";
 import { PendingNodeCard } from "../map/PendingNodeCard";
 import { CreateEdgeModal } from "../map/CreateEdgeModal";
@@ -991,6 +992,17 @@ export function MapPage() {
     return idOf(node.userId) === user?._id;
   }
 
+  // Your own thought with at least two words in it can be cut into smaller nodes hanging from it.
+  function canSplitNode(node: NodeDoc) {
+    return isOwnNode(node) && !node.isWeapon && !node.isProtection && canSplitText(node.text ?? "");
+  }
+
+  function openSplit(node: NodeDoc) {
+    setInlineEditId(null);
+    setSplitNode({ nodeId: node.nodeId, text: node.text });
+    setTextNodesAt(positions.get(node.nodeId) ?? { x: node.x ?? 0, y: node.y ?? 0 });
+  }
+
   // Owner-only — text/type editing isn't otherwise restricted (an earlier
   // version locked it once a node had taken any damage, but that blocked
   // ordinary corrections too aggressively; see NodePanel.tsx's own canEdit).
@@ -1454,6 +1466,8 @@ export function MapPage() {
   }, [pendingCreate?.x, pendingCreate?.y]);
   // "Text → nodes" (canvas right-click menu): where on the canvas it was asked for.
   const [textNodesAt, setTextNodesAt] = useState<{ x: number; y: number } | null>(null);
+  // "Split into nodes": the node whose text the Text → nodes dialog cuts up (null: a fresh text).
+  const [splitNode, setSplitNode] = useState<{ nodeId: string; text: string } | null>(null);
   // "Draw a picture" is choosing a picture: where it goes, or "view" for the
   // middle of what's on screen (the "+" menu).
   const [picturePickerAt, setPicturePickerAt] = useState<{ x: number; y: number } | "view" | null>(null);
@@ -2353,6 +2367,7 @@ export function MapPage() {
                 onUnpacked={(unpacked) => upsertNode(unpacked)}
                 isClusterParent={circleRootSentimentByNode.has(selectedNode.nodeId)}
                 onExtractText={() => extractClusterText(selectedNode.nodeId)}
+                onSplitText={canSplitNode(selectedNode) ? () => openSplit(selectedNode) : undefined}
               />
             </>
           )
@@ -2448,6 +2463,7 @@ export function MapPage() {
             startChooseFrom(anchor.nodeId);
           }}
           onAttack={() => setContextMenu(null)}
+          onSplit={canSplitNode(contextMenu.node) ? () => openSplit(contextMenu.node) : undefined}
         />
       )}
 
@@ -2498,6 +2514,7 @@ export function MapPage() {
           onTextToNodes={() => {
             setCanvasContextMenu(null);
             setInlineEditId(null);
+            setSplitNode(null);
             setTextNodesAt({ x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY });
           }}
           onTextToMap={() => {
@@ -2524,6 +2541,8 @@ export function MapPage() {
 
       {textNodesAt && (
         <TextToNodesModal
+          key={splitNode?.nodeId ?? "text"}
+          splitNode={splitNode ?? undefined}
           // The whole canvas counts, not just what's on screen — the question
           // is whether the map itself has room. New nodes keep the usual
           // spacing from everything already there (zones included) and the
@@ -2537,8 +2556,11 @@ export function MapPage() {
             )
           }
           onCreate={createFromText}
-          onClose={() => setTextNodesAt(null)}
-          mapNodes={visibleNodes.filter((n) => !n.isWeapon).map((n) => ({ id: n.nodeId, label: linkLabel(n.nodeId) }))}
+          onClose={() => {
+            setTextNodesAt(null);
+            setSplitNode(null);
+          }}
+          mapNodes={visibleNodes.filter((n) => !n.isWeapon && n.nodeId !== splitNode?.nodeId).map((n) => ({ id: n.nodeId, label: linkLabel(n.nodeId) }))}
         />
       )}
 

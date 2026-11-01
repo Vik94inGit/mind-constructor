@@ -198,3 +198,37 @@ export function autoPieces(
   }
   return pieces;
 }
+
+/**
+ * What is left of `text` once every piece is cut out of it — for splitting a
+ * node already on the map (map/TextToNodesModal.tsx's split mode), where the
+ * node keeps only the text no piece took. Spaces left behind collapse to one,
+ * empty lines go, and a stray comma or dash at a line's edge goes with them.
+ */
+export function textWithoutPieces(text: string, pieces: { start: number; end: number }[]): string {
+  let out = "";
+  let at = 0;
+  for (const p of [...pieces].sort((a, b) => a.start - b.start)) {
+    if (p.start > at) out += text.slice(at, p.start);
+    // A space where the piece was, so the words either side don't run together.
+    out += " ";
+    at = Math.max(at, p.end);
+  }
+  out += text.slice(at);
+  return out
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/[ \t]+/g, " ")
+        .replace(/\s+([,.;:!?…])/g, "$1")
+        .replace(/^[\s,;:—–-]+|[\s,;:—–-]+$/g, "")
+        .replace(/^[.!?…]+\s*/, ""),
+    )
+    .filter((line) => line.length > 0)
+    .join("\n");
+}
+
+/** Whether a node's text has anything to split: at least two words. */
+export function canSplitText(text: string): boolean {
+  return wordRanges(text).length >= 2;
+}

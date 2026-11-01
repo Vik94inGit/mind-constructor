@@ -563,6 +563,16 @@ export interface UiStrings {
     addAndPack: (shown: number, packed: number) => string;
     created: (count: number, packed: number) => string;
     failed: string;
+    /** Splitting a node already on the map (node panel → Modify, or its menu). */
+    splitEntry: string;
+    splitEntryTitle: string;
+    splitTitle: string;
+    splitHint: string;
+    thisNode: string;
+    takeOut: string;
+    keeps: (text: string) => string;
+    keepsAll: string;
+    nothingLeft: string;
   };
   admin: {
     title: string;
@@ -1206,6 +1216,15 @@ const en: UiStrings = {
     created: (n, packed) =>
       packed > 0 ? `${n} ${n === 1 ? "node" : "nodes"} added, ${packed} packed into the main node` : `${n} ${n === 1 ? "node" : "nodes"} added`,
     failed: "Couldn't add the nodes",
+    splitEntry: "✂ Split into nodes…",
+    splitEntryTitle: "Cut this node's text into smaller nodes that hang from it",
+    splitTitle: "Split into nodes",
+    splitHint: "Tap the word a piece starts on, then the word it ends on, and give it a type — or cut the text by lines or sentences in one go. Each piece becomes a node hanging from this one.",
+    thisNode: "This node",
+    takeOut: "Take the pieces out of this node's text",
+    keeps: (text) => `This node keeps: “${text.length > 80 ? `${text.slice(0, 80)}…` : text}”`,
+    keepsAll: "This node keeps its whole text.",
+    nothingLeft: "The pieces take the whole text, so this node keeps it as it is.",
   },
   admin: {
     title: "Admin",
@@ -1838,6 +1857,15 @@ const cs: UiStrings = {
     addAndPack: (shown, packed) => `Přidat ${shown}, zabalit ${packed}`,
     created: (n, packed) => (packed > 0 ? `Přidáno: ${csNodes(n)}, ${packed} zabaleno do hlavního uzlu` : `Přidáno: ${csNodes(n)}`),
     failed: "Uzly se nepodařilo přidat",
+    splitEntry: "✂ Rozdělit na uzly…",
+    splitEntryTitle: "Rozdělit text tohoto uzlu na menší uzly, které z něj visí",
+    splitTitle: "Rozdělit na uzly",
+    splitHint: "Klepněte na slovo, kde část začíná, pak na slovo, kde končí, a dejte jí typ — nebo text rozdělte po řádcích či větách najednou. Každá část bude uzel visící z tohoto.",
+    thisNode: "Tento uzel",
+    takeOut: "Vyjmout části z textu tohoto uzlu",
+    keeps: (text) => `Tento uzel si ponechá: „${text.length > 80 ? `${text.slice(0, 80)}…` : text}“`,
+    keepsAll: "Tento uzel si ponechá celý text.",
+    nothingLeft: "Části zabírají celý text, takže uzel si ho ponechá beze změny.",
   },
   admin: {
     title: "Správa",
@@ -2473,6 +2501,15 @@ const uk: UiStrings = {
         ? `Додано ${n} ${slavicPlural(n, "вузол", "вузли", "вузлів")}, ${packed} спаковано в головний вузол`
         : `Додано ${n} ${slavicPlural(n, "вузол", "вузли", "вузлів")}`,
     failed: "Не вдалося додати вузли",
+    splitEntry: "✂ Розділити на вузли…",
+    splitEntryTitle: "Розрізати текст цього вузла на менші вузли, що висять з нього",
+    splitTitle: "Розділити на вузли",
+    splitHint: "Торкніться слова, з якого починається частина, потім слова, яким вона закінчується, і дайте їй тип — або розріжте текст по рядках чи реченнях одразу. Кожна частина стане вузлом, що висить з цього.",
+    thisNode: "Цей вузол",
+    takeOut: "Вийняти частини з тексту цього вузла",
+    keeps: (text) => `Цей вузол залишить: «${text.length > 80 ? `${text.slice(0, 80)}…` : text}»`,
+    keepsAll: "Цей вузол залишить увесь текст.",
+    nothingLeft: "Частини займають увесь текст, тож вузол залишить його без змін.",
   },
   admin: {
     title: "Адміністрування",
@@ -3108,6 +3145,15 @@ const ru: UiStrings = {
         ? `Добавлено ${n} ${slavicPlural(n, "узел", "узла", "узлов")}, ${packed} упаковано в главный узел`
         : `Добавлено ${n} ${slavicPlural(n, "узел", "узла", "узлов")}`,
     failed: "Не удалось добавить узлы",
+    splitEntry: "✂ Разделить на узлы…",
+    splitEntryTitle: "Разрезать текст этого узла на узлы поменьше, висящие на нём",
+    splitTitle: "Разделить на узлы",
+    splitHint: "Нажмите на слово, с которого начинается часть, потом на слово, которым она заканчивается, и дайте ей тип — или разрежьте текст по строкам или предложениям сразу. Каждая часть станет узлом, висящим на этом.",
+    thisNode: "Этот узел",
+    takeOut: "Вынуть части из текста этого узла",
+    keeps: (text) => `Этот узел оставит: «${text.length > 80 ? `${text.slice(0, 80)}…` : text}»`,
+    keepsAll: "Этот узел оставит весь текст.",
+    nothingLeft: "Части занимают весь текст, поэтому узел оставит его без изменений.",
   },
   admin: {
     title: "Администрирование",

@@ -127,4 +127,66 @@ describe("TextToNodesModal parents", () => {
     expect(byText.two.parentId).toBe(byText.one.id);
     expect(byText.three.parentId).toBe("existing");
   });
+
+  describe("splitting a node already on the map", () => {
+    type Plan = {
+      withRoot: boolean;
+      pieces: { text: string; parentId?: string }[];
+      splitNode?: { nodeId: string; text: string | null };
+    };
+    function split(text: string) {
+      const onCreate = vi.fn(async () => {});
+      const onClose = vi.fn();
+      const findSpots = vi.fn(() => []);
+      render(
+        <I18nProvider>
+          <TextToNodesModal findSpots={findSpots} onCreate={onCreate} onClose={onClose} splitNode={{ nodeId: "n1", text }} />
+        </I18nProvider>,
+      );
+      return { onCreate, onClose, plan: () => (onCreate.mock.calls[0] as unknown[])[0] as Plan };
+    }
+
+    it("starts on the node's own text, and the pieces hang from the node, which keeps what's left", async () => {
+      const { onClose, plan } = split("Trip to Rome\nbook hotel\npack bags");
+      expect(screen.getByText(en.ui.textNodes.splitTitle)).toBeTruthy();
+      expect(screen.queryByPlaceholderText(en.split.textPlaceholder)).toBeNull();
+      expect(screen.queryByText(en.ui.textNodes.back)).toBeNull();
+      fireEvent.click(screen.getByText("book"));
+      fireEvent.click(screen.getByText("hotel"));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(en.ui.types.Option) }));
+      fireEvent.click(screen.getByText("pack"));
+      fireEvent.click(screen.getByText("bags"));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(en.ui.types.Idea) }));
+      expect(screen.getByText(en.ui.textNodes.keeps("Trip to Rome"))).toBeTruthy();
+      fireEvent.click(screen.getByText(en.ui.textNodes.add(2)));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(plan().withRoot).toBe(false);
+      expect(plan().pieces).toEqual([
+        expect.objectContaining({ text: "book hotel", parentId: "n1" }),
+        expect.objectContaining({ text: "pack bags", parentId: "n1" }),
+      ]);
+      expect(plan().splitNode).toEqual({ nodeId: "n1", text: "Trip to Rome" });
+    });
+
+    it("leaves the node's text alone when asked to, or when the pieces take all of it", async () => {
+      const { onClose, plan } = split("one\ntwo");
+      fireEvent.click(screen.getByText(en.ui.textNodes.splitLines));
+      expect(screen.getByText(en.ui.textNodes.nothingLeft)).toBeTruthy();
+      fireEvent.click(screen.getByText(en.ui.textNodes.add(2)));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(plan().splitNode).toEqual({ nodeId: "n1", text: null });
+    });
+
+    it("keeps the whole text when 'take out' is unticked", async () => {
+      const { onClose, plan } = split("Main. Side note.");
+      fireEvent.click(screen.getByText("Side"));
+      fireEvent.click(screen.getByText("note."));
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(en.ui.types.Idea) }));
+      fireEvent.click(screen.getByLabelText(en.ui.textNodes.takeOut));
+      expect(screen.getByText(en.ui.textNodes.keepsAll)).toBeTruthy();
+      fireEvent.click(screen.getByText(en.ui.textNodes.add(1)));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(plan().splitNode).toEqual({ nodeId: "n1", text: null });
+    });
+  });
 });
