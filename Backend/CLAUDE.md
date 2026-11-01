@@ -84,9 +84,15 @@ attack-indicators,summary}`, not `/api/maps/{mapId}/...`). `GET /api/search?q=` 
   client calls, in bulk, only for whichever nodes actually need their real text right now.
 - **`src/controllers/*.ts`** — HTTP concerns only: pull `req.user`/`req.params`/`req.body`, call
   one ABL function, translate its return value and thrown error classes into a status code + JSON
-  body, call `broadcastToMap` on success. Every handler is a `try/catch` that pattern-matches on
-  specific error classes imported from the ABL module before falling back to a generic 500 —
-  follow that pattern for any new endpoint rather than inventing a different error shape.
+  body, call `broadcastToMap` on success. Every handler behind `protect` is written as
+  `authed(logLabel, async (req, res, userId) => …, { errors, message })` from
+  `controllers/errorHandling.ts`: it answers 401 if `req.user` is missing, hands the action the
+  caller's id, and sends anything thrown through `handleAblError`, which maps `ValidationError`
+  (400), `MapFinishedError` (409) and the action's own `errors` list of ABL error classes before
+  falling back to a 500 with `message`. The same file has `fail(res, status, error)`,
+  `param(req, name)`, `publicMapIdOf(doc)` and `isIdList(value)`. Follow that pattern for any new
+  endpoint rather than writing a try/catch or a different error shape. Only the public auth
+  routes in `authController.ts` keep their own try/catch.
 - **`src/abl/*.ts`** ("application business logic") — the actual domain logic: validation (via
   `zod` schemas + `parseOrThrow` from `abl/errors.ts`, which turns a failed `safeParse` into a
   `ValidationError`), authorization checks (map membership, node ownership), and orchestrating DAO

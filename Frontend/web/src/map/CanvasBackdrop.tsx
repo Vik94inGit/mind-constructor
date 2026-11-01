@@ -467,9 +467,12 @@ export function CanvasBackdrop({
             y1={a.y}
             x2={b.x}
             y2={b.y}
-            stroke={color}
-            strokeOpacity={dimmed ? 0.12 : chosenHighlighted ? (group ? 0.95 : 0.6) : group ? 0.65 : 0.35}
-            strokeWidth={group ? 1.75 : 1.5}
+            // At rest a branch is a quiet gray hairline, so the nodes and their
+            // text hold the eye; it takes its zone's colour only once one of
+            // its ends is chosen.
+            stroke={chosenHighlighted ? color : "var(--ink-soft)"}
+            strokeOpacity={dimmed ? 0.1 : chosenHighlighted ? (group ? 0.95 : 0.6) : group ? 0.32 : 0.22}
+            strokeWidth={chosenHighlighted ? 1.75 : 1.25}
             strokeDasharray={group ? undefined : "5 4"}
             markerEnd="url(#branch-arrow)"
             // The whole overlay SVG is pointer-events-none (so its
@@ -556,9 +559,11 @@ export function CanvasBackdrop({
             x2={b.x}
             y2={b.y}
             data-reveal-line={`${fromId} ${toId}`}
-            stroke={color}
-            strokeWidth={2}
-            strokeOpacity={dimmed ? 0.06 : highlighted ? 0.9 : 0.55}
+            // Neutral gray at rest, like the branches; the sentiment colour
+            // shows once one of its ends is chosen.
+            stroke={highlighted ? color : "var(--ink-soft)"}
+            strokeWidth={highlighted ? 2 : 1.5}
+            strokeOpacity={dimmed ? 0.06 : highlighted ? 0.9 : 0.3}
           />
         );
       })}

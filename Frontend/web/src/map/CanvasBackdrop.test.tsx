@@ -133,3 +133,55 @@ describe("CanvasBackdrop cards view", () => {
     expect(document.querySelector("polygon")).not.toBeNull();
   });
 });
+
+describe("quiet lines at rest", () => {
+  const nodes = [
+    { nodeId: "a", text: "a", type: "unknown", parentId: null, userId: "u1", health: 100, defeated: false },
+    { nodeId: "b", text: "b", type: "unknown", parentId: "a", userId: "u1", health: 100, defeated: false },
+  ] as React.ComponentProps<typeof CanvasBackdrop>["visibleNodes"];
+  const edges = [
+    { edgeId: "e1", mapId: "m1", fromNodeId: "a", toNodeId: "b", sentiment: "negative", userId: "u1" },
+  ] as React.ComponentProps<typeof CanvasBackdrop>["edges"];
+  const lines = (chosenNodeIds: Set<string> | null) => {
+    const { container } = render(
+      <I18nProvider>
+        <CanvasBackdrop
+          {...{
+            nodeGroups: [],
+            selectedCircle: null,
+            visibleNodes: nodes,
+            edges,
+            posFor: () => ({ x: 0, y: 0 }),
+            circleRootSentimentByNode: new Map(),
+            linkCycles: [],
+            chosenNodeIds,
+            pendingLink: null,
+            onCircleClick: vi.fn(),
+            lines: [],
+            canDeleteLine: () => false,
+            onLineClick: vi.fn(),
+            interactive: true,
+            drawing: null,
+            onZoneMenu: vi.fn(),
+          }}
+        />
+      </I18nProvider>,
+    );
+    return {
+      branch: container.querySelector('line[data-reveal-line="a b"][marker-end]')!,
+      edge: container.querySelector('line[data-reveal-line="a b"]:not([marker-end])')!,
+    };
+  };
+
+  it("draws branches and links in neutral gray when nothing is chosen", () => {
+    const { branch, edge } = lines(null);
+    expect(branch.getAttribute("stroke")).toBe("var(--ink-soft)");
+    expect(edge.getAttribute("stroke")).toBe("var(--ink-soft)");
+  });
+
+  it("gives a chosen node's lines their colour back", () => {
+    const { branch, edge } = lines(new Set(["a"]));
+    expect(branch.getAttribute("stroke")).toBe("var(--accent)");
+    expect(edge.getAttribute("stroke")).toBe("var(--danger)");
+  });
+});

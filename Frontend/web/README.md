@@ -55,7 +55,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   container, group nodes into a chosen circle, choose a node (and optionally its whole branch) to
   link/copy/number/delete together, and switch how nodes read (icons only, icons + text, or
   cards — each node a sticker card with its whole text — or a mixed mode: zone parents as
-  cards, everything else a bare icon) for the whole map or just the chosen nodes. Cards sit on the
+  cards, everything else a bare icon) for the whole map or just the chosen nodes. Branch arrows
+  and links rest as thin, quiet gray lines so the nodes and their text hold the eye; a line takes
+  its zone's or feeling's colour once one of its ends is chosen (`CanvasBackdrop.tsx`). Cards sit on the
   board in its own units (their own spot, `Node.cardX/cardY`), so they grow and shrink with the zoom;
   their owner resizes one from its corner grip and picks its text size and shape (rounded, square,
   round) in the panel's Info tab (`Node.cardW/cardH/cardFont/cardShape`, `map/StickerCard.tsx`). A

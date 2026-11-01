@@ -21,6 +21,7 @@ import { usePackMode } from "../hooks/usePackMode";
 import type { PendingCreate } from "../hooks/useNodeCreation";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
+import { useZoneGroups } from "../hooks/useZoneGroups";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
 import { useStableActions } from "../hooks/useStableActions";
@@ -66,7 +67,6 @@ import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { CanvasFrame } from "../map/CanvasFrame";
 import { DrawLineBar } from "../map/DrawLineBar";
 import { SiegePanel } from "../map/SiegePanel";
-import { holdsOf } from "../utils/siege";
 import { MapBanner } from "../map/MapBanner";
 import { MarqueeRect, PuzzleConnectLine, ZoneLoadingSpinner } from "../map/CanvasOverlays";
 import { zoneModeByNode } from "../utils/zoneDisplay";
@@ -159,13 +159,9 @@ export function MapPage() {
   const { user, logout } = useAuth();
   const { t } = useI18n();
 
-  // The canvas's own interaction mode — at most one of choosing nodes,
-  // packing nodes into a container, or drawing a separator line, each with
-  // its own data (see useCanvasMode's own doc comment for why this is one
-  // reducer rather than nine separate booleans/values). `chooseMode`/
-  // `packMode`/`drawMode` and each mode's own fields below are derived from
-  // it fresh every render — plain reads, not additional state — so the rest
-  // of this file reads exactly as it did with separate flags.
+  // The canvas's interaction mode: at most one of choosing, packing, drawing a
+  // line or changing a parent, one reducer (useCanvasMode). The flags below are
+  // plain reads of it.
   const [mode, dispatchMode] = useCanvasMode();
   const chooseMode = mode.kind === "choose";
   const packMode = mode.kind === "pack";
@@ -198,15 +194,9 @@ export function MapPage() {
   // Every attack on the map, fetched when a replay starts, so the replay can
   // show health as it was at each step (utils/finish.ts healthAt).
   const [replayAttacks, setReplayAttacks] = useState<MapAttack[]>([]);
-  // Off by default: a bare click on a node only ever selects it while this
-  // is false — onNodePointerDown's single-node mouse drag is gated behind it
-  // (see its own comment), so a click never relocates a node by accident.
-  // Turning it on is a deliberate act (the toolbar's Move toggle). A finger
-  // drags a node either way once it really travels; a tap or a graze below
-  // that distance stays a tap.
-  // Doesn't touch double-click-to-edit (startInlineEdit) or an
-  // already-multi-selected group's own drag — both stay available
-  // regardless, since neither one is the "accidental" case this addresses.
+  // Off by default, so a mouse click never moves a node by accident; the
+  // toolbar's Move turns it on. A finger drags either way once it really
+  // travels, and a multi-selection always drags.
   const [moveMode, setMoveMode] = useState(false);
   // The ids the node search currently matches (null = no search): everything else dims.
   const [searchMatches, setSearchMatches] = useState<Set<string> | null>(null);
@@ -259,25 +249,11 @@ export function MapPage() {
     // Locking a block mid-edit ends the edit.
     setInlineEditId((cur) => (cur === nodeId ? null : cur));
   }
-  // Choose mode: a tap on one of your own nodes adds it to / drops it from the
-  // group selection (multiSelectIds — the same one shift+click and the marquee
-  // build), instead of opening that node's panel. The group bar then offers
-  // what to do with the chosen nodes: link, copy or delete them. (See `mode`
-  // above for chooseMode/packMode/packContainerId/packSelection/packError
-  // themselves — declared once, together, up there.)
-  //
-  // The chosen nodes, in the order they were chosen, waiting on the sentiment
-  // modal to finish linking them — 2 nodes finish as a single edge (a line);
-  // 3+ finish as a closed loop (every consecutive pair plus one closing the
-  // last node back to the first), which is what the cycle detector below then
-  // colors as a figure.
+  // Nodes waiting on the link dialog, in the order chosen: 2 make one edge,
+  // 3+ a closed loop (which then colors in as a figure).
   const [pendingLink, setPendingLink] = useState<NodeDoc[] | null>(null);
-  // Same reasoning, generalized: every other per-action failure (a failed
-  // update/delete/create/circle-join) routes here rather than through
-  // setError, which drives the full-page failure view — a rejected
-  // drag-to-join-circle shouldn't nuke the whole canvas behind a "map not
-  // found"-style screen. This is a dismissible banner over the still-live
-  // canvas instead.
+  // A failed action shows as a dismissible banner over the live canvas, not
+  // the full-page error view.
   const [actionError, setActionError] = useState<string | null>(null);
   const { notice, showNotice, dismissNotice } = useNotice();
 
@@ -285,16 +261,9 @@ export function MapPage() {
   // PendingCreate (hooks/useNodeCreation.ts).
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [showInvite, setShowInvite] = useState(false);
-  // Collapses Back/+/Move down to a single "⋮" button (Discussion/Personal
-  // mode stays separately visible either way — see its own comment further
-  // down) while the quick-add ghost ring is up (see quickAddActive below) —
-  // that cluster floats at z-[45], above the ghosts' own z-[33], so a ghost
-  // that happens to land near the top-left corner could render right
-  // underneath it; shrinking most of the cluster to one small button all
-  // but eliminates that, and frees up the corner for a bigger ring besides.
-  // Manually reset to true (re-showing the full toolbar without waiting for
-  // quick-add to end) and reset back to false the next time quick-add
-  // activates fresh — see the effect below.
+  // While the quick-add ring is up the toolbar folds to one "⋮" (it floats
+  // above the ghosts and would hide one); this re-shows it until quick-add
+  // starts again.
   const [forceShowToolbar, setForceShowToolbar] = useState(false);
   const [showExportText, setShowExportText] = useState(false);
   // Set to a circle-parent's own rootId while its cluster-scoped "Extract
@@ -308,15 +277,10 @@ export function MapPage() {
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
   const { shotState, triggerWeaponShot } = useWeaponReplay();
   const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
-  // Right-click on *empty* canvas (as opposed to a node — see contextMenu
-  // above) — opens a small type-picker for creating a new, parent-less
-  // node right where the click landed. Carries both coordinate spaces:
-  // screenX/screenY position the fixed-to-viewport menu itself (same as
-  // contextMenu's own x/y), canvasX/canvasY (run through screenToCanvas)
-  // are where the eventual node actually gets placed.
-  // A zone's pattern/colour menu, opened by right-clicking the zone or holding
-  // a finger on it (see CanvasBackdrop's onZoneMenu).
+  // A zone's pattern/colour menu (right-click or hold on the zone, CanvasBackdrop's onZoneMenu).
   const [zoneMenu, setZoneMenu] = useState<{ rootId: string; x: number; y: number } | null>(null);
+  // Right-click on empty canvas: the new-node menu, at screen coordinates
+  // (the menu) and canvas ones (where the node goes).
   const [canvasContextMenu, setCanvasContextMenu] = useState<{
     screenX: number;
     screenY: number;
@@ -326,12 +290,8 @@ export function MapPage() {
   // Which node currently has its caption swapped for an inline text input —
   // see startInlineEdit. Null means no node is being edited.
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
-  // Group (multi-node) selection — see the marquee/shift-click handling
-  // below. A node in here shows NodeCard's dashed multiSelected ring
-  // instead of (or alongside) the single `selectedId` ring; once this has
-  // 2+ members, NodePanel gives way to a small "N selected" pill and
-  // connections not touching the selection dim (see the `muted`/edge/
-  // branch-arrow computations further down).
+  // Group selection (marquee, shift+click, choose mode): dashed rings; with 2+
+  // the panel gives way to the selection bar and other links dim.
   const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
 
   // The map, its nodes/links/lines and how they load, change and stay in
@@ -375,32 +335,12 @@ export function MapPage() {
     handleCircleBackdropClick,
   } = useChosenCircle({ mapId, map, applyCircleSelection, setActionError, t });
 
-  // onNodePointerDown calls setPointerCapture on the node's own element —
-  // per the Pointer Events spec that re-targets every subsequent event for
-  // this interaction, *including the browser's own synthesized "click"*, to
-  // that same element regardless of where the pointer physically ends up.
-  // So after any drag (a reposition, a join, a leave), a native click still
-  // lands back on the node once released, hitting NodeCard's onClick and
-  // running handleNodeClick a second time — which is what was popping the
-  // side panel/quick-add ghosts open right after finishing a drag. onUp
-  // below already resolves this same interaction correctly (drag outcome or
-  // plain-click selection, whichever it was) before that click ever fires,
-  // so this just needs to swallow the one redundant click that follows —
-  // set at the top of onUp, consumed (and reset) by the very next click,
-  // which — same task, same interaction — is always that trailing one.
+  // Pointer capture sends the browser's trailing click to the dragged node too,
+  // after onUp has already handled the press; this swallows that one click.
   const suppressNextClick = useRef(false);
 
-  // Where every node sits, the node the panel is showing, and the scrolling/
-  // zooming viewport onto the canvas — all derived before anything below
-  // reads them.
-  // Filters packed-away members out of every canvas rendering loop. Packing
-  // (packAbl.ts) still exists as a relationship regardless — a container's
-  // own count badge, and its "Packed (N)" unpack list in NodePanel, both
-  // still work off Node.packedIntoNodeId either way — but a packed member
-  // itself is hidden from the canvas. NodePanel still receives plain
-  // `nodes` (not this), since it has to show a packed member in its
-  // container's own unpack list even though the canvas itself doesn't
-  // render it.
+  // Packed-away members are left off the canvas (NodePanel still gets every
+  // node, for the container's Packed list).
   const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
   // Parents that tuck their branch in, and the overview — see hooks/useAutoPack.ts.
   const { folded, fold, mapParents, toggleFold, overviewOn, setOverview } = useAutoPack(mapId, unpackedNodes);
@@ -512,41 +452,17 @@ export function MapPage() {
   // flagged root, and everything hanging from it by parentId).
   const hiddenBranchIds = useMemo(() => computeHiddenBranchIds(nodes), [nodes]);
 
-  // Any node "chosen" on the map right now — a multi-select takes priority
-  // (it's the more specific state), falling back to the plain single
-  // selection. Null when nothing at all is chosen, the one case edges/
-  // branch-arrows stay fully lit. Feeds the same dimming both the branch
-  // arrows and plain Edges apply below, for a single selection too, not
-  // just a multi-select — a lone selected node is already the map's "I'm
-  // focused on this one" state everywhere else (NodeCard's own outline/
-  // health/wings), so its edges should read that way too.
+  // What's chosen right now (a multi-select wins over the single selection);
+  // null when nothing is, the one case every link stays fully lit.
   const chosenNodeIds = multiSelectIds.size > 0 ? multiSelectIds : selectedId ? new Set([selectedId]) : null;
-  // quickAddActive (below useNodeDragAndDrop further down, since it reads
-  // that hook's own dragState) gates the quick-add ghost ring; the same
-  // condition is reused here so every other node dims while it's showing,
-  // putting the focus on the selected node and its type-to-create options
-  // instead of competing with the rest of the canvas.
-  // Same "focus on the one thing" treatment as quickAddActive above, keyed
-  // off a *chosen circle* instead of a selected node — every node outside
-  // the chosen circle (a member of some other circle, or standalone) dims,
-  // spotlighting the one the team settled on. Membership comes straight off
-  // the snapshot taken at selection time (Map.selectedCircle.nodeIds), not
-  // recomputed from current parentId links, so it can't disagree with
-  // what's actually locked.
+  // A chosen circle spotlights its members, from the snapshot taken when it
+  // was chosen (Map.selectedCircle.nodeIds), so it can't disagree with what's locked.
   const spotlightedNodeIds = map?.selectedCircle?.nodeIds;
   const spotlightedSet = useMemo(() => (spotlightedNodeIds ? new Set(spotlightedNodeIds) : null), [spotlightedNodeIds]);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.nodeId, n])), [nodes]);
 
-  // Selecting either end of an attack (clicking the objection node or the
-  // node it's aimed at — see handleNodeClick) keeps *that pair* visible
-  // even if a chosen circle would otherwise dim one of them: a weapon node
-  // never belongs to any circle itself, so with a circle spotlighted every
-  // attack elsewhere on the map would otherwise mute into near-invisibility
-  // the moment you're actually looking at one of them. Derived from
-  // selectedId rather than a one-shot flag set by the click, so it just
-  // keeps working for as long as either end stays selected and clears
-  // itself the moment selection moves on to something unrelated — no timer
-  // to manage.
+  // Selecting either end of an attack keeps that pair visible even under a
+  // spotlighted circle (an attack is never in one), for as long as it stays selected.
   const unmutedAttackNodeIds = useMemo(() => computeAttackPairIds(selectedId, nodes), [selectedId, nodes]);
 
 
@@ -575,12 +491,7 @@ export function MapPage() {
     // The map's opening animation: drifting out and back (useIntroMigration).
     const drift = introOffset(node.nodeId);
     const own = drift ? { x: stored.x + drift.x, y: stored.y + drift.y } : stored;
-    // Presentation mode's own org-chart blend — checked ahead of the radial
-    // selection ring below since the two are mutually exclusive in practice
-    // (there's no NodePanel/selection to ring neighbors around while
-    // presenting — see enterPresentation), but resolving the order
-    // explicitly here means nothing actually depends on that invariant
-    // holding forever elsewhere in the file.
+    // Presentation's org-chart blend first; it and the radial ring never overlap.
     const geo = geometrizeBlend.map?.get(node.nodeId);
     if (geo) {
       const b = geometrizeBlend.blend;
@@ -623,35 +534,18 @@ export function MapPage() {
   // own corner badge reads this by nodeId.
   const packedCountByContainer = useMemo(() => countPackedByContainer(nodes), [nodes]);
 
-  // Any node with 2+ direct parentId-children reads as a group ("circle") —
-  // general on purpose, same as linkCycles below. See canvasLayout.ts's own
-  // computeNodeGroups doc comment for the full reasoning (zone color vote,
-  // outline polygon, etc.) — the grouping logic itself lives there now as a
-  // pure function of these three inputs, this just wraps it in the memo.
-  // Deliberately still keyed off [visibleNodes, positions] only, not `nodes`
-  // too, even though the function resolves each root against `nodes` —
-  // matching this hook's original dependency list exactly rather than
-  // changing behavior as part of a pure relocation.
   // Nodes that leave the map pop where they stood — see hooks/useNodeBursts.ts.
   const bursts = useNodeBursts(mapId, nodes, positions);
 
-  // Each zone's corner order from last time — moving one node then moves only
-  // its own corner (see computeNodeGroups).
-  const zoneCornerOrder = useRef(new Map<string, string[]>());
-  const nodeGroups = useMemo(
-    () => computeNodeGroups(visibleNodes, nodes, positions, undefined, zoneLayouts, zoneCornerOrder.current),
-    [visibleNodes, positions, zoneLayouts],
-  );
-  // Discussion mode reads the zones as a realm: the kingdom and its castles
-  // (utils/siege.ts), named like the zone list names them.
-  const holds = useMemo(
-    () =>
-      holdsOf(
-        nodeGroups.map((g) => g.rootId),
-        nodes,
-      ).map((h) => ({ ...h, name: zoneLabel(nodes.find((n) => n.nodeId === h.rootId)) ?? "" })),
-    [nodeGroups, nodes],
-  );
+  // The zones, their realm reading and sentiments — see hooks/useZoneGroups.ts.
+  const { nodeGroups, holds, groupSentimentByNode, circleRootSentimentByNode } = useZoneGroups({
+    visibleNodes,
+    nodes,
+    positions,
+    zoneLayouts,
+    selectedCircleRootId: map?.selectedCircle?.rootId,
+    centerOnPoint,
+  });
 
   // Zoomed out to 50%: no icons anywhere on the canvas — nodes are plain
   // dots, and the decorations drawn around them (circle-parent rings,
@@ -681,35 +575,7 @@ export function MapPage() {
     hasSelectedCircle: !!map?.selectedCircle,
   });
 
-  // Centers the viewport on a circle/cluster the instant it becomes the
-  // chosen one (handleCircleBackdropClick) — same "whatever you just picked
-  // is always brought to the middle of the screen" rule centerOnNode already
-  // applies to a single node, just aimed at the cluster's own centroid
-  // (nodeGroups' cx/cy) instead of one node's position. Keyed only off the
-  // rootId, not the whole selectedCircle object — a fresh object arrives on
-  // every socket echo/API response even when it still names the same
-  // circle, and re-panning on each of those would fight anyone who'd since
-  // scrolled elsewhere without actually releasing it.
-  useEffect(() => {
-    const rootId = map?.selectedCircle?.rootId;
-    if (!rootId) return;
-    const group = nodeGroups.find((g) => g.rootId === rootId);
-    if (!group) return;
-    centerOnPoint(group.cx, group.cy);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map?.selectedCircle?.rootId]);
 
-  // Every circle member's sentiment, keyed by node id — what NodeCard reads
-  // to decide its dashed outline and whether it's eligible to chaotic-drift
-  // at all (see NodeCard's `chaotic`). A node in no circle isn't in this
-  // map and never drifts, regardless of node.locked.
-  const groupSentimentByNode = useMemo(() => {
-    const map = new Map<string, Sentiment>();
-    for (const g of nodeGroups) {
-      for (const m of g.members) map.set(m.nodeId, g.sentiment);
-    }
-    return map;
-  }, [nodeGroups]);
 
   // Fetching the text the canvas is about to show — see hooks/useTextBackfill.ts.
   useTextBackfill({
@@ -725,16 +591,6 @@ export function MapPage() {
     setCircleLoadingRootId,
   });
 
-  // Just the root/parent of each circle, keyed by its own id — what
-  // NodeCard reads to draw its small crown badge (a "this is what the
-  // circle radiates from" marker, distinct from groupSentimentByNode above,
-  // which covers every member). Colored by the same majority-vote sentiment
-  // as the circle's own zone backdrop, per nodeGroups.
-  const circleRootSentimentByNode = useMemo(() => {
-    const map = new Map<string, Sentiment>();
-    for (const g of nodeGroups) map.set(g.rootId, g.sentiment);
-    return map;
-  }, [nodeGroups]);
 
   // Choosing a zone — clicking its parent node, or holding the zone still —
   // turns its emoji cards over one by one, parent first (see useFlipSequence).
@@ -961,15 +817,9 @@ export function MapPage() {
     t,
   });
 
-  // Same condition that gates the quick-add ghost ring below — reused
-  // higher up (chosenNodeIds' own muted computation) so every other node
-  // dims while it's showing, putting the focus on the selected node and its
-  // type-to-create options instead of competing with the rest of the
-  // canvas. selectionSettled: the ghosts (and the dimming that comes with
-  // them) wait until centerOnNode's own pan has landed — see its own doc
-  // comment.
-  // Not around a card on the board: a card has its own place among the
-  // other cards, and the ghost ring would only sit on top of them.
+  // The quick-add ghost ring (and the dimming around it) waits until
+  // centerOnNode's pan has landed (selectionSettled), and never shows round a
+  // card on the board.
   const quickAddActive =
     !!(selectedNode && isOwnNode(selectedNode) && !chooseMode && !packMode && !dragState && !onCardBoard(selectedNode)) &&
     selectionSettled &&
@@ -982,11 +832,8 @@ export function MapPage() {
     if (!quickAddActive) setForceShowToolbar(false);
   }, [quickAddActive]);
 
-  // "Mine" gates dragging, linking, quick-add branching, and editing alike —
-  // a weapon node counts here too now: it's a real node its own attacker
-  // owns like any other, just one that happened to spawn from an attack
-  // rather than the toolbar. Client-side only: this can't stop a crafted
-  // request straight to the API, just the UI paths.
+  // "Mine" gates dragging, linking, branching and editing, attack nodes
+  // included (UI only; the API checks for itself).
   // This map is the user's Inbox (utils/inbox.ts): its notes offer "Move to a map".
   const isInboxMap = !!map && !!user && findInbox([map], user._id, t.dashboard.quickNote.inboxName)?.mapId === map.mapId;
 
@@ -1029,16 +876,9 @@ export function MapPage() {
     setPendingCreate(null);
   }
 
-  // Single entry point for "start editing this node's text/type inline, on
-  // its own icon" — always selects (so the side panel shows something,
-  // including the locked message when editing isn't allowed), but only
-  // actually turns the inline input on when canEditNode agrees. Reached from
-  // a node double-click and the side panel's own Edit button. The context
-  // menu's own "Edit" item is a different, separate action now — it just
-  // opens the panel (see handleNodeClick below), not this inline editor.
-  // Editing opens the node's panel on its text field (NodePanel's
-  // autoFocusText), the same place a new node is written — not an inline
-  // input under the icon any more.
+  // Editing always selects the node (so the panel shows, with the locked
+  // message if needed) and, when allowed, opens it on its text field
+  // (NodePanel's autoFocusText). From a double-click or the panel's Edit.
   async function startInlineEdit(node: NodeDoc) {
     setContextMenu(null);
     setPendingCreate(null);
@@ -1095,12 +935,8 @@ export function MapPage() {
       });
       return;
     }
-    // Shift+click toggles group (multi-)selection instead of the normal
-    // single-select/center flow below — only own nodes can join it, same
-    // gate as dragging a node at all (see onNodePointerDown/isOwnNode).
-    // Doesn't touch `selectedId`/centering/weapon-replay at all; a group
-    // selection has its own small "N selected" pill instead of NodePanel
-    // (see the JSX below).
+    // Shift+click toggles the node in the group selection (own nodes only),
+    // leaving the single selection and camera alone.
     if (shiftKey) {
       if (!isOwnNode(node)) return;
       setMultiSelectIds((prev) => {
@@ -1170,20 +1006,9 @@ export function MapPage() {
   function selectNodeFromClick(node: NodeDoc) {
     setSelectedId(node.nodeId);
     releaseChosenCircleIfOutside(node.nodeId);
-    // Whatever was just clicked is "chosen" now — always center the camera
-    // on it, not just nudge it into view. Takes priority over panning to a
-    // *different* node (an attack's other end, below): with bows now
-    // anchored near the attacker rather than the target (see getNodeMinDist
-    // usage in the positions memo), that other end can be far enough away
-    // that panning to it would immediately un-center the node someone just
-    // chose.
+    // Center on what was just clicked, rather than on an attack's far end.
     centerOnNode(node.nodeId);
-    // Clicking either end of an attack still replays its arrow flight (see
-    // WeaponMark) — that's independent of where the camera ends up, so it
-    // stays regardless of who's centered. A weapon node has exactly one
-    // target; an attacked node can carry several landed attacks, so this
-    // replays whichever landed most recently (nodes come back in creation
-    // order, so the last match is that one).
+    // Clicking either end of an attack replays its arrow (the latest one landed on it).
     if (node.isWeapon) {
       triggerWeaponShot(node.nodeId);
     } else {
@@ -1247,14 +1072,8 @@ export function MapPage() {
     packFailedMessage: t.ui.errors.pack,
   });
 
-  // Right-click on empty canvas opens a small type-picker for creating a
-  // new, parent-less node right where the click landed (see
-  // CanvasContextMenu/confirmPendingCreate) — also dismisses the side panel
-  // (which tears down its own quick-add ghost ring, derived from
-  // selectedId) and any node context menu, same "close whatever's open
-  // first" as before. Right-click *on* a node instead opens that node's own
-  // menu — see handleNodeContextMenu, which stops the event before it ever
-  // reaches this handler.
+  // Right-click on empty canvas: close what's open and offer a new node right
+  // there (a node's own right-click stops before reaching this).
   function onCanvasContextMenu(e: ReactMouseEvent<HTMLDivElement>) {
     e.preventDefault();
     // While drawing, a right-click takes back the last point.
@@ -1889,12 +1708,7 @@ export function MapPage() {
                   selected={selectedId === node.nodeId}
                   multiSelected={multiSelectIds.has(node.nodeId)}
                   dragging={nodeDragged(node)}
-                  // Drags off a bare pointer-down only actually happen when
-                  // moveMode is on, or the node is already part of an
-                  // active 2+-node multi-selection (that path stays live
-                  // regardless — see onNodePointerDown's own group-drag
-                  // branch) — this just keeps NodeCard's own grab/grabbing
-                  // cursor honest about which nodes will really respond.
+                  // Keeps the grab cursor honest: only nodes that will really drag.
                   canDrag={
                     isOwnNode(node) &&
                     !node.locked &&
@@ -2604,13 +2418,7 @@ export function MapPage() {
         (() => {
           const rootNode = nodes.find((n) => n.nodeId === extractClusterRootId);
           if (!rootNode) return null;
-          // Reuses ExportTextModal/buildTreeExport as-is — handing it just
-          // this cluster's own subtree (see collectClusterSubtree) instead
-          // of every node on the map makes it build the exact same
-          // section-per-parent document, just scoped to this one branch.
-          // mapName doubles as the modal's own title label here — there's
-          // no separate "scope name" prop, and the root's own text reads
-          // fine in that slot ("Export text — "<root text> cluster"").
+          // The same export, scoped to this cluster's subtree, titled after its root.
           return (
             <ExportTextModal
               mapName={`${rootNode.text} cluster`}

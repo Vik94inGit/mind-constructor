@@ -62,7 +62,7 @@ npm run build        # tsc -b && vite build
 
 - **`pages/`** — `DashboardPage` (folders + maps grid, quick note, "What's on your mind?"),
   `ThinkPage` (the guided "Think it through" flow, logic in `utils/thoughtFlow.ts` and `think/`),
-  `MapPage` (the canvas; ~2,500 lines, so most behavior is pulled out into `hooks/` and `map/`),
+  `MapPage` (the canvas; ~2,400 lines, so most behavior is pulled out into `hooks/` and `map/`),
   `SplitTextPage`, `AdminPage`, login/register.
 - **`api/`** — one module per backend resource (`maps`, `nodes`, `edges`, `lines`, `folders`,
   `state`, `auth`, `usage`) over `client.ts`. `socket.ts` holds the one shared Socket.IO connection; it
@@ -70,12 +70,12 @@ npm run build        # tsc -b && vite build
   Safari won't send the session cookie there (see `Backend/src/realtime/socketToken.ts`).
 - **`hooks/`** — canvas behavior as testable hooks: `useMapData` (loading + realtime merge via
   `useMapSocket`), viewport/framing, drag and drop, marquee select, node creation, pack mode, line
-  drawing, the change-parent mode (`useReparent`, `reparent` in `useCanvasMode`, opened from the node panel; `utils/edgeRedirect.ts` also swaps a child with its parent), the map's entrance and the view it settles into (`useMapEntrance`, with `useAutoPack` for the overview), presentation, undo of moves, position glide, `useWeaponReplay` (weapon marks in the
+  drawing, the change-parent mode (`useReparent`, `reparent` in `useCanvasMode`, opened from the node panel; `utils/edgeRedirect.ts` also swaps a child with its parent), the zones and what the canvas reads off them (`useZoneGroups`), the map's entrance and the view it settles into (`useMapEntrance`, with `useAutoPack` for the overview), presentation, undo of moves, position glide, `useWeaponReplay` (weapon marks in the
   time-lapse replay; `MapPage` loads `GET /api/:mapId/attacks` so the replay shows health as it was).
-- **`map/`** — canvas components: `NodeCard` (drawn on the canvas through the memoized `CanvasNodeCard`, which takes one stable `actions` object from `hooks/useStableActions` so a drag or pan doesn't redraw every card), `StickerCard` (a node in the cards view, which draws no links and lays its cards close: `utils/cardPack.ts`, `hooks/useCardPacking.ts`), `ViewPrompt` (whole map, overview or cards, asked once the map has built itself up; the overview auto-packs parents, `utils/autoPack.ts`), `CanvasBackdrop` (zones, walls, realm
+- **`map/`** — canvas components: `NodeCard` (its badges and icon face in `nodeCard/`; drawn on the canvas through the memoized `CanvasNodeCard`, which takes one stable `actions` object from `hooks/useStableActions` so a drag or pan doesn't redraw every card), `StickerCard` (a node in the cards view, which draws no links and lays its cards close: `utils/cardPack.ts`, `hooks/useCardPacking.ts`), `ViewPrompt` (whole map, overview or cards, asked once the map has built itself up; the overview auto-packs parents, `utils/autoPack.ts`), `CanvasBackdrop` (zones, walls, realm
   border), `MiniMap`, `ViewCorner` (eye menu, zoom, minimap in the bottom-right corner),
   `QuickAddGhosts` (type and emoji rings), `NodePanel` + `nodePanel/` tabs (Info, Modify, Attack,
-  Protect, Packed, History), `SiegePanel` (the imitated opponent's turn), `HistoryPanel` (the map's
+  Protect, Packed, History; pictures in `useNodeImages`), `SiegePanel` (the imitated opponent's turn), `HistoryPanel` (the map's
   discussion history), `FinishedBanner`, `TimeLapseBar`, zone menus and style pickers.
 - **`utils/`** — pure logic, each with a `*.test.ts` beside it: `zoneRules.ts` (where a new node
   may go: no node inside a zone it doesn't belong to, zones never cross, no wasted space; a node the
@@ -90,8 +90,10 @@ npm run build        # tsc -b && vite build
   once the server is back (temporary `local_…` ids swapped for real ones); `public/sw.js` caches the
   app shell.
 - **`i18n/`** — English, Czech, Ukrainian, Russian. Every user-visible string goes through
-  `translations.ts` / `uiStrings.ts` / `siegeStrings.ts` / `thinkStrings.ts` in all four languages;
-  stored values (node types etc.) stay English.
+  `translations.ts` / `uiStrings.ts` / `siegeStrings.ts` / `thinkStrings.ts` / `feelingStrings.ts`
+  (each holds the shape and the English) and `locales/<cs|uk|ru>.ts` (that language's copy of all
+  five, loaded only when picked: `loadTranslation`); add a new string in all four. Stored values
+  (node types etc.) stay English.
 - Per-browser view preferences (card fills, locked blocks, minimap) live in
   `localStorage`; anything that should follow the user across devices goes through `/api/state`
   (`context/UserStateContext.tsx`).

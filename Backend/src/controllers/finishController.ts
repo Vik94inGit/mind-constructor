@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import type { Request } from "express";
 import {
   agreeToFinishAbl,
   finishMapAbl,
@@ -12,7 +12,7 @@ import {
 } from "../abl/finishAbl.js";
 import { listMapHistoryAbl, MapNotFoundError as HistoryMapNotFoundError } from "../abl/historyAbl.js";
 import { broadcastToMap } from "../realtime/io.js";
-import { handleAblError, type ErrorMapping } from "./errorHandling.js";
+import { authed, param, type ErrorMapping } from "./errorHandling.js";
 
 // Finishing a discussion — see abl/finishAbl.ts.
 const MAPPINGS: ErrorMapping[] = [
@@ -23,27 +23,18 @@ const MAPPINGS: ErrorMapping[] = [
   [FinishNotAllowedError, 409, (e) => ({ error: e.message, reason: "lastWordIsYours" })],
 ];
 
-const mapIdOf = (req: Request) => {
-  const { mapId } = req.params;
-  return Array.isArray(mapId) ? mapId[0] : mapId;
-};
-
 function handler(label: string, run: (mapId: string, userId: string, req: Request) => Promise<unknown>, broadcast: boolean) {
-  return async (req: Request, res: Response) => {
-    try {
-      const userId = req.user?._id;
-      if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
-      const mapId = mapIdOf(req);
+  return authed(
+    label,
+    async (req, res, userId) => {
+      const mapId = param(req, "mapId");
       const result = await run(mapId, userId, req);
-      if (broadcast) {
-        broadcastToMap(mapId, "map:updated", { map: result });
-        return res.status(200).json({ success: true, map: result });
-      }
-      return res.status(200).json({ success: true, ...(result as object) });
-    } catch (error) {
-      return handleAblError(res, error, MAPPINGS, { message: "Server error", logLabel: label });
-    }
-  };
+      if (!broadcast) return res.status(200).json({ success: true, ...(result as object) });
+      broadcastToMap(mapId, "map:updated", { map: result });
+      return res.status(200).json({ success: true, map: result });
+    },
+    { errors: MAPPINGS, message: "Server error" },
+  );
 }
 
 export const getFinishStatus = handler("getFinishStatus", (mapId, userId) => getFinishStatusAbl(mapId, userId), false);

@@ -1,4 +1,3 @@
-import { Request, Response } from "express";
 import {
   deleteDraftAbl,
   getCheckInsAbl,
@@ -11,94 +10,62 @@ import {
   updateMapViewStateAbl,
   updatePreferencesAbl,
 } from "../abl/userStateAbl.js";
-import { handleAblError } from "./errorHandling.js";
+import { authed, type ErrorMapping } from "./errorHandling.js";
 
-const mapNotFound: [typeof MapNotFoundError, number, string] = [MapNotFoundError, 404, "Map not found"];
-const unknownDraft: [typeof UnknownDraftError, number, string] = [UnknownDraftError, 404, "Unknown draft kind"];
+const mapNotFound: ErrorMapping[] = [[MapNotFoundError, 404, "Map not found"]];
+const unknownDraft: ErrorMapping[] = [[UnknownDraftError, 404, "Unknown draft kind"]];
 
-export const getUserState = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
-    return res.status(200).json({ success: true, ...(await getUserStateAbl(userId)) });
-  } catch (error) {
-    return handleAblError(res, error, [], { message: "Failed to load your state", logLabel: "getUserState" });
-  }
-};
+export const getUserState = authed(
+  "getUserState",
+  async (_req, res, userId) => res.status(200).json({ success: true, ...(await getUserStateAbl(userId)) }),
+  { message: "Failed to load your state" },
+);
 
-export const updatePreferences = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const preferences = await updatePreferencesAbl(req.body, userId);
-    return res.status(200).json({ success: true, preferences });
-  } catch (error) {
-    return handleAblError(res, error, [], { message: "Failed to save preferences", logLabel: "updatePreferences" });
-  }
-};
+export const updatePreferences = authed(
+  "updatePreferences",
+  async (req, res, userId) =>
+    res.status(200).json({ success: true, preferences: await updatePreferencesAbl(req.body, userId) }),
+  { message: "Failed to save preferences" },
+);
 
-export const getMapViewState = async (req: Request<{ mapId: string }>, res: Response) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const view = await getMapViewStateAbl(req.params.mapId, userId);
-    return res.status(200).json({ success: true, view });
-  } catch (error) {
-    return handleAblError(res, error, [mapNotFound], { message: "Failed to load the map view", logLabel: "getMapViewState" });
-  }
-};
+export const getMapViewState = authed<{ mapId: string }>(
+  "getMapViewState",
+  async (req, res, userId) =>
+    res.status(200).json({ success: true, view: await getMapViewStateAbl(req.params.mapId, userId) }),
+  { errors: mapNotFound, message: "Failed to load the map view" },
+);
 
-export const updateMapViewState = async (req: Request<{ mapId: string }>, res: Response) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const view = await updateMapViewStateAbl(req.params.mapId, req.body, userId);
-    return res.status(200).json({ success: true, view });
-  } catch (error) {
-    return handleAblError(res, error, [mapNotFound], { message: "Failed to save the map view", logLabel: "updateMapViewState" });
-  }
-};
+export const updateMapViewState = authed<{ mapId: string }>(
+  "updateMapViewState",
+  async (req, res, userId) =>
+    res.status(200).json({ success: true, view: await updateMapViewStateAbl(req.params.mapId, req.body, userId) }),
+  { errors: mapNotFound, message: "Failed to save the map view" },
+);
 
-export const getCheckIns = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const checkIns = await getCheckInsAbl(userId);
-    return res.status(200).json({ success: true, checkIns });
-  } catch (error) {
-    return handleAblError(res, error, [], { message: "Failed to load your check-ins", logLabel: "getCheckIns" });
-  }
-};
+export const getCheckIns = authed(
+  "getCheckIns",
+  async (_req, res, userId) => res.status(200).json({ success: true, checkIns: await getCheckInsAbl(userId) }),
+  { message: "Failed to load your check-ins" },
+);
 
-export const getDraft = async (req: Request<{ kind: string }>, res: Response) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const draft = await getDraftAbl(req.params.kind, userId);
-    return res.status(200).json({ success: true, draft });
-  } catch (error) {
-    return handleAblError(res, error, [unknownDraft], { message: "Failed to load the draft", logLabel: "getDraft" });
-  }
-};
+export const getDraft = authed<{ kind: string }>(
+  "getDraft",
+  async (req, res, userId) => res.status(200).json({ success: true, draft: await getDraftAbl(req.params.kind, userId) }),
+  { errors: unknownDraft, message: "Failed to load the draft" },
+);
 
-export const saveDraft = async (req: Request<{ kind: string }>, res: Response) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const result = await saveDraftAbl(req.params.kind, req.body, userId);
-    return res.status(200).json({ success: true, ...result });
-  } catch (error) {
-    return handleAblError(res, error, [unknownDraft], { message: "Failed to save the draft", logLabel: "saveDraft" });
-  }
-};
+export const saveDraft = authed<{ kind: string }>(
+  "saveDraft",
+  async (req, res, userId) =>
+    res.status(200).json({ success: true, ...(await saveDraftAbl(req.params.kind, req.body, userId)) }),
+  { errors: unknownDraft, message: "Failed to save the draft" },
+);
 
-export const deleteDraft = async (req: Request<{ kind: string }>, res: Response) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ success: false, error: "Not authenticated" });
+export const deleteDraft = authed<{ kind: string }>(
+  "deleteDraft",
+  async (req, res, userId) => {
     await deleteDraftAbl(req.params.kind, userId);
     return res.status(200).json({ success: true });
-  } catch (error) {
-    return handleAblError(res, error, [unknownDraft], { message: "Failed to delete the draft", logLabel: "deleteDraft" });
-  }
-};
+  },
+  { errors: unknownDraft, message: "Failed to delete the draft" },
+);
