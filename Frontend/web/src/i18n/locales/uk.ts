@@ -790,6 +790,8 @@ const ui: UiStrings = {
     isCard: "Картка",
     removeCard: "Прибрати картку з мапи",
     iconFailed: "Не вдалося змінити показ зображення",
+    templates: "✨ Шаблон",
+    templatesHint: "Додати готовий малюнок: по одному для кожного виду думки",
   },
   emoji: {
     label: "Емодзі",

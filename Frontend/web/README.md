@@ -187,6 +187,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
   the cards view).
+- **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens ready-made
+  pictures, one per node type (a bulb for an Idea, a stop sign for a Problem…, the same drawings as
+  *Draw a picture*, inked in on a soft square of their colour; `utils/pictureTemplates.ts`), with the
+  node's own type first. Picking one adds it like any other picture, so it can be the node's icon or card.
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
   in the panel; the inline inputs grow taller with the text, never wider.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
