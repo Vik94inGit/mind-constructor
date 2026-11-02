@@ -36,7 +36,7 @@ describe("timeLapseStepMs", () => {
 
 describe("TimeLapseBar", () => {
   function renderBar(props: Partial<React.ComponentProps<typeof TimeLapseBar>> = {}) {
-    const handlers = { onStep: vi.fn(), onTogglePlay: vi.fn(), onExit: vi.fn() };
+    const handlers = { onStep: vi.fn(), onTogglePlay: vi.fn(), onStepBy: vi.fn(), onExit: vi.fn() };
     render(
       <I18nProvider>
         <TimeLapseBar step={1} total={3} playing={false} {...handlers} {...props} />
@@ -82,11 +82,32 @@ describe("TimeLapseBar", () => {
     expect(onExit).toHaveBeenCalled();
   });
 
+  it("steps back or forward one node, and can't go past the first or last", async () => {
+    const { onStepBy } = renderBar({ step: 1, total: 3 });
+    await userEvent.click(screen.getByRole("button", { name: t.map.toolbar.timeLapsePrev }));
+    expect(onStepBy).toHaveBeenCalledWith(-1);
+    await userEvent.click(screen.getByRole("button", { name: t.map.toolbar.timeLapseNext }));
+    expect(onStepBy).toHaveBeenCalledWith(1);
+  });
+
+  it("greys out Previous before the first node and Next after the last", () => {
+    const { unmount } = render(
+      <I18nProvider>
+        <TimeLapseBar step={0} total={2} playing={false} onStep={vi.fn()} onTogglePlay={vi.fn()} onStepBy={vi.fn()} onExit={vi.fn()} />
+      </I18nProvider>,
+    );
+    expect((screen.getByRole("button", { name: t.map.toolbar.timeLapsePrev }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: t.map.toolbar.timeLapseNext }) as HTMLButtonElement).disabled).toBe(false);
+    unmount();
+    renderBar({ step: 2, total: 2 });
+    expect((screen.getByRole("button", { name: t.map.toolbar.timeLapseNext }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("opens the newest node's info as it comes back, none before the first", () => {
     const current = { ...node("a"), type: "Problem", title: "Rent", text: "Rent went up again" } as NodeDoc;
     const { unmount } = render(
       <I18nProvider>
-        <TimeLapseBar step={1} total={3} playing={false} current={current} onStep={vi.fn()} onTogglePlay={vi.fn()} onExit={vi.fn()} />
+        <TimeLapseBar step={1} total={3} playing={false} current={current} onStep={vi.fn()} onTogglePlay={vi.fn()} onStepBy={vi.fn()} onExit={vi.fn()} />
       </I18nProvider>,
     );
     expect(screen.getByText("Rent")).toBeTruthy();

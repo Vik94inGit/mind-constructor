@@ -321,7 +321,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   what every thought says; the last one stays open at the end. On the canvas the newest node also shows its
   title and text at its icon, up to 5 rows. The replay stays on each node long enough to read it (longer for a
   longer thought, about 2 to 5 s), and the bar offers three speeds, Slow, Normal and Fast, remembered in
-  this browser. A zone fades in just after the node that made it (its parent's second child), so the
+  this browser. The arrows either side of Play (and ← / → on a keyboard) step back or forward one node
+  at a time and pause the replay, so a thought can be read again or the next one brought in by hand;
+  they grey out at the first and last node. A zone fades in just after the node that made it (its parent's second child), so the
   nodes come first and the zones they form follow (`src/map/TimeLapseBar.tsx`, `src/hooks/useTimeLapse.ts`).
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
   slides, with the canvas tidied into an org chart. Each node gets a slide, with its children on it as

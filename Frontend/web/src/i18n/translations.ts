@@ -152,6 +152,8 @@ export interface Translation {
       timeLapse: string;
       timeLapsePlay: string;
       timeLapsePause: string;
+      timeLapsePrev: string;
+      timeLapseNext: string;
       timeLapseExit: string;
       timeLapseSpeed: string;
       timeLapseSpeeds: Record<"slow" | "normal" | "fast", string>;
@@ -363,6 +365,8 @@ const en: Translation = {
       timeLapse: "Time-lapse — watch the map grow",
       timeLapsePlay: "Play",
       timeLapsePause: "Pause",
+      timeLapsePrev: "Previous node",
+      timeLapseNext: "Next node",
       timeLapseExit: "Close",
       timeLapseSpeed: "Replay speed",
       timeLapseSpeeds: { slow: "Slow", normal: "Normal", fast: "Fast" },

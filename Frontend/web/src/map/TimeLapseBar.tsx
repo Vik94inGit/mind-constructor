@@ -56,6 +56,8 @@ interface Props {
   at?: string;
   onStep: (step: number) => void;
   onTogglePlay: () => void;
+  /** Back or forward one node; pauses the replay (useTimeLapse's stepTimeLapse). */
+  onStepBy: (dir: -1 | 1) => void;
   onExit: () => void;
 }
 
@@ -63,8 +65,9 @@ interface Props {
 // thought, and the slider scrubs back and forth through it. Takes the bottom
 // sheet's slot, like DrawLineBar, and opens the newest node's info above its
 // controls (the read-only part of NodePanel's Info tab), so each thought is
-// read again as it comes back; at the end the last one stays open.
-export function TimeLapseBar({ step, total, playing, current, at, onStep, onTogglePlay, onExit }: Props) {
+// read again as it comes back; at the end the last one stays open. The
+// arrows either side of Play step back or forward one node, like ← / →.
+export function TimeLapseBar({ step, total, playing, current, at, onStep, onTogglePlay, onStepBy, onExit }: Props) {
   const { t, language } = useI18n();
   const s = t.map.toolbar;
   const [speed, setSpeed] = useState<TimeLapseSpeed>(loadTimeLapseSpeed);
@@ -78,21 +81,34 @@ export function TimeLapseBar({ step, total, playing, current, at, onStep, onTogg
 
   const btn =
     "inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color] duration-[120ms] hover:bg-surface-2";
+  const arrow = `${btn} px-[0.55rem] disabled:cursor-default disabled:opacity-40 disabled:hover:bg-surface`;
   const date = at ? new Date(at) : null;
   const info = step > 0 ? current : undefined;
   return (
     <div className="fixed inset-x-0 bottom-0 z-[46] rounded-t-2xl border-t border-line bg-surface shadow-[var(--shadow-card)]">
       {info && <TimeLapseInfo key={info.nodeId} node={info} />}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
-        <button type="button" className={btn} aria-label={playing ? s.timeLapsePause : s.timeLapsePlay} title={playing ? s.timeLapsePause : s.timeLapsePlay} onClick={onTogglePlay}>
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            {playing ? (
-              <path d="M3.5 2.5 H5.5 V11.5 H3.5 Z M8.5 2.5 H10.5 V11.5 H8.5 Z" fill="currentColor" />
-            ) : (
-              <path d="M4 2.2 L11.5 7 L4 11.8 Z" fill="currentColor" />
-            )}
-          </svg>
-        </button>
+        <div className="inline-flex items-center gap-[0.35rem]">
+          <button type="button" className={arrow} aria-label={s.timeLapsePrev} title={s.timeLapsePrev} disabled={step <= 0} onClick={() => onStepBy(-1)}>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M2.5 2.5 H4.3 V11.5 H2.5 Z M11.5 2.5 L5 7 L11.5 11.5 Z" fill="currentColor" />
+            </svg>
+          </button>
+          <button type="button" className={btn} aria-label={playing ? s.timeLapsePause : s.timeLapsePlay} title={playing ? s.timeLapsePause : s.timeLapsePlay} onClick={onTogglePlay}>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              {playing ? (
+                <path d="M3.5 2.5 H5.5 V11.5 H3.5 Z M8.5 2.5 H10.5 V11.5 H8.5 Z" fill="currentColor" />
+              ) : (
+                <path d="M4 2.2 L11.5 7 L4 11.8 Z" fill="currentColor" />
+              )}
+            </svg>
+          </button>
+          <button type="button" className={arrow} aria-label={s.timeLapseNext} title={s.timeLapseNext} disabled={step >= total} onClick={() => onStepBy(1)}>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M2.5 2.5 L9 7 L2.5 11.5 Z M9.7 2.5 H11.5 V11.5 H9.7 Z" fill="currentColor" />
+            </svg>
+          </button>
+        </div>
         <input
           type="range"
           min={0}
