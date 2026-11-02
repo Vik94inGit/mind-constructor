@@ -1087,6 +1087,8 @@ const translation: Translation = {
       timeLapse: "Таймлапс — посмотрите, как растёт карта",
       timeLapsePlay: "Воспроизвести",
       timeLapsePause: "Пауза",
+      timeLapsePrev: "Предыдущий узел",
+      timeLapseNext: "Следующий узел",
       timeLapseExit: "Закрыть",
       timeLapseSpeed: "Скорость воспроизведения",
       timeLapseSpeeds: { slow: "Медленно", normal: "Обычно", fast: "Быстро" },

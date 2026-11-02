@@ -1076,6 +1076,8 @@ const translation: Translation = {
       timeLapse: "Časosběr — sledujte, jak mapa roste",
       timeLapsePlay: "Přehrát",
       timeLapsePause: "Pozastavit",
+      timeLapsePrev: "Předchozí uzel",
+      timeLapseNext: "Další uzel",
       timeLapseExit: "Zavřít",
       timeLapseSpeed: "Rychlost přehrávání",
       timeLapseSpeeds: { slow: "Pomalu", normal: "Normálně", fast: "Rychle" },

@@ -1995,6 +1995,7 @@ export function MapPage() {
             at={timeLapseNodes[timeLapseStep - 1]?.createdAt}
             onStep={onTimeLapseStep}
             onTogglePlay={togglePlay}
+            onStepBy={stepTimeLapse}
             onExit={() => setTimeLapse(null)}
           />
         ) : historyOpen && isDiscussionMode && mapId ? (
