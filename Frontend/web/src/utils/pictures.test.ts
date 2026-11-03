@@ -18,6 +18,7 @@ import {
 import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import { makeNode } from "../test/fixtures";
 import { NODE_TYPES } from "../types";
+import { TRANSLATIONS, loadTranslation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 
 function dotNode(id: string, dot: number, written: boolean, kind = "tree", pictureId = "p1"): NodeDoc {
@@ -40,6 +41,17 @@ describe("PICTURES", () => {
       for (let j = i + 1; j < dots.length; j++) {
         const clear = Math.abs(dots[i].x - dots[j].x) >= 170 || Math.abs(dots[i].y - dots[j].y) >= 110;
         expect(clear, `${kind} dots ${i} and ${j}`).toBe(true);
+      }
+    }
+  });
+
+  it("has a different question for every dot of every picture, in every language", async () => {
+    for (const lang of ["en", "cs", "uk", "ru"] as const) {
+      const tr = lang === "en" ? TRANSLATIONS.en : await loadTranslation(lang);
+      for (const kind of PICTURE_KINDS) {
+        const qs = tr.ui.pictures.questions[kind];
+        expect(qs, `${lang} ${kind}`).toHaveLength(PICTURES[kind].dots.length);
+        expect(new Set(qs).size, `${lang} ${kind}`).toBe(qs.length);
       }
     }
   });

@@ -125,8 +125,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   that type: a bulb (Idea), a stop sign (Problem), a warning triangle (Problematic option), a key
   (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail) and a question mark
   (unknown). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
-  Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking the picture's
-  question ("What is stopping you?", "What do you love?"). Write in two
+  Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking its own
+  question on the picture's theme (a stop sign: "What is stopping you?", "What keeps coming back?"…;
+  a heart: "What do you love?", "Who do you love?"…). Write in two
   neighbouring dots and the line between them is inked in the picture's colour; until then it is a faint
   dotted guide, and a closed shape fills in a little more with every dot. A caption under the picture
   says how much of it is drawn ("Heart · 60% drawn", then "done!"), and the minimap draws the inked lines

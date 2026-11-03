@@ -59,8 +59,8 @@ export interface UiStrings {
     forTypesHint: string;
     forFun: string;
     names: Record<PictureKind, string>;
-    /** The question every dot of the picture asks, as its ghost's prompt. */
-    questions: Record<PictureKind, string>;
+    /** One question per dot of the picture, in dot order, each its ghost's prompt (the first is also the picker's hint). */
+    questions: Record<PictureKind, string[]>;
     /** Under a picture on the canvas: how much of it is drawn. */
     progress: (name: string, percent: number) => string;
     done: (name: string) => string;
@@ -727,20 +727,20 @@ const en: UiStrings = {
     forFun: "Just for fun",
     names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
     questions: {
-      bulb: "What idea lights up?",
-      stop: "What is stopping you?",
-      warning: "What could go wrong here?",
-      key: "What could unlock it?",
-      fork: "Which way could you go?",
-      flag: "What have you already managed?",
-      cloud: "What didn't work out?",
-      question: "What are you not sure about yet?",
-      heart: "What do you love?",
-      star: "What do you want to reach?",
-      house: "What makes you feel at home?",
-      tree: "What helps you grow?",
-      fish: "Where would you like to go?",
-      smile: "What made you smile lately?",
+      bulb: ["What idea lights up?", "What could you try that you haven't yet?", "What would make it easier?", "What would you do if you couldn't fail?", "What would a child suggest?", "What could you combine?", "What could you do differently tomorrow?", "What idea have you been putting off?", "What would make it fun?", "What is the simplest way?"],
+      stop: ["What is stopping you?", "What keeps coming back?", "What worries you most about it?", "What is it costing you?", "What are you avoiding?", "What is out of your hands?", "What drains your energy?", "What would happen if you did nothing?"],
+      warning: ["What could go wrong here?", "What is the catch?", "What would you have to give up?", "What makes you hesitate?", "What are you ignoring?", "Who might not like it?", "What could it cost later?", "What is the worst that could happen?"],
+      key: ["What could unlock it?", "What has worked before?", "Who could help you with it?", "What is the smallest step that would help?", "What do you already have?", "What would you advise a friend?", "What could you stop doing?", "What could you ask for?", "What would make it easy to start?", "What will you do first?"],
+      fork: ["Which way could you go?", "What else could you choose?", "What if you did the opposite?", "What would someone you admire choose?", "What would you choose without fear?", "What can you try first?"],
+      flag: ["What have you already managed?", "What are you proud of?", "What went better than you expected?", "What did you learn on the way?", "Who helped you get here?", "What got easier?", "How will you celebrate?"],
+      cloud: ["What didn't work out?", "What would you do differently?", "What did it teach you?", "What still hurts about it?", "What was out of your control?", "What would you tell yourself back then?", "What can you let go of?", "What came out of it after all?", "Who could you talk to about it?", "What will you try next time?"],
+      question: ["What are you not sure about yet?", "What do you still need to find out?", "What are you guessing?", "Who could you ask?", "What would help you decide?", "What are you afraid to ask?", "How could you test it?"],
+      heart: ["What do you love?", "Who do you love?", "What warms you up?", "What would you never give up?", "What makes you feel alive?", "Who do you miss?", "What do you love about yourself?", "What place do you love?", "What do you love to do?", "Who loves you?"],
+      star: ["What do you want to reach?", "What would make you proud?", "What do you dream about?", "Where do you want to be in a year?", "What would you like to learn?", "Who do you want to become?", "What would you try if no one watched?", "What is your next big step?", "What would make this year special?", "What wish do you keep to yourself?"],
+      house: ["What makes you feel at home?", "Who makes you feel safe?", "Where do you rest best?", "What would you keep forever?", "What smell reminds you of home?", "Who would you invite over?", "What makes a room cosy for you?", "What do you need to feel calm?", "What does home mean to you?"],
+      tree: ["What helps you grow?", "What are your roots?", "What gives you strength?", "What would you like to learn?", "What have you outgrown?", "Who has helped you grow?", "What is starting to blossom?"],
+      fish: ["Where would you like to go?", "What would you like to explore?", "What carries you along?", "What would you like to leave behind?", "What makes you feel free?", "What new thing would you dive into?", "Who would you take with you?", "What are you swimming against?"],
+      smile: ["What made you smile lately?", "Who makes you laugh?", "What are you grateful for?", "What small thing made your day?", "What funny moment do you remember?", "What are you looking forward to?", "What made you laugh as a child?", "Who could you make smile today?", "What kind thing did someone do for you?", "What song cheers you up?", "What did you do well today?", "What makes you laugh at yourself?", "What is good right now?"],
     },
     progress: (name, percent) => `${name} · ${percent}% drawn`,
     done: (name) => `${name} · done!`,
