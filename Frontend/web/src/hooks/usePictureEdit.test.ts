@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { usePictureEdit } from "./usePictureEdit";
 import { makeNode } from "../test/fixtures";
-import { pictureDots, pictureGroups } from "../utils/pictures";
+import { PICTURES, pictureCardOffsets, pictureDots, pictureGroups, pictureSpots } from "../utils/pictures";
 import type { NodeDoc } from "../types";
 
 vi.mock("../api/nodes", () => ({ updateNode: vi.fn(async (id: string, patch: object) => ({ nodeId: id, ...patch })) }));
@@ -58,6 +58,30 @@ describe("usePictureEdit", () => {
     expect(nodesApi.updateNode).toHaveBeenCalledTimes(nodes.length);
     const after = vi.mocked(nodesApi.updateNode).mock.calls.map(([, patch]) => patch as { x: number; y: number });
     expect(width(after) / width(nodes.map(posFor))).toBeCloseTo(1.15, 1);
+  });
+
+  it("grows a picture drawn on its own: a bigger drawing, its cards laid round it afresh, the size saved on every dot", async () => {
+    const size = 100;
+    const nodes = pictureCardOffsets(PICTURES.star, size).map((o, i) =>
+      makeNode({ nodeId: `s${i}`, x: 1800 + o.x, y: 1200 + o.y, ghost: true, picture: { id: "p1", kind: "star", dot: i, size } }),
+    );
+    const { params, hook } = setup(nodes);
+    const before = pictureSpots(pictureGroups(nodes)[0], posFor);
+    act(() => hook.result.current.openPictureBar("p1"));
+    await act(async () => hook.result.current.resizePicture(1));
+    expect(params.recordMove).not.toHaveBeenCalled();
+    const patches = vi.mocked(nodesApi.updateNode).mock.calls.map(([, patch]) => patch as { x: number; y: number; pictureSize: number });
+    expect(patches).toHaveLength(nodes.length);
+    expect(patches.every((p) => p.pictureSize === 115)).toBe(true);
+    const grown = nodes.map((n, i) => ({ ...n, x: patches[i].x, y: patches[i].y, picture: { ...n.picture!, size: 115 } }));
+    const after = pictureSpots(pictureGroups(grown)[0], posFor);
+    // The drawing grows round the same middle.
+    expect(width([...after.values()]) / width([...before.values()])).toBeCloseTo(1.15, 1);
+    const mid = (m: Map<number, { x: number; y: number }>) => {
+      const xs = [...m.values()].map((p) => p.x);
+      return (Math.min(...xs) + Math.max(...xs)) / 2;
+    };
+    expect(Math.abs(mid(after) - mid(before))).toBeLessThan(2);
   });
 
   it("picks up every dot in Move mode to move the picture as one", () => {

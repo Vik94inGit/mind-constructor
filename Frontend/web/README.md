@@ -134,7 +134,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   dotted guide, and a closed shape fills in a little more with every dot. A caption under the picture
   says how much of it is drawn ("Heart · 60% drawn", then "done!"), and the minimap draws the inked lines
   too with the percentage in its corner. The picture is placed whole where it doesn't cover anything,
-  its dots never hang from one another (so no zone forms), and moving a dot bends the drawing with it.
+  its dots never hang from one another (so no zone forms). The picture is drawn on its own, small enough
+  to see whole at 100% on the screen it was drawn on, with numbered dots; its cards sit round it, each
+  joined to its dot by a thin line, so dragging a card moves only the card and the drawing keeps its shape
+  (`Node.picture.size`, [sketch](../../docs/gestures/picture-projection.md)). Pictures drawn before this
+  keep their lines through their cards, and moving one of their dots bends the drawing.
   Tapping the caption opens a small bar to treat the picture as one thing: a row of soft colours gives
   it a muted background fill (`Node.picture.color`, saved on every dot), **−** / **+** shrink or grow
   the whole picture by 15% around its middle (never so small that two dots' cards touch, never off the

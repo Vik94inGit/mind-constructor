@@ -51,12 +51,17 @@ const emojiSchema = z
   .max(32, "emoji must be at most 32 characters")
   .refine((v) => v === "" || !/[\p{L}\p{N}]/u.test(v), "emoji must be an emoji, not text");
 
+// Node.picture.size — canvas units per picture unit for a picture drawn on
+// its own, apart from its cards.
+const pictureSizeSchema = z.number().positive("picture size must be above 0").max(1000, "picture size must be at most 1000");
+
 // Node.picture — which dot of a picture a node is ("Draw a picture").
 const pictureSchema = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, "picture id must be 1-40 letters, digits, - or _"),
   kind: z.string().regex(/^[a-z]{1,20}$/, "picture kind must be 1-20 lowercase letters"),
   dot: z.number().int("picture dot must be a whole number").min(0).max(63),
   color: z.enum(ZONE_PALETTE).nullish(),
+  size: pictureSizeSchema.nullish(),
 });
 
 // Node.order — a whole step number, 1..9999. null clears it (update only).
@@ -283,6 +288,8 @@ const updateNodeSchema = z
     // The fill colour of the picture this node is a dot of (Node.picture.color)
     // — null goes back to the picture's own colour.
     pictureColor: z.enum(ZONE_PALETTE).nullish(),
+    // The size of the picture's own drawing (Node.picture.size), the same on every dot.
+    pictureSize: pictureSizeSchema.optional(),
   })
   .refine((fields) => Object.values(fields).some((v) => v !== undefined), {
     error: "No fields to update",
@@ -329,12 +336,14 @@ export const updateNodeAbl = async (
   }
 
   // Only a dot of a picture has a picture colour; it lives inside Node.picture.
-  if ("pictureColor" in definedUpdates) {
+  if ("pictureColor" in definedUpdates || "pictureSize" in definedUpdates) {
     const node = await findNodeByPublicIdDao(publicNodeId);
     if (!node) return null;
     if (!node.picture) throw new ValidationError("node is not part of a picture");
-    definedUpdates["picture.color"] = definedUpdates.pictureColor;
+    if ("pictureColor" in definedUpdates) definedUpdates["picture.color"] = definedUpdates.pictureColor;
+    if ("pictureSize" in definedUpdates) definedUpdates["picture.size"] = definedUpdates.pictureSize;
     delete definedUpdates.pictureColor;
+    delete definedUpdates.pictureSize;
   }
 
   if (typeof definedUpdates.zoneColor === "string") {

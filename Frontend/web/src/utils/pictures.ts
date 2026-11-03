@@ -293,6 +293,193 @@ export function pictureScale(def: PictureDef): number {
   return scale;
 }
 
+// ---------------------------------------------------------------------------
+// A picture drawn on its own (Node.picture.size set): the drawing is small
+// enough to see whole at 100% zoom, and its cards sit round it on their own
+// spots, each joined to its numbered dot by a thin line
+// (docs/gestures/picture-projection.md). Where the drawing sits follows from
+// its cards' spots (pictureSpots), so moving the whole picture moves the
+// drawing, and dragging one card only nudges it instead of bending it.
+
+/** A picture's dots, in picture units, round the middle of the box they fill. */
+function centeredDots(def: PictureDef): Pt[] {
+  const xs = def.dots.map((d) => d.x);
+  const ys = def.dots.map((d) => d.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  return def.dots.map((d) => ({ x: d.x - cx, y: d.y - cy }));
+}
+
+/** How wide and tall a picture is, in picture units. */
+function unitSpan(def: PictureDef): { w: number; h: number } {
+  const xs = def.dots.map((d) => d.x);
+  const ys = def.dots.map((d) => d.y);
+  return { w: Math.max(...xs) - Math.min(...xs) || 1, h: Math.max(...ys) - Math.min(...ys) || 1 };
+}
+
+/** The share of the screen a new drawing may take, and its limits in canvas units. */
+const FIT_SHARE = 0.6;
+const DRAWING_MAX = 600;
+const DRAWING_MIN = 160;
+
+/**
+ * The size (canvas units per picture unit) at which a picture's drawing fits
+ * a screen of `view` pixels at 100% zoom: FIT_SHARE of it, never longer than
+ * DRAWING_MAX nor shorter than DRAWING_MIN on its longer side.
+ */
+export function pictureFitSize(def: PictureDef, view: { w: number; h: number }): number {
+  const { w, h } = unitSpan(def);
+  const longer = Math.max(w, h);
+  const fit = Math.min((view.w * FIT_SHARE) / w, (view.h * FIT_SHARE) / h, DRAWING_MAX / longer);
+  return Math.round(Math.max(fit, DRAWING_MIN / longer) * 10) / 10;
+}
+
+/** The smallest and largest size − / + may take a picture's drawing to. */
+export function pictureSizeLimits(def: PictureDef): { min: number; max: number } {
+  const longer = Math.max(unitSpan(def).w, unitSpan(def).h);
+  return { min: DRAWING_MIN / longer, max: (DRAWING_MAX * 2) / longer };
+}
+
+/** Where each dot of the drawing sits when the drawing's middle is at `center`. */
+export function drawingSpots(def: PictureDef, center: Pt, size: number): Pt[] {
+  return centeredDots(def).map((d) => ({ x: center.x + d.x * size, y: center.y + d.y * size }));
+}
+
+// Cards go on a rectangle round the drawing, this far clear of it (on top of
+// half a card), spaced at least CARD_STEP apart along it, so no two cards
+// touch (DOT_GAP) and none covers the drawing.
+const CARD_CLEARANCE = 28;
+const CARD_STEP = 230;
+
+/** A point on the rectangle of half-width hw and half-height hh, `s` along its edge from its top-left corner, clockwise. */
+function rectPointAt(s: number, hw: number, hh: number): Pt {
+  const per = 4 * (hw + hh);
+  let t = ((s % per) + per) % per;
+  if (t < 2 * hw) return { x: -hw + t, y: -hh };
+  t -= 2 * hw;
+  if (t < 2 * hh) return { x: hw, y: -hh + t };
+  t -= 2 * hh;
+  if (t < 2 * hw) return { x: hw - t, y: hh };
+  t -= 2 * hw;
+  return { x: -hw, y: hh - t };
+}
+
+/** How far along the rectangle's edge (as rectPointAt counts) the ray from its middle through `p` meets it. */
+function rectArcOf(p: Pt, hw: number, hh: number): number {
+  const ax = Math.abs(p.x);
+  const ay = Math.abs(p.y);
+  if (ax < 1e-9 && ay < 1e-9) return 0;
+  const k = Math.min(ax > 0 ? hw / ax : Infinity, ay > 0 ? hh / ay : Infinity);
+  const x = p.x * k;
+  const y = p.y * k;
+  if (Math.abs(y + hh) < 1e-6 && x < hw) return x + hw; // top
+  if (Math.abs(x - hw) < 1e-6 && y < hh) return 2 * hw + (y + hh); // right
+  if (Math.abs(y - hh) < 1e-6 && x > -hw) return 2 * hw + 2 * hh + (hw - x); // bottom
+  return 4 * hw + 2 * hh + (hh - y); // left
+}
+
+/**
+ * Where a picture's cards go round its drawing, as offsets from the drawing's
+ * middle: each on the side of the drawing its dot is on, spread along a
+ * rectangle round the drawing so none touches another or covers the drawing,
+ * then all shifted so their mean is the drawing's middle.
+ */
+export function pictureCardOffsets(def: PictureDef, size: number): Pt[] {
+  let cached = cardOffsetCache.get(def)?.get(size);
+  if (!cached) {
+    cached = layCards(def, size);
+    if (!cardOffsetCache.has(def)) cardOffsetCache.set(def, new Map());
+    cardOffsetCache.get(def)!.set(size, cached);
+  }
+  return cached.map((p) => ({ ...p }));
+}
+
+const cardOffsetCache = new WeakMap<PictureDef, Map<number, Pt[]>>();
+
+function layCards(def: PictureDef, size: number): Pt[] {
+  const dots = centeredDots(def).map((d) => ({ x: d.x * size, y: d.y * size }));
+  const { w, h } = unitSpan(def);
+  const n = dots.length;
+  let hw = (w * size) / 2 + DOT_GAP.x / 2 + CARD_CLEARANCE;
+  let hh = (h * size) / 2 + DOT_GAP.y / 2 + CARD_CLEARANCE;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const per = 4 * (hw + hh);
+    if (per < n * CARD_STEP) {
+      const grow = (n * CARD_STEP - per) / 8 + 1;
+      hw += grow;
+      hh += grow;
+      continue;
+    }
+    // Each card where the ray from the middle through its dot meets the
+    // rectangle, then pushed apart along it, keeping their order round it.
+    const order = dots.map((d, i) => ({ i, at: rectArcOf(d, hw, hh) })).sort((a, b) => a.at - b.at);
+    const at = order.map((o) => o.at);
+    for (let iter = 0; iter < 400; iter++) {
+      let moved = false;
+      for (let k = 0; k < n; k++) {
+        const next = k + 1 < n ? at[k + 1] : at[0] + per;
+        const gap = next - at[k];
+        if (n > 1 && gap < CARD_STEP - 0.01) {
+          const push = (CARD_STEP - gap) / 2;
+          at[k] -= push;
+          if (k + 1 < n) at[k + 1] += push;
+          else at[0] += push;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    const spots: Pt[] = new Array(n);
+    order.forEach((o, k) => (spots[o.i] = rectPointAt(at[k], hw, hh)));
+    const mean = {
+      x: spots.reduce((s, p) => s + p.x, 0) / n,
+      y: spots.reduce((s, p) => s + p.y, 0) / n,
+    };
+    const out = spots.map((p) => ({ x: Math.round(p.x - mean.x), y: Math.round(p.y - mean.y) }));
+    // Shifting by the mean must not slide a card onto the drawing.
+    const offDrawing = out.every(
+      (p) => Math.abs(p.x) >= (w * size) / 2 + DOT_GAP.x / 2 || Math.abs(p.y) >= (h * size) / 2 + DOT_GAP.y / 2,
+    );
+    if (cardsClear(out) && offDrawing) return out;
+    hw += 30;
+    hh += 30;
+  }
+  // Never reached for the pictures there are; the old layout as a fallback.
+  return dots.map((d) => ({ x: Math.round((d.x / size) * pictureScale(def)), y: Math.round((d.y / size) * pictureScale(def)) }));
+}
+
+/** The mean of these spots. */
+export function pictureCenter(spots: Pt[]): Pt {
+  return {
+    x: spots.reduce((s, p) => s + p.x, 0) / spots.length,
+    y: spots.reduce((s, p) => s + p.y, 0) / spots.length,
+  };
+}
+
+/**
+ * Where each of a picture's dots is drawn, by dot: on the picture's own
+ * drawing when it has one (size set), otherwise on its node, as pictures
+ * were drawn before. `posOf` gives a node's spot, or undefined to leave it out.
+ */
+export function pictureSpots(g: PictureGroup, posOf: (node: NodeDoc) => Pt | undefined): Map<number, Pt> {
+  const out = new Map<number, Pt>();
+  const cards = new Map<number, Pt>();
+  g.byDot.forEach((n, dot) => {
+    const p = posOf(n);
+    if (p) cards.set(dot, p);
+  });
+  if (!g.size || cards.size === 0) return cards;
+  // Each card puts the middle where it would be had the card stayed on its
+  // laid-out spot; the drawing goes to the mean of those. So it stays put
+  // while its cards arrive one by one or one is deleted, follows the whole
+  // picture when it moves, and moves only a fraction with one dragged card.
+  const offsets = pictureCardOffsets(g.def, g.size);
+  const center = pictureCenter([...cards.entries()].map(([dot, p]) => ({ x: p.x - offsets[dot].x, y: p.y - offsets[dot].y })));
+  const drawn = drawingSpots(g.def, center, g.size);
+  g.byDot.forEach((_, dot) => out.set(dot, drawn[dot]));
+  return out;
+}
+
 /** Where each dot of `kind` lands when its middle is at `center`. */
 export function pictureDots(kind: PictureKind, center: Pt): Pt[] {
   const def = PICTURES[kind];
@@ -308,10 +495,16 @@ const SEARCH_STEP = 60;
  * fully on the canvas and with every dot clear of `obstacles` (whatever is
  * already on the map). The picture is never squeezed or bent to fit, so it
  * stays the picture; when nowhere is clear it goes where the fewest of its
- * dots land on something, nearest `desired` among those.
+ * dots land on something, nearest `desired` among those. With `size`, the
+ * picture is drawn on its own at that size and these are its cards' spots
+ * round the drawing (pictureCardOffsets).
  */
-export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacle[] = []): Pt[] {
-  const unit = pictureDots(kind, { x: 0, y: 0 });
+export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacle[] = [], size?: number): Pt[] {
+  // A picture drawn on its own: its cards round the drawing, and the
+  // drawing's own dots kept clear of the map too.
+  const cards = size ? pictureCardOffsets(PICTURES[kind], size) : pictureDots(kind, { x: 0, y: 0 });
+  const drawing = size ? drawingSpots(PICTURES[kind], { x: 0, y: 0 }, size) : [];
+  const unit = [...cards, ...drawing];
   const minX = EDGE - Math.min(...unit.map((p) => p.x));
   const maxX = CANVAS_W - EDGE - Math.max(...unit.map((p) => p.x));
   const minY = EDGE - Math.min(...unit.map((p) => p.y));
@@ -319,7 +512,7 @@ export function layoutPicture(kind: PictureKind, desired: Pt, obstacles: Obstacl
   const clampTo = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
   const start = { x: clampTo(desired.x, minX, maxX), y: clampTo(desired.y, minY, maxY) };
   const blocked = (c: Pt) => unit.filter((p) => !clearOf({ x: c.x + p.x, y: c.y + p.y }, obstacles)).length;
-  const shift = (c: Pt) => unit.map((p) => ({ x: Math.round(c.x + p.x), y: Math.round(c.y + p.y) }));
+  const shift = (c: Pt) => cards.map((p) => ({ x: Math.round(c.x + p.x), y: Math.round(c.y + p.y) }));
 
   // Rings of candidate middles round the start, nearest first. A full map
   // may have no clear spot at all; then the nearest spot with the fewest
@@ -397,6 +590,8 @@ export interface PictureGroup {
   percent: number;
   /** The fill colour picked for it (Node.picture.color, the same on every dot), or null for its own. */
   color: ZonePaletteColor | null;
+  /** Canvas units per picture unit of its own drawing (Node.picture.size), or null for an older picture drawn through its cards. */
+  size: number | null;
 }
 
 /** A dot counts as drawn once its node has been written in (no longer a ghost). */
@@ -414,11 +609,12 @@ export function pictureGroups(nodes: NodeDoc[]): PictureGroup[] {
     if (p.dot < 0 || p.dot >= def.dots.length) continue;
     let g = groups.get(p.id);
     if (!g) {
-      g = { id: p.id, kind: p.kind, def, byDot: new Map(), filled: 0, total: def.dots.length, percent: 0, color: null };
+      g = { id: p.id, kind: p.kind, def, byDot: new Map(), filled: 0, total: def.dots.length, percent: 0, color: null, size: null };
       groups.set(p.id, g);
     }
     if (!g.byDot.has(p.dot)) g.byDot.set(p.dot, n);
     if (p.color && !g.color) g.color = p.color;
+    if (typeof p.size === "number" && p.size > 0 && !g.size) g.size = p.size;
   }
   for (const g of groups.values()) {
     g.filled = [...g.byDot.values()].filter(isDotDrawn).length;

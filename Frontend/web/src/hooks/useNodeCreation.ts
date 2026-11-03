@@ -8,7 +8,7 @@ import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import { layoutTemplate, MAP_KIND_ROOTS } from "../utils/templates";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import { sleep } from "../utils/sleep";
-import { layoutPicture, newPictureId, pictureNodeType } from "../utils/pictures";
+import { PICTURES, drawingSpots, layoutPicture, newPictureId, pictureCenter, pictureFitSize, pictureNodeType } from "../utils/pictures";
 import type { PictureKind } from "../utils/pictures";
 import { piecesParentsFirst } from "../utils/textSplit";
 import type { Translation } from "../i18n/translations";
@@ -84,7 +84,7 @@ interface Params {
   viewportBounds: () => ViewportBounds;
   showNodes: (ids: string[]) => void;
   /** Frames the view on these canvas points (useCanvasFraming's showPoints). */
-  showPoints: (pts: Pt[]) => void;
+  showPoints: (pts: Pt[], opts?: { pad?: number; aboveSheet?: boolean }) => void;
   showNotice: (message: string) => void;
   /** Called once a node is made (see confirmPendingCreate). */
   onCreated: (node: NodeDoc, at: Pt) => void;
@@ -292,15 +292,20 @@ export function useNodeCreation({
   async function drawPicture(kind: PictureKind, desired: Pt) {
     if (!mapId) return;
     setActionError(null);
-    const dots = layoutPicture(kind, desired, [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()]);
+    // The drawing sized to be seen whole on this screen at 100% zoom, its
+    // cards round it (docs/gestures/picture-projection.md).
+    const screen =
+      typeof window === "undefined" ? { w: 1280, h: 720 } : { w: Math.max(240, window.innerWidth - 80), h: Math.max(240, window.innerHeight - 60) };
+    const size = pictureFitSize(PICTURES[kind], screen);
+    const dots = layoutPicture(kind, desired, [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()], size);
     track({ name: "picture_drawn" });
     const id = newPictureId();
     const questions = t.ui.pictures.questions[kind];
     const type = pictureNodeType(kind);
     setSelectedId(null);
     setMultiSelectIds(new Set());
-    // The whole picture in view before its first dot lands, so it is seen being dotted out.
-    showPoints(dots);
+    // The whole drawing in view before its first dot lands, so it is seen being dotted out.
+    showPoints(drawingSpots(PICTURES[kind], pictureCenter(dots), size), { pad: 24, aboveSheet: false });
     try {
       for (let dot = 0; dot < dots.length; dot++) {
         const node = await nodesApi.createNode(mapId, {
@@ -310,7 +315,7 @@ export function useNodeCreation({
           x: dots[dot].x,
           y: dots[dot].y,
           parentId: null,
-          picture: { id, kind, dot },
+          picture: { id, kind, dot, size },
         });
         upsertNode(node);
         setCelebrateIds((prev) => new Set(prev).add(node.nodeId));

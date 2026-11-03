@@ -6,7 +6,7 @@ import type { EdgeDoc, LineDoc, NodeDoc } from "../types";
 import { zoneColorFor } from "../utils/zoneStyle";
 import { useI18n } from "../i18n/I18nContext";
 import { PictureIcon } from "./PicturePicker";
-import { overallPercent, pictureSegments } from "../utils/pictures";
+import { overallPercent, pictureSegments, pictureSpots } from "../utils/pictures";
 import type { PictureGroup } from "../utils/pictures";
 
 // Smaller than the original per-node dots (which were 2.2px and colored one
@@ -350,10 +350,12 @@ export const MiniMap = memo(function MiniMap({
         ))}
         {/* Pictures — each line inked in the picture's colour once both its
             dots are written in, a faint guide until then. */}
-        {pictures.flatMap((g) =>
-          pictureSegments(g).map((s) => {
-            const a = positions.get(s.from.nodeId);
-            const b = positions.get(s.to.nodeId);
+        {pictures.flatMap((g) => {
+          // On the picture's own drawing when it has one (utils/pictures.ts pictureSpots).
+          const spots = pictureSpots(g, (n) => positions.get(n.nodeId));
+          return pictureSegments(g).map((s) => {
+            const a = spots.get(s.from.picture?.dot ?? -1);
+            const b = spots.get(s.to.picture?.dot ?? -1);
             if (!a || !b) return null;
             return (
               <line
@@ -370,8 +372,8 @@ export const MiniMap = memo(function MiniMap({
                 strokeLinecap="round"
               />
             );
-          }),
-        )}
+          });
+        })}
         {/* Per-node dots — colored only by which side of the positive/
             negative split a node's type falls on (same ZONE_COLORS pair the
             zones above use), not a whole palette of per-type colors.
