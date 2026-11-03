@@ -207,7 +207,7 @@ export function computeGeometrizedPositions(nodes: NodeDoc[]): Map<string, { x: 
     cursor += width * COLUMN + FOREST_GAP;
   }
 
-  // Recenter the whole forest on the fixed 3600x2400 canvas — it was built
+  // Recenter the whole forest on the fixed 2400x1600 canvas — it was built
   // growing rightward/downward from (0,0) above, with no regard for where
   // the canvas actually is, so shift every point by the same amount at the
   // end rather than threading a canvas-center offset through the recursion

@@ -9,13 +9,13 @@ import type { EdgeDoc, NodeDoc, NodeType } from "../types";
 import { zoneLayoutResolver } from "./zoneLayout";
 import type { ZoneLayouts } from "./zoneLayout";
 
-export const CANVAS_W = 3600;
-export const CANVAS_H = 2400;
+export const CANVAS_W = 2400;
+export const CANVAS_H = 1600;
 
 // Canvas zoom bounds/step — see MapPage's own zoom state and zoomAt(). 0.5x
 // still leaves individual node captions legible; 2.5x is plenty for
 // picking out detail in a crowded circle without the canvas's own
-// 3600x2400 bound making a fully-zoomed-out view pointless.
+// 2400x1600 bound making a fully-zoomed-out view pointless.
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 2.5;
 export const ZOOM_STEP = 0.35;
@@ -138,7 +138,7 @@ export function isMobileViewport(): boolean {
 // comment on why it isn't size-tier-aware) — a circle-parent renders at the
 // 130% tier, but the caption width, not the icon, is already the limiting
 // footprint, so the same number covers it. The margin shrinks on a phone-
-// width viewport: the canvas is the same 3600x2400 regardless of screen
+// width viewport: the canvas is the same 2400x1600 regardless of screen
 // size, so the same buffer that's comfortable on desktop just means more
 // panning/zooming to see fewer nodes at once on mobile.
 // Read live (not memoized) since it only matters at the moment a node is

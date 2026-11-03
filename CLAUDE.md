@@ -83,7 +83,7 @@ npm run build        # tsc -b && vite build
   `canvasLayout.ts`, `siege.ts` (opponent strategies and moves), `finish.ts` (mirrors the backend's
   `finishRule` so the Finish button can say why it waits; the server still decides), `nodeType.ts`
   (mirrors `allowedAttackTypes`), `seedMap.ts`/`templates.ts` (starter structures as ghosts, in the
-  user's language), `shapeLayout.ts` (templates and the Think map laid out as a circle, square or triangle, shared with the preview), `textSplit.ts`, `pictures.ts` ("Draw a picture": a connect-the-dots of ghost nodes whose lines ink in as they are written, `Node.picture`; drawn on its own small enough to see whole at 100%, its cards round it, `Node.picture.size`), `cardGlue.ts` (cards glue side to side and never
+  user's language), `shapeLayout.ts` (templates and the Think map laid out as a circle, square or triangle, shared with the preview), `textSplit.ts`, `pictures.ts` ("Draw a picture": a connect-the-dots of ghost nodes whose lines ink in as they are written, `Node.picture`), `cardGlue.ts` (cards glue side to side and never
   overlap), `parentMagnet.ts` (a moved parent pulls its own far children back in), `emojiFace.ts` (emoji first, each type's emoji, a still emoji), `usage.ts` (`track()`: how the app is used, a name and short labels per event, never a thought's text; shown on the admin page by `admin/UsageSummary.tsx`), `feeling.ts` (a viewer's own
   feeling per thought and the before/after check-in, private to them like the rest of their view of a map).
 - **`offline/`** — read cache of every GET plus an outbox of changes made offline, replayed in order
