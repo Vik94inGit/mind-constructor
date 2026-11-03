@@ -65,14 +65,14 @@ export function useCanvasViewport({ mapId, loading, sheetOpen, positions, openAt
   // the camera is still gliding there.
   const lastPanTargetRef = useRef<{ left: number; top: number } | null>(null);
   // Canvas zoom level — applied to canvasRef as a CSS transform: scale(),
-  // see the JSX below. 1 = the canvas's own native 3600x2400 pixels.
+  // see the JSX below. 1 = the canvas's own native 2400x1600 pixels.
   // Changed via zoomAt() (the zoom control buttons, fit-to-display) rather
   // than set directly, so every change stays clamped to [MIN_ZOOM, MAX_ZOOM]
   // in one place and glides there instead of jumping.
   const [zoom, setZoom] = useState(1);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   // The scrollable ancestor of canvasRef — canvasRef itself is the full
-  // 3600x2400 canvas, this is the clipped, scrolled window onto it a user
+  // 2400x1600 canvas, this is the clipped, scrolled window onto it a user
   // is actually looking at, which viewportBounds() below reads from.
   const wrapRef = useRef<HTMLDivElement | null>(null);
 

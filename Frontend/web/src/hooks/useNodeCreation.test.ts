@@ -66,8 +66,7 @@ describe("useNodeCreation", () => {
     expect(ids.size).toBe(1);
     calls.forEach((c, i) => {
       expect(c).toMatchObject({ text: "", type: "Idea", parentId: null, picture: { kind: "star", dot: i } });
-      const questions = TRANSLATIONS.en.ui.pictures.questions.star;
-      expect(c.prompt).toBe(`${i + 1}. ${questions[i % questions.length]}`);
+      expect(c.prompt).toBe(`${i + 1}. ${TRANSLATIONS.en.ui.pictures.questions.star[i]}`);
     });
     expect(params.showPoints).toHaveBeenCalledTimes(1);
     expect(params.upsertNode).toHaveBeenCalledTimes(PICTURES.star.dots.length);
@@ -82,8 +81,8 @@ describe("useNodeCreation", () => {
       expect(c).toMatchObject({ type: "Problem", picture: { kind: "stop" } });
       expect(TRANSLATIONS.en.ui.pictures.questions.stop.some((q) => c.prompt?.endsWith(q))).toBe(true);
     });
-    // Neighbouring dots ask different questions.
-    expect(calls[0].prompt).not.toBe(calls[1].prompt?.replace(/^2/, "1"));
+    // Every dot asks a different question.
+    expect(new Set(calls.map((c) => c.prompt?.replace(/^\d+\. /, ""))).size).toBe(calls.length);
   });
 
   it("does nothing without a pending node", async () => {

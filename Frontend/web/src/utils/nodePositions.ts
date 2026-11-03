@@ -186,7 +186,7 @@ export const radialNeighborRadius = () => (isMobileViewport() ? 110 : 190);
 // `bounds`. Same fix as QuickAddGhosts' own ring-centering: without bounds
 // awareness — just `center + radius`, trusting centerOnNode to have put
 // `center` in the middle of the screen — a node close enough to the edge of
-// the whole 3600x2400 canvas (nothing left to scroll into) never gets truly
+// the whole 2400x1600 canvas (nothing left to scroll into) never gets truly
 // centered, and on a narrow phone viewport that's routine, so members on
 // the far side of the ring would render clear off the visible screen,
 // unreachable to tap. Nudging the ring's own center into a

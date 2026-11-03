@@ -2,14 +2,7 @@ import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
-import {
-  drawingSpots,
-  pictureCardOffsets,
-  pictureSizeLimits,
-  pictureSpots,
-  resizePicture,
-  PICTURE_RESIZE_STEP,
-} from "../utils/pictures";
+import { resizePicture, PICTURE_RESIZE_STEP } from "../utils/pictures";
 import type { PictureGroup } from "../utils/pictures";
 import type { NodeDoc, ZonePaletteColor } from "../types";
 
@@ -69,57 +62,23 @@ export function usePictureEdit({
   const dotsOf = (g: PictureGroup) => [...g.byDot.values()];
   const spotsOf = (g: PictureGroup) => dotsOf(g).map(posFor);
 
-  /**
-   * Where the open picture's dots would go one step bigger (1) or smaller
-   * (-1), and the drawing's new size for a picture drawn on its own; null
-   * when it can't. A picture drawn on its own grows or shrinks its drawing,
-   * and its cards are laid round it afresh (docs/gestures/picture-projection.md).
-   */
-  function nextSize(direction: 1 | -1): { spots: Pt[]; size?: number } | null {
+  /** Where the open picture's dots would go one step bigger (1) or smaller (-1); null when it can't. */
+  function nextSize(direction: 1 | -1): Pt[] | null {
     if (!open) return null;
-    const factor = direction > 0 ? PICTURE_RESIZE_STEP : 1 / PICTURE_RESIZE_STEP;
-    if (open.size) {
-      const size = Math.round(open.size * factor * 10) / 10;
-      const { min, max } = pictureSizeLimits(open.def);
-      if (size < min || size > max) return null;
-      const drawn = drawingSpots(open.def, { x: 0, y: 0 }, open.size);
-      // The drawing's own middle, back from where its dots are drawn.
-      const [dot0, at0] = [...pictureSpots(open, posFor).entries()][0];
-      const middle = { x: at0.x - drawn[dot0].x, y: at0.y - drawn[dot0].y };
-      const offsets = pictureCardOffsets(open.def, size);
-      const spots = dotsOf(open).map((n) => {
-        const o = offsets[n.picture?.dot ?? 0];
-        return { x: Math.round(middle.x + o.x), y: Math.round(middle.y + o.y) };
-      });
-      return { spots, size };
-    }
-    const spots = resizePicture(spotsOf(open), factor);
-    return spots ? { spots } : null;
+    return resizePicture(spotsOf(open), direction > 0 ? PICTURE_RESIZE_STEP : 1 / PICTURE_RESIZE_STEP);
   }
 
   async function resize(direction: 1 | -1) {
     const g = open;
-    const step = nextSize(direction);
-    if (!g || !step) return;
-    const { spots: next, size } = step;
+    const next = nextSize(direction);
+    if (!g || !next) return;
     const dots = dotsOf(g);
     setActionError(null);
-    // Undo only puts spots back, not a drawing's size, so a picture drawn on
-    // its own is put back with the other button instead.
-    if (!size) recordMove(dots);
+    recordMove(dots);
     // Shown straight away; each dot glides there (usePositionGlide).
-    dots.forEach((n, i) =>
-      upsertNode({
-        ...n,
-        x: next[i].x,
-        y: next[i].y,
-        ...(size && n.picture ? { picture: { ...n.picture, size } } : {}),
-      }),
-    );
+    dots.forEach((n, i) => upsertNode({ ...n, x: next[i].x, y: next[i].y }));
     try {
-      const saved = await Promise.all(
-        dots.map((n, i) => nodesApi.updateNode(n.nodeId, { x: next[i].x, y: next[i].y, ...(size ? { pictureSize: size } : {}) })),
-      );
+      const saved = await Promise.all(dots.map((n, i) => nodesApi.updateNode(n.nodeId, { x: next[i].x, y: next[i].y })));
       saved.forEach((n) => upsertNode(n));
     } catch (err) {
       dots.forEach((n) => upsertNode(n));

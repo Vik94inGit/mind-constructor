@@ -40,21 +40,4 @@ describe("PictureLayer", () => {
     expect(container.querySelectorAll('line[data-drawn="true"]')).toHaveLength(2);
     expect(container.querySelectorAll("line")).toHaveLength(7);
   });
-
-  it("draws a picture on its own as numbered dots, each joined to its card by a thin line", () => {
-    const nodes = treeNodes(2).map((n) => ({ ...n, picture: { ...n.picture!, size: 80 } }));
-    const { container } = render(
-      <I18nProvider>
-        <PictureLayer pictures={pictureGroups(nodes)} posFor={posFor} />
-      </I18nProvider>,
-    );
-    expect(container.querySelector("[data-own-drawing]")).not.toBeNull();
-    expect(container.querySelectorAll("[data-leader]")).toHaveLength(PICTURES.tree.dots.length);
-    expect(container.querySelectorAll("[data-dot]")).toHaveLength(PICTURES.tree.dots.length);
-    expect(container.querySelector('[data-dot="0"] text')?.textContent).toBe("1");
-    // The drawing is 80 units per picture unit round the cards' middle, not on the cards.
-    const leader = container.querySelector('[data-leader="0"]')!;
-    const ends = ["x1", "y1", "x2", "y2"].map((a) => leader.getAttribute(a));
-    expect(`${ends[0]},${ends[1]}`).not.toBe(`${ends[2]},${ends[3]}`);
-  });
 });

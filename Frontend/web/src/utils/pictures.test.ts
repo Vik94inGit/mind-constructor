@@ -14,15 +14,11 @@ import {
   pictureGroups,
   pictureSegments,
   resizePicture,
-  pictureFitSize,
-  pictureCardOffsets,
-  drawingSpots,
-  pictureSpots,
-  pictureCenter,
 } from "./pictures";
 import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import { makeNode } from "../test/fixtures";
 import { NODE_TYPES } from "../types";
+import { TRANSLATIONS, loadTranslation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 
 function dotNode(id: string, dot: number, written: boolean, kind = "tree", pictureId = "p1"): NodeDoc {
@@ -45,6 +41,17 @@ describe("PICTURES", () => {
       for (let j = i + 1; j < dots.length; j++) {
         const clear = Math.abs(dots[i].x - dots[j].x) >= 170 || Math.abs(dots[i].y - dots[j].y) >= 110;
         expect(clear, `${kind} dots ${i} and ${j}`).toBe(true);
+      }
+    }
+  });
+
+  it("has a different question for every dot of every picture, in every language", async () => {
+    for (const lang of ["en", "cs", "uk", "ru"] as const) {
+      const tr = lang === "en" ? TRANSLATIONS.en : await loadTranslation(lang);
+      for (const kind of PICTURE_KINDS) {
+        const qs = tr.ui.pictures.questions[kind];
+        expect(qs, `${lang} ${kind}`).toHaveLength(PICTURES[kind].dots.length);
+        expect(new Set(qs).size, `${lang} ${kind}`).toBe(qs.length);
       }
     }
   });
@@ -180,88 +187,6 @@ describe("resizePicture", () => {
     for (const p of resizePicture(nearEdge, 1.3)!) {
       expect(p.x).toBeGreaterThanOrEqual(120);
       expect(p.x).toBeLessThanOrEqual(CANVAS_W - 120);
-    }
-  });
-});
-
-describe("a picture drawn on its own", () => {
-  const span = (pts: { x: number; y: number }[]) => ({
-    w: Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)),
-    h: Math.max(...pts.map((p) => p.y)) - Math.min(...pts.map((p) => p.y)),
-  });
-
-  it.each(PICTURE_KINDS)("%s fits a phone and a desktop screen at 100%%", (kind) => {
-    for (const view of [
-      { w: 360, h: 640 },
-      { w: 1280, h: 720 },
-    ]) {
-      const size = pictureFitSize(PICTURES[kind], view);
-      const s = span(drawingSpots(PICTURES[kind], { x: 0, y: 0 }, size));
-      expect(s.w).toBeLessThanOrEqual(view.w * 0.6 + 1);
-      expect(s.h).toBeLessThanOrEqual(view.h * 0.6 + 1);
-    }
-  });
-
-  it.each(PICTURE_KINDS)("%s lays its cards round the drawing, none touching another or the drawing", (kind) => {
-    for (const view of [
-      { w: 360, h: 640 },
-      { w: 1280, h: 720 },
-    ]) {
-      const def = PICTURES[kind];
-      const size = pictureFitSize(def, view);
-      const cards = pictureCardOffsets(def, size);
-      expect(cards).toHaveLength(def.dots.length);
-      for (let i = 0; i < cards.length; i++) {
-        for (let j = i + 1; j < cards.length; j++) {
-          const clear = Math.abs(cards[i].x - cards[j].x) >= 170 || Math.abs(cards[i].y - cards[j].y) >= 110;
-          expect(clear, `${kind} cards ${i} and ${j}`).toBe(true);
-        }
-      }
-      const center = pictureCenter(cards);
-      expect(Math.abs(center.x)).toBeLessThan(1);
-      expect(Math.abs(center.y)).toBeLessThan(1);
-      const d = span(drawingSpots(def, center, size));
-      for (const c of cards) {
-        expect(Math.abs(c.x) >= d.w / 2 + 74 || Math.abs(c.y) >= d.h / 2 + 45, `${kind} card on the drawing`).toBe(true);
-      }
-    }
-  });
-
-  it("draws the dots on the drawing, round the middle of the cards, and follows a whole move", () => {
-    const size = 100;
-    const cards = pictureCardOffsets(PICTURES.heart, size).map((p) => ({ x: p.x + 1800, y: p.y + 1200 }));
-    const nodes = cards.map((c, i) => makeNode({ nodeId: `n${i}`, x: c.x, y: c.y, picture: { id: "p1", kind: "heart", dot: i, size } }));
-    const [g] = pictureGroups(nodes);
-    expect(g.size).toBe(size);
-    const spots = pictureSpots(g, (n) => ({ x: n.x!, y: n.y! }));
-    const expected = drawingSpots(PICTURES.heart, pictureCenter(cards), size)[0];
-    expect(spots.get(0)!.x).toBeCloseTo(expected.x, 0);
-    expect(spots.get(0)!.y).toBeCloseTo(expected.y, 0);
-    // One card gone (deleted): the drawing stays where it was.
-    const [partial] = pictureGroups(nodes.slice(1));
-    const without = pictureSpots(partial, (n) => ({ x: n.x!, y: n.y! }));
-    expect(without.get(3)!.x).toBeCloseTo(spots.get(3)!.x, 0);
-    expect(without.get(3)!.y).toBeCloseTo(spots.get(3)!.y, 0);
-    const moved = pictureSpots(g, (n) => ({ x: n.x! + 50, y: n.y! }));
-    expect(moved.get(0)!.x - spots.get(0)!.x).toBeCloseTo(50);
-  });
-
-  it("keeps an older picture's lines on its cards", () => {
-    const nodes = [0, 1].map((i) => makeNode({ nodeId: `n${i}`, x: 100 * i, y: 50, picture: { id: "p1", kind: "heart", dot: i } }));
-    const [g] = pictureGroups(nodes);
-    expect(g.size).toBeNull();
-    expect(pictureSpots(g, (n) => ({ x: n.x!, y: n.y! })).get(1)).toEqual({ x: 100, y: 50 });
-  });
-
-  it("places a sized picture's cards on the canvas", () => {
-    const size = pictureFitSize(PICTURES.smile, { w: 1280, h: 720 });
-    const cards = layoutPicture("smile", { x: 1800, y: 1200 }, [], size);
-    expect(cards).toHaveLength(PICTURES.smile.dots.length);
-    for (const c of cards) {
-      expect(c.x).toBeGreaterThanOrEqual(0);
-      expect(c.y).toBeGreaterThanOrEqual(0);
-      expect(c.x).toBeLessThanOrEqual(CANVAS_W);
-      expect(c.y).toBeLessThanOrEqual(CANVAS_H);
     }
   });
 });

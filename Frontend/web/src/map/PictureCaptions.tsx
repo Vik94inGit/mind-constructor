@@ -1,4 +1,3 @@
-import { pictureSpots } from "../utils/pictures";
 import type { PictureGroup } from "../utils/pictures";
 import type { NodeDoc, ZonePaletteColor } from "../types";
 import { useI18n } from "../i18n/I18nContext";
@@ -50,12 +49,8 @@ export function PictureCaptions({
   return (
     <>
       {pictures.map((g) => {
-        // A picture that stands for a node type is called by that type's name.
-        const type = g.def.type;
-        const name = type ? t.ui.types[type] : p.names[g.kind];
-        // Under everything the picture has: its cards and, for a picture
-        // drawn on its own, the drawing among them.
-        const spots = [...[...g.byDot.values()].map(posFor), ...pictureSpots(g, posFor).values()];
+        const name = p.names[g.kind];
+        const spots = [...g.byDot.values()].map(posFor);
         const minX = Math.min(...spots.map((s) => s.x));
         const maxX = Math.max(...spots.map((s) => s.x));
         const minY = Math.min(...spots.map((s) => s.y));

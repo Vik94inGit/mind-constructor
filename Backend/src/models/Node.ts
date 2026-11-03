@@ -130,14 +130,8 @@ export const NodeSchema = new mongoose.Schema(
         dot: { type: Number, required: true, min: 0, max: 63 },
         // The picture's own fill colour, from ZONE_PALETTE (every dot of a
         // picture carries the same one; null: the picture's own colour).
-        // Changes after creation through nodeAbl's pictureColor.
+        // The only part that changes after creation (nodeAbl's pictureColor).
         color: { type: String, enum: ZONE_PALETTE, default: null },
-        // Canvas units per picture unit for a picture drawn on its own, small
-        // enough to see whole at 100%, with its cards laid round it and each
-        // joined to its dot by a thin line; its middle is the middle of its
-        // cards. null: an older picture whose lines run through its cards.
-        // Changes with nodeAbl's pictureSize.
-        size: { type: Number, default: null, min: 0, max: 1000 },
       },
       default: null,
     },

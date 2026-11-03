@@ -101,12 +101,12 @@ export function useCanvasFraming({
   // so the whole glide stays on-screen, not just wherever it happens to end
   // up.
   // `opts` is passed through to centerOnPoint.
-  function showPoints(pts: Pt[], opts?: { aboveSheet?: boolean; pad?: number }) {
+  function showPoints(pts: Pt[], opts?: { aboveSheet?: boolean }) {
     const wrap = wrapRef.current;
     if (!wrap || pts.length === 0) return;
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
-    const PAD = opts?.pad ?? 140;
+    const PAD = 140;
     const width = Math.max(...xs) - Math.min(...xs) + PAD * 2;
     const height = Math.max(...ys) - Math.min(...ys) + PAD * 2;
     const middle = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 };

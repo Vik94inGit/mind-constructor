@@ -452,16 +452,6 @@ describe("nodeAbl", () => {
       await expect(updateNodeAbl("node1", "user1", { pictureColor: "teal" })).rejects.toThrow(ValidationError);
     });
 
-    it("sets a picture's drawing size inside Node.picture, and refuses a size of 0", async () => {
-      vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
-      vi.mocked(findNodeByPublicIdDao).mockResolvedValueOnce({ nodeId: "node1", picture: { id: "p1", kind: "heart", dot: 0 } } as never);
-
-      await updateNodeAbl("node1", "user1", { pictureSize: 120 });
-      expect(updateNodeDao).toHaveBeenLastCalledWith("node1", "user1", { "picture.size": 120 });
-
-      await expect(updateNodeAbl("node1", "user1", { pictureSize: 0 })).rejects.toThrow(ValidationError);
-    });
-
     it("passes a zone edge brightness from 0 to 1 through, null back to the default", async () => {
       vi.mocked(updateNodeDao).mockResolvedValue({ nodeId: "node1" } as never);
 

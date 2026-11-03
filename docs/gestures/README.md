@@ -47,7 +47,6 @@ node) must be told apart by something the user can see before they let go.
 | Change-parent mode | Tap a node | Click a node | Hangs the child from it (own parent: swap) |
 | Strong attack, discussion | Tap the attack | Hover it or its target | Pac-Man run to the node it hit |
 | Picture caption | Tap | Click | Opens the picture's bar: − / + resize the whole picture, Move picks every dot for a group drag ([sketch](picture-resize.md)) |
-| Picture card | Drag | Drag | A card of a picture drawn on its own moves alone, its thin line following; the drawing keeps its shape ([sketch](picture-projection.md)) |
 | Canvas | Pinch | Ctrl+wheel, − / + | Zoom |
 | Panel | Its arrows | Arrow keys | Step node to node |
 | Canvas, first open | Tap | Click or wheel | Skip the entrance |
