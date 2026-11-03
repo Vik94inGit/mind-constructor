@@ -21,13 +21,16 @@ import { InboxTray } from "../dashboard/InboxTray";
 import { findInbox } from "../utils/inbox";
 import { CreateMapModal } from "../dashboard/CreateMapModal";
 import { EditMapModal } from "../dashboard/EditMapModal";
-import { FolderModal, primaryBtn, secondaryBtn } from "../dashboard/FolderModal";
+import { FolderModal, secondaryBtn } from "../dashboard/FolderModal";
 import { MoveToFolderModal } from "../dashboard/MoveToFolderModal";
 import { FolderIcon, LibraryTile, MapIcon } from "../dashboard/LibraryTile";
 import { libraryItems, paginate } from "../dashboard/library";
 import { useConfirm } from "../context/ConfirmContext";
 import * as stateApi from "../api/state";
 import { CheckInModal } from "../dashboard/CheckInModal";
+import { MenuNode } from "../dashboard/MenuNode";
+import type { MenuGhost } from "../dashboard/MenuNode";
+import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { checkInShift } from "../utils/feeling";
 import type { CheckIns } from "../utils/feeling";
 
@@ -66,6 +69,8 @@ export function DashboardPage() {
   // How the user felt about each map before and after thinking it through (utils/feeling.ts) — only theirs.
   const [checkIns, setCheckIns] = useState<CheckIns>({});
   const [checkInMap, setCheckInMap] = useState<MapDoc | null>(null);
+  // The main menu's picked ghost (or its centre node): its box shows under the ring.
+  const [menuOpen, setMenuOpen] = useState<"center" | "note" | "inbox" | null>(searchParams.get("note") === "1" ? "note" : null);
 
   async function load() {
     setLoading(true);
@@ -223,6 +228,22 @@ export function DashboardPage() {
     ];
   }
 
+  const ring = t.dashboard.ring;
+  const unsortedCount = inbox?.nodeCount ?? 0;
+  const toggleMenu = (id: "center" | "note" | "inbox") => setMenuOpen((cur) => (cur === id ? null : id));
+  const menuGhosts: MenuGhost[] = [
+    ...(lastMap
+      ? [{ id: "last", label: `${ring.lastStop}: ${lastMap.name}`, icon: "↩", color: NODE_TYPE_COLORS.Success, onClick: () => navigate(`/maps/${lastMap.mapId}`) }]
+      : []),
+    { id: "note", label: ring.quickNote, icon: "✎", color: NODE_TYPE_COLORS.Idea, onClick: () => toggleMenu("note") },
+    ...(inbox && unsortedCount > 0
+      ? [{ id: "inbox", label: ring.unsorted(unsortedCount), icon: "📥", color: NODE_TYPE_COLORS["Problematic option"], onClick: () => toggleMenu("inbox") }]
+      : []),
+    { id: "map", label: ring.newMap, icon: "＋", color: NODE_TYPE_COLORS.Solution, onClick: () => setShowCreate(true) },
+    { id: "folder", label: ring.newFolder, icon: "🗂", color: NODE_TYPE_COLORS.Option, onClick: () => setFolderModal({}) },
+    { id: "split", label: ring.split, icon: "✂", color: NODE_TYPE_COLORS.unknown, onClick: () => navigate("/split") },
+  ];
+
   const filterLabels: Record<Filter, string> = {
     all: t.dashboard.filter.all,
     owned: t.dashboard.filter.owned,
@@ -234,76 +255,51 @@ export function DashboardPage() {
     // column: the writing tools (resume, quick note, think) on the left and
     // the map library filling the rest.
     <div className="mx-auto w-full max-w-[1080px] px-6 pt-8 pb-16 lg:max-w-[1600px] lg:px-10">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="m-0 text-2xl font-bold">{t.dashboard.title}</h1>
-          <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">{t.dashboard.subtitle}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className={secondaryBtn} onClick={() => navigate("/split")}>
-            {t.split.entry}
-          </button>
-          <button className={secondaryBtn} onClick={() => setFolderModal({})}>
-            {t.dashboard.library.newFolder}
-          </button>
-          <button className={primaryBtn} onClick={() => setShowCreate(true)}>
-            {t.dashboard.newMap}
-          </button>
-        </div>
+      <div className="mb-4">
+        <h1 className="m-0 text-2xl font-bold">{t.dashboard.title}</h1>
+        <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">{t.dashboard.subtitle}</p>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] lg:items-start lg:gap-8">
-        <aside className="lg:sticky lg:top-6">
-          {lastMap && (
-            <button
-              type="button"
-              className="mb-5 flex w-full cursor-pointer items-center gap-3 rounded-card border border-line bg-surface p-3 text-left shadow-card transition-colors duration-[120ms] hover:border-accent"
-              onClick={() => navigate(`/maps/${lastMap.mapId}`)}
-            >
-              <MapIcon color={lastMap.color} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[0.75rem] font-semibold tracking-[0.03em] text-ink-soft uppercase">
-                  {t.dashboard.library.resume.title}
-                </span>
-                <span className="block truncate text-[1rem] font-bold">{lastMap.name}</span>
-              </span>
-              <span className="shrink-0 rounded-lg bg-accent px-3 py-[0.45rem] text-[0.85rem] font-semibold text-white">
-                {t.dashboard.library.resume.open} →
-              </span>
-            </button>
-          )}
+      <div className="lg:grid lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        {/* The main menu: a node with its ring of ghosts; the picked one's box below it. */}
+        <aside className="mb-8 lg:sticky lg:top-6 lg:mb-0">
+          <MenuNode ghosts={menuGhosts} active={menuOpen} onCenter={() => toggleMenu("center")} />
 
-          <QuickNote
-            maps={maps}
-            autoFocus={searchParams.get("note") === "1"}
-            onSaved={(map, created) => {
-              setMaps((prev) =>
-                created
-                  ? [{ ...map, nodeCount: 1 }, ...prev]
-                  : prev.map((m) => (m.mapId === map.mapId ? { ...m, nodeCount: (m.nodeCount ?? 0) + 1 } : m)),
-              );
-            }}
-          />
+          <div className="mt-8">
+            {menuOpen === "center" && <ThinkEntry />}
 
-          {inbox && (
-            <InboxTray
-              inbox={inbox}
-              maps={maps}
-              onMoved={(target, count) =>
-                setMaps((prev) =>
-                  prev.map((m) =>
-                    m.mapId === inbox.mapId
-                      ? { ...m, nodeCount: Math.max(0, (m.nodeCount ?? 0) - count) }
-                      : m.mapId === target.mapId
-                        ? { ...m, nodeCount: (m.nodeCount ?? 0) + count }
-                        : m,
-                  ),
-                )
-              }
-            />
-          )}
+            {menuOpen === "note" && (
+              <QuickNote
+                maps={maps}
+                autoFocus
+                onSaved={(map, created) => {
+                  setMaps((prev) =>
+                    created
+                      ? [{ ...map, nodeCount: 1 }, ...prev]
+                      : prev.map((m) => (m.mapId === map.mapId ? { ...m, nodeCount: (m.nodeCount ?? 0) + 1 } : m)),
+                  );
+                }}
+              />
+            )}
 
-          <ThinkEntry />
+            {menuOpen === "inbox" && inbox && (
+              <InboxTray
+                inbox={inbox}
+                maps={maps}
+                onMoved={(target, count) =>
+                  setMaps((prev) =>
+                    prev.map((m) =>
+                      m.mapId === inbox.mapId
+                        ? { ...m, nodeCount: Math.max(0, (m.nodeCount ?? 0) - count) }
+                        : m.mapId === target.mapId
+                          ? { ...m, nodeCount: (m.nodeCount ?? 0) + count }
+                          : m,
+                    ),
+                  )
+                }
+              />
+            )}
+          </div>
         </aside>
 
         <section className="min-w-0">

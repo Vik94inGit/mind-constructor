@@ -77,7 +77,6 @@ import { useChompRuns } from "../hooks/useChompRuns";
 import { MapToolbar } from "../map/MapToolbar";
 import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
-import { MapLegend } from "../map/MapLegend";
 import { ZoneMenu } from "../map/ZoneMenu";
 import { GestureHint } from "../map/GestureHint";
 import type { ZoneStylePatch } from "../map/ZoneMenuBody";
@@ -130,6 +129,7 @@ import {
   nodeObstacles,
 } from "../utils/canvasLayout";
 import type { ReadingMode } from "../utils/readingMode";
+import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
 import type { AttackIndicator, MapAttack, NodeDoc, NodeType } from "../types";
 import { battleTally, healthAt } from "../utils/finish";
 import { FinishedBanner } from "../map/FinishedBanner";
@@ -1833,6 +1833,9 @@ export function MapPage() {
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
                 onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
+                currentType={selectedNode.type}
+                changeTypes={selectedNode.isWeapon || selectedNode.isProtection ? ATTACK_NODE_TYPES : NODE_TYPES}
+                onChangeType={canEditNode(selectedNode) ? (type) => void handleChangeNodeType(selectedNode, type) : undefined}
               />
             )}
 
@@ -2067,7 +2070,6 @@ export function MapPage() {
             type={pendingCreate.type}
             emoji={pendingCreate.emoji || undefined}
             prompt={pendingCreate.prompt}
-            onTypeChange={(type) => setPendingCreate((prev) => (prev ? { ...prev, type } : prev))}
             onClearEmoji={() => setPendingCreate((prev) => (prev ? { ...prev, emoji: "" } : prev))}
             onCreate={(text, type, images, prompt) => confirmPendingCreate(text, type, images, prompt)}
             onCancel={cancelPendingCreate}
@@ -2386,7 +2388,6 @@ export function MapPage() {
         />
       )}
 
-      {!presenting && <MapLegend />}
 
       {pendingLink && mapId && (
         <CreateEdgeModal

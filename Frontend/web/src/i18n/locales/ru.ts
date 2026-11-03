@@ -501,6 +501,8 @@ const ui: UiStrings = {
       "unknown": ["Открытый вопрос:", "Нужно больше информации о…", "Идея:"],
     },
     ghostTemplatesTitle: "Начать с этой фразы",
+    ghostChangeTo: (type) => `Сменить на: ${type}`,
+    ghostNewOne: (type) => `Новый: ${type}`,
   },
   attack: {
     intro: "Атака создаёт настоящий узел с вашим возражением, связанный с этим узлом стрелой оружия.",
@@ -1001,6 +1003,16 @@ const translation: Translation = {
       owner: "Владелец",
     },
     menu: { summary: "Сводка", edit: "Изменить", invite: "Пригласить", delete: "Удалить", moveToFolder: "Переместить в папку…" },
+    ring: {
+      label: "Главное меню",
+      center: "Что у вас на уме?",
+      lastStop: "Где вы остановились",
+      quickNote: "Быстрая заметка",
+      unsorted: (count) => `Неразобранные (${count})`,
+      newMap: "Новая карта",
+      newFolder: "Новая папка",
+      split: "Текст → карта",
+    },
     quickNote: { title: "Быстрая заметка", placeholder: "Запишите мысль — она попадёт в карту «Входящие»…", save: "Сохранить", saved: "Сохранено.", open: (name) => `Открыть ${name} →`, error: "Не удалось сохранить заметку", inboxName: "Входящие" },
     library: {
       newFolder: "+ Новая папка",
@@ -1113,7 +1125,6 @@ const translation: Translation = {
       history: "История",
       packed: (count) => `Свёрнуто (${count})`,
     },
-    legend: { positiveCircle: "положительный круг", negativeCircle: "отрицательный круг / под атакой" },
   },
   split: {
     entry: "✂ Текст → карта",

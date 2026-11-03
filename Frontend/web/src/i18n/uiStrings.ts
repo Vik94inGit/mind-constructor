@@ -216,6 +216,10 @@ export interface UiStrings {
     /** Starter phrases a ghost offers once it's picked out — click one to open the new node with it. */
     ghostTemplates: Record<NodeType, string[]>;
     ghostTemplatesTitle: string;
+    /** On a picked ghost: turn the chosen node itself into this type. */
+    ghostChangeTo: (type: string) => string;
+    /** On a picked ghost: add a new node of this type. */
+    ghostNewOne: (type: string) => string;
   };
   attack: {
     intro: string;
@@ -905,6 +909,8 @@ const en: UiStrings = {
       "unknown": ["Open question:", "Need more info on…", "Idea:"],
     },
     ghostTemplatesTitle: "Start from this phrase",
+    ghostChangeTo: (type) => `Make this a ${type}`,
+    ghostNewOne: (type) => `New ${type}`,
   },
   attack: {
     intro: "Landing an attack creates a real node with your objection, linked to this one by a weapon arrow.",

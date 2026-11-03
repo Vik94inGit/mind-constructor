@@ -501,6 +501,8 @@ const ui: UiStrings = {
       "unknown": ["Відкрите питання:", "Потрібно більше інформації про…", "Ідея:"],
     },
     ghostTemplatesTitle: "Почати з цієї фрази",
+    ghostChangeTo: (type) => `Змінити на: ${type}`,
+    ghostNewOne: (type) => `Новий: ${type}`,
   },
   attack: {
     intro: "Атака створює справжній вузол із вашим запереченням, з’єднаний з цим вузлом стрілою зброї.",
@@ -1001,6 +1003,16 @@ const translation: Translation = {
       owner: "Власник",
     },
     menu: { summary: "Підсумок", edit: "Редагувати", invite: "Запросити", delete: "Видалити", moveToFolder: "Перемістити в папку…" },
+    ring: {
+      label: "Головне меню",
+      center: "Що у вас на думці?",
+      lastStop: "Де ви зупинились",
+      quickNote: "Швидка нотатка",
+      unsorted: (count) => `Нерозібрані (${count})`,
+      newMap: "Нова мапа",
+      newFolder: "Нова тека",
+      split: "Текст → мапа",
+    },
     quickNote: { title: "Швидка нотатка", placeholder: "Запишіть думку — вона піде у мапу «Вхідні»…", save: "Зберегти", saved: "Збережено.", open: (name) => `Відкрити ${name} →`, error: "Не вдалося зберегти нотатку", inboxName: "Вхідні" },
     library: {
       newFolder: "+ Нова папка",
@@ -1113,7 +1125,6 @@ const translation: Translation = {
       history: "Історія",
       packed: (count) => `Згорнуто (${count})`,
     },
-    legend: { positiveCircle: "позитивне коло", negativeCircle: "негативне коло / під атакою" },
   },
   split: {
     entry: "✂ Текст → карта",
