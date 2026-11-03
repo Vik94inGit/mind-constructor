@@ -20,7 +20,7 @@ import type { PictureGroup } from "../utils/pictures";
 const DOT_R = 1.5;
 
 // Fixed corner overlay, sized to the same 3:2 ratio as the real canvas
-// (CANVAS_W:CANVAS_H = 2400:1600) so a straight linear scale-down (scaleX/
+// (CANVAS_W:CANVAS_H = 3600:2400) so a straight linear scale-down (scaleX/
 // scaleY below) is all the coordinate math needs to place a dot/zone —
 // canvas-coordinate space itself never changes shape, only how zoomed-in
 // the *real* canvas is currently rendered at (see the zoom prop below,

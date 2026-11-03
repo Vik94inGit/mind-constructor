@@ -49,7 +49,9 @@ export function PictureCaptions({
   return (
     <>
       {pictures.map((g) => {
-        const name = p.names[g.kind];
+        // A picture that stands for a node type is called by that type's name.
+        const type = g.def.type;
+        const name = type ? t.ui.types[type] : p.names[g.kind];
         const spots = [...g.byDot.values()].map(posFor);
         const minX = Math.min(...spots.map((s) => s.x));
         const maxX = Math.max(...spots.map((s) => s.x));

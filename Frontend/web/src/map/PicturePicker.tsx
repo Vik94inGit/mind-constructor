@@ -102,13 +102,12 @@ export function PicturePicker({ onPick, onClose }: Props) {
         data-picture={kind}
       >
         <PictureThumb kind={kind} size={THUMB} />
-        <span className="text-center font-semibold">{p.names[kind]}</span>
-        {type && (
-          <span className="flex items-center gap-1 text-center text-[0.7rem] text-ink-soft">
+        <span className="flex items-center gap-1 text-center font-semibold">
+          {type && (
             <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: NODE_TYPE_COLORS[type] }} />
-            {t.ui.types[type]}
-          </span>
-        )}
+          )}
+          {type ? t.ui.types[type] : p.names[kind]}
+        </span>
       </button>
     );
   };
