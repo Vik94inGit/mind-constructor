@@ -81,8 +81,8 @@ export async function createNode(
   return node;
 }
 
-/** What a node update may send: its own fields, plus a picture dot's fill colour (Node.picture.color). */
-export type NodeUpdate = Partial<NodeDoc> & { pictureColor?: ZonePaletteColor | null };
+/** What a node update may send: its own fields, plus a picture dot's fill colour and drawing size (Node.picture.color, .size). */
+export type NodeUpdate = Partial<NodeDoc> & { pictureColor?: ZonePaletteColor | null; pictureSize?: number };
 
 // Which feature a node change is, by the fields it sends (moves aren't: see moveNodes).
 const NODE_FIELD_FEATURES: Record<string, Feature> = {
@@ -115,13 +115,21 @@ export async function updateNode(nodeId: string, updates: NodeUpdate): Promise<N
       // A drag sends a move per drop; offline, one request with the last position is enough.
       merge: true,
       optimistic: () => {
-        const { pictureColor, ...fields } = updates;
+        const { pictureColor, pictureSize, ...fields } = updates;
         const known = offline.knownNode<NodeDoc>(nodeId) ?? ({ nodeId } as NodeDoc);
         return {
           ...known,
           ...fields,
           ...(typeof updates.text === "string" ? { ghost: false } : {}),
-          ...(pictureColor !== undefined && known.picture ? { picture: { ...known.picture, color: pictureColor } } : {}),
+          ...(known.picture && (pictureColor !== undefined || pictureSize !== undefined)
+            ? {
+                picture: {
+                  ...known.picture,
+                  ...(pictureColor !== undefined ? { color: pictureColor } : {}),
+                  ...(pictureSize !== undefined ? { size: pictureSize } : {}),
+                },
+              }
+            : {}),
           updatedAt: new Date().toISOString(),
         };
       },

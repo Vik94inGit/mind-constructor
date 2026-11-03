@@ -59,8 +59,8 @@ export interface UiStrings {
     forTypesHint: string;
     forFun: string;
     names: Record<PictureKind, string>;
-    /** The question every dot of the picture asks, as its ghost's prompt. */
-    questions: Record<PictureKind, string>;
+    /** The questions a picture's dots ask, as their ghosts' prompts, one after another round the dots (the first is also the picker's hint). */
+    questions: Record<PictureKind, string[]>;
     /** Under a picture on the canvas: how much of it is drawn. */
     progress: (name: string, percent: number) => string;
     done: (name: string) => string;
@@ -727,20 +727,20 @@ const en: UiStrings = {
     forFun: "Just for fun",
     names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
     questions: {
-      bulb: "What idea lights up?",
-      stop: "What is stopping you?",
-      warning: "What could go wrong here?",
-      key: "What could unlock it?",
-      fork: "Which way could you go?",
-      flag: "What have you already managed?",
-      cloud: "What didn't work out?",
-      question: "What are you not sure about yet?",
-      heart: "What do you love?",
-      star: "What do you want to reach?",
-      house: "What makes you feel at home?",
-      tree: "What helps you grow?",
-      fish: "Where would you like to go?",
-      smile: "What made you smile lately?",
+      bulb: ["What idea lights up?", "What could you try that you haven't yet?", "What would make it easier?", "What would you do if you couldn't fail?"],
+      stop: ["What is stopping you?", "What keeps coming back?", "What worries you most about it?", "What is it costing you?"],
+      warning: ["What could go wrong here?", "What is the catch?", "What would you have to give up?", "What makes you hesitate?"],
+      key: ["What could unlock it?", "What has worked before?", "Who could help you with it?", "What is the smallest step that would help?"],
+      fork: ["Which way could you go?", "What else could you choose?", "What if you did the opposite?", "What would someone you admire choose?"],
+      flag: ["What have you already managed?", "What are you proud of?", "What went better than you expected?", "What did you learn on the way?"],
+      cloud: ["What didn't work out?", "What would you do differently?", "What did it teach you?", "What still hurts about it?"],
+      question: ["What are you not sure about yet?", "What do you still need to find out?", "What are you guessing?", "Who could you ask?"],
+      heart: ["What do you love?", "Who do you love?", "What warms you up?", "What would you never give up?"],
+      star: ["What do you want to reach?", "What would make you proud?", "What do you dream about?", "Where do you want to be in a year?"],
+      house: ["What makes you feel at home?", "Who makes you feel safe?", "Where do you rest best?", "What would you keep forever?"],
+      tree: ["What helps you grow?", "What are your roots?", "What gives you strength?", "What would you like to learn?"],
+      fish: ["Where would you like to go?", "What would you like to explore?", "What carries you along?", "What would you like to leave behind?"],
+      smile: ["What made you smile lately?", "Who makes you laugh?", "What are you grateful for?", "What small thing made your day?"],
     },
     progress: (name, percent) => `${name} · ${percent}% drawn`,
     done: (name) => `${name} · done!`,
