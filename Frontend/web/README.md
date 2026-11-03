@@ -49,7 +49,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   from it and the links inside that branch) is made there on a free spot and taken off the Inbox.
   The same **Move to a map** sits in a note's Info tab when the Inbox map is open
   (`src/dashboard/InboxTray.tsx`, `src/dashboard/MoveNoteModal.tsx`, `src/utils/inbox.ts`).
-- **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
+- **Map canvas** (`/maps/:mapId`) — the core of the app. The canvas is 3600x2400 (`CANVAS_W`/`CANVAS_H`
+  in `utils/canvasLayout.ts`), and drawn pictures are laid out as tight as their cards allow so they leave room around them. Drag your own nodes, branch off a node
   with the quick-add ghosts or the toolbar, link nodes explicitly, draw separator lines, attack
   other members' nodes with the three combat weapons, shield your own, pack nodes into a
   container, group nodes into a chosen circle, choose a node (and optionally its whole branch) to
@@ -124,7 +125,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   pick one. The first group has a picture for each node type, and its dots arrive as thoughts of
   that type: a bulb (Idea), a stop sign (Problem), a warning triangle (Problematic option), a key
   (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail) and a question mark
-  (unknown). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
+  (unknown), and each is named after its type (the bulb is called "Idea", the stop sign "Problem"), in
+  the picker and in its caption. The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
   Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking the picture's
   question ("What is stopping you?", "What do you love?"). Write in two
   neighbouring dots and the line between them is inked in the picture's colour; until then it is a faint

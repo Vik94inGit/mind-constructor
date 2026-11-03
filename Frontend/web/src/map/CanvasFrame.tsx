@@ -20,7 +20,7 @@ interface Props {
   onPointerDown: (e: PointerEvent<HTMLDivElement>) => void;
   onPointerMove?: (e: PointerEvent<HTMLDivElement>) => void;
   onContextMenu: (e: MouseEvent<HTMLDivElement>) => void;
-  /** Everything drawn on the canvas, in its own 2400x1600 coordinates. */
+  /** Everything drawn on the canvas, in its own 3600x2400 coordinates. */
   children: ReactNode;
 }
 
@@ -134,9 +134,9 @@ export function CanvasFrame({
         // same way for the same reason (see its own select-none).
         // The map's own background (Map.background — utils/mapBackground.ts).
         className={`absolute select-none ${background.className}${crosshair ? " cursor-crosshair" : ""}`}
-        // width/height stay the canvas's own native 2400x1600 — every
+        // width/height stay the canvas's own native 3600x2400 — every
         // node/ghost/SVG position below is still expressed in that
-        // native 0..2400 coordinate space, unaffected by this div now
+        // native 0..3600 coordinate space, unaffected by this div now
         // sitting inset within a bigger padded parent rather than
         // filling it — only the *outer* wrapper's own size/transform
         // above changed. left/top inset by the same margin
@@ -150,7 +150,7 @@ export function CanvasFrame({
           width: CANVAS_W,
           height: CANVAS_H,
           // The active space's border — drawn outside the box (outline,
-          // not border) so it never eats into the 2400x1600 coordinate
+          // not border) so it never eats into the 3600x2400 coordinate
           // space every node position is expressed in.
           outline: "3px solid color-mix(in srgb, var(--ink) 55%, transparent)",
         }}

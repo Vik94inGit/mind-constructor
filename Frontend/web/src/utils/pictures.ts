@@ -266,13 +266,13 @@ export function pictureForType(type: NodeType): PictureKind {
 }
 
 // Two dots must sit at least this far apart on one axis or the other, so the
-// node cards drawn on them (NODE_FOOTPRINT, 148 x 90, plus air for a zoomed-out view)
-// never overlap.
-const DOT_GAP = { x: 196, y: 128 };
+// node cards drawn on them (NODE_FOOTPRINT, 148 x 90, plus a little air)
+// never overlap. Kept tight so a picture stays small on the map.
+const DOT_GAP = { x: 170, y: 110 };
 
 // A picture is drawn at least this wide (or tall, whichever is longer), so a
 // squat one still reads as a picture rather than a cluster of cards.
-const MIN_SPAN = 600;
+const MIN_SPAN = 400;
 
 /**
  * Canvas units per picture unit: the smallest scale at which no two dots'
