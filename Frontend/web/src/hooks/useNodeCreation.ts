@@ -283,8 +283,9 @@ export function useNodeCreation({
   }
 
   // "Draw a picture" (utils/pictures.ts): the picture's dots as ghosts, one
-  // node per dot, centered as near `desired` as the map has room for. Each
-  // ghost asks the picture's question, numbered like a connect-the-dots page,
+  // node per dot, centered as near `desired` as the map has room for. The
+  // ghosts take turns asking the picture's questions (a bulb's are all about
+  // ideas, a stop sign's about what stops you), numbered like a connect-the-dots page,
   // and is the node type the picture stands for (a bulb's dots are Ideas, a
   // stop sign's Problems; a picture for fun is Ideas); none hangs from
   // another, so a picture never makes a zone.
@@ -294,7 +295,7 @@ export function useNodeCreation({
     const dots = layoutPicture(kind, desired, [...nodeObstacles(obstaclePoints()), ...bigNodeObstacles()]);
     track({ name: "picture_drawn" });
     const id = newPictureId();
-    const question = t.ui.pictures.questions[kind];
+    const questions = t.ui.pictures.questions[kind];
     const type = pictureNodeType(kind);
     setSelectedId(null);
     setMultiSelectIds(new Set());
@@ -304,7 +305,7 @@ export function useNodeCreation({
       for (let dot = 0; dot < dots.length; dot++) {
         const node = await nodesApi.createNode(mapId, {
           text: "",
-          prompt: `${dot + 1}. ${question}`,
+          prompt: `${dot + 1}. ${questions[dot % questions.length]}`,
           type,
           x: dots[dot].x,
           y: dots[dot].y,
