@@ -987,8 +987,8 @@ export function MapPage() {
   // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
   // open node to the one before or after it, or, with none open, from the
   // first (→) or last (←) node. With a zone chosen, the arrows stay inside it
-  // and go by when each thought was written, oldest first (creationOrder), so
-  // stepping replays how that thinking grew. The panel's arrows and the
+  // and go by when each thought was written, newest first (creationOrder
+  // reversed), so → walks back into how that thinking grew. The panel's arrows and the
   // keyboard's ← / → both land here; only the text field's own arrows move
   // focus into the next node's text.
   function stepReading(dir: -1 | 1, focusText = true) {
@@ -1001,7 +1001,7 @@ export function MapPage() {
     let order: NodeDoc[];
     if (zoneIds?.length) {
       const inZone = collectDescendants(new Set(zoneIds), visibleNodes);
-      order = creationOrder(visibleNodes.filter((n) => inZone.has(n.nodeId)));
+      order = creationOrder(visibleNodes.filter((n) => inZone.has(n.nodeId))).reverse();
     } else {
       order = readingOrder(visibleNodes);
     }

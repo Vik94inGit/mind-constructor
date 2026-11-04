@@ -49,7 +49,7 @@ node) must be told apart by something the user can see before they let go.
 | Picture caption | Tap | Click | Opens the picture's bar: − / + resize the whole picture, Move picks every dot for a group drag ([sketch](picture-resize.md)) |
 | Canvas | Pinch | Ctrl+wheel, − / + | Zoom |
 | Panel | Its arrows | Arrow keys | Step node to node |
-| Panel, zone chosen | Its arrows | Arrow keys | Step through the zone oldest thought first ([sketch](zone-creation-order.md)) |
+| Panel, zone chosen | Its arrows | Arrow keys | Step through the zone newest thought first, back into the past ([sketch](zone-creation-order.md)) |
 | Canvas, first open | Tap | Click or wheel | Skip the entrance |
 
 Sources: [Frontend/web/README.md](../../Frontend/web/README.md), `hooks/useNodeDragAndDrop.ts`,
