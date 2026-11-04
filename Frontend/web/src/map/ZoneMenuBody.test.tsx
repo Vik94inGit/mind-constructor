@@ -28,6 +28,20 @@ describe("ZoneMenuBody", () => {
     expect(onPicked).toHaveBeenCalledTimes(1);
   });
 
+  it("starts a presentation of the zone from its menu, then reports the pick", () => {
+    const onPresent = vi.fn();
+    const onPicked = vi.fn();
+    renderBody({ view: { value: null, onPick: vi.fn() }, onPresent, onPicked });
+    fireEvent.click(screen.getByRole("menuitem", { name: new RegExp(t.ui.presentation.presentZone) }));
+    expect(onPresent).toHaveBeenCalledTimes(1);
+    expect(onPicked).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no presentation when none is wired", () => {
+    renderBody({ view: { value: null, onPick: vi.fn() } });
+    expect(screen.queryByRole("menuitem", { name: new RegExp(t.ui.presentation.presentZone) })).not.toBeInTheDocument();
+  });
+
   it("shows no look section to someone who doesn't own the parent", () => {
     renderBody({ view: { value: null, onPick: vi.fn() } });
     expect(screen.queryByRole("slider", { name: t.ui.zoneStyle.edge })).not.toBeInTheDocument();

@@ -5,6 +5,11 @@ import { TRANSLATIONS } from "../i18n/translations";
 import { PresentationOverlay } from "./PresentationOverlay";
 import { computeSlideGroups } from "../utils/presentation";
 import { makeNode } from "../test/fixtures";
+import * as nodesApi from "../api/nodes";
+
+vi.mock("../api/nodes", () => ({
+  getNode: vi.fn(async (nodeId: string) => ({ nodeId, images: nodeId === "trip" ? ["/api/images/a", "/api/images/b"] : [] })),
+}));
 
 const en = TRANSLATIONS.en;
 
@@ -12,7 +17,7 @@ function setup(index = 0) {
   const groups = computeSlideGroups([
     makeNode({ nodeId: "trip", text: "Weekend trip", type: "Problem", createdAt: "2026-01-01T00:00:00Z" }),
     makeNode({ nodeId: "hotel", text: "Book a hotel", type: "Option", parentId: "trip", x: 100, createdAt: "2026-01-02T00:00:00Z" }),
-    makeNode({ nodeId: "train", text: "Buy train tickets", type: "Option", parentId: "trip", x: 300, createdAt: "2026-01-03T00:00:00Z" }),
+    makeNode({ nodeId: "train", text: "Buy train tickets", type: "Option", parentId: "trip", x: 300, createdAt: "2026-01-03T00:00:00Z", cardImage: "/api/images/card" }),
     makeNode({ nodeId: "cheap", text: "Find a cheap one", type: "Idea", parentId: "hotel", createdAt: "2026-01-04T00:00:00Z" }),
   ]);
   const onOpenNode = vi.fn();
@@ -66,5 +71,24 @@ describe("PresentationOverlay", () => {
     const { onIndexChange } = setup(1);
     fireEvent.click(screen.getByText(new RegExp(en.ui.presentation.under("Weekend trip"))));
     expect(onIndexChange).toHaveBeenLastCalledWith(0);
+  });
+
+  it("shows the slide node's pictures, fetched with the node, and opens one full size", async () => {
+    setup();
+    const pictures = await screen.findAllByRole("button", { name: en.ui.images.open });
+    expect(pictures).toHaveLength(2);
+    expect(nodesApi.getNode).toHaveBeenCalledWith("trip");
+    expect(pictures[0].querySelector("img")?.getAttribute("src")).toMatch(/\/api\/images\/a$/);
+    fireEvent.click(pictures[1]);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector("img")?.getAttribute("src")).toMatch(/\/api\/images\/b$/);
+    fireEvent.click(within(dialog).getByRole("button", { name: en.ui.images.close }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows a child's picture card on its card", () => {
+    setup();
+    const train = screen.getAllByRole("listitem")[1];
+    expect(train.querySelector("img")?.getAttribute("src")).toMatch(/\/api\/images\/card$/);
   });
 });

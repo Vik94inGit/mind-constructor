@@ -31,6 +31,7 @@ import { imageSrc } from "../utils/images";
 import { chompMouth } from "../utils/pacman";
 import type { ChompMove } from "../utils/pacman";
 import type { ReadingMode } from "../utils/readingMode";
+import { isEditableTarget } from "../utils/editable";
 
 
 // Reading modes (see utils/readingMode.ts). A puzzle card is as wide
@@ -371,8 +372,11 @@ export const NodeCard = memo(function NodeCard({
     // Same stopPropagation reasoning as clicks: without it this also
     // reaches .map-canvas's own onContextMenu, which closes everything —
     // right-clicking a node should open its menu, not dismiss it.
-    e.preventDefault();
     e.stopPropagation();
+    // A long press in the caption's own text field is the tablet's
+    // Paste/Select bubble: left to the browser.
+    if (isEditableTarget(e.target)) return;
+    e.preventDefault();
     // A finger held on a node is already the long press (multi-select, or a
     // puzzle card's menu, see useNodeDragAndDrop); the phone's own
     // contextmenu for the same hold would select the node over it.
@@ -712,7 +716,7 @@ export const NodeCard = memo(function NodeCard({
           maxLength={MAX_NODE_TEXT}
           // Same width as the node; a long text makes it taller (up to
           // max-h, then it scrolls), never wider.
-          className="pointer-events-auto absolute top-full left-0 mt-[0.6rem] block max-h-[200px] w-full resize-none overflow-y-auto rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+          className="pointer-events-auto absolute top-full left-0 mt-[0.6rem] block select-text [-webkit-touch-callout:default] max-h-[200px] w-full resize-none overflow-y-auto rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.68rem] leading-[1.3] font-medium font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
           autoFocus
           value={draftText}
           placeholder={node.prompt || undefined}

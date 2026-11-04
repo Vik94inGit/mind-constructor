@@ -90,6 +90,8 @@ interface Props {
   canUndo?: boolean;
   /** Computer mode (see hooks/useDesktopLayout): a panel docked down the left edge instead of a floating top-left cluster. */
   vertical?: boolean;
+  /** How far the visible part of the page has slid (hooks/useVisualViewportOffset): the floating cluster moves with it, so a tablet's keyboard doesn't carry it off screen. */
+  viewportOffset?: { top: number; left: number };
 }
 
 const iconBtn =
@@ -154,6 +156,7 @@ export function MapToolbar({
   onTimeLapse,
   canUndo = false,
   vertical = false,
+  viewportOffset,
 }: Props) {
   const { t } = useI18n();
   // Each dropdown's own open/closed state.
@@ -206,6 +209,11 @@ export function MapToolbar({
           : // Wraps onto a second row rather than running off a phone's edge
             // (discussion mode adds the opponent, history and finish buttons).
             `absolute top-3 left-3 ${layer} flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-card border border-line bg-surface p-1 shadow-card`
+      }
+      style={
+        !vertical && viewportOffset && (viewportOffset.top || viewportOffset.left)
+          ? { transform: `translate(${viewportOffset.left}px, ${viewportOffset.top}px)` }
+          : undefined
       }
       role={vertical ? "navigation" : undefined}
     >

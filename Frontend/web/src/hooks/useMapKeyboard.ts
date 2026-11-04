@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { imageFilesFrom } from "../utils/images";
+import { isEditableTarget } from "../utils/editable";
 
 interface Params {
   presenting: boolean;
@@ -54,10 +55,6 @@ export function useMapKeyboard({
   // fires for the "nothing text-editable is focused" case, i.e. the
   // canvas/selection itself has the user's attention.
   useEffect(() => {
-    function isEditableTarget(el: EventTarget | null): boolean {
-      if (!(el instanceof HTMLElement)) return false;
-      return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable;
-    }
     function onKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
       // Presentation mode takes the keyboard over outright while active —
