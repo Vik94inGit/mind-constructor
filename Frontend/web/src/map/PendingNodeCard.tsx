@@ -149,7 +149,7 @@ export function PendingNodeCard({ x, y, type, initialText = "", emoji, iconOnly 
         rows={1}
         maxLength={MAX_NODE_TEXT}
         // Grows taller, never wider — past max-h it scrolls in place.
-        className="mt-[0.35rem] block max-h-[200px] w-full resize-none overflow-y-auto rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
+        className="mt-[0.35rem] block max-h-[200px] select-text [-webkit-touch-callout:default] w-full resize-none overflow-y-auto rounded-[4px] border-[1.5px] border-accent bg-surface px-[0.25rem] py-[0.1rem] text-center text-[0.58rem] leading-[1.25] font-[inherit] text-ink focus:outline-none focus:shadow-[0_0_0_2px_color-mix(in_srgb,var(--accent)_30%,transparent)]"
         autoFocus
         onFocus={(e) => e.currentTarget.select()}
         value={text}

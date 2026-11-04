@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as nodesApi from "../../api/nodes";
 import type { NodeDoc } from "../../types";
 import { MAX_NODE_IMAGES, imageFilesFrom, makeCardImage, makeIconImage, shrinkImage } from "../../utils/images";
+import { clipboardHasText, isEditableTarget } from "../../utils/editable";
 import type { Translation } from "../../i18n/translations";
 
 interface Options {
@@ -105,8 +106,7 @@ export function useNodeImages({ node, canEdit, t, run, setError, onUpdated, onPa
     if (!canEdit) return;
     function onDocumentPaste(e: ClipboardEvent) {
       if (e.defaultPrevented) return;
-      const target = e.target instanceof HTMLElement ? e.target : null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (isEditableTarget(e.target)) return;
       const files = imageFilesFrom(e.clipboardData);
       if (files.length === 0) return;
       e.preventDefault();
@@ -121,6 +121,9 @@ export function useNodeImages({ node, canEdit, t, run, setError, onUpdated, onPa
   // pasting plain text is left alone.
   function onPanelPaste(e: React.ClipboardEvent) {
     if (!canEdit) return;
+    // Into the text field, words come first: text copied from a web page or
+    // an office app often carries a picture of itself too.
+    if (isEditableTarget(e.target) && clipboardHasText(e.clipboardData)) return;
     const files = imageFilesFrom(e.clipboardData);
     if (files.length === 0) return;
     e.preventDefault();

@@ -95,13 +95,22 @@ export function usePresentation({
   // "nodes or zones" choice the canvas' own selection tools already offer,
   // reused here rather than inventing a separate picker.
   function enterPresentation() {
-    feature("presentation");
     const scopeIds =
       multiSelectIds.size > 0
         ? multiSelectIds
         : selectedCircleNodeIds?.length
           ? collectDescendants(new Set(selectedCircleNodeIds), visibleNodes)
           : null;
+    startPresentation(scopeIds);
+  }
+  // A zone's own menu ("Present this zone"): only that zone, from its parent
+  // down through every node below it, castles inside it included, whatever
+  // else happens to be selected.
+  function presentZone(rootId: string) {
+    startPresentation(collectDescendants(new Set([rootId]), visibleNodes));
+  }
+  function startPresentation(scopeIds: Set<string> | null) {
+    feature("presentation");
     const eligible = visibleNodes.filter(
       (n) =>
         !n.isWeapon &&
@@ -140,6 +149,7 @@ export function usePresentation({
     slideNodes,
     slideGroups,
     enterPresentation,
+    presentZone,
     exitPresentation,
   };
 }
