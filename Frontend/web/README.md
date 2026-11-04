@@ -42,9 +42,16 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   lives in your own view of the map (`/api/state/maps/:mapId`, `feelings` and `checkIn`). See
   `src/utils/feeling.ts`, `src/components/FeelingPicker.tsx`, `src/components/CheckInForm.tsx`,
   `src/map/CheckInPrompt.tsx` and `src/dashboard/CheckInModal.tsx`.
-- **Dashboard** (`/`) — maps you own or were invited to; create/rename/delete, invite members, see
+- **Dashboard** (`/`) — on a phone or tablet it opens on the **main menu**, drawn like a thought on the map: a node
+  (*What's on your mind?*, which opens Think it through) with a ring of ghosts round it, one per
+  thing to do: **Last stop** (the map you were last on), **Quick note**, **Unsorted notes** (only
+  while the Inbox has some), **New map**, **New folder** and **Text → map**. A ghost that opens a box
+  (quick note, unsorted notes, the centre's question) shows it under the ring; tapping it again
+  closes it (`src/dashboard/MenuNode.tsx`, `src/dashboard/menuRing.ts`). A computer (wide screen and a mouse, `hooks/useDesktopLayout.ts`) keeps the earlier
+  layout: the buttons top right, and last stop, quick note, unsorted notes and the question stacked on the left. After it: the filters,
+  search, folders and maps you own or were invited to; create/rename/delete, invite members, see
   who's on a map and who owns it, copy a whole map's nodes to paste into another one. A quick note
-  goes to the **Inbox** map; under the box the dashboard counts the Inbox's unsorted notes, and
+  goes to the **Inbox** map; the *Unsorted notes* ghost counts the Inbox's unsorted notes, and
   **Sort** lists them, each with **Move to a map**: pick a map and the note (with anything hanging
   from it and the links inside that branch) is made there on a free spot and taken off the Inbox.
   The same **Move to a map** sits in a note's Info tab when the Inbox map is open
@@ -172,11 +179,18 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   holding it still) turns its cards over one after another, parent first, then the children by
   their order (`hooks/useFlipSequence.ts`). Both choices follow the user to every device
   (`utils/emojiFace.ts`, `/api/state`).
+- **Changing a type** — there is no row of types in the node panel. Tapping a ghost of another type
+  round your own node offers **↻ Make this a …** (the node itself takes that type) and **＋ New …**
+  (a new node of it), above that type's starter phrases; tapping the ghost again still adds a new one.
+  A weapon or protection node only offers the types an attack may carry. The node's right-click menu
+  keeps *Change type* ([sketch](../../docs/gestures/ghost-change-type.md)).
+- **No legend** — the canvas has no strip of types along the bottom: the ring of ghosts names every
+  type where the user meets it.
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
 - **Node panel under the node** — the node panel (and the pack picker and new-node panel) is a bottom
-  sheet, half the screen, with the node's text first and a type picker in its header; the chosen node
+  sheet, half the screen, with the node's text first and its type's symbol in its header; the chosen node
   is centered in the half above it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
   node (any way) opens `map/NewNodePanel.tsx` with its text field focused — with the feelings offered
   as a ring around the new node, optional — and editing opens the node's panel on its text.

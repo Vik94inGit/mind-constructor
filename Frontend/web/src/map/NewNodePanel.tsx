@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { isMobileViewport } from "../utils/canvasLayout";
 import { MAX_NODE_IMAGES, imageFilesFrom, shrinkImage } from "../utils/images";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
-import { TypePicker } from "./TypePicker";
+import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ImagesSection } from "./nodePanel/ImagesSection";
 
 interface Props {
@@ -13,7 +12,6 @@ interface Props {
   emoji?: string;
   /** A starter phrase picked on the quick-add ring: the field's placeholder, and the node's prompt. */
   prompt?: string;
-  onTypeChange: (type: NodeType) => void;
   onClearEmoji: () => void;
   /** Resolves once the node is made (or making it failed — the caller shows that). */
   /** Empty `text` with a `prompt` makes a ghost (see NodeDoc.ghost). */
@@ -22,15 +20,16 @@ interface Props {
 }
 
 // Where a new node is written before it exists: the same bottom sheet NodePanel
-// uses, opened with its text field focused. Type, emoji and pictures can be
-// set here too; nothing is sent until Create (or Enter). The emoji is
+// uses, opened with its text field focused. Emoji and pictures can be
+// set here too (the type itself was picked on the ring of ghosts); nothing is
+// sent until Create (or Enter). The emoji is
 // optional — writing straight away makes the node without one.
 //
 // "Ghost" turns what's written into the node's prompt instead of its text:
 // the node lands faded with that question as its placeholder, to be filled in
 // later. A picked starter phrase is a prompt from the start, so Create with
 // nothing written makes a ghost of it too.
-export function NewNodePanel({ type, emoji, prompt = "", onTypeChange, onClearEmoji, onCreate, onCancel }: Props) {
+export function NewNodePanel({ type, emoji, prompt = "", onClearEmoji, onCreate, onCancel }: Props) {
   const { t } = useI18n();
   const [text, setText] = useState("");
   const [asGhost, setAsGhost] = useState(false);
@@ -96,7 +95,9 @@ export function NewNodePanel({ type, emoji, prompt = "", onTypeChange, onClearEm
     >
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-[0.8rem] font-semibold text-ink">{t.ui.newNode.title}</span>
-        <TypePicker value={type} types={NODE_TYPES} onChange={onTypeChange} disabled={busy} />
+        <span className="flex items-center" title={t.ui.types[type]} aria-label={t.ui.types[type]}>
+          <NodeTypeSymbol type={type} size={17} />
+        </span>
         {emoji && (
           <span className="inline-flex items-center gap-[0.2rem] rounded-full border border-line bg-surface-2 py-[0.05rem] pr-[0.15rem] pl-[0.4rem]">
             <span aria-hidden className="text-[1.05rem] leading-none">

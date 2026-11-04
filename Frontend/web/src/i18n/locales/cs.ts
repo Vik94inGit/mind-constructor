@@ -493,6 +493,8 @@ const ui: UiStrings = {
       "unknown": ["Otevřená otázka:", "Potřebujeme víc info o…", "Nápad:"],
     },
     ghostTemplatesTitle: "Začít touto frází",
+    ghostChangeTo: (type) => `Změnit na: ${type}`,
+    ghostNewOne: (type) => `Nový: ${type}`,
   },
   attack: {
     intro: "Útok vytvoří skutečný uzel s vaší námitkou, propojený s tímto uzlem šípem zbraně.",
@@ -990,6 +992,16 @@ const translation: Translation = {
       owner: "Vlastník",
     },
     menu: { summary: "Přehled", edit: "Upravit", invite: "Pozvat", delete: "Smazat", moveToFolder: "Přesunout do složky…" },
+    ring: {
+      label: "Hlavní nabídka",
+      center: "Co máte na mysli?",
+      lastStop: "Kde jste skončili",
+      quickNote: "Rychlá poznámka",
+      unsorted: (count) => `Neroztříděné (${count})`,
+      newMap: "Nová mapa",
+      newFolder: "Nová složka",
+      split: "Text → mapa",
+    },
     quickNote: { title: "Rychlá poznámka", placeholder: "Zapište myšlenku — uloží se do mapy Doručené…", save: "Uložit", saved: "Uloženo.", open: (name) => `Otevřít ${name} →`, error: "Poznámku se nepodařilo uložit", inboxName: "Doručené" },
     library: {
       newFolder: "+ Nová složka",
@@ -1102,7 +1114,6 @@ const translation: Translation = {
       history: "Historie",
       packed: (count) => `Sbaleno (${count})`,
     },
-    legend: { positiveCircle: "pozitivní kruh", negativeCircle: "negativní kruh / pod útokem" },
   },
   split: {
     entry: "✂ Text → mapa",
