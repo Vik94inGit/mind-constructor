@@ -370,4 +370,29 @@ describe("NodeCard", () => {
     expect(text.className).toContain("line-clamp-3");
     expect(text.style.maxHeight).toBe("");
   });
+
+  describe("pack pill", () => {
+    it("shows a − pill on an open parent that packs it, without opening the node", () => {
+      const onFold = vi.fn();
+      const { onClick } = renderNode({ node: makeNode({ nodeId: "p" }), onFold, selected: true });
+      const pill = screen.getByTestId("auto-pack-fold");
+      expect(pill.className).not.toContain("invisible");
+      fireEvent.click(pill);
+      expect(onFold).toHaveBeenCalledTimes(1);
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it("keeps the − pill for a hover until the parent is selected", () => {
+      renderNode({ node: makeNode({ nodeId: "p" }), onFold: vi.fn() });
+      expect(screen.getByTestId("auto-pack-fold").className).toContain("group-hover:visible");
+    });
+
+    it("shows +N instead once the parent is packed", () => {
+      const onUnfold = vi.fn();
+      renderNode({ node: makeNode({ nodeId: "p" }), onFold: vi.fn(), onUnfold, foldedCount: 3 });
+      expect(screen.queryByTestId("auto-pack-fold")).toBeNull();
+      fireEvent.click(screen.getByTestId("auto-pack-count"));
+      expect(onUnfold).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -73,4 +73,24 @@ describe("ViewCorner", () => {
     await userEvent.click(screen.getByRole("button", { name: s.menu }));
     expect(screen.queryByRole("button", { name: /Lay the cards close/ })).not.toBeInTheDocument();
   });
+
+  it("packs every branch, or unpacks them all once some are packed", async () => {
+    const onPackAll = vi.fn();
+    renderCorner({ onPackAll });
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    await userEvent.click(screen.getByRole("button", { name: new RegExp(a.packAll) }));
+    expect(onPackAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the button Unpack all while something is packed, and hides it in the cards view", async () => {
+    renderCorner({ onPackAll: vi.fn(), somePacked: true });
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    expect(screen.getByRole("button", { name: new RegExp(a.unpackAll) })).toBeInTheDocument();
+  });
+
+  it("has no pack-all button in the cards view", async () => {
+    renderCorner({ onPackAll: vi.fn(), view: "cards" });
+    await userEvent.click(screen.getByRole("button", { name: s.menu }));
+    expect(screen.queryByRole("button", { name: new RegExp(a.packAll) })).not.toBeInTheDocument();
+  });
 });

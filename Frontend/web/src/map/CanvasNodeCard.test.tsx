@@ -33,6 +33,7 @@ function actions(): CanvasNodeActions {
     hoverText: vi.fn(),
     iconHover: vi.fn(),
     unfold: vi.fn(),
+    fold: vi.fn(),
   };
 }
 

@@ -15,7 +15,8 @@ already shows a **+N** pill on its right that opens it again. The new part is th
 canvas:
 
 - **Touch (phone, tablet):** tap a parent node to select it, as now. A small **−** pill appears in
-  the same spot as the +N pill (the node's right middle). Tap it: the children fold into the parent,
+  the same spot as the +N pill: the right middle of a round icon, or just above a card (a card's
+  right side has its link tab, and on a phone the ring's ghost sits there once it's selected). Tap it: the children fold into the parent,
   and the pill becomes **+N**. Tap **+N** to open them again.
 - **Mouse:** the same, and the **−** pill also shows while the pointer is over a parent, so it's one
   click without selecting first.
@@ -46,8 +47,13 @@ before (parent selected)          after tapping −
 
 | Person | Tried first | Stuck on | Changed |
 |---|---|---|---|
-| Viktor | | | |
+| Viktor | Read the sketch; asked for a Pack all / Unpack all for the whole map too | — | Added *Pack all* / *Unpack all* to the eye menu |
+| me, on a phone (iPhone-sized browser) | Tapped the parent, looked for − at its right | On a card the ghost ring's right ghost covered the pill | Above a card instead of on its right |
 
 ## Decision
 
-To be filled once the test is done.
+Every open parent gets a − pill (selected on touch; selected or hovered with a mouse) that packs its
+branch in, and a packed parent keeps the +N pill that opens it. Both sit on a round icon's right
+middle and above a card. The eye menu gets *Pack all* (every parent packed, so only the tops are left
+and each +N opens one level) and *Unpack all* (shown once anything is packed). All of it stays a
+per-browser, per-map way of looking (`utils/autoPack.ts`); a map still opens unpacked.
