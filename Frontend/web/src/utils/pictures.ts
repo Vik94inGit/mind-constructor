@@ -266,11 +266,12 @@ export function pictureForType(type: NodeType): PictureKind {
 }
 
 // Two dots must sit at least this far apart on one axis or the other, so the
-// node cards drawn on them (NODE_FOOTPRINT, 148 x 90) never overlap, with a
-// little air between them. Any more and a picture of ghosts grows far past
+// node cards drawn on them (NODE_FOOTPRINT, 148 x 90) never overlap. Two
+// dots side by side keep about 24 between their captions, so the questions
+// under them read as two (the top of a stop sign). Any more and a picture of ghosts grows far past
 // the screen; the dots of each picture above are spread evenly so that no one
 // close pair blows the whole picture up.
-const DOT_GAP = { x: 156, y: 96 };
+const DOT_GAP = { x: 172, y: 96 };
 
 // A picture is drawn at least this wide (or tall, whichever is longer), so a
 // squat one still reads as a picture rather than a cluster of cards.
