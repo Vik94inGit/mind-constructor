@@ -296,6 +296,19 @@ describe("NodeCard", () => {
     });
   });
 
+  describe("long press in the inline text field", () => {
+    it("leaves it to the browser, so a tablet still offers Paste", () => {
+      const onContextMenu = vi.fn();
+      const node = makeNode({ nodeId: "a", text: "some text" });
+      renderNode({ node, inlineEditing: true, onContextMenu });
+
+      const notPrevented = fireEvent.contextMenu(screen.getByRole("textbox"));
+
+      expect(notPrevented).toBe(true);
+      expect(onContextMenu).not.toHaveBeenCalled();
+    });
+  });
+
   describe("health ring visibility", () => {
     it("hints to select the node when health isn't showing (unselected)", () => {
       const node = makeNode({ nodeId: "a", text: "x" });

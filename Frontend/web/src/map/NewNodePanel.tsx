@@ -4,6 +4,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { isMobileViewport } from "../utils/canvasLayout";
 import { MAX_NODE_IMAGES, imageFilesFrom, shrinkImage } from "../utils/images";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
+import { clipboardHasText, isEditableTarget } from "../utils/editable";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ImagesSection } from "./nodePanel/ImagesSection";
 
@@ -78,6 +79,9 @@ export function NewNodePanel({ type, emoji, prompt = "", onClearEmoji, onCreate,
       className="fixed inset-x-0 bottom-0 z-[46] flex h-[50dvh] w-full flex-col overflow-y-auto rounded-t-2xl border-t border-line bg-surface px-5 pt-3 pb-4 shadow-[var(--shadow-card)]"
       data-testid="new-node-panel"
       onPaste={(e) => {
+        // Words pasted into the text field stay words, even when the copy
+        // carries a picture of itself too (see useNodeImages).
+        if (isEditableTarget(e.target) && clipboardHasText(e.clipboardData)) return;
         const files = imageFilesFrom(e.clipboardData);
         if (files.length === 0) return;
         e.preventDefault();

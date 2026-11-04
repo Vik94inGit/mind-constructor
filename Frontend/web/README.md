@@ -277,6 +277,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
   floating top-left cluster.
+- **Phones and tablets with the keyboard up** — the floating toolbar follows the part of the page
+  still on screen, so the keyboard sliding the page up doesn't carry it off the top, and the page is put
+  back at the top once nothing is being typed in, which iPad browsers otherwise forget after the node panel closes (`hooks/useVisualViewportOffset.ts`). A long press in a text field on the
+  canvas is left to the browser, so its own Paste bubble shows; words pasted into a node's text stay
+  words even when the copy carries a picture of itself too (`utils/editable.ts`).
 - **Live updates** — everyone with a map open sees each other's nodes, attacks, shields and deletions as
   they happen (`hooks/useMapSocket.ts`). If the live connection is down or the server never confirms the
   map's room, the map is fetched again every 10 seconds and the join retried; a tab that is shown again
