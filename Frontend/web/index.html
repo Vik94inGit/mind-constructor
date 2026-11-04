@@ -1,7 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <!-- The app translates itself (src/i18n, four languages). Chrome's own
+         page translation rewrote its text behind React's back: a Russian
+         page came out as nonsense ("ставка карта", "Восьми") and on a map
+         node captions vanished or stayed half translated, because React kept
+         updating text nodes the translator had already swapped out. -->
+    <meta name="google" content="notranslate" />
+    <script>
+      // The language this browser last picked, on <html lang> before the
+      // first paint (I18nProvider keeps it in step after), so the page
+      // never announces itself as English while showing Czech or Russian.
+      try {
+        var l = localStorage.getItem("mc_language");
+        if (l === "cs" || l === "uk" || l === "ru" || l === "en") document.documentElement.lang = l;
+      } catch (e) {}
+    </script>
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
     <!-- interactive-widget=resizes-visual: on Android the on-screen keyboard
          then slides over the page (as it already does on iPhone) instead of
