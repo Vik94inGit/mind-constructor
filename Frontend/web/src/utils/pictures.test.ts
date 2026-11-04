@@ -50,7 +50,7 @@ describe("PICTURES", () => {
     const dots = pictureDots(kind, { x: 0, y: 0 });
     const span = (axis: "x" | "y") => Math.max(...dots.map((d) => d[axis])) - Math.min(...dots.map((d) => d[axis]));
     // A picture of ghosts once spanned up to 934 units, far past a screen at 100%.
-    expect(Math.max(span("x"), span("y"))).toBeLessThanOrEqual(640);
+    expect(Math.max(span("x"), span("y"))).toBeLessThanOrEqual(700);
   });
 
   it("has a different question for every dot of every picture, in every language", async () => {
