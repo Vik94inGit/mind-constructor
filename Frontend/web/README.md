@@ -250,7 +250,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node follows the finger and the rest walk its path behind it, one after another, each hopping on
   its own beat, and catch up after the drop; cards glued together follow the same way
   (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
-- **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
+- **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`), or its name chip's menu, offers
+  *Present this zone* (a presentation of only that zone, castles inside it included), *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
   layout and look.
 - **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
@@ -341,7 +342,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   they grey out at the first and last node. A zone fades in just after the node that made it (its parent's second child), so the
   nodes come first and the zones they form follow (`src/map/TimeLapseBar.tsx`, `src/hooks/useTimeLapse.ts`).
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
-  slides in a full-screen view. Each node gets a slide, with its children on it as
+  slides in a full-screen view. *Present this zone* in a zone's menu starts one with just that zone:
+  its parent and every node below it, nested zones included (`usePresentation` `presentZone`). Each node gets a slide, with its children on it as
   cards, left to right as they sit on the canvas; tapping a card opens that child's slide, and the
   *Under …* line goes back up to the parent's. The show goes a parent, then all of its own children one
   by one, then the next parent and its children, and so on (level by level, so a grandchild never

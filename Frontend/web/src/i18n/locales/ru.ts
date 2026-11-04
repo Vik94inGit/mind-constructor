@@ -749,6 +749,7 @@ const ui: UiStrings = {
     under: (parent) => `Под: ${parent}`,
     showOnMap: "Показать на карте ↗",
     empty: "Пока нечего презентовать — сначала добавьте узел",
+    presentZone: "Презентовать эту зону",
   },
   exportText: { title: (name) => `Экспорт текста — «${name}»`, download: "Скачать .md" },
   summary: {

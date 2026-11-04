@@ -469,6 +469,8 @@ export interface UiStrings {
     /** On a slide's parent and each child: closes the presentation and opens that node on the map. */
     showOnMap: string;
     empty: string;
+    /** A zone's menu: starts a presentation of only that zone, its castles included. */
+    presentZone: string;
   };
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
@@ -1157,6 +1159,7 @@ const en: UiStrings = {
     under: (parent) => `Under: ${parent}`,
     showOnMap: "Show on map ↗",
     empty: "Nothing to present yet — add a node first",
+    presentZone: "Present this zone",
   },
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
   summary: {
