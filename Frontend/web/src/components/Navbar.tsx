@@ -23,6 +23,25 @@ function TargetLogo() {
   );
 }
 
+// A door with an arrow leaving it, drawn in currentColor like the theme
+// toggle's sun/moon so the logout button reads as part of the same cluster.
+function LogoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M14 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <g stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="10" y1="12" x2="20" y2="12" />
+        <polyline points="16.5,8.5 20,12 16.5,15.5" />
+      </g>
+    </svg>
+  );
+}
+
 export function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const { t } = useI18n();
@@ -86,10 +105,20 @@ export function Navbar() {
         >
           {user.username}
         </button>
+        {/* Same h-8 and outline as the language picker beside it, so the
+            right-hand cluster lines up as three equal-height controls
+            instead of a boxed select, a bare icon and loose text. The
+            label never wraps; the icon joins it from sm up, where there's
+            room. */}
         <button
-          className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-120ms enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          title={t.nav.logout}
+          className="inline-flex h-8 cursor-pointer items-center justify-center gap-[0.35rem] whitespace-nowrap rounded-md border border-line bg-surface px-[0.6rem] text-[0.78rem] font-semibold text-ink transition-[background-color] duration-[120ms] hover:bg-surface-2"
           onClick={() => logout()}
         >
+          <span className="hidden sm:inline-flex">
+            <LogoutIcon />
+          </span>
           {t.nav.logout}
         </button>
       </div>
