@@ -279,6 +279,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
   floating top-left cluster.
+- **Toolbar while a node is open** — on a phone it folds to one ⋮ so it doesn't cover the ring of ghosts; on a tablet or wider it stays whole (`isMobileViewport`).
 - **Phones and tablets with the keyboard up** — the floating toolbar follows the part of the page
   still on screen, so the keyboard sliding the page up doesn't carry it off the top, and the page is put
   back at the top once nothing is being typed in, which iPad browsers otherwise forget after the node panel closes (`hooks/useVisualViewportOffset.ts`). A long press in a text field on the

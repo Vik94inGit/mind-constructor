@@ -131,6 +131,7 @@ import {
   computeLinkCycles,
   getCirclePackSpacing,
   nodeObstacles,
+  isMobileViewport,
 } from "../utils/canvasLayout";
 import type { ReadingMode } from "../utils/readingMode";
 import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
@@ -266,8 +267,8 @@ export function MapPage() {
   // PendingCreate (hooks/useNodeCreation.ts).
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [showInvite, setShowInvite] = useState(false);
-  // While the quick-add ring is up the toolbar folds to one "⋮" (it floats
-  // above the ghosts and would hide one); this re-shows it until quick-add
+  // While the quick-add ring is up on a phone the toolbar folds to one "⋮"
+  // (it floats above the ghosts and would hide one); this re-shows it until quick-add
   // starts again.
   const [forceShowToolbar, setForceShowToolbar] = useState(false);
   const [showExportText, setShowExportText] = useState(false);
@@ -1501,7 +1502,10 @@ export function MapPage() {
       isOwner={isOwner}
       isDiscussionMode={isDiscussionMode}
       offline={!online}
-      expanded={!quickAddActive || forceShowToolbar}
+      // Only a phone folds it: on a tablet or wider the ring round the
+      // centred node never reaches the top-left corner, and folding it there
+      // read as the toolbar disappearing whenever a node was open.
+      expanded={!quickAddActive || forceShowToolbar || !isMobileViewport()}
       onExpand={() => setForceShowToolbar(true)}
       moveMode={moveMode}
       onToggleMove={() => setMoveMode((v) => !v)}
