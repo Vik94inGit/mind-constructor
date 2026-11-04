@@ -115,11 +115,9 @@ describe("NodePanel", () => {
     expect(await screen.findByText("-7")).toBeInTheDocument();
   });
 
-  it("tabs through the type, the open tab, close and the text before the arrows", async () => {
+  it("tabs through the open tab, close and the text before the arrows", async () => {
     const user = userEvent.setup();
     renderPanel({ onStepNode: vi.fn() });
-    await user.tab();
-    expect(screen.getByRole("radio", { checked: true })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("tab", { name: en.map.panelTabs.info })).toHaveFocus();
     await user.tab();
@@ -146,17 +144,9 @@ describe("NodePanel", () => {
     expect(screen.getByRole("tab", { name: en.map.panelTabs.history })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("moves between types with the arrows without changing the type", async () => {
-    const user = userEvent.setup();
+  it("has no row of types to pick from: the type changes from the ring of ghosts", () => {
     renderPanel();
-    const radios = screen.getAllByRole("radio");
-    expect(radios.filter((el) => el.tabIndex === 0)).toEqual([screen.getByRole("radio", { checked: true })]);
-    vi.mocked(nodesApi.updateNode).mockClear();
-    screen.getByRole("radio", { checked: true }).focus();
-    await user.keyboard("{ArrowRight}");
-    expect(document.activeElement).not.toBe(screen.getByRole("radio", { checked: true }));
-    expect(document.activeElement).toHaveAttribute("role", "radio");
-    expect(nodesApi.updateNode).not.toHaveBeenCalled();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
   });
 
   it("opens an attack on your node on its Attack tab", () => {

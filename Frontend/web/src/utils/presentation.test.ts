@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeGeometrizedPositions, computeSlideGroups, computeSlideOrder } from "./presentation";
+import { computeSlideGroups, computeSlideOrder, slideHeadSize, slideSubSize } from "./presentation";
 import { makeNode } from "../test/fixtures";
 
 const ids = (nodes: { nodeId: string }[]) => nodes.map((n) => n.nodeId);
@@ -63,14 +63,23 @@ describe("computeSlideGroups", () => {
   });
 });
 
-describe("computeGeometrizedPositions", () => {
-  it("keeps children in the left-to-right order they sit in on the canvas", () => {
-    const nodes = [
-      makeNode({ nodeId: "root", x: 500 }),
-      makeNode({ nodeId: "right", parentId: "root", x: 800 }),
-      makeNode({ nodeId: "left", parentId: "root", x: 200 }),
-    ];
-    const pos = computeGeometrizedPositions(nodes);
-    expect(pos.get("left")!.x).toBeLessThan(pos.get("right")!.x);
+describe("slideHeadSize", () => {
+  it("keeps a short headline big and centered, a step smaller when children share the slide", () => {
+    expect(slideHeadSize("Weekend trip", false)).toEqual({ size: "text-[2rem] sm:text-[2.8rem]", align: "center" });
+    expect(slideHeadSize("Weekend trip", true).size).toBe("text-[1.6rem] sm:text-[2.2rem]");
+  });
+
+  it("shrinks a long headline and reads it left-aligned", () => {
+    const medium = slideHeadSize("x".repeat(100), false);
+    const long = slideHeadSize("x".repeat(200), false);
+    const veryLong = slideHeadSize("x".repeat(500), true);
+    expect(medium.align).toBe("center");
+    expect(long).toEqual({ size: "text-[1.25rem] sm:text-[1.6rem]", align: "left" });
+    expect(veryLong).toEqual({ size: "text-[1.1rem] sm:text-[1.3rem]", align: "left" });
+  });
+
+  it("does the same for the second line", () => {
+    expect(slideSubSize("Short").align).toBe("center");
+    expect(slideSubSize("x".repeat(300))).toEqual({ size: "text-[0.95rem]", align: "left" });
   });
 });

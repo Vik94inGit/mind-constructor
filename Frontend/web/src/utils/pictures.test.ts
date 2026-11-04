@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NODE_FOOTPRINT } from "./canvasLayout";
 import {
   PICTURES,
   FUN_PICTURE_KINDS,
@@ -18,6 +19,7 @@ import {
 import { CANVAS_H, CANVAS_W } from "./canvasLayout";
 import { makeNode } from "../test/fixtures";
 import { NODE_TYPES } from "../types";
+import { TRANSLATIONS, loadTranslation } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 
 function dotNode(id: string, dot: number, written: boolean, kind = "tree", pictureId = "p1"): NodeDoc {
@@ -38,8 +40,26 @@ describe("PICTURES", () => {
     const dots = pictureDots(kind, { x: 0, y: 0 });
     for (let i = 0; i < dots.length; i++) {
       for (let j = i + 1; j < dots.length; j++) {
-        const clear = Math.abs(dots[i].x - dots[j].x) >= 170 || Math.abs(dots[i].y - dots[j].y) >= 110;
+        const clear = Math.abs(dots[i].x - dots[j].x) >= NODE_FOOTPRINT.w + 6 || Math.abs(dots[i].y - dots[j].y) >= NODE_FOOTPRINT.h + 4;
         expect(clear, `${kind} dots ${i} and ${j}`).toBe(true);
+      }
+    }
+  });
+
+  it.each(PICTURE_KINDS)("%s is drawn no bigger than its cards need", (kind) => {
+    const dots = pictureDots(kind, { x: 0, y: 0 });
+    const span = (axis: "x" | "y") => Math.max(...dots.map((d) => d[axis])) - Math.min(...dots.map((d) => d[axis]));
+    // A picture of ghosts once spanned up to 934 units, far past a screen at 100%.
+    expect(Math.max(span("x"), span("y"))).toBeLessThanOrEqual(700);
+  });
+
+  it("has a different question for every dot of every picture, in every language", async () => {
+    for (const lang of ["en", "cs", "uk", "ru"] as const) {
+      const tr = lang === "en" ? TRANSLATIONS.en : await loadTranslation(lang);
+      for (const kind of PICTURE_KINDS) {
+        const qs = tr.ui.pictures.questions[kind];
+        expect(qs, `${lang} ${kind}`).toHaveLength(PICTURES[kind].dots.length);
+        expect(new Set(qs).size, `${lang} ${kind}`).toBe(qs.length);
       }
     }
   });

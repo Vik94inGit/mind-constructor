@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { useRadialBlend } from "./useRadialBlend";
-import type { CanvasModeAction, Pt } from "./useCanvasMode";
-import { computeSlideGroups, computeSlideOrder, computeGeometrizedPositions } from "../utils/presentation";
+import type { CanvasModeAction } from "./useCanvasMode";
+import { computeSlideGroups, computeSlideOrder } from "../utils/presentation";
 import { collectDescendants } from "../utils/mapGraph";
 import type { NodeDoc } from "../types";
 import { feature } from "../utils/usage";
@@ -13,8 +12,6 @@ interface Params {
   multiSelectIds: Set<string>;
   /** The stabilized zone/circle's own members, if one is chosen. */
   selectedCircleNodeIds: string[] | undefined;
-  posFor: (node: NodeDoc) => Pt;
-  centerOnPoint: (x: number, y: number) => void;
   ensureNodeText: (ids: string[]) => Promise<Record<string, string>>;
   // Entering clears whatever else is going on — see enterPresentation.
   setMultiSelectIds: Dispatch<SetStateAction<Set<string>>>;
@@ -29,8 +26,6 @@ export function usePresentation({
   hiddenBranchIds,
   multiSelectIds,
   selectedCircleNodeIds,
-  posFor,
-  centerOnPoint,
   ensureNodeText,
   setMultiSelectIds,
   setSelectedId,
@@ -39,15 +34,14 @@ export function usePresentation({
   emptyMessage,
 }: Params) {
   // Presentation mode: steps through the map's own nodes as slides (see
-  // computeSlideOrder/utils/presentation.ts), with the canvas auto-tidied
-  // into a clean org-chart shape for the duration (computeGeometrizedPositions
-  // — a display override only, never written back to a node's own stored
-  // x/y, same "never touches positions/backend" contract radialPositions
-  // below already follows). Personal to this viewer/session, not map data —
-  // deliberately NOT the Map.discussionMode server-persisted pattern, and
-  // not folded into the useCanvasMode reducer above either: that one is
-  // purpose-built for canvas click-interaction semantics (choose/pack/draw),
-  // not a full-screen takeover with its own slide index.
+  // computeSlideOrder/utils/presentation.ts) in a full-screen overlay
+  // (map/PresentationOverlay.tsx). The canvas under it is left exactly as
+  // it was: no tidying of nodes and no camera moves while presenting, so
+  // leaving the presentation lands back on the very view it was started
+  // from. (It used to tidy the hidden canvas into an org chart and follow
+  // the slides with the camera; on exit the user saw every node slide back
+  // from that chart, with the camera parked on a spot that was now empty.)
+  // Personal to this viewer/session, not map data.
   const [presenting, setPresenting] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
   // Which nodes a presentation is scoped to — null means the whole map.
@@ -91,32 +85,6 @@ export function usePresentation({
   // counts these.
   const slideGroups = useMemo(() => computeSlideGroups(slideNodes), [slideNodes]);
 
-  const geometrizedPositions = useMemo(
-    () => (presenting && slideNodes.length > 0 ? computeGeometrizedPositions(slideNodes) : null),
-    [presenting, slideNodes],
-  );
-  // Same glide-toward-a-target-map-or-back-to-nothing mechanism the radial
-  // selection ring already uses (useRadialBlend is fully general — nothing
-  // about it is ring/neighbor-specific), reused here as a second,
-  // independent instance for the org-chart shape.
-  const geometrizeBlend = useRadialBlend(geometrizedPositions);
-
-  // Keeps the camera on the current slide while presenting — including
-  // while it's still gliding into its own org-chart spot (this effect
-  // re-fires on every geometrizeBlend.blend tick, so it re-centers on the
-  // node's own live, still-moving posFor position rather than jump-cutting
-  // to the final spot only once the glide finishes). centerOnPoint (not
-  // centerOnNode, which deliberately reads a node's raw *stored* position —
-  // see its own doc comment) is the right primitive here since there's no
-  // single stored position to key off during the glide.
-  useEffect(() => {
-    if (!presenting || slideGroups.length === 0) return;
-    const current = slideGroups[Math.min(slideIndex, slideGroups.length - 1)].node;
-    const p = posFor(current);
-    centerOnPoint(p.x, p.y);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presenting, slideIndex, slideGroups, geometrizeBlend.blend]);
-
   // Guards an empty selection (nothing eligible to present) rather than
   // entering a blank slideshow; computes the eligible set eagerly, on the
   // toolbar click itself, well before `presenting` flips true and
@@ -127,13 +95,22 @@ export function usePresentation({
   // "nodes or zones" choice the canvas' own selection tools already offer,
   // reused here rather than inventing a separate picker.
   function enterPresentation() {
-    feature("presentation");
     const scopeIds =
       multiSelectIds.size > 0
         ? multiSelectIds
         : selectedCircleNodeIds?.length
           ? collectDescendants(new Set(selectedCircleNodeIds), visibleNodes)
           : null;
+    startPresentation(scopeIds);
+  }
+  // A zone's own menu ("Present this zone"): only that zone, from its parent
+  // down through every node below it, castles inside it included, whatever
+  // else happens to be selected.
+  function presentZone(rootId: string) {
+    startPresentation(collectDescendants(new Set([rootId]), visibleNodes));
+  }
+  function startPresentation(scopeIds: Set<string> | null) {
+    feature("presentation");
     const eligible = visibleNodes.filter(
       (n) =>
         !n.isWeapon &&
@@ -171,8 +148,8 @@ export function usePresentation({
     setSlideIndex,
     slideNodes,
     slideGroups,
-    geometrizeBlend,
     enterPresentation,
+    presentZone,
     exitPresentation,
   };
 }

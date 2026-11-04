@@ -10,8 +10,6 @@ function setup(overrides: Partial<Parameters<typeof usePresentation>[0]> = {}) {
     hiddenBranchIds: new Set<string>(),
     multiSelectIds: new Set<string>(),
     selectedCircleNodeIds: undefined as string[] | undefined,
-    posFor: (n: NodeDoc) => ({ x: n.x ?? 0, y: n.y ?? 0 }),
-    centerOnPoint: vi.fn(),
     ensureNodeText: vi.fn(async () => ({})),
     setMultiSelectIds: vi.fn(),
     setSelectedId: vi.fn(),
@@ -49,7 +47,6 @@ describe("usePresentation", () => {
     expect(params.setSelectedId).toHaveBeenCalledWith(null);
     expect(params.dispatchMode).toHaveBeenCalledWith({ type: "reset" });
     expect(result.current.slideNodes.map((n) => n.nodeId)).toEqual(["a"]);
-    expect(params.centerOnPoint).toHaveBeenCalled();
 
     act(() => result.current.exitPresentation());
     expect(result.current.presenting).toBe(false);
@@ -69,5 +66,26 @@ describe("usePresentation", () => {
     act(() => result.current.enterPresentation());
     await waitFor(() => expect(result.current.presenting).toBe(true));
     expect(new Set(result.current.slideNodes.map((n) => n.nodeId))).toEqual(new Set(["root", "child", "grandchild"]));
+  });
+
+  it("presents only the zone picked from its menu, nested zones included, whatever else is selected", async () => {
+    const { result, params } = setup({
+      visibleNodes: [
+        makeNode({ nodeId: "top", text: "T" }),
+        makeNode({ nodeId: "zone", text: "Z", parentId: "top" }),
+        makeNode({ nodeId: "a", text: "A", parentId: "zone" }),
+        makeNode({ nodeId: "castle", text: "C", parentId: "zone" }),
+        makeNode({ nodeId: "inner", text: "I", parentId: "castle" }),
+        makeNode({ nodeId: "hit", text: "H", parentId: "a", isWeapon: true }),
+        makeNode({ nodeId: "sibling", text: "S", parentId: "top" }),
+      ],
+      multiSelectIds: new Set(["sibling"]),
+      selectedCircleNodeIds: ["top", "sibling"],
+    });
+    act(() => result.current.presentZone("zone"));
+    await waitFor(() => expect(result.current.presenting).toBe(true));
+    expect(new Set(result.current.slideNodes.map((n) => n.nodeId))).toEqual(new Set(["zone", "a", "castle", "inner"]));
+    expect(result.current.slideGroups[0].node.nodeId).toBe("zone");
+    expect(params.setMultiSelectIds).toHaveBeenCalledWith(new Set());
   });
 });

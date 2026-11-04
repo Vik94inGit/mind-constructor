@@ -23,6 +23,25 @@ function TargetLogo() {
   );
 }
 
+// A door with an arrow leaving it, drawn in currentColor like the theme
+// toggle's sun/moon so the logout button reads as part of the same cluster.
+function LogoutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M14 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H14"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <g stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="10" y1="12" x2="20" y2="12" />
+        <polyline points="16.5,8.5 20,12 16.5,15.5" />
+      </g>
+    </svg>
+  );
+}
+
 export function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const { t } = useI18n();
@@ -30,7 +49,7 @@ export function Navbar() {
   if (!user) return null;
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-md px-2 py-[0.3rem] text-[0.9rem] font-medium ${
+    `min-w-0 truncate whitespace-nowrap rounded-md px-2 py-[0.3rem] text-[0.9rem] font-medium ${
       isActive
         ? "bg-surface-2 text-ink"
         : "text-ink-soft hover:bg-surface-2 hover:text-ink"
@@ -43,7 +62,7 @@ export function Navbar() {
     // spare (a gap-6 row would push username + logout button clean off
     // the right edge, and wrap "Mind Constructor" onto its own second
     // line, pushing the row taller still).
-    <header className="flex items-center gap-3 sm:gap-6 border-b border-line bg-surface px-3 sm:px-6 py-[0.85rem]">
+    <header className="flex min-w-0 items-center gap-3 sm:gap-6 border-b border-line bg-surface px-3 sm:px-6 py-[0.85rem]">
       <NavLink
         to="/"
         className="flex items-center gap-[0.45rem] text-[1.05rem] font-bold tracking-[-0.01em] text-ink"
@@ -56,7 +75,10 @@ export function Navbar() {
             smaller and hope" reasoning as the username below. */}
         <span className="hidden sm:inline">Mind Constructor</span>
       </NavLink>
-      <nav className="flex flex-1 gap-2 sm:gap-4">
+      {/* min-w-0 so a long link (a language's word for Admin) shrinks and
+          truncates instead of pushing the header, and the whole page,
+          wider than a phone. */}
+      <nav className="flex min-w-0 flex-1 gap-2 sm:gap-4">
         <NavLink to="/" end className={navLinkClass}>
           {t.nav.maps}
         </NavLink>
@@ -66,7 +88,7 @@ export function Navbar() {
           </NavLink>
         )}
       </nav>
-      <div className="flex items-center gap-[0.4rem] sm:gap-[0.7rem]">
+      <div className="flex shrink-0 items-center gap-[0.4rem] sm:gap-[0.7rem]">
         <LanguageSwitcher />
         <ThemeToggle />
         {/* Dropped below sm, not truncated — a demo account's own username
@@ -83,10 +105,20 @@ export function Navbar() {
         >
           {user.username}
         </button>
+        {/* Same h-8 and outline as the language picker beside it, so the
+            right-hand cluster lines up as three equal-height controls
+            instead of a boxed select, a bare icon and loose text. The
+            label never wraps; the icon joins it from sm up, where there's
+            room. */}
         <button
-          className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-transparent bg-transparent px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-120ms enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          title={t.nav.logout}
+          className="inline-flex h-8 cursor-pointer items-center justify-center gap-[0.35rem] whitespace-nowrap rounded-md border border-line bg-surface px-[0.6rem] text-[0.78rem] font-semibold text-ink transition-[background-color] duration-[120ms] hover:bg-surface-2"
           onClick={() => logout()}
         >
+          <span className="hidden sm:inline-flex">
+            <LogoutIcon />
+          </span>
           {t.nav.logout}
         </button>
       </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NewNodePanel } from "./NewNodePanel";
 import { I18nProvider } from "../i18n/I18nContext";
@@ -11,7 +11,7 @@ function renderPanel(prompt?: string) {
   const onCreate = vi.fn().mockResolvedValue(undefined);
   render(
     <I18nProvider>
-      <NewNodePanel type="Option" prompt={prompt} onTypeChange={vi.fn()} onClearEmoji={vi.fn()} onCreate={onCreate} onCancel={vi.fn()} />
+      <NewNodePanel type="Option" prompt={prompt} onClearEmoji={vi.fn()} onCreate={onCreate} onCancel={vi.fn()} />
     </I18nProvider>,
   );
   return onCreate;
@@ -48,5 +48,29 @@ describe("NewNodePanel", () => {
   it("can't create an empty node with no prompt", () => {
     renderPanel();
     expect(screen.getByRole("button", { name: s.create })).toBeDisabled();
+  });
+
+  it("pastes words into the text field even when the copy carries a picture too", () => {
+    renderPanel();
+    const picture = new File(["x"], "copy.png", { type: "image/png" });
+    const clipboardData = {
+      getData: (type: string) => (type === "text/plain" ? "copied words" : ""),
+      items: [{ kind: "file", type: "image/png", getAsFile: () => picture }],
+      files: [picture],
+    };
+    const notPrevented = fireEvent.paste(screen.getByRole("textbox"), { clipboardData });
+    expect(notPrevented).toBe(true);
+  });
+
+  it("still takes a bare screenshot as a picture", () => {
+    renderPanel();
+    const picture = new File(["x"], "shot.png", { type: "image/png" });
+    const clipboardData = {
+      getData: () => "",
+      items: [{ kind: "file", type: "image/png", getAsFile: () => picture }],
+      files: [picture],
+    };
+    const notPrevented = fireEvent.paste(screen.getByRole("textbox"), { clipboardData });
+    expect(notPrevented).toBe(false);
   });
 });

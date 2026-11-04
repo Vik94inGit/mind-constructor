@@ -15,6 +15,8 @@ import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
 import { useDesktopLayout } from "../hooks/useDesktopLayout";
+import { useVisualViewportOffset } from "../hooks/useVisualViewportOffset";
+import { isEditableTarget } from "../utils/editable";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
 import { useChosenCircle } from "../hooks/useChosenCircle";
 import { usePackMode } from "../hooks/usePackMode";
@@ -60,7 +62,7 @@ import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
-import { readingOrder, stepNode } from "../utils/nodeOrder";
+import { creationOrder, readingOrder, stepAlong } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
 import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
@@ -77,7 +79,6 @@ import { useChompRuns } from "../hooks/useChompRuns";
 import { MapToolbar } from "../map/MapToolbar";
 import { ZoomControls } from "../map/ZoomControls";
 import { SelectionBar } from "../map/SelectionBar";
-import { MapLegend } from "../map/MapLegend";
 import { ZoneMenu } from "../map/ZoneMenu";
 import { GestureHint } from "../map/GestureHint";
 import type { ZoneStylePatch } from "../map/ZoneMenuBody";
@@ -94,6 +95,7 @@ import { useLineDrawing } from "../hooks/useLineDrawing";
 import { useNodeDragAndDrop } from "../hooks/useNodeDragAndDrop";
 import { useReparent } from "../hooks/useReparent";
 import { useRestoreView } from "../hooks/useRestoreView";
+import { firstParentPoint, showsAnyNode } from "../utils/openingFocus";
 import { useNodeBursts } from "../hooks/useNodeBursts";
 import { useTextBackfill } from "../hooks/useTextBackfill";
 import { useNodeStyling } from "../hooks/useNodeStyling";
@@ -110,6 +112,7 @@ import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
 import {
   computeAttackPairIds,
+  collectDescendants,
   computeHiddenBranchIds,
   computeSolved,
   computeUnsolvedProblemIds,
@@ -130,6 +133,7 @@ import {
   nodeObstacles,
 } from "../utils/canvasLayout";
 import type { ReadingMode } from "../utils/readingMode";
+import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
 import type { AttackIndicator, MapAttack, NodeDoc, NodeType } from "../types";
 import { battleTally, healthAt } from "../utils/finish";
 import { FinishedBanner } from "../map/FinishedBanner";
@@ -153,6 +157,7 @@ export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
   const desktopLayout = useDesktopLayout();
+  const viewportOffset = useVisualViewportOffset();
   // A back swipe / back button doesn't leave the map — only the toolbar's ←
   // does (see useBackGuard).
   useBackGuard();
@@ -408,6 +413,19 @@ export function MapPage() {
   // group-selection footer (multiSelectIds), which is a slim bar, not a tall
   // sheet.
   const sheetOpen = chooseMode || packMode || reparentMode || !!pendingCreate || (!!selectedNode && multiSelectIds.size === 0);
+  // Where the map opens: back at the spot left last time when that spot
+  // shows a node, else on the map's first parent (utils/openingFocus.ts),
+  // never on empty canvas.
+  const firstParent = useMemo(() => firstParentPoint(visibleNodes, positions), [visibleNodes, positions]);
+  const restoreCenter = useMemo(() => {
+    const center = savedView?.center;
+    if (!center) return null;
+    return showsAnyNode(center, positions, window.innerWidth / 2, window.innerHeight / 2) ? center : null;
+  }, [savedView?.center, positions]);
+  const restoreView = useMemo(
+    () => (savedView ? { ...savedView, center: restoreCenter } : null),
+    [savedView, restoreCenter],
+  );
   const {
     canvasRef,
     wrapRef,
@@ -429,7 +447,7 @@ export function MapPage() {
     loading,
     sheetOpen,
     positions,
-    openAt: focusNodeId ? null : (savedView?.center ?? null),
+    openAt: focusNodeId ? null : (restoreCenter ?? firstParent),
   });
 
   // Picking up where you left off — see hooks/useRestoreView.ts.
@@ -437,7 +455,7 @@ export function MapPage() {
     mapId,
     loading,
     focusNodeId,
-    savedView,
+    savedView: restoreView,
     saveView,
     visibleNodes,
     selectedId,
@@ -491,12 +509,6 @@ export function MapPage() {
     // The map's opening animation: drifting out and back (useIntroMigration).
     const drift = introOffset(node.nodeId);
     const own = drift ? { x: stored.x + drift.x, y: stored.y + drift.y } : stored;
-    // Presentation's org-chart blend first; it and the radial ring never overlap.
-    const geo = geometrizeBlend.map?.get(node.nodeId);
-    if (geo) {
-      const b = geometrizeBlend.blend;
-      return { x: own.x + (geo.x - own.x) * b, y: own.y + (geo.y - own.y) * b };
-    }
     // A card on the board stays at its own spot among the other cards.
     const radial = cardSpace.has(node.nodeId) ? undefined : radialBlend.map?.get(node.nodeId);
     if (!radial) return own;
@@ -504,24 +516,21 @@ export function MapPage() {
     return { x: own.x + (radial.x - own.x) * b, y: own.y + (radial.y - own.y) * b };
   }
 
-  // Presentation mode: the map's own nodes as slides over an auto-tidied,
-  // org-chart canvas — see hooks/usePresentation.ts. posFor reads its
-  // geometrizeBlend to draw that shape.
+  // Presentation mode: the map's own nodes as slides in a full-screen
+  // overlay — see hooks/usePresentation.ts.
   const {
     presenting,
     slideIndex,
     setSlideIndex,
     slideGroups,
-    geometrizeBlend,
     enterPresentation,
+    presentZone,
     exitPresentation,
   } = usePresentation({
     visibleNodes,
     hiddenBranchIds,
     multiSelectIds,
     selectedCircleNodeIds: map?.selectedCircle?.nodeIds,
-    posFor,
-    centerOnPoint,
     ensureNodeText,
     setMultiSelectIds,
     setSelectedId,
@@ -981,17 +990,26 @@ export function MapPage() {
 
   // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
   // open node to the one before or after it, or, with none open, from the
-  // first (→) or last (←) node. The panel's arrows and the keyboard's ← / →
-  // both land here; only the text field's own arrows move focus into the
-  // next node's text.
+  // first (→) or last (←) node. With a zone chosen, the arrows stay inside it
+  // and go by when each thought was written, newest first (creationOrder
+  // reversed), so → walks back into how that thinking grew. The panel's arrows and the
+  // keyboard's ← / → both land here; only the text field's own arrows move
+  // focus into the next node's text.
   function stepReading(dir: -1 | 1, focusText = true) {
     if (timeLapse) {
       // In the time-lapse the arrows step it instead, one node at a time.
       stepTimeLapse(dir);
       return;
     }
-    const order = readingOrder(visibleNodes);
-    const next = selectedId ? stepNode(visibleNodes, selectedId, dir) : (dir === 1 ? order[0] : order[order.length - 1])?.nodeId;
+    const zoneIds = map?.selectedCircle?.nodeIds;
+    let order: NodeDoc[];
+    if (zoneIds?.length) {
+      const inZone = collectDescendants(new Set(zoneIds), visibleNodes);
+      order = creationOrder(visibleNodes.filter((n) => inZone.has(n.nodeId))).reverse();
+    } else {
+      order = readingOrder(visibleNodes);
+    }
+    const next = stepAlong(order, selectedId, dir);
     if (!next) return;
     clearPictureView();
     setSteppedToId(next);
@@ -1075,6 +1093,9 @@ export function MapPage() {
   // Right-click on empty canvas: close what's open and offer a new node right
   // there (a node's own right-click stops before reaching this).
   function onCanvasContextMenu(e: ReactMouseEvent<HTMLDivElement>) {
+    // A long press in a text field on the canvas (a new node's name) is the
+    // tablet's own Paste/Select bubble: left to the browser.
+    if (isEditableTarget(e.target)) return;
     e.preventDefault();
     // While drawing, a right-click takes back the last point.
     if (drawMode) {
@@ -1475,6 +1496,7 @@ export function MapPage() {
   const renderToolbar = (vertical: boolean) => (
     <MapToolbar
       vertical={vertical}
+      viewportOffset={viewportOffset}
       isDemo={!!user?.isDemo}
       isOwner={isOwner}
       isDiscussionMode={isDiscussionMode}
@@ -1562,7 +1584,11 @@ export function MapPage() {
             rather than the scrolling canvas itself — an absolutely
             positioned child of wrapRef would scroll away with the canvas
             content, same as everything else inside it. */}
-        <div className="relative min-w-0 flex-1">
+        {/* overflow-clip: nothing in here (a long menu, a chip) can make the
+            page itself taller than the screen, so a tablet's keyboard has no
+            page to scroll and the floating toolbar stays put. Clip, not
+            hidden, so this isn't a scroller either. */}
+        <div className="relative min-w-0 flex-1 overflow-clip">
           <CanvasFrame
             wrapRef={wrapRef}
             canvasRef={canvasRef}
@@ -1833,6 +1859,9 @@ export function MapPage() {
                 emojiFirst={emojiFirst}
                 onPick={(type, pos, text, emoji) => startQuickAdd(type, pos, selectedNode, text, emoji)}
                 onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
+                currentType={selectedNode.type}
+                changeTypes={selectedNode.isWeapon || selectedNode.isProtection ? ATTACK_NODE_TYPES : NODE_TYPES}
+                onChangeType={canEditNode(selectedNode) ? (type) => void handleChangeNodeType(selectedNode, type) : undefined}
               />
             )}
 
@@ -1944,6 +1973,7 @@ export function MapPage() {
                 layouts={zoneLayouts}
                 onSetLayout={setZoneLayout}
                 onSetStyle={setZoneStyle}
+                onPresent={presentZone}
                 onGo={(rootId) => {
                   const group = nodeGroups.find((g) => g.rootId === rootId);
                   if (!group) return;
@@ -2067,7 +2097,6 @@ export function MapPage() {
             type={pendingCreate.type}
             emoji={pendingCreate.emoji || undefined}
             prompt={pendingCreate.prompt}
-            onTypeChange={(type) => setPendingCreate((prev) => (prev ? { ...prev, type } : prev))}
             onClearEmoji={() => setPendingCreate((prev) => (prev ? { ...prev, emoji: "" } : prev))}
             onCreate={(text, type, images, prompt) => confirmPendingCreate(text, type, images, prompt)}
             onCancel={cancelPendingCreate}
@@ -2303,6 +2332,7 @@ export function MapPage() {
             }
           }
           actions={zoneActionsFor(zoneMenu.rootId)}
+          onPresent={() => presentZone(zoneMenu.rootId)}
           onClose={() => setZoneMenu(null)}
         />
       )}
@@ -2386,7 +2416,6 @@ export function MapPage() {
         />
       )}
 
-      {!presenting && <MapLegend />}
 
       {pendingLink && mapId && (
         <CreateEdgeModal

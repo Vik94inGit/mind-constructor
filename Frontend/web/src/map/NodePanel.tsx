@@ -8,7 +8,6 @@ import type { NodeTemplateKind, TemplateKind } from "../utils/templates";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ringKindFor } from "./OutcomeBadge";
 import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
-import { TypePicker } from "./TypePicker";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeShape, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { usePanelSheet } from "./nodePanel/usePanelSheet";
@@ -538,22 +537,15 @@ export function NodePanel({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line pb-[0.7rem]">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex flex-shrink-0 items-center gap-[0.4rem]">
-            {isCreator ? (
-              // The node's own type, changeable right here.
-              <TypePicker
-                value={node.type}
-                types={node.isWeapon || node.isProtection ? ATTACK_NODE_TYPES : NODE_TYPES}
-                disabled={busy}
-                onChange={(type) => void patch({ type }, t.ui.errors.type)}
-              />
-            ) : (
-              <div
-                className="flex items-center text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase"
-                title={t.ui.types[node.type]}
-              >
-                <NodeTypeSymbol type={node.type} size={17} />
-              </div>
-            )}
+            {/* The node's type, shown, not picked: it changes from the ring of
+                ghosts round the node (a ghost of another type offers "Make this
+                a …") or from the node's right-click menu. */}
+            <div
+              className="flex items-center text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase"
+              title={t.ui.types[node.type]}
+            >
+              <NodeTypeSymbol type={node.type} size={17} />
+            </div>
             {/* No title/caption here any more — the node's own text is
                 still readable in the Info tab below (scrollable, full
                 text), just not repeated as a header up here. */}

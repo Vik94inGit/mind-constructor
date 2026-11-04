@@ -9,7 +9,7 @@ import { TRANSLATIONS } from "../i18n/translations";
 const en = TRANSLATIONS.en.ui;
 const problemPhrases = en.node.ghostTemplates.Problem;
 
-function renderGhosts() {
+function renderGhosts(extra: Partial<Parameters<typeof QuickAddGhosts>[0]> = {}) {
   const onPick = vi.fn();
   render(
     <I18nProvider>
@@ -17,12 +17,46 @@ function renderGhosts() {
         anchorPos={{ x: 1000, y: 800 }}
         bounds={{ minX: 0, minY: 0, maxX: 2400, maxY: 1600 }}
         onPick={onPick}
+        {...extra}
       />
     </I18nProvider>,
   );
   const ghost = () => screen.getAllByRole("button").find((b) => b.title.startsWith(en.types.Problem))!;
   return { onPick, ghost };
 }
+
+describe("QuickAddGhosts change type or add", () => {
+  it("offers to make the chosen node this type, or to add a new one", async () => {
+    const user = userEvent.setup();
+    const onChangeType = vi.fn();
+    const { onPick, ghost } = renderGhosts({ currentType: "Idea", onChangeType });
+    await user.click(ghost());
+    await user.click(screen.getByTestId("ghost-change-type"));
+    expect(onChangeType).toHaveBeenCalledWith("Problem");
+    expect(onPick).not.toHaveBeenCalled();
+    // The pick is cleared, so the choice doesn't linger.
+    expect(screen.queryByTestId("ghost-change-type")).toBeNull();
+
+    await user.click(ghost());
+    await user.click(screen.getByTestId("ghost-new-node"));
+    expect(onPick).toHaveBeenCalledWith("Problem", expect.objectContaining({ x: expect.any(Number) }), undefined, undefined);
+  });
+
+  it("doesn't offer a change to the type the node already has", async () => {
+    const user = userEvent.setup();
+    const { ghost } = renderGhosts({ currentType: "Problem", onChangeType: vi.fn() });
+    await user.click(ghost());
+    expect(screen.queryByTestId("ghost-change-type")).toBeNull();
+  });
+
+  it("offers no change when the node isn't the viewer's to edit", async () => {
+    const user = userEvent.setup();
+    const { ghost } = renderGhosts({ currentType: "Idea" });
+    await user.click(ghost());
+    expect(screen.queryByTestId("ghost-change-type")).toBeNull();
+    expect(screen.queryByTestId("ghost-new-node")).toBeNull();
+  });
+});
 
 describe("QuickAddGhosts templates", () => {
   it("shows no starter phrases until a ghost is picked out", () => {
@@ -136,5 +170,14 @@ describe("PendingNodeCard", () => {
       </I18nProvider>,
     );
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Root cause:");
+  });
+});
+
+describe("QuickAddGhosts change type limits", () => {
+  it("offers no change to a type the node may not take", async () => {
+    const user = userEvent.setup();
+    const { ghost } = renderGhosts({ currentType: "Idea", onChangeType: vi.fn(), changeTypes: ["Idea", "Solution"] });
+    await user.click(ghost());
+    expect(screen.queryByTestId("ghost-change-type")).toBeNull();
   });
 });

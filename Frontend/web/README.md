@@ -42,9 +42,16 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   lives in your own view of the map (`/api/state/maps/:mapId`, `feelings` and `checkIn`). See
   `src/utils/feeling.ts`, `src/components/FeelingPicker.tsx`, `src/components/CheckInForm.tsx`,
   `src/map/CheckInPrompt.tsx` and `src/dashboard/CheckInModal.tsx`.
-- **Dashboard** (`/`) — maps you own or were invited to; create/rename/delete, invite members, see
+- **Dashboard** (`/`) — on a phone or tablet it opens on the **main menu**, drawn like a thought on the map: a node
+  (*What's on your mind?*, which opens Think it through) with a ring of ghosts round it, one per
+  thing to do: **Last stop** (the map you were last on), **Quick note**, **Unsorted notes** (only
+  while the Inbox has some), **New map**, **New folder** and **Text → map**. A ghost that opens a box
+  (quick note, unsorted notes, the centre's question) shows it under the ring; tapping it again
+  closes it (`src/dashboard/MenuNode.tsx`, `src/dashboard/menuRing.ts`). A computer (wide screen and a mouse, `hooks/useDesktopLayout.ts`) keeps the earlier
+  layout: the buttons top right, and last stop, quick note, unsorted notes and the question stacked on the left. After it: the filters,
+  search, folders and maps you own or were invited to; create/rename/delete, invite members, see
   who's on a map and who owns it, copy a whole map's nodes to paste into another one. A quick note
-  goes to the **Inbox** map; under the box the dashboard counts the Inbox's unsorted notes, and
+  goes to the **Inbox** map; the *Unsorted notes* ghost counts the Inbox's unsorted notes, and
   **Sort** lists them, each with **Move to a map**: pick a map and the note (with anything hanging
   from it and the links inside that branch) is made there on a free spot and taken off the Inbox.
   The same **Move to a map** sits in a note's Info tab when the Inbox map is open
@@ -125,8 +132,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   that type: a bulb (Idea), a stop sign (Problem), a warning triangle (Problematic option), a key
   (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail) and a question mark
   (unknown). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
-  Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking the picture's
-  question ("What is stopping you?", "What do you love?"). Write in two
+  Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking its own
+  question on the picture's theme (a stop sign: "What is stopping you?", "What keeps coming back?"…;
+  a heart: "What do you love?", "Who do you love?"…). Write in two
   neighbouring dots and the line between them is inked in the picture's colour; until then it is a faint
   dotted guide, and a closed shape fills in a little more with every dot. A caption under the picture
   says how much of it is drawn ("Heart · 60% drawn", then "done!"), and the minimap draws the inked lines
@@ -171,18 +179,27 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   holding it still) turns its cards over one after another, parent first, then the children by
   their order (`hooks/useFlipSequence.ts`). Both choices follow the user to every device
   (`utils/emojiFace.ts`, `/api/state`).
+- **Changing a type** — there is no row of types in the node panel. Tapping a ghost of another type
+  round your own node offers **↻ Make this a …** (the node itself takes that type) and **＋ New …**
+  (a new node of it), above that type's starter phrases; tapping the ghost again still adds a new one.
+  A weapon or protection node only offers the types an attack may carry. The node's right-click menu
+  keeps *Change type* ([sketch](../../docs/gestures/ghost-change-type.md)).
+- **No legend** — the canvas has no strip of types along the bottom: the ring of ghosts names every
+  type where the user meets it.
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
 - **Node panel under the node** — the node panel (and the pack picker and new-node panel) is a bottom
-  sheet, half the screen, with the node's text first and a type picker in its header; the chosen node
+  sheet, half the screen, with the node's text first and its type's symbol in its header; the chosen node
   is centered in the half above it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
   node (any way) opens `map/NewNodePanel.tsx` with its text field focused — with the feelings offered
   as a ring around the new node, optional — and editing opens the node's panel on its text.
   Big round ← / → arrows at either end of the sheet's top edge step to the previous or next
   node, with the resize handle between them. The steps include every attack, right after the node it
   hit, and each node they reach opens on its Info tab (an attack on your own node otherwise opens on
-  Attack, ready to strike back).
+  Attack, ready to strike back). With a zone chosen, the arrows (and ← / →) stay inside it and go by
+  when each thought was written, newest first, so → walks back into how that thinking grew
+  (`utils/nodeOrder.ts` `creationOrder`, reversed).
 - **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
@@ -239,7 +256,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node follows the finger and the rest walk its path behind it, one after another, each hopping on
   its own beat, and catch up after the drop; cards glued together follow the same way
   (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
-- **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
+- **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`), or its name chip's menu, offers
+  *Present this zone* (a presentation of only that zone, castles inside it included), *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
   layout and look.
 - **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
@@ -265,6 +283,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
   floating top-left cluster.
+- **Phones and tablets with the keyboard up** — the floating toolbar follows the part of the page
+  still on screen, so the keyboard sliding the page up doesn't carry it off the top, and the page is put
+  back at the top once nothing is being typed in, which iPad browsers otherwise forget after the node panel closes (`hooks/useVisualViewportOffset.ts`). A long press in a text field on the
+  canvas is left to the browser, so its own Paste bubble shows; words pasted into a node's text stay
+  words even when the copy carries a picture of itself too (`utils/editable.ts`).
 - **Live updates** — everyone with a map open sees each other's nodes, attacks, shields and deletions as
   they happen (`hooks/useMapSocket.ts`). If the live connection is down or the server never confirms the
   map's room, the map is fetched again every 10 seconds and the join retried; a tab that is shown again
@@ -296,7 +319,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   and when the tab is hidden, kept for a while if offline. Browsers with Global Privacy Control
   or Do Not Track on send nothing.
 - **i18n** — English, Czech, Ukrainian and Russian throughout the toolbar, panels, menus and error
-  messages (`src/i18n/`), node type names included (the stored value stays English).
+  messages (`src/i18n/`), node type names included (the stored value stays English). The page asks browsers not to
+  translate it (`translate="no"`, `<meta name="google" content="notranslate">` in `index.html`):
+  Chrome's own translation on top garbled the menus and made node captions vanish on the map.
 - **Templates** — the node panel's Info tab offers a ready branch on a node with no children yet:
   a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
   breakdown, an Idea gets "Develop this idea" (the need it meets, how it would work with the smallest
@@ -330,13 +355,23 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   they grey out at the first and last node. A zone fades in just after the node that made it (its parent's second child), so the
   nodes come first and the zones they form follow (`src/map/TimeLapseBar.tsx`, `src/hooks/useTimeLapse.ts`).
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
-  slides, with the canvas tidied into an org chart. Each node gets a slide, with its children on it as
+  slides in a full-screen view. *Present this zone* in a zone's menu starts one with just that zone:
+  its parent and every node below it, nested zones included (`usePresentation` `presentZone`). Each node gets a slide, with its children on it as
   cards, left to right as they sit on the canvas; tapping a card opens that child's slide, and the
   *Under …* line goes back up to the parent's. The show goes a parent, then all of its own children one
   by one, then the next parent and its children, and so on (level by level, so a grandchild never
   interrupts its parent's siblings). The node and every child have a
   **Show on map** link that closes the presentation and opens that node on the map
-  (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`).
+  (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`). A slide shows
+  its node's pictures under the text (fetched with the node the first time its slide comes up,
+  `src/hooks/useSlidePictures.ts`); tap one to see it full size. A child's card shows its picture card,
+  if it has one. A slide's text is sized to its length so it fits on the screen: a long thought gets
+  smaller and reads left-aligned, and the *Under …* line shows two lines of the parent (`slideHeadSize`). The canvas under
+  the slides stays as it was, so *Exit* lands back on exactly the view the presentation started from.
+- **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
+  children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the
+  spot that was in the middle of the screen when that spot still shows a node; a search result opens on
+  that node (`src/utils/openingFocus.ts`, `src/hooks/useRestoreView.ts`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
   matches stay lit while everything else dims, and a result takes you to that node. Under the box,
   one chip per node type the map has (with its count) filters by type: pick one or more and only
