@@ -2,6 +2,9 @@ import { useI18n } from "../i18n/I18nContext";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { nodeRefId } from "../utils/nodeType";
+import { imageSrc } from "../utils/images";
+import { useSlidePictures } from "../hooks/useSlidePictures";
+import { useState } from "react";
 import type { NodeDoc } from "../types";
 import type { SlideGroup } from "../utils/presentation";
 
@@ -35,6 +38,13 @@ export function PresentationOverlay({
 }: Props) {
   const { t } = useI18n();
   const slide = slides[index];
+  const pictures = useSlidePictures(slide?.node);
+  // The picture shown full size, if any: which node's, and which of its
+  // pictures. Tied to the node so moving on (arrows, keys) closes it.
+  const [zoom, setZoom] = useState<{ nodeId: string; i: number } | null>(null);
+  const zoomed = zoom && zoom.nodeId === slide?.node.nodeId ? zoom.i : null;
+  const setZoomed = (i: number | null) =>
+    setZoom(i === null || !slide ? null : { nodeId: slide.node.nodeId, i });
   if (!slide) return null;
   const { node, children } = slide;
   // The parent the slide's own head hangs from, when that one is in the show.
@@ -89,6 +99,39 @@ export function PresentationOverlay({
             </button>
           )}
           <SlideHead node={node} compact={children.length > 0} />
+          {pictures.length > 0 && (
+            // The node's own pictures, under its text the way the node
+            // panel shows them: one runs wide, more go two (three on a
+            // wide screen) to a row. Tap one to see it full size.
+            <div
+              data-slide-pictures
+              className={`grid w-full gap-3 ${
+                pictures.length === 1
+                  ? "max-w-[800px] grid-cols-1"
+                  : "max-w-[900px] grid-cols-2 sm:grid-cols-3"
+              }`}
+            >
+              {pictures.map((src, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="block w-full cursor-zoom-in overflow-hidden rounded-md border border-line bg-surface-2 p-0"
+                  aria-label={t.ui.images.open}
+                  onClick={() => setZoomed(i)}
+                >
+                  <img
+                    src={imageSrc(src)}
+                    alt=""
+                    className={`mx-auto block max-w-full object-contain ${
+                      pictures.length === 1
+                        ? "h-auto max-h-[45vh] w-full"
+                        : "h-[140px] w-full sm:h-[180px]"
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             className={linkCls}
@@ -128,6 +171,15 @@ export function PresentationOverlay({
                         {c.text}
                       </p>
                     )}
+                    {/* The child's picture card from the map, if it has one;
+                        all its pictures are on its own slide. */}
+                    {c.cardImage && (
+                      <img
+                        src={imageSrc(c.cardImage)}
+                        alt=""
+                        className="block max-h-[160px] w-full rounded-md border border-line bg-surface-2 object-contain"
+                      />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -161,6 +213,31 @@ export function PresentationOverlay({
           {t.ui.presentation.next} →
         </button>
       </div>
+
+      {zoomed !== null && pictures[zoomed] && (
+        // Full-size view, above the slide; a click anywhere closes it.
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+          role="dialog"
+          aria-label={t.ui.images.title}
+          onClick={() => setZoomed(null)}
+        >
+          <img
+            src={imageSrc(pictures[zoomed])}
+            alt=""
+            className="max-h-full max-w-full rounded-md object-contain shadow-card"
+          />
+          <button
+            type="button"
+            autoFocus
+            className="absolute top-3 right-3 cursor-pointer rounded-full border-0 bg-surface px-3 py-1 text-[0.85rem] font-semibold text-ink"
+            onKeyDown={(e) => e.key === "Escape" && setZoomed(null)}
+            onClick={() => setZoomed(null)}
+          >
+            {t.ui.images.close}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
