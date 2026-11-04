@@ -954,7 +954,7 @@ const ui: UiStrings = {
 };
 
 const translation: Translation = {
-  nav: { maps: "Карти", admin: "Адміністрування", logout: "Вийти" },
+  nav: { maps: "Карти", admin: "Адмін", logout: "Вийти" },
   auth: {
     login: {
       title: "З поверненням",
