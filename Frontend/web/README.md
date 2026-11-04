@@ -292,7 +292,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   and when the tab is hidden, kept for a while if offline. Browsers with Global Privacy Control
   or Do Not Track on send nothing.
 - **i18n** — English, Czech, Ukrainian and Russian throughout the toolbar, panels, menus and error
-  messages (`src/i18n/`), node type names included (the stored value stays English).
+  messages (`src/i18n/`), node type names included (the stored value stays English). The page asks browsers not to
+  translate it (`translate="no"`, `<meta name="google" content="notranslate">` in `index.html`):
+  Chrome's own translation on top garbled the menus and made node captions vanish on the map.
 - **Templates** — the node panel's Info tab offers a ready branch on a node with no children yet:
   a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
   breakdown, an Idea gets "Develop this idea" (the need it meets, how it would work with the smallest
