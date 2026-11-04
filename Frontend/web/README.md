@@ -361,7 +361,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`). A slide shows
   its node's pictures under the text (fetched with the node the first time its slide comes up,
   `src/hooks/useSlidePictures.ts`); tap one to see it full size. A child's card shows its picture card,
-  if it has one. The canvas under
+  if it has one. A slide's text is sized to its length so it fits on the screen: a long thought gets
+  smaller and reads left-aligned, and the *Under …* line shows two lines of the parent (`slideHeadSize`). The canvas under
   the slides stays as it was, so *Exit* lands back on exactly the view the presentation started from.
 - **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
   children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the
