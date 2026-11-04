@@ -66,6 +66,17 @@ export interface Translation {
     };
     menu: { summary: string; edit: string; invite: string; delete: string; moveToFolder: string };
     /** The dashboard's quick note box (dashboard/QuickNote.tsx). */
+    /** The main menu: a node with a ring of ghosts (dashboard/MenuNode.tsx). */
+    ring: {
+      label: string;
+      center: string;
+      lastStop: string;
+      quickNote: string;
+      unsorted: (count: number) => string;
+      newMap: string;
+      newFolder: string;
+      split: string;
+    };
     quickNote: { title: string; placeholder: string; save: string; saved: string; open: (mapName: string) => string; error: string; inboxName: string };
     library: {
       newFolder: string;
@@ -178,7 +189,6 @@ export interface Translation {
       history: string;
       packed: (count: number) => string;
     };
-    legend: { positiveCircle: string; negativeCircle: string };
   };
   /** "Text → map" (pages/SplitTextPage.tsx). */
   split: {
@@ -279,6 +289,16 @@ const en: Translation = {
       owner: "Owner",
     },
     menu: { summary: "Summary", edit: "Edit", invite: "Invite", delete: "Delete", moveToFolder: "Move to folder…" },
+    ring: {
+      label: "Main menu",
+      center: "What's on your mind?",
+      lastStop: "Last stop",
+      quickNote: "Quick note",
+      unsorted: (count) => `Unsorted notes (${count})`,
+      newMap: "New map",
+      newFolder: "New folder",
+      split: "Text → map",
+    },
     quickNote: { title: "Quick note", placeholder: "Jot a thought — it goes to your Inbox map…", save: "Save", saved: "Saved.", open: (name) => `Open ${name} →`, error: "Couldn't save the note", inboxName: "Inbox" },
     library: {
       newFolder: "+ New folder",
@@ -391,7 +411,6 @@ const en: Translation = {
       history: "History",
       packed: (count) => `Packed (${count})`,
     },
-    legend: { positiveCircle: "positive circle", negativeCircle: "negative circle / under fire" },
   },
   split: {
     entry: "✂ Text → map",

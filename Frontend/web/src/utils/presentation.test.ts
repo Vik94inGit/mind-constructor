@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeGeometrizedPositions, computeSlideGroups, computeSlideOrder } from "./presentation";
+import { computeSlideGroups, computeSlideOrder } from "./presentation";
 import { makeNode } from "../test/fixtures";
 
 const ids = (nodes: { nodeId: string }[]) => nodes.map((n) => n.nodeId);
@@ -60,17 +60,5 @@ describe("computeSlideGroups", () => {
     expect(groups([makeNode({ nodeId: "solo" })])).toEqual([["solo", []]]);
     const loop = groups([makeNode({ nodeId: "p", parentId: "q" }), makeNode({ nodeId: "q", parentId: "p" })]);
     expect([...new Set(loop.flatMap(([id, kids]) => [id, ...kids]))].sort()).toEqual(["p", "q"]);
-  });
-});
-
-describe("computeGeometrizedPositions", () => {
-  it("keeps children in the left-to-right order they sit in on the canvas", () => {
-    const nodes = [
-      makeNode({ nodeId: "root", x: 500 }),
-      makeNode({ nodeId: "right", parentId: "root", x: 800 }),
-      makeNode({ nodeId: "left", parentId: "root", x: 200 }),
-    ];
-    const pos = computeGeometrizedPositions(nodes);
-    expect(pos.get("left")!.x).toBeLessThan(pos.get("right")!.x);
   });
 });
