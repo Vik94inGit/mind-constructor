@@ -67,4 +67,25 @@ describe("usePresentation", () => {
     await waitFor(() => expect(result.current.presenting).toBe(true));
     expect(new Set(result.current.slideNodes.map((n) => n.nodeId))).toEqual(new Set(["root", "child", "grandchild"]));
   });
+
+  it("presents only the zone picked from its menu, nested zones included, whatever else is selected", async () => {
+    const { result, params } = setup({
+      visibleNodes: [
+        makeNode({ nodeId: "top", text: "T" }),
+        makeNode({ nodeId: "zone", text: "Z", parentId: "top" }),
+        makeNode({ nodeId: "a", text: "A", parentId: "zone" }),
+        makeNode({ nodeId: "castle", text: "C", parentId: "zone" }),
+        makeNode({ nodeId: "inner", text: "I", parentId: "castle" }),
+        makeNode({ nodeId: "hit", text: "H", parentId: "a", isWeapon: true }),
+        makeNode({ nodeId: "sibling", text: "S", parentId: "top" }),
+      ],
+      multiSelectIds: new Set(["sibling"]),
+      selectedCircleNodeIds: ["top", "sibling"],
+    });
+    act(() => result.current.presentZone("zone"));
+    await waitFor(() => expect(result.current.presenting).toBe(true));
+    expect(new Set(result.current.slideNodes.map((n) => n.nodeId))).toEqual(new Set(["zone", "a", "castle", "inner"]));
+    expect(result.current.slideGroups[0].node.nodeId).toBe("zone");
+    expect(params.setMultiSelectIds).toHaveBeenCalledWith(new Set());
+  });
 });

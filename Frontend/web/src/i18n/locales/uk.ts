@@ -749,6 +749,7 @@ const ui: UiStrings = {
     under: (parent) => `Під: ${parent}`,
     showOnMap: "Показати на мапі ↗",
     empty: "Поки нема чого презентувати — спершу додайте вузол",
+    presentZone: "Презентувати цю зону",
   },
   exportText: { title: (name) => `Експорт тексту — «${name}»`, download: "Завантажити .md" },
   summary: {
@@ -954,7 +955,7 @@ const ui: UiStrings = {
 };
 
 const translation: Translation = {
-  nav: { maps: "Карти", admin: "Адміністрування", logout: "Вийти" },
+  nav: { maps: "Карти", admin: "Адмін", logout: "Вийти" },
   auth: {
     login: {
       title: "З поверненням",

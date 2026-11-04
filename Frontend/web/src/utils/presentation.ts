@@ -148,3 +148,27 @@ export function computeSlideGroups(nodes: NodeDoc[]): SlideGroup[] {
   for (const n of nodes) walk(n);
   return groups;
 }
+
+/**
+ * How big a slide's headline (its node's title, else its text) is drawn, so a
+ * long thought still fits on the screen: the longer the text, the smaller the
+ * step, and past a few lines it reads left-aligned like a paragraph instead
+ * of a centered heading. `compact` (children share the slide) starts a step
+ * smaller so the children fit under it.
+ */
+export function slideHeadSize(text: string, compact: boolean): { size: string; align: "center" | "left" } {
+  const len = text.trim().length;
+  if (len > 280) return { size: "text-[1.1rem] sm:text-[1.3rem]", align: "left" };
+  if (len > 140) return { size: "text-[1.25rem] sm:text-[1.6rem]", align: "left" };
+  if (len > 60 || compact)
+    return { size: len > 60 ? "text-[1.4rem] sm:text-[1.9rem]" : "text-[1.6rem] sm:text-[2.2rem]", align: "center" };
+  return { size: "text-[2rem] sm:text-[2.8rem]", align: "center" };
+}
+
+/** The same for the slide's second line (its text, under a title). */
+export function slideSubSize(text: string): { size: string; align: "center" | "left" } {
+  const len = text.trim().length;
+  if (len > 280) return { size: "text-[0.95rem]", align: "left" };
+  if (len > 120) return { size: "text-[1.05rem]", align: "left" };
+  return { size: "text-[1.15rem]", align: "center" };
+}

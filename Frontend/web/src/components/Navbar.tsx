@@ -49,7 +49,7 @@ export function Navbar() {
   if (!user) return null;
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-md px-2 py-[0.3rem] text-[0.9rem] font-medium ${
+    `min-w-0 truncate whitespace-nowrap rounded-md px-2 py-[0.3rem] text-[0.9rem] font-medium ${
       isActive
         ? "bg-surface-2 text-ink"
         : "text-ink-soft hover:bg-surface-2 hover:text-ink"
@@ -62,7 +62,7 @@ export function Navbar() {
     // spare (a gap-6 row would push username + logout button clean off
     // the right edge, and wrap "Mind Constructor" onto its own second
     // line, pushing the row taller still).
-    <header className="flex items-center gap-3 sm:gap-6 border-b border-line bg-surface px-3 sm:px-6 py-[0.85rem]">
+    <header className="flex min-w-0 items-center gap-3 sm:gap-6 border-b border-line bg-surface px-3 sm:px-6 py-[0.85rem]">
       <NavLink
         to="/"
         className="flex items-center gap-[0.45rem] text-[1.05rem] font-bold tracking-[-0.01em] text-ink"
@@ -75,6 +75,9 @@ export function Navbar() {
             smaller and hope" reasoning as the username below. */}
         <span className="hidden sm:inline">Mind Constructor</span>
       </NavLink>
+      {/* min-w-0 so a long link (a language's word for Admin) shrinks and
+          truncates instead of pushing the header, and the whole page,
+          wider than a phone. */}
       <nav className="flex min-w-0 flex-1 gap-2 sm:gap-4">
         <NavLink to="/" end className={navLinkClass}>
           {t.nav.maps}

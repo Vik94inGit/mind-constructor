@@ -197,7 +197,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   Big round ← / → arrows at either end of the sheet's top edge step to the previous or next
   node, with the resize handle between them. The steps include every attack, right after the node it
   hit, and each node they reach opens on its Info tab (an attack on your own node otherwise opens on
-  Attack, ready to strike back).
+  Attack, ready to strike back). With a zone chosen, the arrows (and ← / →) stay inside it and go by
+  when each thought was written, newest first, so → walks back into how that thinking grew
+  (`utils/nodeOrder.ts` `creationOrder`, reversed).
 - **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
@@ -250,7 +252,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node follows the finger and the rest walk its path behind it, one after another, each hopping on
   its own beat, and catch up after the drop; cards glued together follow the same way
   (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
-- **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`) offers *Copy as text* (every
+- **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`), or its name chip's menu, offers
+  *Present this zone* (a presentation of only that zone, castles inside it included), *Copy as text* (every
   node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
   layout and look.
 - **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
@@ -276,6 +279,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
   floating top-left cluster.
+- **Phones and tablets with the keyboard up** — the floating toolbar follows the part of the page
+  still on screen, so the keyboard sliding the page up doesn't carry it off the top, and the page is put
+  back at the top once nothing is being typed in, which iPad browsers otherwise forget after the node panel closes (`hooks/useVisualViewportOffset.ts`). A long press in a text field on the
+  canvas is left to the browser, so its own Paste bubble shows; words pasted into a node's text stay
+  words even when the copy carries a picture of itself too (`utils/editable.ts`).
 - **Live updates** — everyone with a map open sees each other's nodes, attacks, shields and deletions as
   they happen (`hooks/useMapSocket.ts`). If the live connection is down or the server never confirms the
   map's room, the map is fetched again every 10 seconds and the join retried; a tab that is shown again
@@ -343,13 +351,18 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   they grey out at the first and last node. A zone fades in just after the node that made it (its parent's second child), so the
   nodes come first and the zones they form follow (`src/map/TimeLapseBar.tsx`, `src/hooks/useTimeLapse.ts`).
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
-  slides in a full-screen view. Each node gets a slide, with its children on it as
+  slides in a full-screen view. *Present this zone* in a zone's menu starts one with just that zone:
+  its parent and every node below it, nested zones included (`usePresentation` `presentZone`). Each node gets a slide, with its children on it as
   cards, left to right as they sit on the canvas; tapping a card opens that child's slide, and the
   *Under …* line goes back up to the parent's. The show goes a parent, then all of its own children one
   by one, then the next parent and its children, and so on (level by level, so a grandchild never
   interrupts its parent's siblings). The node and every child have a
   **Show on map** link that closes the presentation and opens that node on the map
-  (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`). The canvas under
+  (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`). A slide shows
+  its node's pictures under the text (fetched with the node the first time its slide comes up,
+  `src/hooks/useSlidePictures.ts`); tap one to see it full size. A child's card shows its picture card,
+  if it has one. A slide's text is sized to its length so it fits on the screen: a long thought gets
+  smaller and reads left-aligned, and the *Under …* line shows two lines of the parent (`slideHeadSize`). The canvas under
   the slides stays as it was, so *Exit* lands back on exactly the view the presentation started from.
 - **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
   children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the

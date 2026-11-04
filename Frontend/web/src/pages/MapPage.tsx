@@ -15,6 +15,8 @@ import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
 import { useDesktopLayout } from "../hooks/useDesktopLayout";
+import { useVisualViewportOffset } from "../hooks/useVisualViewportOffset";
+import { isEditableTarget } from "../utils/editable";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
 import { useChosenCircle } from "../hooks/useChosenCircle";
 import { usePackMode } from "../hooks/usePackMode";
@@ -60,7 +62,7 @@ import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
-import { readingOrder, stepNode } from "../utils/nodeOrder";
+import { creationOrder, readingOrder, stepAlong } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
 import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
@@ -110,6 +112,7 @@ import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
 import {
   computeAttackPairIds,
+  collectDescendants,
   computeHiddenBranchIds,
   computeSolved,
   computeUnsolvedProblemIds,
@@ -154,6 +157,7 @@ export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
   const desktopLayout = useDesktopLayout();
+  const viewportOffset = useVisualViewportOffset();
   // A back swipe / back button doesn't leave the map — only the toolbar's ←
   // does (see useBackGuard).
   useBackGuard();
@@ -520,6 +524,7 @@ export function MapPage() {
     setSlideIndex,
     slideGroups,
     enterPresentation,
+    presentZone,
     exitPresentation,
   } = usePresentation({
     visibleNodes,
@@ -985,17 +990,26 @@ export function MapPage() {
 
   // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
   // open node to the one before or after it, or, with none open, from the
-  // first (→) or last (←) node. The panel's arrows and the keyboard's ← / →
-  // both land here; only the text field's own arrows move focus into the
-  // next node's text.
+  // first (→) or last (←) node. With a zone chosen, the arrows stay inside it
+  // and go by when each thought was written, newest first (creationOrder
+  // reversed), so → walks back into how that thinking grew. The panel's arrows and the
+  // keyboard's ← / → both land here; only the text field's own arrows move
+  // focus into the next node's text.
   function stepReading(dir: -1 | 1, focusText = true) {
     if (timeLapse) {
       // In the time-lapse the arrows step it instead, one node at a time.
       stepTimeLapse(dir);
       return;
     }
-    const order = readingOrder(visibleNodes);
-    const next = selectedId ? stepNode(visibleNodes, selectedId, dir) : (dir === 1 ? order[0] : order[order.length - 1])?.nodeId;
+    const zoneIds = map?.selectedCircle?.nodeIds;
+    let order: NodeDoc[];
+    if (zoneIds?.length) {
+      const inZone = collectDescendants(new Set(zoneIds), visibleNodes);
+      order = creationOrder(visibleNodes.filter((n) => inZone.has(n.nodeId))).reverse();
+    } else {
+      order = readingOrder(visibleNodes);
+    }
+    const next = stepAlong(order, selectedId, dir);
     if (!next) return;
     clearPictureView();
     setSteppedToId(next);
@@ -1079,6 +1093,9 @@ export function MapPage() {
   // Right-click on empty canvas: close what's open and offer a new node right
   // there (a node's own right-click stops before reaching this).
   function onCanvasContextMenu(e: ReactMouseEvent<HTMLDivElement>) {
+    // A long press in a text field on the canvas (a new node's name) is the
+    // tablet's own Paste/Select bubble: left to the browser.
+    if (isEditableTarget(e.target)) return;
     e.preventDefault();
     // While drawing, a right-click takes back the last point.
     if (drawMode) {
@@ -1479,6 +1496,7 @@ export function MapPage() {
   const renderToolbar = (vertical: boolean) => (
     <MapToolbar
       vertical={vertical}
+      viewportOffset={viewportOffset}
       isDemo={!!user?.isDemo}
       isOwner={isOwner}
       isDiscussionMode={isDiscussionMode}
@@ -1566,7 +1584,11 @@ export function MapPage() {
             rather than the scrolling canvas itself — an absolutely
             positioned child of wrapRef would scroll away with the canvas
             content, same as everything else inside it. */}
-        <div className="relative min-w-0 flex-1">
+        {/* overflow-clip: nothing in here (a long menu, a chip) can make the
+            page itself taller than the screen, so a tablet's keyboard has no
+            page to scroll and the floating toolbar stays put. Clip, not
+            hidden, so this isn't a scroller either. */}
+        <div className="relative min-w-0 flex-1 overflow-clip">
           <CanvasFrame
             wrapRef={wrapRef}
             canvasRef={canvasRef}
@@ -1951,6 +1973,7 @@ export function MapPage() {
                 layouts={zoneLayouts}
                 onSetLayout={setZoneLayout}
                 onSetStyle={setZoneStyle}
+                onPresent={presentZone}
                 onGo={(rootId) => {
                   const group = nodeGroups.find((g) => g.rootId === rootId);
                   if (!group) return;
@@ -2309,6 +2332,7 @@ export function MapPage() {
             }
           }
           actions={zoneActionsFor(zoneMenu.rootId)}
+          onPresent={() => presentZone(zoneMenu.rootId)}
           onClose={() => setZoneMenu(null)}
         />
       )}

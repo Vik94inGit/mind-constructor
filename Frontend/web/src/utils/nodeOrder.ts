@@ -45,3 +45,31 @@ export function stepNode(nodes: NodeDoc[], fromId: string, dir: -1 | 1): string 
   if (i === -1) return null;
   return order[i + dir]?.nodeId ?? null;
 }
+
+/**
+ * The order the arrows step through a chosen zone: oldest thought first, so
+ * stepping replays how the thinking grew. Nodes written at the same moment
+ * (or with no date) keep their reading order.
+ */
+export function creationOrder(nodes: NodeDoc[]): NodeDoc[] {
+  const reading = readingOrder(nodes);
+  const rank = new Map(reading.map((n, i) => [n.nodeId, i]));
+  return reading.slice().sort((a, b) => {
+    const ta = a.createdAt ? Date.parse(a.createdAt) : NaN;
+    const tb = b.createdAt ? Date.parse(b.createdAt) : NaN;
+    if (!Number.isNaN(ta) && !Number.isNaN(tb) && ta !== tb) return ta - tb;
+    if (Number.isNaN(ta) !== Number.isNaN(tb)) return Number.isNaN(ta) ? 1 : -1;
+    return rank.get(a.nodeId)! - rank.get(b.nodeId)!;
+  });
+}
+
+/**
+ * The next node to read along `order`: the one before (-1) or after (1)
+ * `fromId`, or, when `fromId` is null or not in the order, the first (→) or
+ * last (←). Null at either end.
+ */
+export function stepAlong(order: NodeDoc[], fromId: string | null, dir: -1 | 1): string | null {
+  const i = fromId ? order.findIndex((n) => n.nodeId === fromId) : -1;
+  if (i === -1) return (dir === 1 ? order[0] : order[order.length - 1])?.nodeId ?? null;
+  return order[i + dir]?.nodeId ?? null;
+}

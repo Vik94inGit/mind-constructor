@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readingOrder, stepNode } from "./nodeOrder";
+import { creationOrder, readingOrder, stepAlong, stepNode } from "./nodeOrder";
 import { makeNode } from "../test/fixtures";
 
 const ref = (nodeId: string) => ({ nodeId, text: "", type: "Option" }) as never;
@@ -39,5 +39,38 @@ describe("readingOrder with attacks", () => {
     ];
     expect(readingOrder(nodes).map((n) => n.nodeId)).toEqual(["claim", "hit", "next"]);
     expect(stepNode(nodes, "claim", 1)).toBe("hit");
+  });
+});
+
+describe("creationOrder", () => {
+  const nodes = [
+    makeNode({ nodeId: "root", createdAt: "2026-01-01T10:00:00Z" }),
+    makeNode({ nodeId: "late", parentId: ref("root"), createdAt: "2026-03-01T10:00:00Z" }),
+    makeNode({ nodeId: "early", parentId: ref("root"), createdAt: "2026-02-01T10:00:00Z" }),
+    makeNode({ nodeId: "deep", parentId: ref("late"), createdAt: "2026-02-15T10:00:00Z" }),
+  ];
+
+  it("goes oldest first, whatever the tree or step numbers say", () => {
+    const withOrder = nodes.map((n) => (n.nodeId === "late" ? { ...n, order: 1 } : n));
+    expect(creationOrder(withOrder).map((n) => n.nodeId)).toEqual(["root", "early", "deep", "late"]);
+  });
+
+  it("keeps reading order for the same moment and puts undated nodes last", () => {
+    const same = [
+      makeNode({ nodeId: "b", createdAt: "2026-01-01T10:00:00Z", order: 2 }),
+      makeNode({ nodeId: "x" }),
+      makeNode({ nodeId: "a", createdAt: "2026-01-01T10:00:00Z", order: 1 }),
+    ];
+    expect(creationOrder(same).map((n) => n.nodeId)).toEqual(["a", "b", "x"]);
+  });
+
+  it("steps along an order, starting at an end when nothing in it is open", () => {
+    const order = creationOrder(nodes);
+    expect(stepAlong(order, "early", 1)).toBe("deep");
+    expect(stepAlong(order, "early", -1)).toBe("root");
+    expect(stepAlong(order, "late", 1)).toBeNull();
+    expect(stepAlong(order, null, 1)).toBe("root");
+    expect(stepAlong(order, "elsewhere", -1)).toBe("late");
+    expect(stepAlong([], null, 1)).toBeNull();
   });
 });
