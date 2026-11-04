@@ -42,7 +42,7 @@ export function QuickNote({ maps, autoFocus, onSaved }: { maps: MapDoc[]; autoFo
 
   return (
     <form onSubmit={onSubmit} className="mb-6 flex flex-col gap-2" aria-label={s.title}>
-      <div className="flex items-end gap-2">
+      <div className="flex items-stretch gap-2">
         <textarea
           rows={2}
           maxLength={MAX_NODE_TEXT}

@@ -98,7 +98,7 @@ export function PicturePicker({ onPick, onClose }: Props) {
         type="button"
         className="flex cursor-pointer flex-col items-center gap-0.5 rounded-card border border-line bg-surface p-1.5 text-[0.75rem] leading-tight text-ink hover:bg-surface-2"
         onClick={() => onPick(kind)}
-        title={p.questions[kind]}
+        title={p.questions[kind][0]}
         data-picture={kind}
       >
         <PictureThumb kind={kind} size={THUMB} />

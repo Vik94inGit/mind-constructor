@@ -82,6 +82,15 @@ interface Props {
    * Without it the ghosts can only be clicked.
    */
   onSketch?: (type: NodeType, pos: { x: number; y: number }) => void;
+  /**
+   * The chosen node's own type. With onChangeType, a picked ghost of another
+   * type offers two things: turn the chosen node into that type, or add a new
+   * node of it (the node panel has no row of types any more).
+   */
+  currentType?: NodeType;
+  onChangeType?: (type: NodeType) => void;
+  /** The types the chosen node may become (a weapon or protection node only takes ATTACK_NODE_TYPES). */
+  changeTypes?: readonly NodeType[];
 }
 
 // How far (screen px) a ghost has to travel before a press counts as a drag.
@@ -115,6 +124,9 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   emojiFirst = false,
   onPickEmoji,
   onSketch,
+  currentType,
+  onChangeType,
+  changeTypes = NODE_TYPES,
 }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
@@ -450,6 +462,17 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
           phrases={t.ui.node.ghostTemplates[armed.type]}
           title={t.ui.node.ghostTemplatesTitle}
           onPick={(text) => pickType(armed.type, { x: armed.x, y: armed.y }, text)}
+          actions={
+            onChangeType && armed.type !== currentType && changeTypes.includes(armed.type)
+              ? [
+                  { label: `↻ ${t.ui.node.ghostChangeTo(t.ui.types[armed.type])}`, testId: "ghost-change-type", onClick: () => {
+                    onChangeType(armed.type);
+                    setArmed(null);
+                  } },
+                  { label: `＋ ${t.ui.node.ghostNewOne(t.ui.types[armed.type])}`, testId: "ghost-new-node", onClick: () => pickType(armed.type, { x: armed.x, y: armed.y }) },
+                ]
+              : []
+          }
         />
       )}
     </>
@@ -472,6 +495,7 @@ function GhostTemplates({
   phrases,
   title,
   onPick,
+  actions = [],
 }: {
   type: NodeType;
   pos: { x: number; y: number };
@@ -480,6 +504,8 @@ function GhostTemplates({
   phrases: string[];
   title: string;
   onPick: (text: string) => void;
+  /** Shown above the phrases, solid rather than dashed: what the picked ghost can do. */
+  actions?: { label: string; testId: string; onClick: () => void }[];
 }) {
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
@@ -497,6 +523,9 @@ function GhostTemplates({
         top: sin > 0 ? TEMPLATE_BELOW_GAP : -TEMPLATE_ABOVE_GAP,
         transform: `translate(-50%, ${sin > 0 ? "0" : "-100%"})`,
         alignItems: "center",
+        // Above the ghost the column reads upwards, so the actions (listed
+        // first) stay next to the ghost instead of running off the top.
+        flexDirection: sin > 0 ? "column" : "column-reverse",
       };
   return (
     // Drawn in screen pixels: the wrapper undoes the canvas zoom, the same
@@ -506,12 +535,28 @@ function GhostTemplates({
       style={{ left: pos.x, top: pos.y, transform: `scale(${1 / (zoom || 1)})`, transformOrigin: "0 0" }}
     >
       <div className="absolute flex flex-col gap-[0.3rem]" style={place}>
+        {actions.map((action, i) => (
+          <button
+            key={action.testId}
+            type="button"
+            data-testid={action.testId}
+            className="pointer-events-auto animate-ghost-in cursor-pointer rounded-full border-2 bg-surface px-[0.6rem] py-[0.25rem] text-left text-[0.72rem] leading-[1.25] font-semibold whitespace-nowrap text-ink shadow-card transition-transform duration-150 hover:scale-[1.05]"
+            style={{ borderColor: NODE_TYPE_COLORS[type], animationDelay: `${i * 70}ms`, touchAction: "manipulation" }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              action.onClick();
+            }}
+          >
+            {action.label}
+          </button>
+        ))}
         {phrases.map((phrase, i) => (
           <button
             key={phrase}
             type="button"
             className="pointer-events-auto max-w-[11rem] animate-ghost-in cursor-pointer rounded-full border border-dashed bg-surface px-[0.55rem] py-[0.2rem] text-left text-[0.66rem] leading-[1.25] font-medium whitespace-nowrap text-ink opacity-85 shadow-card transition-[opacity,transform] duration-150 hover:scale-[1.05] hover:opacity-100 focus-visible:opacity-100"
-            style={{ borderColor: NODE_TYPE_COLORS[type], animationDelay: `${i * 70}ms`, touchAction: "manipulation" }}
+            style={{ borderColor: NODE_TYPE_COLORS[type], animationDelay: `${(i + actions.length) * 70}ms`, touchAction: "manipulation" }}
             title={title}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {

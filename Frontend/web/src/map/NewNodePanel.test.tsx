@@ -11,7 +11,7 @@ function renderPanel(prompt?: string) {
   const onCreate = vi.fn().mockResolvedValue(undefined);
   render(
     <I18nProvider>
-      <NewNodePanel type="Option" prompt={prompt} onTypeChange={vi.fn()} onClearEmoji={vi.fn()} onCreate={onCreate} onCancel={vi.fn()} />
+      <NewNodePanel type="Option" prompt={prompt} onClearEmoji={vi.fn()} onCreate={onCreate} onCancel={vi.fn()} />
     </I18nProvider>,
   );
   return onCreate;
