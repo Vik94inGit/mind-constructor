@@ -10,8 +10,6 @@ function setup(overrides: Partial<Parameters<typeof usePresentation>[0]> = {}) {
     hiddenBranchIds: new Set<string>(),
     multiSelectIds: new Set<string>(),
     selectedCircleNodeIds: undefined as string[] | undefined,
-    posFor: (n: NodeDoc) => ({ x: n.x ?? 0, y: n.y ?? 0 }),
-    centerOnPoint: vi.fn(),
     ensureNodeText: vi.fn(async () => ({})),
     setMultiSelectIds: vi.fn(),
     setSelectedId: vi.fn(),
@@ -49,7 +47,6 @@ describe("usePresentation", () => {
     expect(params.setSelectedId).toHaveBeenCalledWith(null);
     expect(params.dispatchMode).toHaveBeenCalledWith({ type: "reset" });
     expect(result.current.slideNodes.map((n) => n.nodeId)).toEqual(["a"]);
-    expect(params.centerOnPoint).toHaveBeenCalled();
 
     act(() => result.current.exitPresentation());
     expect(result.current.presenting).toBe(false);

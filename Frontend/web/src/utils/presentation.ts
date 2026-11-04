@@ -1,13 +1,11 @@
 // Pure, stateless helpers for presentation mode (see MapPage's own
 // presenting/slideIndex state and PresentationOverlay) — a full-map
-// slideshow that steps through a map's own nodes as "slides," with the
-// canvas auto-tidied into a clean org-chart shape for the duration. Kept
+// slideshow that steps through a map's own nodes as "slides". Kept
 // separate from canvasLayout.ts (already large, and about canvas
 // *interaction* geometry — drag/obstacle-avoidance) and templates.ts (a
 // different TemplateNode[] shape, for static onboarding templates) since
 // these two functions share a childrenByParent walk with each other but
 // nothing with either of those files' own concerns.
-import { CANVAS_W, CANVAS_H, CAPTION_WIDTH } from "./canvasLayout";
 import { nodeRefId } from "./nodeType";
 import type { NodeDoc } from "../types";
 
@@ -149,73 +147,4 @@ export function computeSlideGroups(nodes: NodeDoc[]): SlideGroup[] {
   for (const root of parents.filter((p) => rootIds.has(p.nodeId))) walk(root);
   for (const n of nodes) walk(n);
   return groups;
-}
-
-// Presentation-mode column/row spacing — same COLUMN formula
-// templates.ts's own layoutTemplate uses (CAPTION_WIDTH, the widest thing a
-// node actually draws, plus a gap), so a geometrized node's own footprint
-// doesn't crowd its neighbors any tighter than a template-seeded one does.
-const COLUMN = CAPTION_WIDTH + 20;
-const ROW = 170;
-// Clear gap between one root's whole tree and the next when a map has more
-// than one — wider than COLUMN alone so two unrelated trees read as
-// visibly separate "stories," not one continuous row.
-const FOREST_GAP = COLUMN * 2;
-
-// A clean, deterministic org-chart layout for `nodes`' own parentId forest
-// — each tree hangs top-to-bottom by depth, a subtree's own column width
-// set by its leaf count (same leaves() idea templates.ts's layoutTemplate
-// already uses), multiple root-level trees placed left-to-right beside each
-// other. Deliberately simpler than layoutTemplate itself: no off-canvas/
-// overlap scoring or two-direction trial — presentation mode owns the
-// whole canvas for its own duration (nothing existing to avoid landing on),
-// and top-to-bottom is the only direction that reads naturally as an
-// outline/slideshow order, so there's nothing worth scoring between
-// alternatives. Pure — returns absolute canvas coordinates and touches
-// nothing else; MapPage blends the live canvas toward these the same
-// non-destructive way it already blends toward radialPositions (see
-// useRadialBlend), never writing any of this back to a node's own stored
-// x/y.
-export function computeGeometrizedPositions(nodes: NodeDoc[]): Map<string, { x: number; y: number }> {
-  const out = new Map<string, { x: number; y: number }>();
-  if (nodes.length === 0) return out;
-  const { indexById, childrenByParent, roots } = buildForest(nodes);
-  const order = leftToRight(indexById);
-  for (const list of childrenByParent.values()) list.sort(order);
-  roots.sort(byCreation(indexById));
-
-  const leaves = (n: NodeDoc): number => {
-    const kids = childrenByParent.get(n.nodeId);
-    return kids?.length ? kids.reduce((sum, c) => sum + leaves(c), 0) : 1;
-  };
-
-  let cursor = 0; // running left edge across the whole forest
-  for (const root of roots) {
-    const width = leaves(root);
-    const place = (n: NodeDoc, left: number, depth: number) => {
-      const w = leaves(n);
-      const x = left + ((w - 1) * COLUMN) / 2;
-      const y = depth * ROW + ROW; // ROW of clearance above the first row
-      out.set(n.nodeId, { x, y });
-      let childCursor = left;
-      for (const c of childrenByParent.get(n.nodeId) ?? []) {
-        place(c, childCursor, depth + 1);
-        childCursor += leaves(c) * COLUMN;
-      }
-    };
-    place(root, cursor, 0);
-    cursor += width * COLUMN + FOREST_GAP;
-  }
-
-  // Recenter the whole forest on the fixed 2400x1600 canvas — it was built
-  // growing rightward/downward from (0,0) above, with no regard for where
-  // the canvas actually is, so shift every point by the same amount at the
-  // end rather than threading a canvas-center offset through the recursion
-  // itself.
-  const xs = [...out.values()].map((p) => p.x);
-  const ys = [...out.values()].map((p) => p.y);
-  const shiftX = CANVAS_W / 2 - (Math.min(...xs) + Math.max(...xs)) / 2;
-  const shiftY = Math.max(80, CANVAS_H / 2 - (Math.min(...ys) + Math.max(...ys)) / 2);
-  for (const [id, p] of out) out.set(id, { x: p.x + shiftX, y: p.y + shiftY });
-  return out;
 }

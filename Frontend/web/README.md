@@ -341,13 +341,18 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   they grey out at the first and last node. A zone fades in just after the node that made it (its parent's second child), so the
   nodes come first and the zones they form follow (`src/map/TimeLapseBar.tsx`, `src/hooks/useTimeLapse.ts`).
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
-  slides, with the canvas tidied into an org chart. Each node gets a slide, with its children on it as
+  slides in a full-screen view. Each node gets a slide, with its children on it as
   cards, left to right as they sit on the canvas; tapping a card opens that child's slide, and the
   *Under …* line goes back up to the parent's. The show goes a parent, then all of its own children one
   by one, then the next parent and its children, and so on (level by level, so a grandchild never
   interrupts its parent's siblings). The node and every child have a
   **Show on map** link that closes the presentation and opens that node on the map
-  (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`).
+  (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`). The canvas under
+  the slides stays as it was, so *Exit* lands back on exactly the view the presentation started from.
+- **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
+  children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the
+  spot that was in the middle of the screen when that spot still shows a node; a search result opens on
+  that node (`src/utils/openingFocus.ts`, `src/hooks/useRestoreView.ts`).
 - **Search** — the magnifier in the map toolbar finds nodes by title, text or zone name (accents ignored);
   matches stay lit while everything else dims, and a result takes you to that node. Under the box,
   one chip per node type the map has (with its count) filters by type: pick one or more and only

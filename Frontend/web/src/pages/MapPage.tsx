@@ -93,6 +93,7 @@ import { useLineDrawing } from "../hooks/useLineDrawing";
 import { useNodeDragAndDrop } from "../hooks/useNodeDragAndDrop";
 import { useReparent } from "../hooks/useReparent";
 import { useRestoreView } from "../hooks/useRestoreView";
+import { firstParentPoint, showsAnyNode } from "../utils/openingFocus";
 import { useNodeBursts } from "../hooks/useNodeBursts";
 import { useTextBackfill } from "../hooks/useTextBackfill";
 import { useNodeStyling } from "../hooks/useNodeStyling";
@@ -408,6 +409,19 @@ export function MapPage() {
   // group-selection footer (multiSelectIds), which is a slim bar, not a tall
   // sheet.
   const sheetOpen = chooseMode || packMode || reparentMode || !!pendingCreate || (!!selectedNode && multiSelectIds.size === 0);
+  // Where the map opens: back at the spot left last time when that spot
+  // shows a node, else on the map's first parent (utils/openingFocus.ts),
+  // never on empty canvas.
+  const firstParent = useMemo(() => firstParentPoint(visibleNodes, positions), [visibleNodes, positions]);
+  const restoreCenter = useMemo(() => {
+    const center = savedView?.center;
+    if (!center) return null;
+    return showsAnyNode(center, positions, window.innerWidth / 2, window.innerHeight / 2) ? center : null;
+  }, [savedView?.center, positions]);
+  const restoreView = useMemo(
+    () => (savedView ? { ...savedView, center: restoreCenter } : null),
+    [savedView, restoreCenter],
+  );
   const {
     canvasRef,
     wrapRef,
@@ -429,7 +443,7 @@ export function MapPage() {
     loading,
     sheetOpen,
     positions,
-    openAt: focusNodeId ? null : (savedView?.center ?? null),
+    openAt: focusNodeId ? null : (restoreCenter ?? firstParent),
   });
 
   // Picking up where you left off — see hooks/useRestoreView.ts.
@@ -437,7 +451,7 @@ export function MapPage() {
     mapId,
     loading,
     focusNodeId,
-    savedView,
+    savedView: restoreView,
     saveView,
     visibleNodes,
     selectedId,
@@ -491,12 +505,6 @@ export function MapPage() {
     // The map's opening animation: drifting out and back (useIntroMigration).
     const drift = introOffset(node.nodeId);
     const own = drift ? { x: stored.x + drift.x, y: stored.y + drift.y } : stored;
-    // Presentation's org-chart blend first; it and the radial ring never overlap.
-    const geo = geometrizeBlend.map?.get(node.nodeId);
-    if (geo) {
-      const b = geometrizeBlend.blend;
-      return { x: own.x + (geo.x - own.x) * b, y: own.y + (geo.y - own.y) * b };
-    }
     // A card on the board stays at its own spot among the other cards.
     const radial = cardSpace.has(node.nodeId) ? undefined : radialBlend.map?.get(node.nodeId);
     if (!radial) return own;
@@ -504,15 +512,13 @@ export function MapPage() {
     return { x: own.x + (radial.x - own.x) * b, y: own.y + (radial.y - own.y) * b };
   }
 
-  // Presentation mode: the map's own nodes as slides over an auto-tidied,
-  // org-chart canvas — see hooks/usePresentation.ts. posFor reads its
-  // geometrizeBlend to draw that shape.
+  // Presentation mode: the map's own nodes as slides in a full-screen
+  // overlay — see hooks/usePresentation.ts.
   const {
     presenting,
     slideIndex,
     setSlideIndex,
     slideGroups,
-    geometrizeBlend,
     enterPresentation,
     exitPresentation,
   } = usePresentation({
@@ -520,8 +526,6 @@ export function MapPage() {
     hiddenBranchIds,
     multiSelectIds,
     selectedCircleNodeIds: map?.selectedCircle?.nodeIds,
-    posFor,
-    centerOnPoint,
     ensureNodeText,
     setMultiSelectIds,
     setSelectedId,
