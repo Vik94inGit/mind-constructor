@@ -54,12 +54,46 @@ describe("useVisualViewportOffset", () => {
     Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
   });
 
-  it("leaves the page alone while the keyboard is up", () => {
+  it("leaves the page alone while a field is being typed in", () => {
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const field = document.createElement("textarea");
+    document.body.appendChild(field);
+    field.focus();
     Object.defineProperty(window, "scrollY", { configurable: true, value: 120 });
-    vv.height = 450;
     renderHook(() => useVisualViewportOffset());
     expect(scrollTo).not.toHaveBeenCalled();
     Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+    field.remove();
+  });
+
+  it("puts the page back once the field loses focus (closing the node panel on an iPad)", () => {
+    vi.useFakeTimers();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const field = document.createElement("textarea");
+    document.body.appendChild(field);
+    field.focus();
+    renderHook(() => useVisualViewportOffset());
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 300 });
+    field.blur();
+    field.remove();
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+    vi.useRealTimers();
+  });
+
+  it("follows a scroll of the page itself, which the visual viewport doesn't report", () => {
+    const field = document.createElement("textarea");
+    document.body.appendChild(field);
+    field.focus();
+    const { result } = renderHook(() => useVisualViewportOffset());
+    act(() => {
+      vv.pageTop = 200;
+      window.dispatchEvent(new Event("scroll"));
+    });
+    expect(result.current.top).toBe(200);
+    field.remove();
   });
 });
