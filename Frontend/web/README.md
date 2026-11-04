@@ -347,7 +347,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   by one, then the next parent and its children, and so on (level by level, so a grandchild never
   interrupts its parent's siblings). The node and every child have a
   **Show on map** link that closes the presentation and opens that node on the map
-  (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`). The canvas under
+  (`src/utils/presentation.ts` `computeSlideGroups`, `src/map/PresentationOverlay.tsx`). A slide shows
+  its node's pictures under the text (fetched with the node the first time its slide comes up,
+  `src/hooks/useSlidePictures.ts`); tap one to see it full size. A child's card shows its picture card,
+  if it has one. The canvas under
   the slides stays as it was, so *Exit* lands back on exactly the view the presentation started from.
 - **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
   children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the
