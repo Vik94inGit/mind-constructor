@@ -60,7 +60,7 @@ import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
-import { readingOrder, stepNode } from "../utils/nodeOrder";
+import { creationOrder, readingOrder, stepAlong } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
 import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
@@ -110,6 +110,7 @@ import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
 import {
   computeAttackPairIds,
+  collectDescendants,
   computeHiddenBranchIds,
   computeSolved,
   computeUnsolvedProblemIds,
@@ -985,17 +986,26 @@ export function MapPage() {
 
   // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
   // open node to the one before or after it, or, with none open, from the
-  // first (→) or last (←) node. The panel's arrows and the keyboard's ← / →
-  // both land here; only the text field's own arrows move focus into the
-  // next node's text.
+  // first (→) or last (←) node. With a zone chosen, the arrows stay inside it
+  // and go by when each thought was written, oldest first (creationOrder), so
+  // stepping replays how that thinking grew. The panel's arrows and the
+  // keyboard's ← / → both land here; only the text field's own arrows move
+  // focus into the next node's text.
   function stepReading(dir: -1 | 1, focusText = true) {
     if (timeLapse) {
       // In the time-lapse the arrows step it instead, one node at a time.
       stepTimeLapse(dir);
       return;
     }
-    const order = readingOrder(visibleNodes);
-    const next = selectedId ? stepNode(visibleNodes, selectedId, dir) : (dir === 1 ? order[0] : order[order.length - 1])?.nodeId;
+    const zoneIds = map?.selectedCircle?.nodeIds;
+    let order: NodeDoc[];
+    if (zoneIds?.length) {
+      const inZone = collectDescendants(new Set(zoneIds), visibleNodes);
+      order = creationOrder(visibleNodes.filter((n) => inZone.has(n.nodeId)));
+    } else {
+      order = readingOrder(visibleNodes);
+    }
+    const next = stepAlong(order, selectedId, dir);
     if (!next) return;
     clearPictureView();
     setSteppedToId(next);
