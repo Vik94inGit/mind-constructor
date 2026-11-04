@@ -6,6 +6,7 @@ import { imageSrc } from "../utils/images";
 import { useSlidePictures } from "../hooks/useSlidePictures";
 import { useState } from "react";
 import type { NodeDoc } from "../types";
+import { slideHeadSize, slideSubSize } from "../utils/presentation";
 import type { SlideGroup } from "../utils/presentation";
 
 interface Props {
@@ -92,7 +93,7 @@ export function PresentationOverlay({
           {parent && (
             <button
               type="button"
-              className="max-w-[700px] cursor-pointer truncate rounded-md px-2 py-1 text-[0.95rem] text-ink-soft hover:bg-surface-2"
+              className="line-clamp-2 max-w-[700px] cursor-pointer rounded-md px-2 py-1 text-[0.95rem] break-words text-ink-soft hover:bg-surface-2"
               onClick={() => goTo(parent.nodeId)}
             >
               ↑ {t.ui.presentation.under(parent.title || parent.text || "")}
@@ -244,9 +245,14 @@ export function PresentationOverlay({
 
 // The slide's parent: its type icon, large, its type, and its title (else
 // text) as the headline, with the text as a second line when there is a
-// title. Smaller when children share the slide, so they fit under it.
+// title. Both shrink with their length (and a long one reads left-aligned),
+// so they fit; smaller still when children share the slide.
 function SlideHead({ node, compact }: { node: NodeDoc; compact: boolean }) {
   const { t } = useI18n();
+  const headline = node.title || node.text || "";
+  // Sized to its own length so a long thought fits (utils/presentation.ts).
+  const head = slideHeadSize(headline, compact);
+  const sub = slideSubSize(node.text || "");
   return (
     <>
       <div
@@ -262,16 +268,18 @@ function SlideHead({ node, compact }: { node: NodeDoc; compact: boolean }) {
         {t.ui.types[node.type]}
       </span>
       <h1
-        className={`m-0 max-w-[900px] leading-tight font-bold break-words text-ink ${
-          compact
-            ? "text-[1.6rem] sm:text-[2.2rem]"
-            : "text-[2rem] sm:text-[2.8rem]"
+        className={`m-0 w-full max-w-[900px] leading-tight font-bold break-words whitespace-pre-line text-ink ${head.size} ${
+          head.align === "left" ? "text-left" : "text-center"
         }`}
       >
-        {node.title || node.text}
+        {headline}
       </h1>
-      {node.title && (
-        <p className="m-0 max-w-[700px] text-[1.15rem] text-ink-soft">
+      {node.title && node.text && (
+        <p
+          className={`m-0 w-full max-w-[760px] break-words whitespace-pre-line text-ink-soft ${sub.size} ${
+            sub.align === "left" ? "text-left" : "text-center"
+          }`}
+        >
           {node.text}
         </p>
       )}
