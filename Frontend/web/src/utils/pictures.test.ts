@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NODE_FOOTPRINT } from "./canvasLayout";
 import {
   PICTURES,
   FUN_PICTURE_KINDS,
@@ -39,10 +40,17 @@ describe("PICTURES", () => {
     const dots = pictureDots(kind, { x: 0, y: 0 });
     for (let i = 0; i < dots.length; i++) {
       for (let j = i + 1; j < dots.length; j++) {
-        const clear = Math.abs(dots[i].x - dots[j].x) >= 170 || Math.abs(dots[i].y - dots[j].y) >= 110;
+        const clear = Math.abs(dots[i].x - dots[j].x) >= NODE_FOOTPRINT.w + 6 || Math.abs(dots[i].y - dots[j].y) >= NODE_FOOTPRINT.h + 4;
         expect(clear, `${kind} dots ${i} and ${j}`).toBe(true);
       }
     }
+  });
+
+  it.each(PICTURE_KINDS)("%s is drawn no bigger than its cards need", (kind) => {
+    const dots = pictureDots(kind, { x: 0, y: 0 });
+    const span = (axis: "x" | "y") => Math.max(...dots.map((d) => d[axis])) - Math.min(...dots.map((d) => d[axis]));
+    // A picture of ghosts once spanned up to 934 units, far past a screen at 100%.
+    expect(Math.max(span("x"), span("y"))).toBeLessThanOrEqual(640);
   });
 
   it("has a different question for every dot of every picture, in every language", async () => {

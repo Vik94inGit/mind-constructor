@@ -77,7 +77,7 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
       { x: -1.05, y: 0.85 },
       { x: -0.55, y: -0.05 },
       { x: 0, y: -0.45 },
-      { x: 0, y: 0.3 },
+      { x: 0, y: 0.4 },
     ],
     paths: [loop(6), [6, 7]],
     color: "#e08a00",
@@ -86,7 +86,7 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
   key: {
     // A round bow on the left, the shaft to the right and one tooth.
     dots: [
-      ...ring(6, 0.55, 0).map((p) => ({ x: p.x - 0.55, y: p.y })),
+      ...ring(6, 0.6, 0).map((p) => ({ x: p.x - 0.6, y: p.y })),
       { x: 0.6, y: 0 },
       { x: 1.2, y: 0 },
       { x: 1.2, y: 0.5 },
@@ -136,10 +136,10 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
     // A rain cloud: its bumpy top, a flat bottom and two streaks of rain.
     dots: [
       { x: -1, y: 0.25 },
-      { x: -0.85, y: -0.35 },
-      { x: -0.3, y: -0.65 },
-      { x: 0.25, y: -0.85 },
-      { x: 0.8, y: -0.45 },
+      { x: -0.9, y: -0.35 },
+      { x: -0.3, y: -0.7 },
+      { x: 0.3, y: -0.85 },
+      { x: 0.9, y: -0.45 },
       { x: 1, y: 0.25 },
       { x: 0.4, y: 0.25 },
       { x: -0.4, y: 0.25 },
@@ -169,13 +169,13 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
     dots: [
       { x: 0, y: -0.45 },
       { x: 0.4, y: -0.9 },
-      { x: 0.95, y: -0.7 },
+      { x: 1, y: -0.65 },
       { x: 1, y: -0.1 },
       { x: 0.55, y: 0.45 },
       { x: 0, y: 1 },
       { x: -0.55, y: 0.45 },
       { x: -1, y: -0.1 },
-      { x: -0.95, y: -0.7 },
+      { x: -1, y: -0.65 },
       { x: -0.4, y: -0.9 },
     ],
     paths: [loop(10)],
@@ -183,21 +183,21 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
   },
   star: {
     // Points and the notches between them, in turn.
-    dots: ring(10, 1, -90).map((p, i) => (i % 2 === 0 ? p : { x: p.x * 0.5, y: p.y * 0.5 })),
+    dots: ring(10, 1, -90).map((p, i) => (i % 2 === 0 ? p : { x: p.x * 0.55, y: p.y * 0.55 })),
     paths: [loop(10)],
     color: "#e7a614",
   },
   house: {
     dots: [
-      { x: -0.8, y: 1 },
-      { x: 0.8, y: 1 },
-      { x: 0.8, y: 0 },
+      { x: -0.9, y: 1 },
+      { x: 0.9, y: 1 },
+      { x: 0.9, y: 0 },
       { x: 0, y: -1 },
-      { x: -0.8, y: 0 },
-      { x: -0.25, y: 1 },
-      { x: -0.25, y: 0.35 },
-      { x: 0.25, y: 0.35 },
-      { x: 0.25, y: 1 },
+      { x: -0.9, y: 0 },
+      { x: -0.3, y: 1 },
+      { x: -0.3, y: 0.35 },
+      { x: 0.3, y: 0.35 },
+      { x: 0.3, y: 1 },
     ],
     paths: [
       [0, 5],
@@ -210,12 +210,12 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
   tree: {
     dots: [
       { x: 0, y: -1 },
-      { x: 0.85, y: 0.25 },
-      { x: 0.22, y: 0.25 },
-      { x: 0.22, y: 1 },
-      { x: -0.22, y: 1 },
-      { x: -0.22, y: 0.25 },
-      { x: -0.85, y: 0.25 },
+      { x: 0.9, y: 0.25 },
+      { x: 0.3, y: 0.25 },
+      { x: 0.3, y: 1 },
+      { x: -0.3, y: 1 },
+      { x: -0.3, y: 0.25 },
+      { x: -0.9, y: 0.25 },
     ],
     paths: [loop(7)],
     color: "#2f9e5b",
@@ -242,9 +242,9 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
       ...ring(8, 1, -90),
       { x: -0.38, y: -0.3 },
       { x: 0.38, y: -0.3 },
-      { x: -0.42, y: 0.32 },
-      { x: 0, y: 0.55 },
-      { x: 0.42, y: 0.32 },
+      { x: -0.42, y: 0.25 },
+      { x: 0, y: 0.62 },
+      { x: 0.42, y: 0.25 },
     ],
     paths: [loop(8), [10, 11, 12]],
     color: "#f08a24",
@@ -266,13 +266,15 @@ export function pictureForType(type: NodeType): PictureKind {
 }
 
 // Two dots must sit at least this far apart on one axis or the other, so the
-// node cards drawn on them (NODE_FOOTPRINT, 148 x 90, plus air for a zoomed-out view)
-// never overlap.
-const DOT_GAP = { x: 196, y: 128 };
+// node cards drawn on them (NODE_FOOTPRINT, 148 x 90) never overlap, with a
+// little air between them. Any more and a picture of ghosts grows far past
+// the screen; the dots of each picture above are spread evenly so that no one
+// close pair blows the whole picture up.
+const DOT_GAP = { x: 156, y: 96 };
 
 // A picture is drawn at least this wide (or tall, whichever is longer), so a
 // squat one still reads as a picture rather than a cluster of cards.
-const MIN_SPAN = 600;
+const MIN_SPAN = 360;
 
 /**
  * Canvas units per picture unit: the smallest scale at which no two dots'
