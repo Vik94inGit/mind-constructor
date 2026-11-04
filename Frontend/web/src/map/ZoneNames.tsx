@@ -44,6 +44,8 @@ interface Props {
   onSetLayout?: (rootId: string, layout: ZoneLayout | null) => void;
   /** A zone's pattern or colour was picked — saved on its parent (Node.zonePattern / zoneColor). */
   onSetStyle?: (rootId: string, patch: ZoneStylePatch) => void;
+  /** "Present this zone" in a zone's menu: a presentation of only that zone. */
+  onPresent?: (rootId: string) => void;
 }
 
 // The names of the zones in view (their parent on screen right now), listed
@@ -64,6 +66,7 @@ export function ZoneNames({
   layouts = {},
   onSetLayout,
   onSetStyle,
+  onPresent,
 }: Props) {
   const { t } = useI18n();
   // The zone whose view menu is open, and where to draw the menu (fixed to
@@ -197,6 +200,7 @@ export function ZoneNames({
                 view={{ value: modes[menu.rootId] ?? null, onPick: (m) => onSetMode(menu.rootId, m) }}
                 layout={onSetLayout ? { value: layouts[menu.rootId] ?? null, onPick: (l) => onSetLayout(menu.rootId, l) } : undefined}
                 style={style && onSetStyle ? { ...style, onChange: (patch) => onSetStyle(menu.rootId, patch) } : undefined}
+                onPresent={onPresent ? () => onPresent(menu.rootId) : undefined}
                 onPicked={() => setMenu(null)}
               />
             );

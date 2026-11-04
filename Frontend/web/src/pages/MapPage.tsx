@@ -520,6 +520,7 @@ export function MapPage() {
     setSlideIndex,
     slideGroups,
     enterPresentation,
+    presentZone,
     exitPresentation,
   } = usePresentation({
     visibleNodes,
@@ -1951,6 +1952,7 @@ export function MapPage() {
                 layouts={zoneLayouts}
                 onSetLayout={setZoneLayout}
                 onSetStyle={setZoneStyle}
+                onPresent={presentZone}
                 onGo={(rootId) => {
                   const group = nodeGroups.find((g) => g.rootId === rootId);
                   if (!group) return;
@@ -2309,6 +2311,7 @@ export function MapPage() {
             }
           }
           actions={zoneActionsFor(zoneMenu.rootId)}
+          onPresent={() => presentZone(zoneMenu.rootId)}
           onClose={() => setZoneMenu(null)}
         />
       )}

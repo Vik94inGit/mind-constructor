@@ -49,17 +49,19 @@ interface Props {
     /** How many nodes onDelete would remove. */
     deleteCount?: number;
   };
+  /** Starts a presentation of only this zone (usePresentation presentZone). */
+  onPresent?: () => void;
   /** A view or layout was picked — the menu around it usually closes. */
   onPicked?: () => void;
 }
 
-// Everything about one zone in one place — copying its text, its nodes'
+// Everything about one zone in one place — presenting it on its own, copying its text, its nodes'
 // shape and deleting them, its view, its layout, and (for the parent's
 // owner) its pattern, colour and edge brightness. The same body
 // opens from right-clicking or holding the zone itself (ZoneMenu), from the
 // zone's name chip (ZoneNames) and from its parent's right-click Zones
 // submenu (NodeContextMenu).
-export function ZoneMenuBody({ idPrefix, view, layout, style, actions, onPicked }: Props) {
+export function ZoneMenuBody({ idPrefix, view, layout, style, actions, onPresent, onPicked }: Props) {
   const { t } = useI18n();
   const modeLabel: Record<ZoneMode, string> = {
     puzzle: t.map.toolbar.readingPuzzle,
@@ -77,6 +79,25 @@ export function ZoneMenuBody({ idPrefix, view, layout, style, actions, onPicked 
 
   return (
     <>
+      {onPresent && (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            className={row(false)}
+            onClick={() => {
+              onPresent();
+              onPicked?.();
+            }}
+          >
+            <span className="w-6 text-center text-[0.72rem]" aria-hidden>
+              ▶
+            </span>
+            {t.ui.presentation.presentZone}
+          </button>
+          {(actions || view || layout || style) && divider}
+        </>
+      )}
       {actions && (
         <>
           <button
