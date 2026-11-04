@@ -21,7 +21,7 @@ import { InboxTray } from "../dashboard/InboxTray";
 import { findInbox } from "../utils/inbox";
 import { CreateMapModal } from "../dashboard/CreateMapModal";
 import { EditMapModal } from "../dashboard/EditMapModal";
-import { FolderModal, secondaryBtn } from "../dashboard/FolderModal";
+import { FolderModal, primaryBtn, secondaryBtn } from "../dashboard/FolderModal";
 import { MoveToFolderModal } from "../dashboard/MoveToFolderModal";
 import { FolderIcon, LibraryTile, MapIcon } from "../dashboard/LibraryTile";
 import { libraryItems, paginate } from "../dashboard/library";
@@ -31,6 +31,7 @@ import { CheckInModal } from "../dashboard/CheckInModal";
 import { MenuNode } from "../dashboard/MenuNode";
 import type { MenuGhost } from "../dashboard/MenuNode";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
+import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { checkInShift } from "../utils/feeling";
 import type { CheckIns } from "../utils/feeling";
 
@@ -41,6 +42,8 @@ export function DashboardPage() {
   const { user } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  // A computer (wide screen, mouse) keeps the original dashboard; a phone or tablet gets the main menu node.
+  const desktop = useDesktopLayout();
   const { lastMapId } = useUserState();
   const [searchParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>("all");
@@ -244,6 +247,37 @@ export function DashboardPage() {
     { id: "split", label: ring.split, icon: "✂", color: NODE_TYPE_COLORS.unknown, onClick: () => navigate("/split") },
   ];
 
+  const quickNote = (autoFocus: boolean) => (
+    <QuickNote
+      maps={maps}
+      autoFocus={autoFocus}
+      onSaved={(map, created) => {
+        setMaps((prev) =>
+          created
+            ? [{ ...map, nodeCount: 1 }, ...prev]
+            : prev.map((m) => (m.mapId === map.mapId ? { ...m, nodeCount: (m.nodeCount ?? 0) + 1 } : m)),
+        );
+      }}
+    />
+  );
+  const inboxTray = inbox && (
+    <InboxTray
+      inbox={inbox}
+      maps={maps}
+      onMoved={(target, count) =>
+        setMaps((prev) =>
+          prev.map((m) =>
+            m.mapId === inbox.mapId
+              ? { ...m, nodeCount: Math.max(0, (m.nodeCount ?? 0) - count) }
+              : m.mapId === target.mapId
+                ? { ...m, nodeCount: (m.nodeCount ?? 0) + count }
+                : m,
+          ),
+        )
+      }
+    />
+  );
+
   const filterLabels: Record<Filter, string> = {
     all: t.dashboard.filter.all,
     owned: t.dashboard.filter.owned,
@@ -255,52 +289,64 @@ export function DashboardPage() {
     // column: the writing tools (resume, quick note, think) on the left and
     // the map library filling the rest.
     <div className="mx-auto w-full max-w-[1080px] px-6 pt-8 pb-16 lg:max-w-[1600px] lg:px-10">
-      <div className="mb-4">
-        <h1 className="m-0 text-2xl font-bold">{t.dashboard.title}</h1>
-        <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">{t.dashboard.subtitle}</p>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="m-0 text-2xl font-bold">{t.dashboard.title}</h1>
+          <p className="mt-[0.2rem] mb-0 text-[0.9rem] text-ink-soft">{t.dashboard.subtitle}</p>
+        </div>
+        {desktop && (
+          <div className="flex flex-wrap gap-2">
+            <button className={secondaryBtn} onClick={() => navigate("/split")}>
+              {t.split.entry}
+            </button>
+            <button className={secondaryBtn} onClick={() => setFolderModal({})}>
+              {t.dashboard.library.newFolder}
+            </button>
+            <button className={primaryBtn} onClick={() => setShowCreate(true)}>
+              {t.dashboard.newMap}
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="lg:grid lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)] lg:items-start lg:gap-8">
-        {/* The main menu: a node with its ring of ghosts; the picked one's box below it. */}
-        <aside className="mb-8 lg:sticky lg:top-6 lg:mb-0">
-          <MenuNode ghosts={menuGhosts} active={menuOpen} onCenter={() => toggleMenu("center")} />
-
-          <div className="mt-8">
-            {menuOpen === "center" && <ThinkEntry />}
-
-            {menuOpen === "note" && (
-              <QuickNote
-                maps={maps}
-                autoFocus
-                onSaved={(map, created) => {
-                  setMaps((prev) =>
-                    created
-                      ? [{ ...map, nodeCount: 1 }, ...prev]
-                      : prev.map((m) => (m.mapId === map.mapId ? { ...m, nodeCount: (m.nodeCount ?? 0) + 1 } : m)),
-                  );
-                }}
-              />
+      <div className="lg:grid lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        {desktop ? (
+          // A computer keeps the dashboard as it was: last stop, the quick
+          // note box, the Inbox's unsorted notes and the question, stacked.
+          <aside className="lg:sticky lg:top-6">
+            {lastMap && (
+              <button
+                type="button"
+                className="mb-5 flex w-full cursor-pointer items-center gap-3 rounded-card border border-line bg-surface p-3 text-left shadow-card transition-colors duration-[120ms] hover:border-accent"
+                onClick={() => navigate(`/maps/${lastMap.mapId}`)}
+              >
+                <MapIcon color={lastMap.color} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[0.75rem] font-semibold tracking-[0.03em] text-ink-soft uppercase">
+                    {t.dashboard.library.resume.title}
+                  </span>
+                  <span className="block truncate text-[1rem] font-bold">{lastMap.name}</span>
+                </span>
+                <span className="shrink-0 rounded-lg bg-accent px-3 py-[0.45rem] text-[0.85rem] font-semibold text-white">
+                  {t.dashboard.library.resume.open} →
+                </span>
+              </button>
             )}
-
-            {menuOpen === "inbox" && inbox && (
-              <InboxTray
-                inbox={inbox}
-                maps={maps}
-                onMoved={(target, count) =>
-                  setMaps((prev) =>
-                    prev.map((m) =>
-                      m.mapId === inbox.mapId
-                        ? { ...m, nodeCount: Math.max(0, (m.nodeCount ?? 0) - count) }
-                        : m.mapId === target.mapId
-                          ? { ...m, nodeCount: (m.nodeCount ?? 0) + count }
-                          : m,
-                    ),
-                  )
-                }
-              />
-            )}
-          </div>
-        </aside>
+            {quickNote(searchParams.get("note") === "1")}
+            {inboxTray}
+            <ThinkEntry />
+          </aside>
+        ) : (
+          // A phone: the main menu, a node with its ring of ghosts; the picked one's box below it.
+          <aside className="mb-8">
+            <MenuNode ghosts={menuGhosts} active={menuOpen} onCenter={() => toggleMenu("center")} />
+            <div className="mt-8">
+              {menuOpen === "center" && <ThinkEntry />}
+              {menuOpen === "note" && quickNote(true)}
+              {menuOpen === "inbox" && inboxTray}
+            </div>
+          </aside>
+        )}
 
         <section className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center gap-[0.4rem]">

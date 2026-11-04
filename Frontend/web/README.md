@@ -42,12 +42,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   lives in your own view of the map (`/api/state/maps/:mapId`, `feelings` and `checkIn`). See
   `src/utils/feeling.ts`, `src/components/FeelingPicker.tsx`, `src/components/CheckInForm.tsx`,
   `src/map/CheckInPrompt.tsx` and `src/dashboard/CheckInModal.tsx`.
-- **Dashboard** (`/`) — opens on the **main menu**, drawn like a thought on the map: a node
+- **Dashboard** (`/`) — on a phone or tablet it opens on the **main menu**, drawn like a thought on the map: a node
   (*What's on your mind?*, which opens Think it through) with a ring of ghosts round it, one per
   thing to do: **Last stop** (the map you were last on), **Quick note**, **Unsorted notes** (only
   while the Inbox has some), **New map**, **New folder** and **Text → map**. A ghost that opens a box
   (quick note, unsorted notes, the centre's question) shows it under the ring; tapping it again
-  closes it (`src/dashboard/MenuNode.tsx`, `src/dashboard/menuRing.ts`). After it: the filters,
+  closes it (`src/dashboard/MenuNode.tsx`, `src/dashboard/menuRing.ts`). A computer (wide screen and a mouse, `hooks/useDesktopLayout.ts`) keeps the earlier
+  layout: the buttons top right, and last stop, quick note, unsorted notes and the question stacked on the left. After it: the filters,
   search, folders and maps you own or were invited to; create/rename/delete, invite members, see
   who's on a map and who owns it, copy a whole map's nodes to paste into another one. A quick note
   goes to the **Inbox** map; the *Unsorted notes* ghost counts the Inbox's unsorted notes, and

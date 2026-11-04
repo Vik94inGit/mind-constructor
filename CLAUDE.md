@@ -60,7 +60,7 @@ npm run build        # tsc -b && vite build
 
 ## Frontend architecture (`Frontend/web/src`)
 
-- **`pages/`** — `DashboardPage` (the main menu: a node with a ring of ghosts, `dashboard/MenuNode.tsx`; then folders + maps grid),
+- **`pages/`** — `DashboardPage` (on a phone the main menu is a node with a ring of ghosts, `dashboard/MenuNode.tsx`; a computer keeps quick note, Inbox and "What's on your mind?" stacked; then folders + maps grid),
   `ThinkPage` (the guided "Think it through" flow, logic in `utils/thoughtFlow.ts` and `think/`),
   `MapPage` (the canvas; ~2,400 lines, so most behavior is pulled out into `hooks/` and `map/`),
   `SplitTextPage`, `AdminPage`, login/register.
