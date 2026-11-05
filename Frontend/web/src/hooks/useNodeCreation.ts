@@ -11,6 +11,7 @@ import { sleep } from "../utils/sleep";
 import { layoutPicture, newPictureId, pictureNodeType } from "../utils/pictures";
 import type { PictureKind } from "../utils/pictures";
 import { piecesParentsFirst } from "../utils/textSplit";
+import { splitNodeText } from "../utils/nodeText";
 import type { Translation } from "../i18n/translations";
 import type { MapKind, NodeDoc, NodeType } from "../types";
 import { track } from "../utils/usage";
@@ -160,10 +161,13 @@ export function useNodeCreation({
   // confirms with non-empty text — the one place any node-creation path
   // (toolbar, double-click, "Create branch", quick-add) ends up.
   // Empty text with a prompt makes a ghost (see NodeDoc.ghost).
-  async function confirmPendingCreate(text: string, type: NodeType, images: string[] = [], prompt?: string) {
+  // `overflow`: pasted text that didn't fit (utils/nodeText.ts), to go into
+  // new nodes carrying on from this one once it's made (see carryText).
+  async function confirmPendingCreate(text: string, type: NodeType, images: string[] = [], prompt?: string, overflow?: string) {
     if (!pendingCreate || !mapId) return;
     const { x, y, parentId, emoji } = pendingCreate;
     setActionError(null);
+    let made: NodeDoc | null = null;
     try {
       let node = await nodesApi.createNode(mapId, { text, type, x, y, parentId, ...(emoji ? { emoji } : {}), ...(prompt ? { prompt } : {}) });
       // Pictures added while writing it (NewNodePanel) go on once it exists.
@@ -174,11 +178,48 @@ export function useNodeCreation({
       // The text was written in NewNodePanel already, so nothing opens
       // after it: the node lands and the map is in view again.
       onCreated(node, { x, y });
+      made = node;
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
     } finally {
       setPendingCreate(null);
     }
+    if (made && overflow) await carryText(made, overflow, { x, y });
+  }
+
+  // Text that ran past a node's limit (MAX_NODE_TEXT), carried on into new
+  // nodes: as many as it takes, each one hanging from the one before, the
+  // first from `from`, and of its type — one thought written on across
+  // several nodes. Placed beside the node it hangs from, under the zone rules.
+  // Resolves false if a node couldn't be made (the error is shown).
+  async function carryText(from: NodeDoc, rest: string, at?: Pt): Promise<boolean> {
+    if (!mapId) return false;
+    const pieces = splitNodeText(rest);
+    if (pieces.length === 0) return true;
+    setActionError(null);
+    let parent = from.nodeId;
+    let parentAt = at ?? positions.get(from.nodeId) ?? { x: from.x ?? CANVAS_W / 2, y: from.y ?? CANVAS_H / 2 };
+    const placed: ExtraNode[] = [];
+    const made: string[] = [];
+    try {
+      for (const text of pieces) {
+        const pos = placeNode(parentAt, [{ nodeId: NEW_NODE_ID, parentId: parent }], placed);
+        const node = await nodesApi.createNode(mapId, { text, type: from.type, x: pos.x, y: pos.y, parentId: parent });
+        upsertNode(node);
+        setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
+        placed.push({ nodeId: node.nodeId, parentId: parent, pos });
+        made.push(node.nodeId);
+        parent = node.nodeId;
+        parentAt = pos;
+      }
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.textOverflow.failed);
+      return false;
+    } finally {
+      if (made.length) showNodes([from.nodeId, ...made]);
+    }
+    showNotice(t.ui.textOverflow.carried(made.length));
+    return true;
   }
 
   // AddMenu's "Create circle" — a root plus 2 children, parented to it, so
@@ -402,5 +443,5 @@ export function useNodeCreation({
     showNotice(t.ui.textNodes.created(total, packedIds.length));
   }
 
-  return { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText, drawPicture };
+  return { confirmPendingCreate, carryText, applyTemplate, createCircle, growStructure, createFromText, drawPicture };
 }

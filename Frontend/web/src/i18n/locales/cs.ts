@@ -746,6 +746,15 @@ const ui: UiStrings = {
   },
   panelDragHandle: "Přetažením posunete tento panel",
   panelResizeHandle: "Přetažením změníte velikost tohoto panelu",
+  textOverflow: {
+    message: (extra, max) => `Nevešlo se znaků: ${extra} (uzel pojme ${max}).`,
+    carry: (n) => (n === 1 ? "Dát je do nového uzlu" : `Dát je do nových uzlů (${n})`),
+    leave: "Vynechat",
+    willCarry: (n) => (n === 1 ? "Zbytek půjde do nového uzlu hned za tímto." : `Zbytek půjde do nových uzlů (${n}) hned za tímto.`),
+    undo: "Zpět",
+    carried: (n) => (n === 1 ? "Zbytek je v novém uzlu" : `Zbytek je v nových uzlech (${n})`),
+    failed: "Nový uzel pro zbytek se nepodařilo vytvořit",
+  },
   newNode: { title: "Nový uzel", placeholder: "Napište svou myšlenku…", create: "Vytvořit", hint: "Enter vytvoří, Shift+Enter přidá řádek", ghost: "Duch", ghostHint: "Napište otázku místo odpovědi: uzel zůstane vybledlý, dokud ho někdo nevyplní", ghostPlaceholder: "Napište otázku, na kterou odpovíte později…", createGhost: "Vytvořit ducha" },
   presentation: {
     exit: "Ukončit",

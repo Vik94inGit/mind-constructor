@@ -40,6 +40,7 @@ import type { CanvasNodeActions } from "../map/CanvasNodeCard";
 import { NodePanel } from "../map/NodePanel";
 import { PackPickerPanel } from "../map/PackPickerPanel";
 import { TextToNodesModal } from "../map/TextToNodesModal";
+import { TextOverflowOffer } from "../components/TextOverflowOffer";
 import { canSplitText } from "../utils/textSplit";
 import { findFreeSpots } from "../utils/freeSpots";
 import { PendingNodeCard } from "../map/PendingNodeCard";
@@ -300,6 +301,10 @@ export function MapPage() {
   // Which node currently has its caption swapped for an inline text input —
   // see startInlineEdit. Null means no node is being edited.
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
+  // Text pasted into a node's inline editor past its limit: what didn't fit,
+  // offered for new nodes carrying on from it (the banner at the top).
+  const [textOverflow, setTextOverflow] = useState<{ nodeId: string; rest: string } | null>(null);
+  const [carryingText, setCarryingText] = useState(false);
   // Group selection (marquee, shift+click, choose mode): dashed rings; with 2+
   // the panel gives way to the selection bar and other links dim.
   const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
@@ -888,6 +893,22 @@ export function MapPage() {
     return isOwnNode(node) && !node.isWeapon && !node.isProtection && canSplitText(node.text ?? "");
   }
 
+  // Pasted text that ran past a node's limit can go on into new nodes from
+  // your own thoughts (not an attack or a shield).
+  function canCarryText(node: NodeDoc) {
+    return isOwnNode(node) && !node.isWeapon && !node.isProtection;
+  }
+
+  async function carryOverflow() {
+    if (!textOverflow) return;
+    const from = nodes.find((n) => n.nodeId === textOverflow.nodeId);
+    if (!from) return setTextOverflow(null);
+    setCarryingText(true);
+    const ok = await carryText(from, textOverflow.rest);
+    setCarryingText(false);
+    if (ok) setTextOverflow(null);
+  }
+
   function openSplit(node: NodeDoc, text = node.text) {
     setInlineEditId(null);
     setSplitNode({ nodeId: node.nodeId, text });
@@ -1385,7 +1406,7 @@ export function MapPage() {
     setActionError,
     errorMessage: t.ui.pictures.edit.resizeFailed,
   });
-  const { confirmPendingCreate, applyTemplate, createCircle, growStructure, createFromText, drawPicture } = useNodeCreation({
+  const { confirmPendingCreate, carryText, applyTemplate, createCircle, growStructure, createFromText, drawPicture } = useNodeCreation({
     mapId,
     positions,
     pendingCreate,
@@ -1476,6 +1497,9 @@ export function MapPage() {
   const nodeActions = useStableActions<CanvasNodeActions>({
     inlineConfirm: (node, text, type) => void confirmInlineEdit(node, text, type),
     inlineCancel: () => setInlineEditId(null),
+    textOverflow: (node, rest) => {
+      if (canCarryText(node)) setTextOverflow({ nodeId: node.nodeId, rest });
+    },
     pointerDown: (node, e) => onNodePointerDown(node, e),
     click: (node, e) => {
       if (suppressNextClick.current) {
@@ -1632,6 +1656,15 @@ export function MapPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {notice && <MapBanner tone="success" message={notice} onDismiss={dismissNotice} />}
+      {textOverflow && (
+        <TextOverflowOffer
+          className="mx-4 mt-[0.6rem]"
+          rest={textOverflow.rest}
+          busy={carryingText}
+          onCarry={() => void carryOverflow()}
+          onLeave={() => setTextOverflow(null)}
+        />
+      )}
       {cardFitWarning && (
         <CardFitBanner
           warning={cardFitWarning}
@@ -2172,7 +2205,7 @@ export function MapPage() {
             emoji={pendingCreate.emoji || undefined}
             prompt={pendingCreate.prompt}
             onClearEmoji={() => setPendingCreate((prev) => (prev ? { ...prev, emoji: "" } : prev))}
-            onCreate={(text, type, images, prompt) => confirmPendingCreate(text, type, images, prompt)}
+            onCreate={(text, type, images, prompt, overflow) => confirmPendingCreate(text, type, images, prompt, overflow)}
             onCancel={cancelPendingCreate}
           />
         ) : (
@@ -2293,6 +2326,7 @@ export function MapPage() {
                 isClusterParent={circleRootSentimentByNode.has(selectedNode.nodeId)}
                 onExtractText={() => extractClusterText(selectedNode.nodeId)}
                 onSplitText={canSplitNode(selectedNode) ? (text) => openSplit(selectedNode, text) : undefined}
+                onCarryText={canCarryText(selectedNode) ? (rest) => carryText(selectedNode, rest) : undefined}
               />
             </>
           )

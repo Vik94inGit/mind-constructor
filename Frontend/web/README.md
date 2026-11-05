@@ -215,7 +215,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (WebP, at most 1024px, in `public/picture-templates/`) is fetched only when picked, then added like
   any other picture, so it can be the node's icon or card.
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
-  in the panel; the inline inputs grow taller with the text, never wider.
+  in the panel; the inline inputs grow taller with the text, never wider. Text **pasted** past the
+  limit isn't cut silently: what fits goes in (cut between words), and an offer
+  (`components/TextOverflowOffer.tsx`) asks to put the rest in a new node, or as many as it takes,
+  each hanging from the one before and of the same type (`carryText` in `hooks/useNodeCreation.ts`).
+  In the panel's text box it shows under the text and makes them at once; in a node's inline editor
+  it's a banner at the top of the map; in the new-node panel and the dashboard's Quick note, saying
+  yes sends the rest along when the node (or note) is made. It works with a tablet's paste bubble
+  too, since it reads the paste event rather than keys.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
 - **Hiding the ghosts** — the ring of ghosts comes up round every node you open; the 👻 at the top of

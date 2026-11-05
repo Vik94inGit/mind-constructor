@@ -3,7 +3,8 @@ import type { NodeType } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { isMobileViewport } from "../utils/canvasLayout";
 import { MAX_NODE_IMAGES, imageFilesFrom, shrinkImage } from "../utils/images";
-import { MAX_NODE_TEXT } from "../utils/nodeText";
+import { MAX_NODE_TEXT, pasteKeepingOverflow } from "../utils/nodeText";
+import { TextOverflowOffer } from "../components/TextOverflowOffer";
 import { clipboardHasText, isEditableTarget } from "../utils/editable";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ImagesSection } from "./nodePanel/ImagesSection";
@@ -16,7 +17,8 @@ interface Props {
   onClearEmoji: () => void;
   /** Resolves once the node is made (or making it failed — the caller shows that). */
   /** Empty `text` with a `prompt` makes a ghost (see NodeDoc.ghost). */
-  onCreate: (text: string, type: NodeType, images: string[], prompt?: string) => Promise<void>;
+  /** `overflow`: pasted text past MAX_NODE_TEXT the user chose to carry on into new nodes after this one. */
+  onCreate: (text: string, type: NodeType, images: string[], prompt?: string, overflow?: string) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -37,6 +39,10 @@ export function NewNodePanel({ type, emoji, prompt = "", onClearEmoji, onCreate,
   const [images, setImages] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Pasted text that didn't fit (utils/nodeText.ts), and whether it's to go
+  // into new nodes once this one is made.
+  const [overflow, setOverflow] = useState<string | null>(null);
+  const [carry, setCarry] = useState(false);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -68,6 +74,7 @@ export function NewNodePanel({ type, emoji, prompt = "", onClearEmoji, onCreate,
     setBusy(true);
     try {
       if (asGhost) await onCreate("", type, images, trimmed || prompt);
+      else if (carry && overflow) await onCreate(trimmed, type, images, prompt || undefined, overflow);
       else await onCreate(trimmed, type, images, prompt || undefined);
     } finally {
       setBusy(false);
@@ -138,6 +145,12 @@ export function NewNodePanel({ type, emoji, prompt = "", onClearEmoji, onCreate,
           placeholder={asGhost ? t.ui.newNode.ghostPlaceholder : prompt || t.ui.newNode.placeholder}
           readOnly={busy}
           onChange={(e) => setText(e.target.value)}
+          onPaste={(e) =>
+            pasteKeepingOverflow(e, setText, (rest) => {
+              setOverflow(rest);
+              setCarry(false);
+            })
+          }
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();
@@ -164,6 +177,17 @@ export function NewNodePanel({ type, emoji, prompt = "", onClearEmoji, onCreate,
           }
         />
       </div>
+      {overflow && !asGhost && (
+        <TextOverflowOffer
+          className="mt-2"
+          rest={overflow}
+          accepted={carry}
+          busy={busy}
+          onCarry={() => setCarry(true)}
+          onLeave={() => setOverflow(null)}
+          onUndo={() => setCarry(false)}
+        />
+      )}
       <div className="mt-3 flex items-center gap-2">
         <button
           type="button"

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NewNodePanel } from "./NewNodePanel";
+import { MAX_NODE_TEXT } from "../utils/nodeText";
 import { I18nProvider } from "../i18n/I18nContext";
 import { UI_STRINGS } from "../i18n/uiStrings";
 
@@ -72,5 +73,30 @@ describe("NewNodePanel", () => {
     };
     const notPrevented = fireEvent.paste(screen.getByRole("textbox"), { clipboardData });
     expect(notPrevented).toBe(false);
+  });
+
+  it("offers a long paste's rest for a new node and sends it along with Create", async () => {
+    const onCreate = renderPanel();
+    const o = UI_STRINGS.en.textOverflow;
+    const long = Array.from({ length: 300 }, (_, i) => `w${i}`).join(" ");
+    const field = screen.getByRole("textbox");
+    fireEvent.paste(field, { clipboardData: { getData: () => long } });
+    const kept = (field as HTMLTextAreaElement).value;
+    expect(kept.length).toBeLessThanOrEqual(MAX_NODE_TEXT);
+    await userEvent.click(screen.getByRole("button", { name: o.carry(1) }));
+    expect(screen.getByText(o.willCarry(1))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: s.create }));
+    const [text, , , , overflow] = onCreate.mock.calls[0];
+    expect(`${text} ${overflow}`).toBe(long);
+  });
+
+  it("drops a long paste's rest when it's left out", async () => {
+    const onCreate = renderPanel();
+    const o = UI_STRINGS.en.textOverflow;
+    fireEvent.paste(screen.getByRole("textbox"), { clipboardData: { getData: () => "x ".repeat(700) } });
+    await userEvent.click(screen.getByRole("button", { name: o.leave }));
+    expect(screen.queryByTestId("text-overflow-offer")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: s.create }));
+    expect(onCreate.mock.calls[0]).toHaveLength(4);
   });
 });

@@ -462,6 +462,16 @@ export interface UiStrings {
   gestureHint: { title: string; touch: string[]; mouse: string[]; gotIt: string };
   panelDragHandle: string;
   panelResizeHandle: string;
+  /** Pasted text past a node's 1000 characters, offered for new nodes (components/TextOverflowOffer.tsx). */
+  textOverflow: {
+    message: (extra: number, max: number) => string;
+    carry: (nodes: number) => string;
+    leave: string;
+    willCarry: (nodes: number) => string;
+    undo: string;
+    carried: (nodes: number) => string;
+    failed: string;
+  };
   /** The panel a new node is written in before it exists — map/NewNodePanel.tsx. */
   newNode: {
     title: string;
@@ -1186,6 +1196,15 @@ const en: UiStrings = {
   },
   panelDragHandle: "Drag to move this panel",
   panelResizeHandle: "Drag to resize this panel",
+  textOverflow: {
+    message: (extra, max) => `${extra} more characters didn't fit: a node holds ${max}.`,
+    carry: (n) => (n === 1 ? "Put them in a new node" : `Put them in ${n} new nodes`),
+    leave: "Leave them out",
+    willCarry: (n) => (n === 1 ? "The rest goes into a new node right after this one." : `The rest goes into ${n} new nodes right after this one.`),
+    undo: "Undo",
+    carried: (n) => (n === 1 ? "The rest is in a new node" : `The rest is in ${n} new nodes`),
+    failed: "Couldn't make the new node for the rest",
+  },
   newNode: { title: "New node", placeholder: "Write your thought…", create: "Create", hint: "Enter creates it, Shift+Enter adds a line", ghost: "Ghost", ghostHint: "Write a question instead of an answer: the node stays faded until someone fills it in", ghostPlaceholder: "Write the question to answer later…", createGhost: "Create ghost" },
   presentation: {
     exit: "Exit",

@@ -100,6 +100,8 @@ interface Props {
   onExtractText: () => void;
   /** Opens "Split into nodes" on this node; absent when its text can't be split (a weapon, a shield, one word). */
   onSplitText?: (text: string) => void;
+  /** Text pasted past the node's limit, put into new nodes carrying on from it (see InfoTab). */
+  onCarryText?: (rest: string) => Promise<boolean>;
   /** Set while this node is drawn as a puzzle card: its fill (the viewer's own, see utils/cardFill.ts) and how to change it. */
   cardFill?: { value: string | undefined; onChange: (color: string | null) => void } | null;
   /** The viewer's own feeling about this thought (utils/feeling.ts) and how to change it — anyone may, it's only theirs. */
@@ -158,6 +160,7 @@ export function NodePanel({
   isClusterParent,
   onExtractText,
   onSplitText,
+  onCarryText,
   cardFill,
   feeling,
   cardLook,
@@ -639,6 +642,7 @@ export function NodePanel({
           templateKind={templateKind}
           onTextSave={handleTextSave}
           onSplitText={onSplitText}
+          onCarryText={onCarryText}
           onStepNode={onStepNode}
           onCopyText={handleCopyText}
           onDelete={handleDelete}

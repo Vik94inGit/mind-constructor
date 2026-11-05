@@ -13,7 +13,7 @@ import { shapeRoundClass } from "./nodeShape";
 import { StickerCard } from "./StickerCard";
 import { NodeBadges } from "./nodeCard/NodeBadges";
 import { NodeFace } from "./nodeCard/NodeFace";
-import { MAX_NODE_TEXT } from "../utils/nodeText";
+import { MAX_NODE_TEXT, pasteKeepingOverflow } from "../utils/nodeText";
 import { CAPTION_WIDTH, nodeZoomScale } from "../utils/canvasLayout";
 import { useI18n } from "../i18n/I18nContext";
 import {
@@ -130,6 +130,8 @@ interface Props {
   onInlineConfirm?: (text: string, type: NodeType) => void;
   /** Fired on Escape, or on blur/Enter when the draft is empty or unchanged. */
   onInlineCancel?: () => void;
+  /** Text pasted into the inline editor past MAX_NODE_TEXT: what didn't fit, for MapPage to offer for a new node. */
+  onTextOverflow?: (rest: string) => void;
   onPointerDown?: (e: ReactPointerEvent) => void;
   /** Receives the raw click event (not just fired) so callers can read modifier keys — a Shift+click toggles group selection instead of the normal single-select/center behavior. See MapPage's handleNodeClick. */
   onClick: (e: ReactMouseEvent) => void;
@@ -198,6 +200,7 @@ export const NodeCard = memo(function NodeCard({
   flightVector,
   onInlineConfirm,
   onInlineCancel,
+  onTextOverflow,
   onPointerDown,
   onClick,
   onDoubleClick,
@@ -754,6 +757,7 @@ export const NodeCard = memo(function NodeCard({
           value={draftText}
           placeholder={node.prompt || undefined}
           onChange={(e) => setDraftText(e.target.value)}
+          onPaste={onTextOverflow ? (e) => pasteKeepingOverflow(e, setDraftText, onTextOverflow) : undefined}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}

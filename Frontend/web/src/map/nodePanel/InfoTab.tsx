@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import { imageFilesFrom } from "../../utils/images";
-import { MAX_NODE_TEXT } from "../../utils/nodeText";
+import { MAX_NODE_TEXT, pasteKeepingOverflow } from "../../utils/nodeText";
+import { TextOverflowOffer } from "../../components/TextOverflowOffer";
 import { isMobileViewport } from "../../utils/canvasLayout";
 import type { NodeTemplateKind } from "../../utils/templates";
 import { CARD_FILL_COLORS } from "../../utils/cardFill";
@@ -64,14 +65,20 @@ interface Props {
   onStepNode?: (dir: -1 | 1) => void;
   /** "Split into nodes" on this node's text (map/TextToNodesModal.tsx's split mode); absent when it can't be split. */
   onSplitText?: (text: string) => void;
+  /** Puts text pasted past MAX_NODE_TEXT into new nodes carrying on from this one; absent where it can't be offered. */
+  onCarryText?: (rest: string) => Promise<boolean>;
 }
 
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode, onSplitText }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
+  // Pasted text that didn't fit (utils/nodeText.ts), offered for a new node.
+  const [overflow, setOverflow] = useState<string | null>(null);
+  const [carrying, setCarrying] = useState(false);
+  useEffect(() => setOverflow(null), [node.nodeId]);
   return (
     <div className="mt-2">
       {/* The node's title, when it has one — read-only here for
@@ -109,6 +116,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             // A ghost's prompt (see NodeDoc.prompt) is the question to answer here.
             placeholder={node.prompt || undefined}
             onChange={(e) => setTextDraft(e.target.value)}
+            onPaste={onCarryText ? (e) => pasteKeepingOverflow(e, setTextDraft, setOverflow) : undefined}
             // readOnly, not disabled, while a save is out: a disabled field
             // drops focus (closing a phone's keyboard) and Safari repaints it
             // pale, a flash on every save.
@@ -164,6 +172,23 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
         )}
         {imagesSection}
       </div>
+      {overflow && onCarryText && (
+        <TextOverflowOffer
+          className="mt-2"
+          rest={overflow}
+          busy={carrying}
+          onCarry={() => {
+            setCarrying(true);
+            // The text is saved first (the field's blur does it too), so the
+            // new node carries on from what this one now says.
+            void onTextSave()
+              .then((ok) => ok && onCarryText(overflow))
+              .then((ok) => ok && setOverflow(null))
+              .finally(() => setCarrying(false));
+          }}
+          onLeave={() => setOverflow(null)}
+        />
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-[0.5rem]">
         <button
           className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
