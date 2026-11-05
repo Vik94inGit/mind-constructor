@@ -2,6 +2,9 @@ import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useI18n } from "../../i18n/I18nContext";
 import { MAX_NODE_IMAGES, imageSrc } from "../../utils/images";
+import { PICTURES } from "../../utils/pictures";
+import { pictureTemplateFile, pictureTemplateSrc, templateKindsFor } from "../../utils/pictureTemplates";
+import type { NodeType } from "../../types";
 
 interface Props {
   /** null while they're still being fetched. */
@@ -20,6 +23,8 @@ interface Props {
   cardImage?: string;
   /** Shows picture `index` as a card on the map, or (null) removes the card. Unset when this viewer can't. */
   onSetCard?: (index: number | null) => void;
+  /** The node's type: its own template picture (utils/pictureTemplates.ts) comes first. */
+  nodeType?: NodeType;
 }
 
 const pictureBtn =
@@ -30,11 +35,12 @@ const pictureBtn =
 // it full size) and, for the node's owner, a small toolbar to add more. A
 // picture can also be pasted anywhere in the panel (NodePanel's own onPaste)
 // or dropped anywhere on the post box (InfoTab).
-export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, iconImage = "", onSetIcon, cardImage = "", onSetCard }: Props) {
+export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, iconImage = "", onSetIcon, cardImage = "", onSetCard, nodeType }: Props) {
   const { t } = useI18n();
   const s = t.ui.images;
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState<number | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const list = images ?? [];
   const full = list.length >= MAX_NODE_IMAGES;
 
@@ -121,6 +127,16 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
           >
             {s.add}
           </button>
+          <button
+            type="button"
+            className={`cursor-pointer rounded-md border border-line px-2 py-[0.15rem] text-[0.75rem] font-semibold text-ink hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50 ${templatesOpen ? "bg-surface" : "bg-surface-2"}`}
+            disabled={busy || full || images === null}
+            aria-expanded={templatesOpen}
+            title={s.templatesHint}
+            onClick={() => setTemplatesOpen((v) => !v)}
+          >
+            {s.templates}
+          </button>
           <span className="text-[0.7rem] text-ink-soft">{full ? s.limit(MAX_NODE_IMAGES) : s.hint}</span>
           {iconImage && onSetIcon && (
             // The picture icon in use, and a way back to the type's symbol.
@@ -167,6 +183,33 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
               if (files.length) onAdd(files);
             }}
           />
+        </div>
+      )}
+      {canEdit && templatesOpen && !full && images !== null && (
+        // Ready-made pictures, one per node type, the node's own type first.
+        // Picking one adds it like any other picture (then it can be the icon or card).
+        <div className="mt-[0.4rem] flex flex-wrap gap-[0.35rem]" role="group" aria-label={s.templatesHint}>
+          {templateKindsFor(nodeType).map((kind) => {
+            const type = PICTURES[kind].type;
+            const label = type ? t.ui.types[type] : kind;
+            return (
+              <button
+                key={kind}
+                type="button"
+                data-template={kind}
+                className="flex w-[3.6rem] cursor-pointer flex-col items-center gap-[0.1rem] rounded-md border border-line bg-surface p-[0.2rem] text-[0.62rem] leading-tight text-ink hover:bg-surface-2 disabled:opacity-50"
+                disabled={busy}
+                title={label}
+                onClick={() => {
+                  setTemplatesOpen(false);
+                  onAdd([pictureTemplateFile(kind)]);
+                }}
+              >
+                <img src={pictureTemplateSrc(kind, 96)} alt="" className="h-[2.6rem] w-[2.6rem] rounded-[4px]" />
+                <span className="w-full truncate text-center">{label}</span>
+              </button>
+            );
+          })}
         </div>
       )}
       {open !== null && list[open] && (

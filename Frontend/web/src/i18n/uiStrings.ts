@@ -518,6 +518,9 @@ export interface UiStrings {
     isCard: string;
     removeCard: string;
     iconFailed: string;
+    /** The button that opens the ready-made pictures, one per node type (utils/pictureTemplates.ts). */
+    templates: string;
+    templatesHint: string;
   };
   /** A node's emoji, and the "emoji first" view — see map/NodeFlipIcon.tsx. */
   emoji: {
@@ -1203,6 +1206,8 @@ const en: UiStrings = {
     isCard: "Card",
     removeCard: "Take the card off the map",
     iconFailed: "Couldn't change how the picture shows",
+    templates: "✨ Template",
+    templatesHint: "Add a ready-made picture: one for each kind of thought",
   },
   emoji: {
     label: "Emoji",

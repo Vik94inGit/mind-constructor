@@ -785,6 +785,8 @@ const ui: UiStrings = {
     isCard: "Karta",
     removeCard: "Odebrat kartu z mapy",
     iconFailed: "Zobrazení obrázku se nepodařilo změnit",
+    templates: "✨ Šablona",
+    templatesHint: "Přidat hotový obrázek: jeden pro každý druh myšlenky",
   },
   emoji: {
     label: "Emoji",
