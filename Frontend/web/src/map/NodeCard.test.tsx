@@ -111,6 +111,19 @@ describe("NodeCard", () => {
       expect(selected.container.querySelector(`img[src="${png}"]`)).toBeNull();
     });
 
+    it("shows the whole picture card, never cropped, at most twice a node's size", () => {
+      const node = makeNode({ nodeId: "a", text: "hello", cardImage: jpeg });
+      const shown = renderNode({ node });
+      const img = shown.getByTestId("node-picture-card").querySelector("img")!;
+      expect(img.className).not.toContain("object-cover");
+      expect(img.style.maxWidth).toBe("96px");
+      expect(img.style.maxHeight).toBe("96px");
+      shown.unmount();
+      const selected = renderNode({ node, selected: true }).getByTestId("node-picture-card").querySelector("img")!;
+      expect(selected.style.maxWidth).toBe("72px");
+      expect(selected.style.maxHeight).toBe("72px");
+    });
+
     it("shows the picture icon when there's no card", () => {
       const node = makeNode({ nodeId: "a", text: "hello", iconImage: png });
       const { container, queryByTestId } = renderNode({ node });

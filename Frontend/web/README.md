@@ -206,7 +206,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Picture icons and cards** — any picture on a node can be its round icon on the map ("Use as
   icon": a small square cut by `utils/images.ts` `makeIconImage`, saved as `Node.iconImage`) and/or a
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
-  the cards view).
+  the cards view). A card always shows the whole picture, never cropped, with its longer side twice a
+  round node (96px, 72px while selected), so tall and wide paintings both sit in proportion.
 - **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens a set of ten
   ready-made paintings (eyes, clock heads, a smiling martini, fishing for time, a yin-yang yo-yo,
   squeezed time, an orange clock, a puppet hand, a heart and mirror, a light bulb;
