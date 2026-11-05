@@ -676,6 +676,15 @@ const ui: UiStrings = {
     takeParentPlace: "Nepodařilo se z něj udělat hlavu zóny.",
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
+  cardFit: {
+    packed: "Na této obrazovce je příliš mnoho karet na čtení, proto je každá větev sbalená do svého rodiče. Klepněte na +N na kartě a otevře se jen ta větev.",
+    tooMany: (n) => `Příliš mnoho karet i se sbalenými větvemi: nevejde se horních karet: ${n}.`,
+    moveExtra: (n) => `Přesunout ${n} na jinou mapu`,
+    moveTitle: (n) => `Přesunout karty (${n}) i s větvemi na…`,
+    newMap: "+ Nová mapa",
+    newMapName: (name) => `${name} (2)`,
+    moved: (n, name) => `Přesunuto karet: ${n}, na mapu ${name}.`,
+  },
   autoPack: {
     pack: "Sbalit větev",
     unpack: "Rozbalit větev",

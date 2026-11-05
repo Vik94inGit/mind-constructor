@@ -80,7 +80,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   close together in reading order (each top idea, then its branch), in a square block (on a
   desktop as on a phone, never one long column or a wide strip), under the cards already placed; your own cards' spots are saved, someone else's are laid
   out just for you (`utils/cardPack.ts`, `hooks/useCardPacking.ts`). Drag any two side by side to
-  compare them; *Lay the cards close* in the eye menu packs them all again. No quick-add ghosts ring a card; instead your selected card has a + button on its bottom edge
+  compare them; *Lay the cards close* in the eye menu packs them all again. The cards view keeps to what fits the screen at a size that can still be read (`utils/cardFit.ts`, `hooks/useCardFit.ts`): when it opens, or the number of cards changes, cards that wouldn't fit pack their branches into their parents (auto-pack, so only for you) and a banner says so; a card's +N then opens just that branch, packing the others again if both wouldn't fit. When even the top cards alone don't fit, the banner says how many don't and offers to move those (your own, each with its branch) to another map or a new one (`map/MoveCardsModal.tsx`). No quick-add ghosts ring a card; instead your selected card has a + button on its bottom edge
   that starts a branch just under it, clear of the cards around (`cardGlue.ts` `spotBelow`). Each card's fill color can be changed in
   its panel's Info tab (per browser). Each zone can also take its own view (cards, mixed, icons + text, the default look, or
   dots) from the ⋯ button beside its name, so one canvas can show different
