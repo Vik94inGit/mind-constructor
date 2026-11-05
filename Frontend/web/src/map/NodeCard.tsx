@@ -113,6 +113,8 @@ interface Props {
   packedCount?: number;
   /** Auto-pack (utils/autoPack.ts): how many nodes this parent has tucked in — a "+N" pill on its right that opens them again (onUnfold). */
   foldedCount?: number;
+  /** The cards view stepping zone by zone: the card's place in the outline ("1.2"), shown on it (utils/cardFit.ts). */
+  seqLabel?: string;
   onUnfold?: () => void;
   /** Set on an open parent: a "−" pill in the same spot as "+N" that packs its branch in. Shows while the node is selected, or under a mouse pointer. */
   onFold?: () => void;
@@ -191,6 +193,7 @@ export const NodeCard = memo(function NodeCard({
   replayCaption = false,
   packedCount,
   foldedCount,
+  seqLabel,
   onUnfold,
   onFold,
   unsolved,
@@ -638,6 +641,7 @@ export const NodeCard = memo(function NodeCard({
               );
             })()}
             typeLabel={t.ui.types[displayType]}
+            seqLabel={seqLabel}
             color={circleBorderColor}
             fill={cardFill}
             shape={node.cardShape}

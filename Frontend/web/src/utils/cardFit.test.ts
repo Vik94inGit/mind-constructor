@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardsFitScreen, howManyFit, openOnly, planCardFit } from "./cardFit";
+import { cardsFitScreen, howManyFit, openOnly, outlineNumbers, planCardFit, zoneMembers, zoneSteps } from "./cardFit";
 import type { NodeDoc } from "../types";
 
 const node = (nodeId: string, parentId?: string) => ({ nodeId, text: "", type: "Option", parentId }) as NodeDoc;
@@ -57,5 +57,27 @@ describe("openOnly", () => {
     const nodes = [node("root"), node("a", "root"), node("a1", "a"), node("a11", "a1"), node("b", "root"), node("b1", "b")];
     expect([...openOnly(nodes, "a1")].sort()).toEqual(["b"]);
     expect([...openOnly(nodes, "b")].sort()).toEqual(["a", "a1"]);
+  });
+});
+
+describe("zones one at a time", () => {
+  // root ─ a ─ a1
+  //      │   └ a2
+  //      └ b
+  // c
+  const nodes = [node("root"), node("a", "root"), node("a1", "a"), node("a2", "a"), node("b", "root"), node("c")];
+
+  it("steps through every parent as the outline reads them", () => {
+    expect(zoneSteps(nodes)).toEqual(["root", "a"]);
+  });
+
+  it("shows a zone as its parent and the nodes hanging straight from it", () => {
+    expect([...zoneMembers(nodes, "root")].sort()).toEqual(["a", "b", "root"]);
+    expect([...zoneMembers(nodes, "a")].sort()).toEqual(["a", "a1", "a2"]);
+  });
+
+  it("numbers the cards like an outline", () => {
+    const at = outlineNumbers(nodes);
+    expect(Object.fromEntries(at)).toEqual({ root: "1", a: "1.1", a1: "1.1.1", a2: "1.1.2", b: "1.2", c: "2" });
   });
 });

@@ -9,6 +9,7 @@ import type { PackItem } from "./cardPack";
 import { branchParentIds, foldAway } from "./autoPack";
 import type { FoldedParents } from "./autoPack";
 import { nodeRefId } from "./nodeType";
+import { readingOrder } from "./nodeOrder";
 import type { NodeDoc } from "../types";
 
 /** The smallest zoom a card's text still reads at. */
@@ -84,4 +85,41 @@ export function openOnly(nodes: NodeDoc[], parentId: string): FoldedParents {
   const next: FoldedParents = new Set();
   for (const id of branchParentIds(nodes)) if (!open.has(id)) next.add(id);
   return next;
+}
+
+/**
+ * The zones, in the order to read them when the cards view shows one at a
+ * time: every parent, as the outline reads them (each top idea, then its
+ * branch, depth first).
+ */
+export function zoneSteps(nodes: NodeDoc[]): string[] {
+  const parents = branchParentIds(nodes);
+  return readingOrder(nodes)
+    .filter((n) => parents.has(n.nodeId))
+    .map((n) => n.nodeId);
+}
+
+/** One zone on its own: its parent and the nodes hanging straight from it. */
+export function zoneMembers(nodes: NodeDoc[], parentId: string): Set<string> {
+  const out = new Set([parentId]);
+  for (const n of nodes) if (nodeRefId(n.parentId) === parentId) out.add(n.nodeId);
+  return out;
+}
+
+/**
+ * Each node's place in the outline, numbered so the logic can be followed:
+ * top ideas 1, 2, 3…, the first one's branch 1.1, 1.2, theirs 1.1.1…
+ */
+export function outlineNumbers(nodes: NodeDoc[]): Map<string, string> {
+  const ids = new Set(nodes.map((n) => n.nodeId));
+  const out = new Map<string, string>();
+  const count = new Map<string, number>();
+  for (const n of readingOrder(nodes)) {
+    const parent = nodeRefId(n.parentId);
+    const key = parent && ids.has(parent) && out.has(parent) ? parent : "";
+    const i = (count.get(key) ?? 0) + 1;
+    count.set(key, i);
+    out.set(n.nodeId, key ? `${out.get(key)}.${i}` : `${i}`);
+  }
+  return out;
 }
