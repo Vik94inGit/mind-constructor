@@ -47,10 +47,11 @@ const PUZZLE_SELECTED_MAX_WIDTH = 180;
 export const PUZZLE_VISIBLE_CHARS = 500;
 const PUZZLE_TEXT_MAX_LINES = Math.ceil(PUZZLE_VISIBLE_CHARS / 36);
 // The "+N" / "−" pill that packs and opens a parent's branch (the step number takes the left).
-// Beside a round icon; above a card, whose right side has its link tab and,
-// selected, the ring's ghost.
+// Beside a round icon; on a card's top edge near its right corner (its right
+// side has its link tab and, selected, the ring's ghost), sitting on the edge
+// so it stays within the gap to the row of cards above.
 const PACK_PILL_NEXT = "top-1/2 left-[calc(100%+4px)] -translate-y-1/2";
-const PACK_PILL_ABOVE = "bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2";
+const PACK_PILL_ABOVE = "top-0 right-3 -translate-y-1/2";
 const PACK_PILL_CLASS =
   "pointer-events-auto absolute z-[7] flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border-2 bg-surface px-[0.35rem] text-[0.7rem] leading-none font-bold whitespace-nowrap shadow-card hover:bg-surface-2";
 // iconText captions: a little wider and taller than the default chip.
@@ -553,7 +554,7 @@ export const NodeCard = memo(function NodeCard({
       >
         {!!foldedCount && !dotted && (
           // Auto-packed: the branch tucked into this parent, on the icon's
-          // right middle (the step number takes the left), or above a card.
+          // right middle (the step number takes the left), or on a card's top edge.
           <button
             type="button"
             data-testid="auto-pack-count"

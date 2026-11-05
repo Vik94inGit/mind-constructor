@@ -35,5 +35,5 @@ export function useAutoPack(mapId: string | undefined, unpackedNodes: NodeDoc[])
   function unpackAll() {
     setFolded(new Set());
   }
-  return { folded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll };
+  return { folded, setFolded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll };
 }

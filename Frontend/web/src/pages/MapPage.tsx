@@ -144,6 +144,9 @@ import { NodeBurst } from "../map/NodeBurst";
 import { mapBackgroundStyle } from "../utils/mapBackground";
 import { autoNodeFade, nodeFadeStyle } from "../utils/nodeFade";
 import { MoveNoteModal } from "../dashboard/MoveNoteModal";
+import { MoveCardsModal } from "../map/MoveCardsModal";
+import { CardFitBanner } from "../map/CardFitBanner";
+import { useCardFit } from "../hooks/useCardFit";
 import { findInbox, noteBranch } from "../utils/inbox";
 import { feature } from "../utils/usage";
 
@@ -350,7 +353,7 @@ export function MapPage() {
   // node, for the container's Packed list).
   const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
   // Parents that tuck their branch in, and the overview — see hooks/useAutoPack.ts.
-  const { folded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll } = useAutoPack(mapId, unpackedNodes);
+  const { folded, setFolded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll } = useAutoPack(mapId, unpackedNodes);
   // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.
   const [minimapShown, setMinimapShown] = useState<boolean>(loadMinimapShown);
   function toggleMinimap() {
@@ -681,6 +684,32 @@ export function MapPage() {
     setReadingMode,
   });
 
+  // The cards view kept to what fits the screen: branches pack in when the
+  // cards don't, and the top cards past what fits can go to another map
+  // (hooks/useCardFit.ts).
+  const fitNodes = useMemo(() => unpackedNodes.filter((n) => !n.isWeapon && !n.isProtection), [unpackedNodes]);
+  const { warning: cardFitWarning, dismissWarning: dismissCardFit, openBranch } = useCardFit({
+    active: view === "cards",
+    ready: !loading && !entranceActive && !timeLapse && !presenting,
+    nodes: fitNodes,
+    folded,
+    setFolded,
+    toggleFold,
+    viewportRef: wrapRef,
+    // Once the cards left are drawn, they're laid close again (and the
+    // camera takes them in), from the newest render's cards.
+    onRefolded: () => setTimeout(() => layCardsCloseLatest.current(), 120),
+  });
+  const [movingExtraCards, setMovingExtraCards] = useState<string[] | null>(null);
+  // Only your own cards can be moved off the map.
+  function movableExtra(ids: string[]): string[] {
+    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+    return ids.filter((id) => {
+      const n = byId.get(id);
+      return !!n && isOwnNode(n);
+    });
+  }
+
   // Whether a node is drawn as a puzzle card right now — the only nodes that
   // snap together (see usePuzzleConnect).
   function drawnAsCard(n: NodeDoc): boolean {
@@ -738,6 +767,8 @@ export function MapPage() {
     // After the cards have glided in, from the newest render's positions.
     onLaidOut: () => setTimeout(() => fitAllLatest.current(), 450),
   });
+  const layCardsCloseLatest = useRef(layCardsClose);
+  layCardsCloseLatest.current = layCardsClose;
   // Ungluing cards, on demand from a card's menu: just this one, or every
   // card of its block. An unglued card moves on its own, and dragging it
   // against another card glues it back.
@@ -1461,7 +1492,7 @@ export function MapPage() {
     addBranch: (node) => addBranchFromCard(node),
     hoverText: (nodeId) => void ensureNodeText([nodeId]),
     iconHover: (nodeId, on) => hoverChomp(nodeId, on),
-    unfold: (nodeId) => toggleFold(nodeId),
+    unfold: (nodeId) => openBranch(nodeId),
     fold: (nodeId) => toggleFold(nodeId),
   });
 
@@ -1601,6 +1632,14 @@ export function MapPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {notice && <MapBanner tone="success" message={notice} onDismiss={dismissNotice} />}
+      {cardFitWarning && (
+        <CardFitBanner
+          warning={cardFitWarning}
+          movable={cardFitWarning.kind === "tooMany" ? movableExtra(cardFitWarning.extraRootIds) : []}
+          onMove={(ids) => setMovingExtraCards(ids)}
+          onDismiss={dismissCardFit}
+        />
+      )}
       {actionError && <MapBanner tone="danger" message={actionError} onDismiss={() => setActionError(null)} />}
       {finish.isFinished && !timeLapse && (
         <FinishedBanner {...battleTally(nodes)} onReplay={startTimeLapse} onReopen={finish.reopen} busy={finish.busy} />
@@ -2273,6 +2312,22 @@ export function MapPage() {
             setSelectedId(null);
             setMovingNote(null);
             showNotice(t.ui.inbox.moved(target.name));
+          }}
+        />
+      )}
+
+      {movingExtraCards && map && (
+        <MoveCardsModal
+          map={map}
+          rootIds={movingExtraCards}
+          onClose={() => setMovingExtraCards(null)}
+          onMoved={(moved, target) => {
+            const gone = new Set(moved.flatMap((id) => noteBranch(nodes, id)));
+            setNodes((prev) => prev.filter((n) => !gone.has(n.nodeId)));
+            setEdges((prev) => prev.filter((e) => !gone.has(nodeRefId(e.fromNodeId) ?? "") && !gone.has(nodeRefId(e.toNodeId) ?? "")));
+            setSelectedId(null);
+            setMovingExtraCards(null);
+            showNotice(t.ui.cardFit.moved(moved.length, target.name));
           }}
         />
       )}

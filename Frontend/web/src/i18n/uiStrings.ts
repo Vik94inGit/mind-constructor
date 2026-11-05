@@ -372,6 +372,16 @@ export interface UiStrings {
     takeParentPlace: string;
   };
   minimapTitle: string;
+  /** The cards view kept to what fits the screen (utils/cardFit.ts). */
+  cardFit: {
+    packed: string;
+    tooMany: (extra: number) => string;
+    moveExtra: (extra: number) => string;
+    moveTitle: (extra: number) => string;
+    newMap: string;
+    newMapName: (mapName: string) => string;
+    moved: (extra: number, mapName: string) => string;
+  };
   /** Auto-pack (utils/autoPack.ts), the three views (utils/viewPrompt.ts) and the cards view's packing (utils/cardPack.ts). */
   autoPack: {
     pack: string;
@@ -1099,6 +1109,15 @@ const en: UiStrings = {
     hideGhosts: "Hide the ghosts",
     showGhosts: "Show the ghosts again",
     takeParentPlace: "Couldn't make it the head of the zone.",
+  },
+  cardFit: {
+    packed: "Too many cards to read on this screen, so each branch is packed into its parent. Tap +N on a card to open just that branch.",
+    tooMany: (n) => `Too many cards for the cards view, even with every branch packed: ${n} top card${n === 1 ? "" : "s"} don't fit.`,
+    moveExtra: (n) => `Move ${n} to another map`,
+    moveTitle: (n) => `Move ${n} card${n === 1 ? "" : "s"} (with their branches) to…`,
+    newMap: "+ New map",
+    newMapName: (name) => `${name} (2)`,
+    moved: (n, name) => `Moved ${n} card${n === 1 ? "" : "s"} to ${name}.`,
   },
   minimapTitle: "Minimap — click or drag to jump around the map",
   autoPack: {
