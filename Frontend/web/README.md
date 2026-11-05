@@ -108,7 +108,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   has built itself up, a small card asks once which of the three views to use (`map/ViewPrompt.tsx`);
   the answer is kept (per browser, closing the card keeps the view as it is) and every map opens in
   it from then on.
-- **Right-click on empty canvas** (on touch: a tap on empty canvas while nothing is open, `utils/canvasTapMenu.ts`) — a menu at that point: *Paste here*, *New node ▸*
+- **Right-click on empty canvas** (on touch: hold a finger still on empty canvas for half a second, `hooks/useCanvasHoldMenu.ts`) — a menu at that point: *Paste here*, *New node ▸*
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.

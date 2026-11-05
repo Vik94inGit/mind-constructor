@@ -724,6 +724,7 @@ const ui: UiStrings = {
       "Klepnutím na uzel ho otevřete; klepnutím na kruh kolem něj přidáte myšlenku.",
       "Uzel přesunete tažením. Podržením a puštěním ho vyberete, dalšími vyberete skupinu a pak ji přetáhnete.",
       "Podržením zóny otevřete její menu: kopírovat text, tvar, smazat, vzhled.",
+      "Podržením prázdného místa otevřete menu: nový uzel, šablony, vložit.",
       "Sevřením prstů měníte přiblížení; oko určuje, kolik detailů vidíte.",
     ],
     mouse: [

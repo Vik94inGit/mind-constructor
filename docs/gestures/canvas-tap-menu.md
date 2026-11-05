@@ -1,4 +1,4 @@
-# Tap empty canvas for the canvas menu (touch)
+# Hold empty canvas for the canvas menu (touch)
 
 Date: 2026-11-04 · PR: #200
 
@@ -43,9 +43,10 @@ before                         after (finger held ~0.5 s)
 | Person | Tried first | Stuck on | Changed |
 |---|---|---|---|
 | Viktor (tablet, Chrome) | tap on empty canvas, twice | nothing showed | the sketch's half-second hold became a plain tap, as Viktor asked |
+| Viktor, a day later with the tap built | the tap | wanted a longer press to open it | back to the half-second hold |
 
-The hold drafted above was never built. A tap already closes an open node, so the tap only opens the menu when nothing is open: the first tap closes the node panel, a group selection or a menu, and the next tap opens the menu.
+The tap was built first (#200). After using it, Viktor asked for a longer press, so this is back to the hold sketched above.
 
 ## Decision
 
-On touch (finger or pen), a tap on empty canvas with nothing open opens the canvas menu at the tap (`utils/canvasTapMenu.ts`). This happens only outside modes (draw, choose, pack, change parent), after the map's entrance, and not while replaying or presenting. A mouse keeps its right-click. A drag still pans, and a tap on a zone still goes to the zone.
+On touch (finger or pen), holding a finger still on empty canvas for half a second opens the canvas menu where the finger is (`hooks/useCanvasHoldMenu.ts`). Moving more than 8 px, lifting early, or a second finger cancels the hold, so a pan, a tap or a pinch never opens it. A quick tap only closes what's open, as before. If a node is open, a hold closes it and opens the menu. Not in modes (draw, choose, pack, change parent, naming a new node), not during the map's entrance, and not while replaying or presenting. A mouse keeps its right-click.
