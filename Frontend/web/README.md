@@ -98,8 +98,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   look at a map: *Whole map*, *Overview* and *Cards* (`utils/viewPrompt.ts`), which took the place
   of the old "simpler ↔ more detail" equalizer. The overview
   auto-packs every parent whose children are all leaves, so the map keeps its shape and only its
-  last details go. Any parent can also be packed or opened on its own from its panel's Info tab
-  (*Pack its branch*); a packed parent shows a "+N" pill on its right that opens it again. Auto-pack
+  last details go. Any parent can also be packed or opened on its own, right on the map: a selected
+  parent (or one under the mouse) shows a "−" pill that packs its children in, and a packed parent
+  shows a "+N" pill that opens them again (beside a round icon, above a card; also *Pack its branch*
+  in its panel's Info tab). The eye menu has *Pack all* (every parent packs, so only the top of
+  each branch is left and each +N opens one level) and *Unpack all*. Auto-pack
   is only a way of looking, per browser and per map, and changes nothing on the map
   (`utils/autoPack.ts`), unlike packing nodes into a container. Once a map of six or more nodes
   has built itself up, a small card asks once which of the three views to use (`map/ViewPrompt.tsx`);

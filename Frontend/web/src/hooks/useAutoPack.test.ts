@@ -31,4 +31,18 @@ describe("useAutoPack", () => {
     act(() => result.current.setOverview(false));
     expect(result.current.overviewOn).toBe(false);
   });
+
+  it("packs every parent at once, leaving the tops, and unpacks them all", () => {
+    const deep = [...nodes, makeNode({ nodeId: "a1", parentId: "a" })];
+    const { result } = renderHook(() => useAutoPack("m1", deep));
+    act(() => result.current.packAll());
+    expect([...result.current.folded].sort()).toEqual(["a", "root"]);
+    expect([...result.current.fold.hidden].sort()).toEqual(["a", "a1", "b"]);
+    expect(result.current.fold.counts.get("root")).toBe(3);
+    act(() => result.current.toggleFold("root"));
+    expect([...result.current.fold.hidden]).toEqual(["a1"]);
+    expect(result.current.fold.counts.get("a")).toBe(1);
+    act(() => result.current.unpackAll());
+    expect(result.current.fold.hidden.size).toBe(0);
+  });
 });

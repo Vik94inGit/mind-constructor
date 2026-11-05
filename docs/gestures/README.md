@@ -46,6 +46,7 @@ node) must be told apart by something the user can see before they let go.
 | Zone | Hold | Right-click | Zone menu: copy text, shape, delete, look |
 | Change-parent mode | Tap a node | Click a node | Hangs the child from it (own parent: swap) |
 | Strong attack, discussion | Tap the attack | Hover it or its target | Pac-Man run to the node it hit |
+| Parent's − / +N pill | Tap (− once the node is selected) | Click (− also on hover) | Packs its children in / opens them again; beside an icon, above a card ([sketch](pack-children.md)) |
 | Picture caption | Tap | Click | Opens the picture's bar: − / + resize the whole picture, Move picks every dot for a group drag ([sketch](picture-resize.md)) |
 | Canvas | Pinch | Ctrl+wheel, − / + | Zoom |
 | Panel | Its arrows | Arrow keys | Step node to node |

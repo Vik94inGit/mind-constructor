@@ -18,6 +18,7 @@ export type CanvasNodeActions = {
   hoverText: (nodeId: string) => void;
   iconHover: (nodeId: string, hovered: boolean) => void;
   unfold: (nodeId: string) => void;
+  fold: (nodeId: string) => void;
 };
 
 type CardProps = ComponentProps<typeof NodeCard>;
@@ -34,7 +35,8 @@ type Callback =
   | "onAddBranch"
   | "onHoverText"
   | "onIconHover"
-  | "onUnfold";
+  | "onUnfold"
+  | "onFold";
 
 interface Props extends Omit<CardProps, Callback | "flightVector"> {
   actions: CanvasNodeActions;
@@ -46,6 +48,8 @@ interface Props extends Omit<CardProps, Callback | "flightVector"> {
   canConnect: boolean;
   /** This card's + button adds a branch. */
   canAddBranch: boolean;
+  /** This node is an open parent whose branch can be packed in (utils/autoPack.ts). */
+  canFold?: boolean;
   /** A strong attack: hovering its icon starts its Pac-Man run (utils/pacman.ts). */
   canChomp?: boolean;
   /** Weapon nodes only: NodeCard's flightVector, as plain numbers so an unchanged one doesn't look new. */
@@ -64,6 +68,7 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
   canConnect,
   canAddBranch,
   canChomp = false,
+  canFold = false,
   flightX,
   flightY,
   ...card
@@ -90,6 +95,7 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
       onHoverText={() => actions.hoverText(node.nodeId)}
       onIconHover={canChomp ? (hovered) => actions.iconHover(node.nodeId, hovered) : undefined}
       onUnfold={card.foldedCount ? () => actions.unfold(node.nodeId) : undefined}
+      onFold={canFold ? () => actions.fold(node.nodeId) : undefined}
     />
   );
 });

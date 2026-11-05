@@ -27,5 +27,13 @@ export function useAutoPack(mapId: string | undefined, unpackedNodes: NodeDoc[])
   function setOverview(on: boolean) {
     setFolded(on ? overviewFolds(unpackedNodes) : new Set());
   }
-  return { folded, fold, mapParents, toggleFold, overviewOn, setOverview };
+  // Pack all: every parent packs in, so only the top of each branch is left
+  // and each +N opens one level at a time. Unpack all opens every one again.
+  function packAll() {
+    setFolded(new Set(mapParents));
+  }
+  function unpackAll() {
+    setFolded(new Set());
+  }
+  return { folded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll };
 }

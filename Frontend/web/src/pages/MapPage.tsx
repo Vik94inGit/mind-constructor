@@ -350,7 +350,7 @@ export function MapPage() {
   // node, for the container's Packed list).
   const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
   // Parents that tuck their branch in, and the overview — see hooks/useAutoPack.ts.
-  const { folded, fold, mapParents, toggleFold, overviewOn, setOverview } = useAutoPack(mapId, unpackedNodes);
+  const { folded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll } = useAutoPack(mapId, unpackedNodes);
   // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.
   const [minimapShown, setMinimapShown] = useState<boolean>(loadMinimapShown);
   function toggleMinimap() {
@@ -1462,6 +1462,7 @@ export function MapPage() {
     hoverText: (nodeId) => void ensureNodeText([nodeId]),
     iconHover: (nodeId, on) => hoverChomp(nodeId, on),
     unfold: (nodeId) => toggleFold(nodeId),
+    fold: (nodeId) => toggleFold(nodeId),
   });
 
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
@@ -1781,6 +1782,7 @@ export function MapPage() {
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   foldedCount={fold.counts.get(node.nodeId)}
+                  canFold={view !== "cards" && mapParents.has(node.nodeId) && !folded.has(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
                   triumphant={solved.successIds.has(node.nodeId)}
                   chooseModeActive={chooseMode}
@@ -1967,6 +1969,8 @@ export function MapPage() {
                 view={view}
                 onViewChange={chooseView}
                 onLayCardsClose={layCardsClose}
+                onPackAll={mapParents.size > 0 ? (folded.size > 0 ? unpackAll : packAll) : undefined}
+                somePacked={folded.size > 0}
               />
               {viewPromptOpen && (
                 <ViewPrompt

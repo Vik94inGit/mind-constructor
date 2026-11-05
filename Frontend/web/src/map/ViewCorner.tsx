@@ -11,6 +11,9 @@ interface Props {
   onViewChange: (view: MapView) => void;
   /** The cards view: packs every card close together again (hooks/useCardPacking.ts). */
   onLayCardsClose?: () => void;
+  /** Packs every parent's branch in, or (somePacked) opens them all again — utils/autoPack.ts. Undefined on a map with no parents. */
+  onPackAll?: () => void;
+  somePacked?: boolean;
 }
 
 // The three views side by side, the chosen one filled. Also the view prompt's
@@ -46,7 +49,7 @@ export function ViewSwitch({ view, onChange }: { view: MapView; onChange: (view:
 // open, the whole corner lifts to z-[49] — the menu's own z-index only counts
 // inside this wrapper, so without the lift the minimap (a later z-45 sibling)
 // painted over it. Still below a real modal (z-50).
-export function ViewCorner({ minimapShown, onToggleMinimap, view, onViewChange, onLayCardsClose }: Props) {
+export function ViewCorner({ minimapShown, onToggleMinimap, view, onViewChange, onLayCardsClose, onPackAll, somePacked = false }: Props) {
   const { t } = useI18n();
   const s = t.ui.abstraction;
   const [open, setOpen] = useState(false);
@@ -86,6 +89,17 @@ export function ViewCorner({ minimapShown, onToggleMinimap, view, onViewChange, 
                 onClick={onLayCardsClose}
               >
                 ▦ {t.ui.autoPack.layClose}
+              </button>
+            )}
+            {view !== "cards" && onPackAll && (
+              <button
+                type="button"
+                data-pack-all
+                title={somePacked ? t.ui.autoPack.unpackAllHint : t.ui.autoPack.packAllHint}
+                className="cursor-pointer rounded-md border border-line bg-surface px-2 py-[0.3rem] text-left text-[0.75rem] font-semibold text-ink hover:bg-surface-2"
+                onClick={onPackAll}
+              >
+                {somePacked ? `⊕ ${t.ui.autoPack.unpackAll}` : `⊖ ${t.ui.autoPack.packAll}`}
               </button>
             )}
           </div>

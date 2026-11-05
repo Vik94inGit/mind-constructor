@@ -383,6 +383,10 @@ export interface UiStrings {
     viewLabel: string;
     layClose: string;
     layCloseHint: string;
+    packAll: string;
+    unpackAll: string;
+    packAllHint: string;
+    unpackAllHint: string;
     promptTitle: string;
     promptClose: string;
   };
@@ -1111,6 +1115,10 @@ const en: UiStrings = {
     viewLabel: "View",
     layClose: "Lay the cards close",
     layCloseHint: "Put every card back close together, in reading order",
+    packAll: "Pack all",
+    unpackAll: "Unpack all",
+    packAllHint: "Pack every branch in, leaving only the top of each (only for you)",
+    unpackAllHint: "Open every packed branch again",
     promptTitle: "How would you like to look at this map?",
     promptClose: "Close",
   },

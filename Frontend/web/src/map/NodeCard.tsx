@@ -46,6 +46,13 @@ const PUZZLE_SELECTED_MAX_WIDTH = 180;
 // text size about 36 characters fit a line, so this is its height in lines.
 export const PUZZLE_VISIBLE_CHARS = 500;
 const PUZZLE_TEXT_MAX_LINES = Math.ceil(PUZZLE_VISIBLE_CHARS / 36);
+// The "+N" / "−" pill that packs and opens a parent's branch (the step number takes the left).
+// Beside a round icon; above a card, whose right side has its link tab and,
+// selected, the ring's ghost.
+const PACK_PILL_NEXT = "top-1/2 left-[calc(100%+4px)] -translate-y-1/2";
+const PACK_PILL_ABOVE = "bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2";
+const PACK_PILL_CLASS =
+  "pointer-events-auto absolute z-[7] flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border-2 bg-surface px-[0.35rem] text-[0.7rem] leading-none font-bold whitespace-nowrap shadow-card hover:bg-surface-2";
 // iconText captions: a little wider and taller than the default chip.
 const ICON_TEXT_CAPTION_WIDTH = 176;
 // A picture card (NodeDoc.cardImage) in place of the icon, on screen.
@@ -105,6 +112,8 @@ interface Props {
   /** Auto-pack (utils/autoPack.ts): how many nodes this parent has tucked in — a "+N" pill on its right that opens them again (onUnfold). */
   foldedCount?: number;
   onUnfold?: () => void;
+  /** Set on an open parent: a "−" pill in the same spot as "+N" that packs its branch in. Shows while the node is selected, or under a mouse pointer. */
+  onFold?: () => void;
   /** True for a Problem-type node with no Success/Option/Solution child yet — nothing proposed against it. Pulses a persistent danger-colored ring (see index.css's own unsolved-problem-pulse) until that changes. Ignored for every other type. */
   unsolved?: boolean;
   /** A Success that solved a Problem or reached a goal (see computeSolved): always wears its wings and halo, even in the simplified view. */
@@ -179,6 +188,7 @@ export const NodeCard = memo(function NodeCard({
   packedCount,
   foldedCount,
   onUnfold,
+  onFold,
   unsolved,
   triumphant = false,
   dropHighlight,
@@ -505,24 +515,6 @@ export const NodeCard = memo(function NodeCard({
       (top-full) rather than in flow, so a node's x/y is always its icon's
       center, captioned or not. */}
       <div className="relative flex w-full flex-col items-center" style={inverseScaleStyle}>
-      {!!foldedCount && !dotted && (
-        // Auto-packed: the branch tucked into this parent. The right middle
-        // is free (the step number takes the left).
-        <button
-          type="button"
-          data-testid="auto-pack-count"
-          className="absolute top-1/2 left-[calc(100%+4px)] z-[7] flex h-6 min-w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-2 border-accent bg-surface px-[0.35rem] text-[0.7rem] leading-none font-bold whitespace-nowrap text-accent-ink shadow-card hover:bg-surface-2"
-          title={t.ui.autoPack.open(foldedCount)}
-          aria-label={t.ui.autoPack.open(foldedCount)}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onUnfold?.();
-          }}
-        >
-          +{foldedCount}
-        </button>
-      )}
       {dotted && !inlineEditing ? (
         // Zoomed far out: just a point in the node's type color — at that
         // distance icons, cards and badges are only noise, and the dots
@@ -559,6 +551,47 @@ export const NodeCard = memo(function NodeCard({
           onIconHover?.(false);
         }}
       >
+        {!!foldedCount && !dotted && (
+          // Auto-packed: the branch tucked into this parent, on the icon's
+          // right middle (the step number takes the left), or above a card.
+          <button
+            type="button"
+            data-testid="auto-pack-count"
+            className={`${PACK_PILL_CLASS} ${puzzle ? PACK_PILL_ABOVE : PACK_PILL_NEXT} border-accent text-accent-ink`}
+            title={t.ui.autoPack.open(foldedCount)}
+            aria-label={t.ui.autoPack.open(foldedCount)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onUnfold?.();
+            }}
+          >
+            +{foldedCount}
+          </button>
+        )}
+        {!foldedCount && onFold && !dotted && !inlineEditing && (
+          // An open parent: the same pill packs its branch in (docs/gestures/pack-children.md).
+          // Selected, it always shows; otherwise only a mouse hovering the node
+          // brings it up, and it lingers a moment so the pointer can cross the
+          // gap from the icon to it. A finger never hovers, so on touch it's
+          // there only once the node is tapped.
+          <button
+            type="button"
+            data-testid="auto-pack-fold"
+            className={`${PACK_PILL_CLASS} ${puzzle ? PACK_PILL_ABOVE : PACK_PILL_NEXT} border-line text-ink-soft ${
+              selected ? "" : "invisible transition-[visibility] delay-300 group-hover:visible group-hover:delay-0"
+            }`}
+            title={t.ui.autoPack.pack}
+            aria-label={t.ui.autoPack.pack}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onFold();
+            }}
+          >
+            −
+          </button>
+        )}
         {hoverLabel && hovered && captionLabel && (
           <div className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-[6] max-w-[220px] -translate-x-1/2 truncate rounded-md border border-line bg-surface px-2 py-[0.15rem] text-[0.75rem] font-semibold whitespace-nowrap text-ink shadow-card">
             {captionLabel}
