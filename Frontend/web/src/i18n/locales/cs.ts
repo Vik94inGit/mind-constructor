@@ -677,7 +677,12 @@ const ui: UiStrings = {
   },
   minimapTitle: "Minimapa — kliknutím nebo tažením se přesunete po mapě",
   cardFit: {
-    packed: "Na této obrazovce je příliš mnoho karet na čtení, proto je každá větev sbalená do svého rodiče. Klepněte na +N na kartě a otevře se jen ta větev.",
+    packed: "Příliš mnoho karet na jednu obrazovku, proto jdou po jedné zóně, popořadě. Listujte ◀ ▶ nebo +N na kartě.",
+    topIdeas: "Hlavní myšlenky",
+    zone: (n) => `Zóna ${n}`,
+    back: "Předchozí zóna",
+    next: "Další zóna",
+    showAll: "Ukázat všechny karty najednou, větve sbalené",
     tooMany: (n) => `Příliš mnoho karet i se sbalenými větvemi: nevejde se horních karet: ${n}.`,
     moveExtra: (n) => `Přesunout ${n} na jinou mapu`,
     moveTitle: (n) => `Přesunout karty (${n}) i s větvemi na…`,

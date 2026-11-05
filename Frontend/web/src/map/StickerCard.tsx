@@ -51,6 +51,8 @@ export interface StickerCardProps {
   typeIcon?: ReactNode;
   /** The icon's name for a screen reader and its tooltip (the type's name). */
   typeLabel?: string;
+  /** Its place in the outline ("1.2"), on the top edge beside the type icon, so the cards read in order. */
+  seqLabel?: string;
   children: ReactNode;
 }
 
@@ -76,6 +78,7 @@ export function StickerCard({
   maxWidth,
   typeIcon,
   typeLabel,
+  seqLabel,
   children,
 }: StickerCardProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -171,6 +174,15 @@ export function StickerCard({
           style={{ border: `1.5px solid color-mix(in srgb, ${color} 70%, transparent)`, color }}
         >
           {typeIcon}
+        </span>
+      )}
+      {seqLabel && (
+        <span
+          data-card-seq
+          className="pointer-events-none absolute -top-[9px] left-[16px] z-[2] rounded-full bg-surface px-[5px] text-[10px] leading-[16px] font-bold text-ink shadow-card"
+          style={{ border: `1.5px solid color-mix(in srgb, ${color} 70%, transparent)` }}
+        >
+          {seqLabel}
         </span>
       )}
       <div className={`relative flex min-h-0 flex-1 flex-col ${h ? "overflow-hidden" : ""}`}>{children}</div>

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { useCardFit } from "./useCardFit";
+import { useState } from "react";
+import { TOP_ZONE, useCardFit } from "./useCardFit";
 import { makeNode } from "../test/fixtures";
 import type { FoldedParents } from "../utils/autoPack";
 import type { NodeDoc } from "../types";
@@ -19,31 +20,75 @@ const branches = (roots: number, kids: number): NodeDoc[] =>
     ...Array.from({ length: kids }, (_, k) => makeNode({ nodeId: `r${r}k${k}`, parentId: `r${r}` })),
   ]).flat();
 
-function setup(nodes: NodeDoc[], folded: FoldedParents = new Set()) {
-  const setFolded = vi.fn();
+function setup(nodes: NodeDoc[], initialFolded: FoldedParents = new Set()) {
+  const setFoldedSpy = vi.fn();
   const toggleFold = vi.fn();
   const onRefolded = vi.fn();
   const viewportRef = viewport();
   const hook = renderHook(
-    ({ active, folded }: { active: boolean; folded: FoldedParents }) =>
-      useCardFit({ active, ready: true, nodes, folded, setFolded, toggleFold, viewportRef, onRefolded }),
-    { initialProps: { active: true, folded } },
+    ({ active }: { active: boolean }) => {
+      const [folded, setFoldedState] = useState(initialFolded);
+      const [zone, setZone] = useState<string | null>(null);
+      const setFolded = (next: FoldedParents) => {
+        setFoldedSpy(next);
+        setFoldedState(next);
+      };
+      const fit = useCardFit({ active, ready: true, nodes, folded, setFolded, toggleFold, viewportRef, onRefolded, zone, setZone });
+      return { ...fit, folded, zone };
+    },
+    { initialProps: { active: true } },
   );
-  return { ...hook, setFolded, toggleFold, onRefolded };
+  return { ...hook, setFolded: setFoldedSpy, toggleFold, onRefolded };
 }
+
+const sorted = (set: Set<string>) => [...set].sort();
 
 describe("useCardFit", () => {
   it("leaves a board that fits alone", () => {
     const { result, setFolded } = setup(branches(2, 2));
     expect(result.current.warning).toBeNull();
+    expect(result.current.zone).toBeNull();
     expect(setFolded).not.toHaveBeenCalled();
   });
 
-  it("packs every branch, and says so, when the cards don't fit", () => {
-    const { result, setFolded, onRefolded } = setup(branches(4, 15));
-    expect([...setFolded.mock.calls[0][0]].sort()).toEqual(["r0", "r1", "r2", "r3"]);
-    expect(onRefolded).toHaveBeenCalled();
+  it("shows the top ideas first, one zone at a time, when the cards don't fit", () => {
+    const { result, onRefolded } = setup(branches(4, 15));
     expect(result.current.warning).toEqual({ kind: "packed" });
+    expect(result.current.zone).toBe(TOP_ZONE);
+    expect(sorted(result.current.folded)).toEqual(["r0", "r1", "r2", "r3"]);
+    expect(result.current.stepAt).toBe(0);
+    expect(result.current.stepCount).toBe(5);
+    expect(onRefolded).toHaveBeenCalled();
+  });
+
+  it("steps through the zones in order, and back", () => {
+    const { result } = setup(branches(4, 15));
+    act(() => result.current.step(1));
+    expect(result.current.zone).toBe("r0");
+    expect(sorted(result.current.folded)).toEqual(["r1", "r2", "r3"]);
+    act(() => result.current.step(1));
+    expect(result.current.zone).toBe("r1");
+    act(() => result.current.step(-1));
+    act(() => result.current.step(-1));
+    act(() => result.current.step(-1));
+    expect(result.current.zone).toBe(TOP_ZONE);
+  });
+
+  it("a card's +N goes to its zone while stepping", () => {
+    const { result, toggleFold } = setup(branches(4, 15));
+    act(() => result.current.openBranch("r2"));
+    expect(result.current.zone).toBe("r2");
+    expect(result.current.stepAt).toBe(3);
+    expect(toggleFold).not.toHaveBeenCalled();
+  });
+
+  it("closing the banner stops stepping, every branch packed", () => {
+    const { result } = setup(branches(4, 15));
+    act(() => result.current.step(1));
+    act(() => result.current.dismissWarning());
+    expect(result.current.zone).toBeNull();
+    expect(result.current.warning).toBeNull();
+    expect(sorted(result.current.folded)).toEqual(["r0", "r1", "r2", "r3"]);
   });
 
   it("names the top cards past what fits when even they don't", () => {
@@ -56,27 +101,19 @@ describe("useCardFit", () => {
     }
   });
 
-  it("opening a branch that doesn't fit alone packs the others", () => {
-    const nodes = branches(4, 30);
-    // r0 is open already; opening r1 as well wouldn't fit.
-    const { result, setFolded, toggleFold } = setup(nodes, new Set(["r1", "r2", "r3"]));
-    setFolded.mockClear();
+  it("after stepping, opening a branch that doesn't fit beside the open ones packs them", () => {
+    const { result } = setup(branches(4, 30));
+    act(() => result.current.step(1));
+    act(() => result.current.dismissWarning());
+    // r0 open by hand; opening r1 as well wouldn't fit.
+    act(() => result.current.openBranch("r0"));
     act(() => result.current.openBranch("r1"));
-    expect(toggleFold).not.toHaveBeenCalled();
-    expect([...setFolded.mock.calls[0][0]].sort()).toEqual(["r0", "r2", "r3"]);
-  });
-
-  it("opening a branch that fits keeps the others as they are", () => {
-    const nodes = branches(4, 3);
-    const { result, setFolded } = setup(nodes, new Set(["r1", "r2", "r3"]));
-    setFolded.mockClear();
-    act(() => result.current.openBranch("r1"));
-    expect([...setFolded.mock.calls[0][0]].sort()).toEqual(["r2", "r3"]);
+    expect(sorted(result.current.folded)).toEqual(["r0", "r2", "r3"]);
   });
 
   it("outside the cards view a +N just opens its branch", () => {
-    const { result, rerender, toggleFold } = setup(branches(2, 2));
-    rerender({ active: false, folded: new Set(["r0"]) });
+    const { result, rerender, toggleFold } = setup(branches(2, 2), new Set(["r0"]));
+    rerender({ active: false });
     act(() => result.current.openBranch("r0"));
     expect(toggleFold).toHaveBeenCalledWith("r0");
   });

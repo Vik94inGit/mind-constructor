@@ -147,7 +147,8 @@ import { autoNodeFade, nodeFadeStyle } from "../utils/nodeFade";
 import { MoveNoteModal } from "../dashboard/MoveNoteModal";
 import { MoveCardsModal } from "../map/MoveCardsModal";
 import { CardFitBanner } from "../map/CardFitBanner";
-import { useCardFit } from "../hooks/useCardFit";
+import { TOP_ZONE, useCardFit } from "../hooks/useCardFit";
+import { outlineNumbers, zoneMembers } from "../utils/cardFit";
 import { findInbox, noteBranch } from "../utils/inbox";
 import { feature } from "../utils/usage";
 
@@ -368,6 +369,13 @@ export function MapPage() {
       return !v;
     });
   }
+  // The cards view showing one zone at a time when its cards don't fit the
+  // screen (hooks/useCardFit.ts): TOP_ZONE, a parent's id, or null.
+  const [cardZone, setCardZone] = useState<string | null>(null);
+  const cardZoneIds = useMemo(
+    () => (cardZone === null || cardZone === TOP_ZONE ? null : zoneMembers(unpackedNodes, cardZone)),
+    [unpackedNodes, cardZone],
+  );
   const timeLapseNodes = useMemo(() => timeLapseOrder(unpackedNodes), [unpackedNodes]);
   const timeLapseStep = timeLapse ? Math.min(timeLapse.step, timeLapseNodes.length) : null;
   const visibleNodes = useMemo(() => {
@@ -380,10 +388,11 @@ export function MapPage() {
         timeLapseNodes[timeLapseStep - 1]?.createdAt,
       );
     }
+    if (cardZoneIds) return unpackedNodes.filter((n) => cardZoneIds.has(n.nodeId));
     return fold.hidden.size === 0
       ? unpackedNodes
       : unpackedNodes.filter((n) => n.nodeId === selectedId || !fold.hidden.has(n.nodeId));
-  }, [unpackedNodes, selectedId, timeLapseNodes, timeLapseStep, replayAttacks, fold]);
+  }, [unpackedNodes, selectedId, timeLapseNodes, timeLapseStep, replayAttacks, fold, cardZoneIds]);
   // A node drawn as a puzzle card sits at its own card spot, apart from the
   // icon's — see utils/cardSpace.ts. Worked out from the same display choices
   // modeOf reads below, with zones taken by membership alone (their outline
@@ -689,11 +698,19 @@ export function MapPage() {
     setReadingMode,
   });
 
-  // The cards view kept to what fits the screen: branches pack in when the
-  // cards don't, and the top cards past what fits can go to another map
-  // (hooks/useCardFit.ts).
+  // The cards view kept to what fits the screen: shown one zone at a time,
+  // numbered like an outline, when its cards don't; the top cards past what
+  // fits can go to another map (hooks/useCardFit.ts).
   const fitNodes = useMemo(() => unpackedNodes.filter((n) => !n.isWeapon && !n.isProtection), [unpackedNodes]);
-  const { warning: cardFitWarning, dismissWarning: dismissCardFit, openBranch } = useCardFit({
+  const cardNumbers = useMemo(() => (cardZone === null ? null : outlineNumbers(fitNodes)), [cardZone, fitNodes]);
+  const {
+    warning: cardFitWarning,
+    dismissWarning: dismissCardFit,
+    openBranch,
+    stepAt: cardStepAt,
+    stepCount: cardStepCount,
+    step: cardStep,
+  } = useCardFit({
     active: view === "cards",
     ready: !loading && !entranceActive && !timeLapse && !presenting,
     nodes: fitNodes,
@@ -704,6 +721,8 @@ export function MapPage() {
     // Once the cards left are drawn, they're laid close again (and the
     // camera takes them in), from the newest render's cards.
     onRefolded: () => setTimeout(() => layCardsCloseLatest.current(), 120),
+    zone: cardZone,
+    setZone: setCardZone,
   });
   const [movingExtraCards, setMovingExtraCards] = useState<string[] | null>(null);
   // Only your own cards can be moved off the map.
@@ -1671,6 +1690,16 @@ export function MapPage() {
           movable={cardFitWarning.kind === "tooMany" ? movableExtra(cardFitWarning.extraRootIds) : []}
           onMove={(ids) => setMovingExtraCards(ids)}
           onDismiss={dismissCardFit}
+          steps={
+            cardZone !== null && cardStepCount > 1
+              ? {
+                  at: cardStepAt,
+                  count: cardStepCount,
+                  label: cardZone === TOP_ZONE ? null : (cardNumbers?.get(cardZone) ?? null),
+                  onStep: cardStep,
+                }
+              : null
+          }
         />
       )}
       {actionError && <MapBanner tone="danger" message={actionError} onDismiss={() => setActionError(null)} />}
@@ -1851,6 +1880,7 @@ export function MapPage() {
                   indicator={indicatorByNode.get(node.nodeId)}
                   packedCount={packedCountByContainer.get(node.nodeId)}
                   foldedCount={fold.counts.get(node.nodeId)}
+                  seqLabel={view === "cards" ? cardNumbers?.get(node.nodeId) : undefined}
                   canFold={view !== "cards" && mapParents.has(node.nodeId) && !folded.has(node.nodeId)}
                   unsolved={unsolvedProblemIds.has(node.nodeId)}
                   triumphant={solved.successIds.has(node.nodeId)}

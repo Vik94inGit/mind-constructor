@@ -376,6 +376,11 @@ export interface UiStrings {
   /** The cards view kept to what fits the screen (utils/cardFit.ts). */
   cardFit: {
     packed: string;
+    topIdeas: string;
+    zone: (number: string) => string;
+    back: string;
+    next: string;
+    showAll: string;
     tooMany: (extra: number) => string;
     moveExtra: (extra: number) => string;
     moveTitle: (extra: number) => string;
@@ -1126,7 +1131,12 @@ const en: UiStrings = {
     takeParentPlace: "Couldn't make it the head of the zone.",
   },
   cardFit: {
-    packed: "Too many cards to read on this screen, so each branch is packed into its parent. Tap +N on a card to open just that branch.",
+    packed: "Too many cards for one screen, so they come one zone at a time, in order. Step with ◀ ▶ or a card's +N.",
+    topIdeas: "Top ideas",
+    zone: (n) => `Zone ${n}`,
+    back: "Previous zone",
+    next: "Next zone",
+    showAll: "Show every card at once, branches packed",
     tooMany: (n) => `Too many cards for the cards view, even with every branch packed: ${n} top card${n === 1 ? "" : "s"} don't fit.`,
     moveExtra: (n) => `Move ${n} to another map`,
     moveTitle: (n) => `Move ${n} card${n === 1 ? "" : "s"} (with their branches) to…`,
