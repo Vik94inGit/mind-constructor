@@ -39,11 +39,13 @@ export function usePlacement({ visibleNodes, positions, nodeGroups, viewportBoun
   // part: nothing on top of another node or its text. In a discussion no drop
   // lands inside another player's castle either.
   // Only the moving nodes move; nothing else on the map is pushed around.
-  function placeNode(desired: Pt, moving: MovingNode[], extra: ExtraNode[] = [], opts: { free?: boolean } = {}) {
-    const obstacles = footprintObstacles(
-      [...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)],
-      MIN_NODE_GAP,
-    );
+  // `opts.obstacles`: more to keep clear of, such as a node drawn as a card,
+  // which covers far more than a node's usual footprint (utils/drawnBox.ts).
+  function placeNode(desired: Pt, moving: MovingNode[], extra: ExtraNode[] = [], opts: { free?: boolean; obstacles?: Obstacle[] } = {}) {
+    const obstacles = [
+      ...footprintObstacles([...obstaclePoints(new Set(moving.map((m) => m.nodeId))), ...extra.map((e) => e.pos)], MIN_NODE_GAP),
+      ...(opts.obstacles ?? []),
+    ];
     return placeByZoneRules(
       desired,
       obstacles,

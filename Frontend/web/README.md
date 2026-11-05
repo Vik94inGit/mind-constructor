@@ -217,8 +217,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
   in the panel; the inline inputs grow taller with the text, never wider. Text **pasted** past the
   limit isn't cut silently: what fits goes in (cut between words), and an offer
-  (`components/TextOverflowOffer.tsx`) asks to put the rest in a new node, or as many as it takes,
-  each hanging from the one before and of the same type (`carryText` in `hooks/useNodeCreation.ts`).
+  (`components/TextOverflowOffer.tsx`) asks to put the rest in a new node, or as many as it takes
+  (`carryText` in `hooks/useNodeCreation.ts`): all of them children of the first node and of its type,
+  numbered in reading order (the first node is 1, unless it already has a number), and laid out in a
+  row under it, clear of everything it really draws — a node shown as a card covers far more than
+  an icon, so its drawn box is measured and kept clear (`utils/drawnBox.ts`).
   In the panel's text box it shows under the text and makes them at once; in a node's inline editor
   it's a banner at the top of the map; in the new-node panel and the dashboard's Quick note, saying
   yes sends the rest along when the node (or note) is made. It works with a tablet's paste bubble

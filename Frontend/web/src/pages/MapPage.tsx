@@ -41,6 +41,7 @@ import { NodePanel } from "../map/NodePanel";
 import { PackPickerPanel } from "../map/PackPickerPanel";
 import { TextToNodesModal } from "../map/TextToNodesModal";
 import { TextOverflowOffer } from "../components/TextOverflowOffer";
+import { drawnBox } from "../utils/drawnBox";
 import { canSplitText } from "../utils/textSplit";
 import { findFreeSpots } from "../utils/freeSpots";
 import { PendingNodeCard } from "../map/PendingNodeCard";
@@ -1446,6 +1447,7 @@ export function MapPage() {
       setMultiSelectIds(new Set());
       setSelectedId(null);
     },
+    drawnBoxOf: (nodeId) => drawnBox(nodeId, screenToCanvas),
     t,
   });
 
