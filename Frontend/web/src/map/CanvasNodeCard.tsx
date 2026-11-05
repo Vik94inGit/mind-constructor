@@ -7,6 +7,8 @@ import type { NodeDoc, NodeType } from "../types";
 export type CanvasNodeActions = {
   inlineConfirm: (node: NodeDoc, text: string, type: NodeType) => void;
   inlineCancel: () => void;
+  /** Pasted text that didn't fit the inline editor (NodeCard's onTextOverflow). */
+  textOverflow: (node: NodeDoc, rest: string) => void;
   pointerDown: (node: NodeDoc, e: ReactPointerEvent) => void;
   click: (node: NodeDoc, e: ReactMouseEvent) => void;
   doubleClick: (node: NodeDoc) => void;
@@ -25,6 +27,7 @@ type CardProps = ComponentProps<typeof NodeCard>;
 type Callback =
   | "onInlineConfirm"
   | "onInlineCancel"
+  | "onTextOverflow"
   | "onPointerDown"
   | "onClick"
   | "onDoubleClick"
@@ -84,6 +87,7 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
       flightVector={flightVector}
       onInlineConfirm={(text, type) => actions.inlineConfirm(node, text, type)}
       onInlineCancel={actions.inlineCancel}
+      onTextOverflow={card.inlineEditing ? (rest) => actions.textOverflow(node, rest) : undefined}
       onPointerDown={card.inlineEditing ? undefined : (e) => actions.pointerDown(node, e)}
       onClick={(e) => actions.click(node, e)}
       onDoubleClick={() => actions.doubleClick(node)}

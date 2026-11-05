@@ -22,6 +22,7 @@ function actions(): CanvasNodeActions {
   return {
     inlineConfirm: vi.fn(),
     inlineCancel: vi.fn(),
+    textOverflow: vi.fn(),
     pointerDown: vi.fn(),
     click: vi.fn(),
     doubleClick: vi.fn(),

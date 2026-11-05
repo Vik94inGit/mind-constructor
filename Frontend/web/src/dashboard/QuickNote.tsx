@@ -5,7 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
 import { ApiRequestError } from "../api/client";
 import { addQuickNote } from "../utils/inbox";
-import { MAX_NODE_TEXT } from "../utils/nodeText";
+import { MAX_NODE_TEXT, pasteKeepingOverflow, splitNodeText } from "../utils/nodeText";
+import { TextOverflowOffer } from "../components/TextOverflowOffer";
 import type { MapDoc } from "../types";
 import { track } from "../utils/usage";
 
@@ -20,6 +21,10 @@ export function QuickNote({ maps, autoFocus, onSaved }: { maps: MapDoc[]; autoFo
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<MapDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Pasted text past a note's limit (utils/nodeText.ts), and whether it's to
+  // be saved as the next notes, one after another.
+  const [overflow, setOverflow] = useState<string | null>(null);
+  const [carry, setCarry] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -30,6 +35,12 @@ export function QuickNote({ maps, autoFocus, onSaved }: { maps: MapDoc[]; autoFo
     try {
       const { map, created } = await addQuickNote(note, maps, user._id, s.inboxName);
       track({ name: "quick_note_added" });
+      // The rest of a long paste: the next notes, in order, on the same Inbox.
+      if (carry && overflow) {
+        for (const piece of splitNodeText(overflow)) await addQuickNote(piece, [map], user._id, s.inboxName);
+      }
+      setOverflow(null);
+      setCarry(false);
       setText("");
       setSaved(map);
       onSaved(map, created);
@@ -52,6 +63,13 @@ export function QuickNote({ maps, autoFocus, onSaved }: { maps: MapDoc[]; autoFo
             setText(e.target.value);
             setSaved(null);
           }}
+          onPaste={(e) =>
+            pasteKeepingOverflow(e, setText, (rest) => {
+              setOverflow(rest);
+              setCarry(false);
+              setSaved(null);
+            })
+          }
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void onSubmit(e);
           }}
@@ -67,6 +85,16 @@ export function QuickNote({ maps, autoFocus, onSaved }: { maps: MapDoc[]; autoFo
           {s.save}
         </button>
       </div>
+      {overflow && (
+        <TextOverflowOffer
+          rest={overflow}
+          accepted={carry}
+          busy={busy}
+          onCarry={() => setCarry(true)}
+          onLeave={() => setOverflow(null)}
+          onUndo={() => setCarry(false)}
+        />
+      )}
       {error && <p className="m-0 text-[0.8rem] text-danger">{error}</p>}
       {saved && (
         <p className="m-0 text-[0.8rem] text-ink-soft">
