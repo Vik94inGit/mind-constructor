@@ -2,9 +2,8 @@ import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useI18n } from "../../i18n/I18nContext";
 import { MAX_NODE_IMAGES, imageSrc } from "../../utils/images";
-import { PICTURES } from "../../utils/pictures";
-import { pictureTemplateFile, pictureTemplateSrc, templateKindsFor } from "../../utils/pictureTemplates";
-import type { NodeType } from "../../types";
+import { PICTURE_TEMPLATES, pictureTemplateFile, pictureTemplateThumb } from "../../utils/pictureTemplates";
+import type { PictureTemplate } from "../../utils/pictureTemplates";
 
 interface Props {
   /** null while they're still being fetched. */
@@ -23,8 +22,6 @@ interface Props {
   cardImage?: string;
   /** Shows picture `index` as a card on the map, or (null) removes the card. Unset when this viewer can't. */
   onSetCard?: (index: number | null) => void;
-  /** The node's type: its own template picture (utils/pictureTemplates.ts) comes first. */
-  nodeType?: NodeType;
 }
 
 const pictureBtn =
@@ -35,14 +32,32 @@ const pictureBtn =
 // it full size) and, for the node's owner, a small toolbar to add more. A
 // picture can also be pasted anywhere in the panel (NodePanel's own onPaste)
 // or dropped anywhere on the post box (InfoTab).
-export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, iconImage = "", onSetIcon, cardImage = "", onSetCard, nodeType }: Props) {
+export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, iconImage = "", onSetIcon, cardImage = "", onSetCard }: Props) {
   const { t } = useI18n();
   const s = t.ui.images;
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  // A template's full painting is fetched when it's picked; while that runs
+  // the tiles wait, and if it fails (offline) the picker says so.
+  const [fetching, setFetching] = useState(false);
+  const [templateFailed, setTemplateFailed] = useState(false);
   const list = images ?? [];
   const full = list.length >= MAX_NODE_IMAGES;
+
+  async function pick(kind: PictureTemplate) {
+    setFetching(true);
+    setTemplateFailed(false);
+    try {
+      const file = await pictureTemplateFile(kind);
+      setTemplatesOpen(false);
+      onAdd([file]);
+    } catch {
+      setTemplateFailed(true);
+    } finally {
+      setFetching(false);
+    }
+  }
 
   if (!canEdit && list.length === 0) return null;
 
@@ -133,7 +148,10 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
             disabled={busy || full || images === null}
             aria-expanded={templatesOpen}
             title={s.templatesHint}
-            onClick={() => setTemplatesOpen((v) => !v)}
+            onClick={() => {
+              setTemplateFailed(false);
+              setTemplatesOpen((v) => !v);
+            }}
           >
             {s.templates}
           </button>
@@ -186,30 +204,29 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
         </div>
       )}
       {canEdit && templatesOpen && !full && images !== null && (
-        // Ready-made pictures, one per node type, the node's own type first.
-        // Picking one adds it like any other picture (then it can be the icon or card).
-        <div className="mt-[0.4rem] flex flex-wrap gap-[0.35rem]" role="group" aria-label={s.templatesHint}>
-          {templateKindsFor(nodeType).map((kind) => {
-            const type = PICTURES[kind].type;
-            const label = type ? t.ui.types[type] : kind;
-            return (
-              <button
-                key={kind}
-                type="button"
-                data-template={kind}
-                className="flex w-[3.6rem] cursor-pointer flex-col items-center gap-[0.1rem] rounded-md border border-line bg-surface p-[0.2rem] text-[0.62rem] leading-tight text-ink hover:bg-surface-2 disabled:opacity-50"
-                disabled={busy}
-                title={label}
-                onClick={() => {
-                  setTemplatesOpen(false);
-                  onAdd([pictureTemplateFile(kind)]);
-                }}
-              >
-                <img src={pictureTemplateSrc(kind, 96)} alt="" className="h-[2.6rem] w-[2.6rem] rounded-[4px]" />
-                <span className="w-full truncate text-center">{label}</span>
-              </button>
-            );
-          })}
+        // Ready-made paintings (utils/pictureTemplates.ts). Picking one adds
+        // it like any other picture (then it can be the icon or card).
+        <div className="mt-[0.4rem]">
+          <div className="grid grid-cols-5 gap-[0.35rem]" role="group" aria-label={s.templatesHint}>
+            {PICTURE_TEMPLATES.map((kind) => {
+              const label = s.templateNames[kind];
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  data-template={kind}
+                  className="aspect-square cursor-pointer overflow-hidden rounded-md border border-line bg-surface p-0 hover:opacity-85 disabled:cursor-wait disabled:opacity-50"
+                  disabled={busy || fetching}
+                  title={label}
+                  aria-label={label}
+                  onClick={() => void pick(kind)}
+                >
+                  <img src={pictureTemplateThumb(kind)} alt="" loading="lazy" className="block h-full w-full object-cover" />
+                </button>
+              );
+            })}
+          </div>
+          {templateFailed && <p className="m-0 mt-[0.3rem] text-[0.72rem] text-danger">{s.templateFailed}</p>}
         </div>
       )}
       {open !== null && list[open] && (

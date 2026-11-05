@@ -655,7 +655,6 @@ export function NodePanel({
               onSetIcon={isCreator ? (i) => setImageAs("iconImage", i) : undefined}
               cardImage={node.cardImage}
               onSetCard={isCreator ? (i) => setImageAs("cardImage", i) : undefined}
-              nodeType={node.type}
               extra={
                 isCreator && !textLocked ? (
                   <span
