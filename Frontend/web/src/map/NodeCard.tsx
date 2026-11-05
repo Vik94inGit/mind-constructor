@@ -56,11 +56,12 @@ const PACK_PILL_CLASS =
   "pointer-events-auto absolute z-[7] flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border-2 bg-surface px-[0.35rem] text-[0.7rem] leading-none font-bold whitespace-nowrap shadow-card hover:bg-surface-2";
 // iconText captions: a little wider and taller than the default chip.
 const ICON_TEXT_CAPTION_WIDTH = 176;
-// A picture card (NodeDoc.cardImage) in place of the icon, on screen.
-const CARD_IMAGE_WIDTH = 120;
-const CARD_IMAGE_MAX_HEIGHT = 120;
+// A picture card (NodeDoc.cardImage) in place of the icon, on screen: the
+// whole picture, never cropped, its longer side twice a round node (48px), so
+// a tall painting and a wide one both sit in proportion to the nodes around.
+const CARD_IMAGE_SIDE = 96;
 // Smaller while selected, so the quick-add ghosts ringing the node stay clear of it.
-const CARD_IMAGE_SELECTED_SIZE = 72;
+const CARD_IMAGE_SELECTED_SIDE = 72;
 
 
 interface Props {
@@ -492,8 +493,7 @@ export const NodeCard = memo(function NodeCard({
   // or not. Editing the node inline brings the icon back, since clicking it
   // there cycles the type.
   const showPictureCard = !!node.cardImage && !puzzle && !inlineEditing;
-  const cardWidth = selected ? CARD_IMAGE_SELECTED_SIZE : CARD_IMAGE_WIDTH;
-  const cardMaxHeight = selected ? CARD_IMAGE_SELECTED_SIZE : CARD_IMAGE_MAX_HEIGHT;
+  const cardSide = selected ? CARD_IMAGE_SELECTED_SIDE : CARD_IMAGE_SIDE;
 
   return (
     <div
@@ -675,7 +675,7 @@ export const NodeCard = memo(function NodeCard({
           >
             {node.cardImage && (
               // The picture card, at the top of the puzzle piece.
-              <img src={imageSrc(node.cardImage)} alt="" className="mb-[0.3rem] block max-h-[110px] w-full rounded-[4px] object-cover" draggable={false} />
+              <img src={imageSrc(node.cardImage)} alt="" className="mx-auto mb-[0.3rem] block h-auto max-h-[110px] w-auto max-w-full rounded-[4px]" draggable={false} />
             )}
             {trimmedTitle && (
               <div className={`text-[1.08em] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}>{trimmedTitle}</div>
@@ -706,9 +706,8 @@ export const NodeCard = memo(function NodeCard({
           // with the selection outline and glows the round icon would carry.
           // Undoes the size tier, so it's one size on screen.
           <div
-            className={`overflow-hidden rounded-md border-2 bg-surface shadow-card transition-transform duration-150 ease-[ease] group-hover:scale-[1.04] ${ringStateClass}`}
+            className={`w-fit overflow-hidden rounded-md border-2 bg-surface shadow-card transition-transform duration-150 ease-[ease] group-hover:scale-[1.04] ${ringStateClass}`}
             style={{
-              width: cardWidth / sizeMultiplier,
               borderColor: circleBorderColor,
               outline: ringStyle.outline,
               outlineOffset: 2,
@@ -718,8 +717,8 @@ export const NodeCard = memo(function NodeCard({
             <img
               src={imageSrc(node.cardImage!)}
               alt=""
-              className="block w-full object-cover"
-              style={{ maxHeight: cardMaxHeight / sizeMultiplier }}
+              className="block h-auto w-auto"
+              style={{ maxWidth: cardSide / sizeMultiplier, maxHeight: cardSide / sizeMultiplier }}
               draggable={false}
             />
           </div>
