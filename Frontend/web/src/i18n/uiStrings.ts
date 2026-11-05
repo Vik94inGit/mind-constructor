@@ -1149,6 +1149,7 @@ const en: UiStrings = {
       "Tap a node to open it; tap a ring around it to add a thought.",
       "Drag a node to move it. Hold and lift to pick it, pick more for a group, then drag the group.",
       "Hold a zone for its menu: copy its text, shape, delete, look.",
+      "Hold empty space for a menu: new node, templates, paste.",
       "Pinch to zoom; the eye sets how much detail you see.",
     ],
     mouse: [

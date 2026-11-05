@@ -17,7 +17,7 @@ import { useNodeCreation } from "../hooks/useNodeCreation";
 import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { useVisualViewportOffset } from "../hooks/useVisualViewportOffset";
 import { isEditableTarget } from "../utils/editable";
-import { canvasTapOpensMenu } from "../utils/canvasTapMenu";
+import { canvasHoldAllowed, useCanvasHoldMenu } from "../hooks/useCanvasHoldMenu";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
 import { useChosenCircle } from "../hooks/useChosenCircle";
 import { usePackMode } from "../hooks/usePackMode";
@@ -1094,27 +1094,27 @@ export function MapPage() {
 
   // Right-click on empty canvas: close what's open and offer a new node right
   // there (a node's own right-click stops before reaching this).
-  // Touch has no right-click: a tap on empty canvas with nothing open opens
-  // the canvas menu instead (utils/canvasTapMenu.ts). Decided when the finger
-  // goes down, before that press closes any menu.
-  const tapOpensMenuRef = useRef(false);
-  function onCanvasPointerDownWithTap(e: ReactPointerEvent<HTMLDivElement>) {
-    tapOpensMenuRef.current = canvasTapOpensMenu({
-      pointerType: e.pointerType,
-      somethingOpen:
-        !!selectedId ||
-        multiSelectIds.size > 0 ||
-        !!pendingCreate ||
-        !!inlineEditId ||
-        !!contextMenu ||
-        !!zoneMenu ||
-        !!canvasContextMenu ||
-        historyOpen ||
-        siegeOpen,
-      busyMode: drawMode || chooseMode || packMode || reparentMode,
-      entranceActive,
-      canEdit: !timeLapse && !presenting,
-    });
+  // Touch has no right-click: holding a finger still on empty canvas opens
+  // the canvas menu instead (hooks/useCanvasHoldMenu.ts). A quick tap only
+  // closes what's open, as before.
+  const canvasHold = useCanvasHoldMenu((clientX, clientY) => {
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    setContextMenu(null);
+    setZoneMenu(null);
+    const at = screenToCanvas(clientX, clientY);
+    setCanvasContextMenu({ screenX: clientX, screenY: clientY, canvasX: at.x, canvasY: at.y });
+  });
+  function onCanvasPointerDownWithHold(e: ReactPointerEvent<HTMLDivElement>) {
+    canvasHold.start(
+      e,
+      canvasHoldAllowed({
+        pointerType: e.pointerType,
+        busyMode: drawMode || chooseMode || packMode || reparentMode || !!pendingCreate || !!inlineEditId,
+        entranceActive,
+        canEdit: !timeLapse && !presenting,
+      }),
+    );
     onCanvasPointerDown(e);
   }
 
@@ -1644,6 +1644,8 @@ export function MapPage() {
                 suppressNextClick.current = false;
                 return;
               }
+              // Lifting the finger after a hold opened the canvas menu.
+              if (canvasHold.swallowClick()) return;
               // Drawing a line: a click places a point (if the spot is free).
               if (drawMode) {
                 addDrawPoint(screenToCanvas(e.clientX, e.clientY));
@@ -1659,13 +1661,8 @@ export function MapPage() {
               setSelectedId(null);
               setMultiSelectIds(new Set());
               releaseChosenCircleIfOutside();
-              if (tapOpensMenuRef.current) {
-                tapOpensMenuRef.current = false;
-                const at = screenToCanvas(e.clientX, e.clientY);
-                setCanvasContextMenu({ screenX: e.clientX, screenY: e.clientY, canvasX: at.x, canvasY: at.y });
-              }
             }}
-            onPointerDown={onCanvasPointerDownWithTap}
+            onPointerDown={onCanvasPointerDownWithHold}
             onPointerMove={drawMode ? onDrawPointerMove : undefined}
             onContextMenu={onCanvasContextMenu}
           >
