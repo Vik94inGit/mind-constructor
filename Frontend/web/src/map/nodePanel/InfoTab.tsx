@@ -400,7 +400,11 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
           type="button"
           className="mt-2 inline-flex cursor-pointer items-center rounded-lg border border-accent bg-accent-soft px-3 py-[0.4rem] text-[0.85rem] font-semibold text-accent-ink disabled:cursor-not-allowed disabled:opacity-50"
           disabled={busy}
-          onClick={() => onTemplate(templateKind)}
+          // Same as Split: the text box's blur would save and disable this
+          // button mid-tap, so a thought just typed ate the first tap. The
+          // tap saves the text itself, then grows the template.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => void onTextSave().then((ok) => ok && onTemplate(templateKind))}
         >
           {t.ui.templates[templateKind].button}
         </button>

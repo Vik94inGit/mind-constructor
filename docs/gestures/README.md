@@ -41,7 +41,7 @@ node) must be told apart by something the user can see before they let go.
 | Group member | Drag | Drag | Moves the group, the others following its path |
 | Node, not Move mode | Swipe | Drag | Pans the map |
 | Empty canvas | Drag | Drag | Pans (touch) / marquee-selects (mouse) |
-| Empty canvas | — | Right-click | Paste here, new node, view menu |
+| Empty canvas, nothing open | Tap | Right-click | Canvas menu: paste here, new node, templates, draw a picture, text → nodes ([sketch](canvas-tap-menu.md)) |
 | Card side handle | Drag onto a card | Drag onto a card | Links the two cards |
 | Zone | Hold | Right-click | Zone menu: copy text, shape, delete, look |
 | Change-parent mode | Tap a node | Click a node | Hangs the child from it (own parent: swap) |

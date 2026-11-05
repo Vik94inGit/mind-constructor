@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
@@ -17,6 +17,7 @@ import { useNodeCreation } from "../hooks/useNodeCreation";
 import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { useVisualViewportOffset } from "../hooks/useVisualViewportOffset";
 import { isEditableTarget } from "../utils/editable";
+import { canvasTapOpensMenu } from "../utils/canvasTapMenu";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
 import { useChosenCircle } from "../hooks/useChosenCircle";
 import { usePackMode } from "../hooks/usePackMode";
@@ -131,6 +132,7 @@ import {
   computeLinkCycles,
   getCirclePackSpacing,
   nodeObstacles,
+  isMobileViewport,
 } from "../utils/canvasLayout";
 import type { ReadingMode } from "../utils/readingMode";
 import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
@@ -266,8 +268,8 @@ export function MapPage() {
   // PendingCreate (hooks/useNodeCreation.ts).
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [showInvite, setShowInvite] = useState(false);
-  // While the quick-add ring is up the toolbar folds to one "⋮" (it floats
-  // above the ghosts and would hide one); this re-shows it until quick-add
+  // While the quick-add ring is up on a phone the toolbar folds to one "⋮"
+  // (it floats above the ghosts and would hide one); this re-shows it until quick-add
   // starts again.
   const [forceShowToolbar, setForceShowToolbar] = useState(false);
   const [showExportText, setShowExportText] = useState(false);
@@ -1092,6 +1094,30 @@ export function MapPage() {
 
   // Right-click on empty canvas: close what's open and offer a new node right
   // there (a node's own right-click stops before reaching this).
+  // Touch has no right-click: a tap on empty canvas with nothing open opens
+  // the canvas menu instead (utils/canvasTapMenu.ts). Decided when the finger
+  // goes down, before that press closes any menu.
+  const tapOpensMenuRef = useRef(false);
+  function onCanvasPointerDownWithTap(e: ReactPointerEvent<HTMLDivElement>) {
+    tapOpensMenuRef.current = canvasTapOpensMenu({
+      pointerType: e.pointerType,
+      somethingOpen:
+        !!selectedId ||
+        multiSelectIds.size > 0 ||
+        !!pendingCreate ||
+        !!inlineEditId ||
+        !!contextMenu ||
+        !!zoneMenu ||
+        !!canvasContextMenu ||
+        historyOpen ||
+        siegeOpen,
+      busyMode: drawMode || chooseMode || packMode || reparentMode,
+      entranceActive,
+      canEdit: !timeLapse && !presenting,
+    });
+    onCanvasPointerDown(e);
+  }
+
   function onCanvasContextMenu(e: ReactMouseEvent<HTMLDivElement>) {
     // A long press in a text field on the canvas (a new node's name) is the
     // tablet's own Paste/Select bubble: left to the browser.
@@ -1501,7 +1527,10 @@ export function MapPage() {
       isOwner={isOwner}
       isDiscussionMode={isDiscussionMode}
       offline={!online}
-      expanded={!quickAddActive || forceShowToolbar}
+      // Only a phone folds it: on a tablet or wider the ring round the
+      // centred node never reaches the top-left corner, and folding it there
+      // read as the toolbar disappearing whenever a node was open.
+      expanded={!quickAddActive || forceShowToolbar || !isMobileViewport()}
       onExpand={() => setForceShowToolbar(true)}
       moveMode={moveMode}
       onToggleMove={() => setMoveMode((v) => !v)}
@@ -1629,8 +1658,13 @@ export function MapPage() {
               setSelectedId(null);
               setMultiSelectIds(new Set());
               releaseChosenCircleIfOutside();
+              if (tapOpensMenuRef.current) {
+                tapOpensMenuRef.current = false;
+                const at = screenToCanvas(e.clientX, e.clientY);
+                setCanvasContextMenu({ screenX: e.clientX, screenY: e.clientY, canvasX: at.x, canvasY: at.y });
+              }
             }}
-            onPointerDown={onCanvasPointerDown}
+            onPointerDown={onCanvasPointerDownWithTap}
             onPointerMove={drawMode ? onDrawPointerMove : undefined}
             onContextMenu={onCanvasContextMenu}
           >

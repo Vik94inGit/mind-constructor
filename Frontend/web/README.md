@@ -105,7 +105,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   has built itself up, a small card asks once which of the three views to use (`map/ViewPrompt.tsx`);
   the answer is kept (per browser, closing the card keeps the view as it is) and every map opens in
   it from then on.
-- **Right-click on empty canvas** — a desktop-style menu at the click point: *Paste here*, *New node ▸*
+- **Right-click on empty canvas** (on touch: a tap on empty canvas while nothing is open, `utils/canvasTapMenu.ts`) — a menu at that point: *Paste here*, *New node ▸*
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
@@ -283,6 +283,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   toolbar docks as a panel down the left edge, like a desktop's taskbar / main menu, with its menus
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
   floating top-left cluster.
+- **Templates in the node panel** — the button saves the text just typed and grows the template in one tap.
+- **Toolbar while a node is open** — on a phone it folds to one ⋮ so it doesn't cover the ring of ghosts; on a tablet or wider it stays whole (`isMobileViewport`).
 - **Phones and tablets with the keyboard up** — the floating toolbar follows the part of the page
   still on screen, so the keyboard sliding the page up doesn't carry it off the top, and the page is put
   back at the top once nothing is being typed in, which iPad browsers otherwise forget after the node panel closes (`hooks/useVisualViewportOffset.ts`). A long press in a text field on the
