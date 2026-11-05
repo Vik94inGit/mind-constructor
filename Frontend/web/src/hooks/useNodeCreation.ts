@@ -1,9 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
-import { CANVAS_W, CANVAS_H, getCirclePackSpacing, nodeObstacles } from "../utils/canvasLayout";
+import { CANVAS_W, CANVAS_H, NODE_FOOTPRINT, getCirclePackSpacing, nodeObstacles } from "../utils/canvasLayout";
 import type { Obstacle, ViewportBounds } from "../utils/canvasLayout";
-import { NEW_NODE_ID } from "../utils/zoneRules";
+import { MIN_NODE_GAP, NEW_NODE_ID } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import { layoutTemplate, MAP_KIND_ROOTS } from "../utils/templates";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
@@ -12,6 +12,8 @@ import { layoutPicture, newPictureId, pictureNodeType } from "../utils/pictures"
 import type { PictureKind } from "../utils/pictures";
 import { piecesParentsFirst } from "../utils/textSplit";
 import { splitNodeText } from "../utils/nodeText";
+import { boxObstacle } from "../utils/drawnBox";
+import type { CanvasBox } from "../utils/drawnBox";
 import type { Translation } from "../i18n/translations";
 import type { MapKind, NodeDoc, NodeType } from "../types";
 import { track } from "../utils/usage";
@@ -81,7 +83,9 @@ interface Params {
   obstaclePoints: (exclude?: Set<string>) => Pt[];
   bigNodeObstacles: (excludeRootIds?: Set<string>) => Obstacle[];
   /** Where `moving` lands when put at `desired`, under the zone rules (utils/zoneRules.ts). */
-  placeNode: (desired: Pt, moving: MovingNode[], extra?: ExtraNode[]) => Pt;
+  placeNode: (desired: Pt, moving: MovingNode[], extra?: ExtraNode[], opts?: { obstacles?: Obstacle[] }) => Pt;
+  /** What a node really covers on the canvas now (utils/drawnBox.ts), when it's drawn. */
+  drawnBoxOf?: (nodeId: string) => CanvasBox | null;
   viewportBounds: () => ViewportBounds;
   showNodes: (ids: string[]) => void;
   /** Frames the view on these canvas points (useCanvasFraming's showPoints). */
@@ -110,6 +114,7 @@ export function useNodeCreation({
   showPoints,
   showNotice,
   onCreated,
+  drawnBoxOf,
   t,
 }: Params) {
   // Grows a template branch (see utils/templates.ts) from `root`: every node
@@ -188,29 +193,43 @@ export function useNodeCreation({
   }
 
   // Text that ran past a node's limit (MAX_NODE_TEXT), carried on into new
-  // nodes: as many as it takes, each one hanging from the one before, the
-  // first from `from`, and of its type — one thought written on across
-  // several nodes. Placed beside the node it hangs from, under the zone rules.
+  // nodes: as many as it takes, every one hanging from `from` and of its
+  // type, and numbered in reading order (Node.order: `from` is 1 unless it
+  // already has a number, the pieces count on from it). They're laid out in
+  // a row under `from`, clear of everything `from` really draws — a node
+  // shown as a card covers far more than an icon (see utils/drawnBox.ts) —
+  // and of each other, under the zone rules.
   // Resolves false if a node couldn't be made (the error is shown).
   async function carryText(from: NodeDoc, rest: string, at?: Pt): Promise<boolean> {
     if (!mapId) return false;
     const pieces = splitNodeText(rest);
     if (pieces.length === 0) return true;
     setActionError(null);
-    let parent = from.nodeId;
-    let parentAt = at ?? positions.get(from.nodeId) ?? { x: from.x ?? CANVAS_W / 2, y: from.y ?? CANVAS_H / 2 };
+    const fromAt = at ?? positions.get(from.nodeId) ?? { x: from.x ?? CANVAS_W / 2, y: from.y ?? CANVAS_H / 2 };
+    const box = drawnBoxOf?.(from.nodeId) ?? null;
+    const obstacles = box ? [boxObstacle(box, MIN_NODE_GAP * 4)] : [];
+    const firstOrder = from.order ?? 1;
     const placed: ExtraNode[] = [];
     const made: string[] = [];
+    // Each piece is first tried right of the one before, the first under `from`.
+    let desired: Pt = { x: fromAt.x, y: box ? box.y + box.h / 2 + NODE_FOOTPRINT.h / 2 + MIN_NODE_GAP * 4 : fromAt.y + NODE_FOOTPRINT.h };
     try {
-      for (const text of pieces) {
-        const pos = placeNode(parentAt, [{ nodeId: NEW_NODE_ID, parentId: parent }], placed);
-        const node = await nodesApi.createNode(mapId, { text, type: from.type, x: pos.x, y: pos.y, parentId: parent });
+      if (from.order == null) upsertNode(await nodesApi.updateNode(from.nodeId, { order: firstOrder }));
+      for (let i = 0; i < pieces.length; i++) {
+        const pos = placeNode(desired, [{ nodeId: NEW_NODE_ID, parentId: from.nodeId }], placed, { obstacles });
+        const node = await nodesApi.createNode(mapId, {
+          text: pieces[i],
+          type: from.type,
+          x: pos.x,
+          y: pos.y,
+          parentId: from.nodeId,
+          order: Math.min(9999, firstOrder + i + 1),
+        });
         upsertNode(node);
         setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-        placed.push({ nodeId: node.nodeId, parentId: parent, pos });
+        placed.push({ nodeId: node.nodeId, parentId: from.nodeId, pos });
         made.push(node.nodeId);
-        parent = node.nodeId;
-        parentAt = pos;
+        desired = { x: pos.x + NODE_FOOTPRINT.w + MIN_NODE_GAP * 4, y: pos.y };
       }
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.textOverflow.failed);

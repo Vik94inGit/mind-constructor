@@ -12,7 +12,7 @@ import * as nodesApi from "../api/nodes";
 vi.mock("../utils/sleep", () => ({ sleep: () => Promise.resolve() }));
 import { PICTURES } from "../utils/pictures";
 
-function setup(pendingCreate: PendingCreate | null = null) {
+function setup(pendingCreate: PendingCreate | null = null, overrides: Partial<Parameters<typeof useNodeCreation>[0]> = {}) {
   const params = {
     mapId: "m1",
     positions: new Map<string, { x: number; y: number }>(),
@@ -32,6 +32,7 @@ function setup(pendingCreate: PendingCreate | null = null) {
     showNotice: vi.fn(),
     onCreated: vi.fn(),
     t: TRANSLATIONS.en,
+    ...overrides,
   };
   const { result } = renderHook(() => useNodeCreation(params));
   return { result, params };
@@ -55,6 +56,28 @@ describe("useNodeCreation", () => {
     expect(params.upsertNode).toHaveBeenCalled();
     expect(params.onCreated).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "n1" }), { x: 10, y: 20 });
     expect(params.setPendingCreate).toHaveBeenCalledWith(null);
+  });
+
+  it("carries a long text on into numbered children of the first node, clear of its card", async () => {
+    const placeNode = vi.fn((p: { x: number; y: number }) => p);
+    const { result } = setup(null, { placeNode, drawnBoxOf: () => ({ x: 500, y: 600, w: 240, h: 250 }) });
+    vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, body) => makeNode({ nodeId, ...body }) as NodeDoc);
+    const from = makeNode({ nodeId: "first", type: "Idea", x: 400, y: 500 }) as NodeDoc;
+    const rest = Array.from({ length: 450 }, (_, i) => `w${i}`).join(" ");
+    let ok = false;
+    await act(async () => {
+      ok = await result.current.carryText(from, rest, { x: 400, y: 500 });
+    });
+    expect(ok).toBe(true);
+    expect(nodesApi.updateNode).toHaveBeenCalledWith("first", { order: 1 });
+    const calls = vi.mocked(nodesApi.createNode).mock.calls.map((c) => c[1]);
+    expect(calls.length).toBeGreaterThan(1);
+    calls.forEach((c, i) => expect(c).toMatchObject({ type: "Idea", parentId: "first", order: i + 2 }));
+    expect(calls.map((c) => c.text).join(" ")).toBe(rest);
+    // The first spot asked for is under the card, and the card is an obstacle.
+    const [desired, , , opts] = placeNode.mock.calls[0] as unknown as [{ x: number; y: number }, unknown, unknown, { obstacles: { footprint: { h: number } }[] }];
+    expect(desired.y).toBeGreaterThan(600 + 125);
+    expect(opts.obstacles).toHaveLength(1);
   });
 
   it("dots a picture out as numbered ghosts that share one picture id", async () => {
