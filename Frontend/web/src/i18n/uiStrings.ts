@@ -1,6 +1,7 @@
 import type { Language } from "./translations";
 import type { MapKind, NodeType } from "../types";
 import type { TemplateNodeKey } from "../utils/templates";
+import type { PictureTemplate } from "../utils/pictureTemplates";
 import type { PictureKind } from "../utils/pictures";
 import { THINK_STRINGS } from "./thinkStrings";
 import type { ThinkStrings } from "./thinkStrings";
@@ -525,6 +526,10 @@ export interface UiStrings {
     /** The button that opens the ready-made pictures, one per node type (utils/pictureTemplates.ts). */
     templates: string;
     templatesHint: string;
+    /** Each ready-made painting's name (utils/pictureTemplates.ts), read out and shown on hover. */
+    templateNames: Record<PictureTemplate, string>;
+    /** A template's painting couldn't be fetched (offline). */
+    templateFailed: string;
   };
   /** A node's emoji, and the "emoji first" view — see map/NodeFlipIcon.tsx. */
   emoji: {
@@ -1216,7 +1221,20 @@ const en: UiStrings = {
     removeCard: "Take the card off the map",
     iconFailed: "Couldn't change how the picture shows",
     templates: "✨ Template",
-    templatesHint: "Add a ready-made picture: one for each kind of thought",
+    templatesHint: "Add a ready-made picture",
+    templateFailed: "Couldn't load that picture. Check the connection and try again.",
+    templateNames: {
+      eyes: "Eyes",
+      clockHeads: "Clock heads",
+      martini: "Smiling martini",
+      fishing: "Fishing for time",
+      yoyo: "Yin-yang yo-yo",
+      clockJuice: "Squeezed time",
+      orangeClock: "Orange clock",
+      puppet: "Puppet hand",
+      heartMirror: "Heart and mirror",
+      lightbulb: "Light bulb",
+    },
   },
   emoji: {
     label: "Emoji",
