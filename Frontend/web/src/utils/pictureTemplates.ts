@@ -8,6 +8,7 @@ import orangeClockThumb from "../assets/picture-templates/orange-clock.webp";
 import puppetThumb from "../assets/picture-templates/puppet.webp";
 import heartMirrorThumb from "../assets/picture-templates/heart-mirror.webp";
 import lightbulbThumb from "../assets/picture-templates/lightbulb.webp";
+import type { MapKind } from "../types";
 
 // Ready-made pictures for a node: a set of paintings offered under
 // "✨ Template" in a node's pictures (map/nodePanel/ImagesSection.tsx).
@@ -61,4 +62,22 @@ export async function pictureTemplateFile(kind: PictureTemplate, fetcher: typeof
   if (!res.ok) throw new Error(`template ${kind}: ${res.status}`);
   const blob = await res.blob();
   return new File([blob], `${FILES[kind].file}.webp`, { type: "image/webp" });
+}
+
+// The paintings a starter structure's first node is given (utils/structurePicture.ts):
+// "Develop an idea" a bulb, "Analyze a problem" the puppeteer's hand, "Make a
+// decision" the yin-yang yo-yo; a retrospective and a plan each pick one of
+// theirs at random every time one is grown.
+export const MAP_KIND_PICTURES: Record<MapKind, readonly PictureTemplate[]> = {
+  idea: ["lightbulb"],
+  problem: ["puppet"],
+  decision: ["yoyo"],
+  retro: ["heartMirror", "clockHeads"],
+  goal: ["clockJuice", "orangeClock", "fishing"],
+};
+
+/** One of `kind`'s paintings, at random when it has more than one. */
+export function pickMapKindPicture(kind: MapKind, random: () => number = Math.random): PictureTemplate {
+  const options = MAP_KIND_PICTURES[kind];
+  return options[Math.min(options.length - 1, Math.floor(random() * options.length))];
 }

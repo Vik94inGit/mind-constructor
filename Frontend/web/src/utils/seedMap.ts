@@ -1,13 +1,15 @@
 import * as nodesApi from "../api/nodes";
 import { CANVAS_W } from "./canvasLayout";
 import { layoutTemplate, MAP_KIND_ROOTS } from "./templates";
+import { addStructurePicture } from "./structurePicture";
 import type { TemplateNodeKey } from "./templates";
 import type { MapKind } from "../types";
 
 // Fills a freshly created map with the starter structure for its kind: a root
 // node in the upper middle of the canvas and the kind's template grown below
 // it, every node a ghost: no text or title, only its prompt (in the user's
-// language), shown as a placeholder until someone writes in it.
+// language), shown as a placeholder until someone writes in it. The root
+// carries the kind's painting (utils/structurePicture.ts).
 export async function seedMapKind(
   mapId: string,
   kind: MapKind,
@@ -22,6 +24,7 @@ export async function seedMapKind(
     x: rootPos.x,
     y: rootPos.y,
   });
+  const picture = addStructurePicture(rootNode.nodeId, kind);
   const ids = new Map<TemplateNodeKey, string>();
   for (const p of layoutTemplate(root.template, rootPos)) {
     const node = await nodesApi.createNode(mapId, {
@@ -35,4 +38,5 @@ export async function seedMapKind(
     });
     ids.set(p.key, node.nodeId);
   }
+  await picture;
 }

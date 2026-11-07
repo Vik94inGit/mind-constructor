@@ -9,6 +9,7 @@ import { MIN_NODE_GAP, makeZoneRule, placeByZoneRules } from "./zoneRules";
 import { shapeStep, shapeTree } from "./shapeLayout";
 import type { ExtraNode } from "./zoneRules";
 import type { MapDoc, MapKind, NodeType } from "../types";
+import { addStructurePicture } from "./structurePicture";
 
 // The "Think it through" flow (pages/ThinkPage.tsx): the user writes the one
 // thought at the center of what's on their mind, answers a few guiding
@@ -268,6 +269,8 @@ export async function buildMapFromDraft(
     x: root.x,
     y: root.y,
   });
+  // A map made from a starting point gets that kind's painting on its center.
+  const picture = options.withKind === false ? null : addStructurePicture(rootNode.nodeId, draft.kind);
   onProgress?.(1, total);
   const nodeIds = new Map<string, string>([[ROOT_ID, rootNode.nodeId]]);
   let done = 1;
@@ -283,6 +286,7 @@ export async function buildMapFromDraft(
     nodeIds.set(t.id, node.nodeId);
     onProgress?.(++done, total);
   }
+  await picture;
   await saveFeelingsAndCheckIn(map.mapId, draft, thoughts, nodeIds);
   return map;
 }
