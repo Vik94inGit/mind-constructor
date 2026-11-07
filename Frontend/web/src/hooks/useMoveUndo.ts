@@ -57,9 +57,18 @@ export function useMoveUndo({ nodes, upsertNode, setActionError, errorMessage, k
     setDepth(stack.current.length);
   }, []);
 
-  const recordUndo = useCallback((run: () => Promise<void>, failMessage: string) => {
-    stack.current.push({ run, errorMessage: failMessage });
+  // Returns the step, so it can be forgotten if it gets taken back another way.
+  const recordUndo = useCallback((run: () => Promise<void>, failMessage: string): object => {
+    const step: CustomStep = { run, errorMessage: failMessage };
+    stack.current.push(step);
     if (stack.current.length > MAX_STEPS) stack.current.shift();
+    setDepth(stack.current.length);
+    return step;
+  }, []);
+
+  // A deletion put back from the deleted list (useDeletedNodes) no longer waits on the stack.
+  const forgetUndo = useCallback((step: object) => {
+    stack.current = stack.current.filter((s) => s !== step);
     setDepth(stack.current.length);
   }, []);
 
@@ -99,5 +108,5 @@ export function useMoveUndo({ nodes, upsertNode, setActionError, errorMessage, k
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [keysEnabled, undo]);
 
-  return { recordMove, recordUndo, undo, canUndo: depth > 0 };
+  return { recordMove, recordUndo, forgetUndo, undo, canUndo: depth > 0 };
 }

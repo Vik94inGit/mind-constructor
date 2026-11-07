@@ -299,6 +299,17 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   Deleting a parent also deletes its own children one generation down that have no children of
   their own; a child that is itself a parent stays, with its branch, and just loses the link. Undo
   brings them all back together (`utils/restoreNode.ts` `leafChildrenOf`).
+- **Deleted list** — everything deleted on a map since it was opened (one node, a group or a zone, a
+  template taken back) waits in the toolbar's 🗑 list, with how many nodes each took, and *Restore*
+  puts any of them back, in any order, with their text, pictures, children and links, until the map
+  is closed. Each deletion is also a step for Undo / Ctrl+Z (`hooks/useDeletedNodes.ts`,
+  `map/DeletedMenu.tsx`, `utils/restoreNode.ts`). Attacks and shields aren't kept: their damage
+  doesn't replay.
+- **Taking a template back** — once a template, a canvas-menu structure or a picture has grown, the
+  notice ("Added 7 nodes") carries an *Undo* button, and Undo / Ctrl+Z does the same: every node it
+  made goes in one step (into the Deleted list, so even that can be put back). A new map made from a
+  kind opens with the same offer for its starter questions while none is answered yet
+  (`onStructureMade` in `hooks/useNodeCreation.ts`, `offerStructureUndo` in `pages/MapPage.tsx`).
 - **First map** — a one-time card lists the main gestures, touch or mouse ones (`map/GestureHint.tsx`).
 - **Loading** — the map editor, *Think it through*, text splitting and admin load on demand
   (`App.tsx`); the build writes `asset-list.json` so the service worker keeps them for offline too.

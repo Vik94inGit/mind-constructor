@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
@@ -67,7 +67,7 @@ import { ViewPrompt } from "../map/ViewPrompt";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
 import { creationOrder, readingOrder, stepAlong } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
-import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
+import { useDeletedNodes } from "../hooks/useDeletedNodes";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
 import { CanvasFrame } from "../map/CanvasFrame";
 import { DrawLineBar } from "../map/DrawLineBar";
@@ -268,7 +268,7 @@ export function MapPage() {
   // A failed action shows as a dismissible banner over the live canvas, not
   // the full-page error view.
   const [actionError, setActionError] = useState<string | null>(null);
-  const { notice, showNotice, dismissNotice } = useNotice();
+  const { notice, noticeAction, showNotice, dismissNotice } = useNotice();
 
   // A node not yet created, still being typed into the inline input — see
   // PendingCreate (hooks/useNodeCreation.ts).
@@ -809,7 +809,7 @@ export function MapPage() {
   // multiselect disambiguation — see hooks/useNodeDragAndDrop.ts.
   // Undo for moves: each drag records where its nodes were; Ctrl+Z (or the
   // toolbar's undo button) puts the last one back.
-  const { recordMove, recordUndo, undo: undoMove, canUndo } = useMoveUndo({
+  const { recordMove, recordUndo, forgetUndo, undo: undoMove, canUndo } = useMoveUndo({
     nodes,
     upsertNode,
     setActionError,
@@ -1247,8 +1247,9 @@ export function MapPage() {
     if (mapId) refreshInsights(mapId);
   }
 
-  // Deleting a node, undoable — see hooks/useNodeDelete.ts.
-  const { deleteNodeWithUndo, handleDeleteNode } = useNodeDelete({
+  // Everything deleted on this map since it was opened, each to put back
+  // until the map is closed (the toolbar's 🗑, and Undo) — see hooks/useDeletedNodes.ts.
+  const { deletedEntries, capture, remember, restoreEntry, deleteNodes } = useDeletedNodes({
     mapId,
     nodes,
     edges,
@@ -1256,12 +1257,63 @@ export function MapPage() {
     setNodes,
     setEdges,
     upsertNode,
-    setSelectedId,
     setCelebrateIds,
+    setActionError,
+    refreshInsights,
+    recordUndo,
+    forgetUndo,
+    failMessage: t.ui.errors.restoreNode,
+  });
+
+  // A template or picture just grown (or a new map's starter questions):
+  // Undo, or the notice's own button, takes all of it away in one step. What
+  // it takes goes into the Deleted list, so even that can be put back.
+  function offerStructureUndo(ids: string[], message: string) {
+    const takeBack = async () => {
+      await deleteNodes(ids);
+    };
+    const step = recordUndo(takeBack, t.ui.errors.delete);
+    showNotice(message, {
+      label: t.ui.templates.undo,
+      run: () => {
+        forgetUndo(step);
+        setActionError(null);
+        takeBack().catch(() => setActionError(t.ui.errors.delete));
+      },
+    });
+  }
+
+  // A map just made from a kind (the dashboard's New map) opens with its
+  // starter questions on it: offered back once, while none is answered yet.
+  const location = useLocation();
+  const seededOffered = useRef(false);
+  useEffect(() => {
+    if (loading || seededOffered.current) return;
+    seededOffered.current = true;
+    if (!(location.state as { seeded?: boolean } | null)?.seeded) return;
+    if (nodes.length === 0 || !nodes.every((n) => n.ghost && isOwnNode(n))) return;
+    offerStructureUndo(
+      nodes.map((n) => n.nodeId),
+      t.ui.templates.seeded,
+    );
+    // Only the first time the map has loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  // Deleting a node, undoable — see hooks/useNodeDelete.ts.
+  const { deleteNodeWithUndo, handleDeleteNode } = useNodeDelete({
+    mapId,
+    nodes,
+    isOwnNode,
+    setNodes,
+    setEdges,
+    upsertNode,
+    setSelectedId,
     setActionError,
     showNotice,
     refreshInsights,
-    recordUndo,
+    capture,
+    remember,
     t,
   });
 
@@ -1380,8 +1432,7 @@ export function MapPage() {
     multiSelectIds,
     isOwnNode,
     upsertNode,
-    setNodes,
-    setEdges,
+    deleteNodes,
     setMultiSelectIds,
     setSelectedId,
     showNodes,
@@ -1447,6 +1498,7 @@ export function MapPage() {
       setMultiSelectIds(new Set());
       setSelectedId(null);
     },
+    onStructureMade: offerStructureUndo,
     drawnBoxOf: (nodeId) => drawnBox(nodeId, screenToCanvas),
     t,
   });
@@ -1669,6 +1721,8 @@ export function MapPage() {
       onDeleteMap={deleteThisMap}
       canUndo={canUndo}
       onUndo={() => void undoMove()}
+      deletedEntries={deletedEntries}
+      onRestoreDeleted={(id) => void restoreEntry(id)}
       onTimeLapse={startTimeLapse}
       onPresent={enterPresentation}
     />
@@ -1676,7 +1730,7 @@ export function MapPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {notice && <MapBanner tone="success" message={notice} onDismiss={dismissNotice} />}
+      {notice && <MapBanner tone="success" message={notice} action={noticeAction ?? undefined} onDismiss={dismissNotice} />}
       {textOverflow && (
         <TextOverflowOffer
           className="mx-4 mt-[0.6rem]"

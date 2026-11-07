@@ -95,6 +95,29 @@ describe("useNodeCreation", () => {
     expect(params.upsertNode).toHaveBeenCalledTimes(PICTURES.star.dots.length);
   });
 
+  it("offers everything a template grew back in one step, the root it grew from staying", async () => {
+    const onStructureMade = vi.fn();
+    const { result, params } = setup(null, { onStructureMade });
+    const root = makeNode({ nodeId: "root", type: "Problem", x: 1200, y: 800 }) as NodeDoc;
+    await act(() => result.current.applyTemplate("problem", root));
+    const made = vi.mocked(nodesApi.createNode).mock.results.length;
+    expect(made).toBeGreaterThan(0);
+    const [ids, message] = onStructureMade.mock.calls[0];
+    expect(ids).toHaveLength(made);
+    expect(ids).not.toContain("root");
+    expect(message).toBe(TRANSLATIONS.en.ui.templates.created(made));
+    expect(params.showNotice).not.toHaveBeenCalled();
+  });
+
+  it("offers a picture's dots back too, even when it was cut short", async () => {
+    const onStructureMade = vi.fn();
+    const { result, params } = setup(null, { onStructureMade });
+    vi.mocked(nodesApi.createNode).mockResolvedValueOnce(makeNode({ nodeId: "d1" }) as NodeDoc).mockRejectedValueOnce(new Error("down"));
+    await act(() => result.current.drawPicture("star", { x: 1200, y: 800 }));
+    expect(onStructureMade).toHaveBeenCalledWith(["d1"], expect.any(String));
+    expect(params.setActionError).toHaveBeenCalled();
+  });
+
   it("makes a type's picture of that type: a stop sign's dots are Problems", async () => {
     const { result } = setup();
     await act(() => result.current.drawPicture("stop", { x: 1200, y: 800 }));

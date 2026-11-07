@@ -18,4 +18,17 @@ describe("MapBanner", () => {
     await userEvent.click(screen.getByRole("button", { name: TRANSLATIONS.en.ui.common.close }));
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
+
+  it("runs its action once and closes", async () => {
+    const onDismiss = vi.fn();
+    const run = vi.fn();
+    render(
+      <I18nProvider>
+        <MapBanner tone="success" message="Added 7 nodes" action={{ label: "Undo", run }} onDismiss={onDismiss} />
+      </I18nProvider>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
 });

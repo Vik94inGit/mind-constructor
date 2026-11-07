@@ -244,6 +244,13 @@ const ui: UiStrings = {
     Idea: "Nápad",
     unknown: "Otázka (neznámé)",
   },
+  deleted: {
+    button: (n) => `Smazáno na této mapě: ${n}`,
+    hint: "Smazáno od otevření mapy. Zůstane tu, dokud mapu nezavřete.",
+    restore: "Obnovit",
+    untitled: "(prázdné)",
+    more: (n) => `+${n} další`,
+  },
   templates: {
     section: "Šablony",
     problem: { button: "Analyzovat tento problém", hint: "Přidá dílčí problémy, riziko nicnedělání, dosavadní zkušenosti, možnosti řešení, plán a jeho výsledek." },
@@ -252,6 +259,8 @@ const ui: UiStrings = {
     idea: { button: "Rozvinout nápad", hint: "Přidá potřebu, na kterou odpovídá, jak by fungoval a první pokus, co by ho potvrdilo, co by ho zabilo, co nevíme a další nápad." },
     created: (n) => `Přidáno: ${csNodes(n)}`,
     failed: "Šablonu se nepodařilo přidat",
+    undo: "Zpět",
+    seeded: "Začínáte s otázkami šablony",
     nodes: {
       subProblem1: "Která část problému nefunguje? (jedna příčina na uzel)",
       subProblem2: "Co dalšího k němu přispívá?",
@@ -472,7 +481,7 @@ const ui: UiStrings = {
     expandTitle: "Rozbalit a zobrazit celý text bez vnitřního posuvníku",
     collapseTitle: "Sbalit zpět do posuvného pole",
     deleteConfirm: "Smazat tento uzel?",
-    deletedUndo: "Smazáno. Ctrl+Z nebo Zpět ho vrátí.",
+    deletedUndo: "Smazáno. Ctrl+Z, Zpět nebo 🗑 ho vrátí, dokud mapu nezavřete.",
     selectToSeeHealth: "Vyberte pro zobrazení zdraví",
     circleParent: (s) => `Rodič kruhu (${s})`,
     variantParent: (s) => `Rodič varianty (${s})`,

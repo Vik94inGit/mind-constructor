@@ -15,10 +15,13 @@ export function MapBanner({
   tone,
   message,
   onDismiss,
+  action,
 }: {
   tone: keyof typeof TONE_CLASS;
   message: string;
   onDismiss: () => void;
+  /** A button beside the message (the notice's Undo). */
+  action?: { label: string; run: () => void };
 }) {
   const { t } = useI18n();
   return (
@@ -26,9 +29,23 @@ export function MapBanner({
       className={`mx-4 mt-[0.6rem] flex items-center justify-between gap-3 rounded-lg ${TONE_CLASS[tone]} px-[0.9rem] py-[0.7rem] text-[0.85rem]`}
     >
       {message}
-      <button type="button" className={btnSmGhost} title={t.ui.common.close} aria-label={t.ui.common.close} onClick={onDismiss}>
-        ✕
-      </button>
+      <span className="flex shrink-0 items-center gap-1">
+        {action && (
+          <button
+            type="button"
+            className={`${btnSmGhost} border-current! underline`}
+            onClick={() => {
+              onDismiss();
+              action.run();
+            }}
+          >
+            {action.label}
+          </button>
+        )}
+        <button type="button" className={btnSmGhost} title={t.ui.common.close} aria-label={t.ui.common.close} onClick={onDismiss}>
+          ✕
+        </button>
+      </span>
     </div>
   );
 }

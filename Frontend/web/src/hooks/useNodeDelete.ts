@@ -2,7 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useConfirm } from "../context/ConfirmContext";
-import { deletedNodeOf, leafChildrenOf, restoreDeletedNode } from "../utils/restoreNode";
+import { leafChildrenOf } from "../utils/restoreNode";
+import type { DeleteCapture } from "./useDeletedNodes";
 import { nodeRefId } from "../utils/nodeType";
 import type { Translation } from "../i18n/translations";
 import type { EdgeDoc, NodeDoc } from "../types";
@@ -10,18 +11,17 @@ import type { EdgeDoc, NodeDoc } from "../types";
 interface Params {
   mapId: string | undefined;
   nodes: NodeDoc[];
-  edges: EdgeDoc[];
   isOwnNode: (node: NodeDoc) => boolean;
   setNodes: Dispatch<SetStateAction<NodeDoc[]>>;
   setEdges: Dispatch<SetStateAction<EdgeDoc[]>>;
   upsertNode: (node: NodeDoc) => void;
   setSelectedId: Dispatch<SetStateAction<string | null>>;
-  setCelebrateIds: Dispatch<SetStateAction<Set<string>>>;
   setActionError: (message: string | null) => void;
   showNotice: (message: string) => void;
   refreshInsights: (mapId: string) => void;
-  /** useMoveUndo's shared stack: a deleted node is put back from there. */
-  recordUndo: (run: () => Promise<void>, failMessage: string) => void;
+  /** useDeletedNodes: what's deleted goes into the map's Deleted list (and on the undo stack). */
+  capture: (ids: string[]) => Promise<DeleteCapture>;
+  remember: (cap: DeleteCapture, deletedIds: string[]) => void;
   t: Translation;
 }
 
@@ -29,17 +29,16 @@ interface Params {
 export function useNodeDelete({
   mapId,
   nodes,
-  edges,
   isOwnNode,
   setNodes,
   setEdges,
   upsertNode,
   setSelectedId,
-  setCelebrateIds,
   setActionError,
   showNotice,
   refreshInsights,
-  recordUndo,
+  capture,
+  remember,
   t,
 }: Params) {
   const confirm = useConfirm();
@@ -64,30 +63,23 @@ export function useNodeDelete({
     // Its leaf children go with it (one generation down, never a child that
     // is a parent itself — see leafChildrenOf).
     const leaves = undoable ? leafChildrenOf(node, nodes, isOwnNode) : [];
-    // The node list arrives without text and pictures — fetch them so undo has them.
-    const withText = (n: NodeDoc) => nodesApi.getNode(n.nodeId).then((f) => ({ ...n, ...f })).catch(() => n);
-    const full = undoable ? await withText(node) : node;
-    const fullLeaves = await Promise.all(leaves.map(withText));
-    const deleted = deletedNodeOf(full, nodes, edges, isOwnNode, fullLeaves);
+    // Taken before it goes: its full text and pictures, and the map round it.
+    const cap = undoable ? await capture([node.nodeId, ...leaves.map((l) => l.nodeId)]) : null;
     const res = await nodesApi.deleteNode(node.nodeId);
     applyNodeDeleted(node.nodeId);
+    const gone = [node.nodeId];
     if (leaves.length) {
-      const { deleted: gone } = await nodesApi.deleteManyNodes(leaves.map((l) => l.nodeId));
-      gone.forEach((g) => applyNodeDeleted(g.deletedId));
+      const { deleted } = await nodesApi.deleteManyNodes(leaves.map((l) => l.nodeId));
+      deleted.forEach((g) => {
+        applyNodeDeleted(g.deletedId);
+        gone.push(g.deletedId);
+      });
     }
     // Deleting a protection node with banked damage releases the whole
     // total onto whatever it was defending — see Backend's deleteNodeDao.
     if (res.damagedProtectedNode) upsertNode(res.damagedProtectedNode);
-    if (undoable && mapId) {
-      recordUndo(async () => {
-        const back = await restoreDeletedNode(mapId, deleted);
-        upsertNode(back.node);
-        back.leaves.forEach(upsertNode);
-        back.children.forEach(upsertNode);
-        setEdges((prev) => [...prev, ...back.edges]);
-        setCelebrateIds((prev) => new Set(prev).add(back.node.nodeId));
-        refreshInsights(mapId);
-      }, t.ui.errors.restoreNode);
+    if (cap?.full.length) {
+      remember(cap, gone);
       showNotice(t.ui.node.deletedUndo);
     }
     return true;

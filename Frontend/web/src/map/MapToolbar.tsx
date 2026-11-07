@@ -1,3 +1,5 @@
+import { DeletedMenu } from "./DeletedMenu";
+import type { DeletedEntry } from "../hooks/useDeletedNodes";
 import { useState } from "react";
 import { PictureIcon } from "./PicturePicker";
 import type { TypeEmoji } from "../utils/emojiFace";
@@ -88,6 +90,9 @@ interface Props {
   onUndo?: () => void;
   onTimeLapse?: () => void;
   canUndo?: boolean;
+  /** What was deleted on this map since it was opened (hooks/useDeletedNodes), each to put back. */
+  deletedEntries?: DeletedEntry[];
+  onRestoreDeleted?: (id: number) => void;
   /** Computer mode (see hooks/useDesktopLayout): a panel docked down the left edge instead of a floating top-left cluster. */
   vertical?: boolean;
   /** How far the visible part of the page has slid (hooks/useVisualViewportOffset): the floating cluster moves with it, so a tablet's keyboard doesn't carry it off screen. */
@@ -155,6 +160,8 @@ export function MapToolbar({
   onUndo,
   onTimeLapse,
   canUndo = false,
+  deletedEntries = [],
+  onRestoreDeleted,
   vertical = false,
   viewportOffset,
 }: Props) {
@@ -282,6 +289,9 @@ export function MapToolbar({
             >
               ↶
             </button>
+          )}
+          {onRestoreDeleted && (
+            <DeletedMenu entries={deletedEntries} onRestore={onRestoreDeleted} side={side} buttonClass={`${iconBtn} ${idle}`} />
           )}
           {/* Draw a separator line: click empty spots to place its points. */}
           <button
