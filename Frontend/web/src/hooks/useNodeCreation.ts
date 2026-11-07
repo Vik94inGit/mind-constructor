@@ -6,6 +6,7 @@ import type { Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, NEW_NODE_ID } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
 import { layoutTemplate, MAP_KIND_ROOTS } from "../utils/templates";
+import { addStructurePicture } from "../utils/structurePicture";
 import type { TemplateKind, TemplateNodeKey } from "../utils/templates";
 import { sleep } from "../utils/sleep";
 import { layoutPicture, newPictureId, pictureNodeType } from "../utils/pictures";
@@ -335,6 +336,8 @@ export function useNodeCreation({
       upsertNode(rootNode);
       setCelebrateIds((prev) => new Set(prev).add(rootNode.nodeId));
       setSelectedId(null);
+      // The kind's painting on the root, fetched while the rest grows round it.
+      void addStructurePicture(rootNode.nodeId, kind).then((pictured) => pictured && upsertNode(pictured));
       await sleep(TEMPLATE_NODE_STAGGER_MS);
       await applyTemplate(root.template, rootNode, pos);
     } catch (err) {

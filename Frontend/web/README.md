@@ -214,6 +214,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   `utils/pictureTemplates.ts`). Their small thumbnails are built into the app; the full painting
   (WebP, at most 1024px, in `public/picture-templates/`) is fetched only when picked, then added like
   any other picture, so it can be the node's icon or card.
+- **Pictures on starter structures** — a structure's first node arrives with a painting as its
+  picture card, whether it's grown from the canvas menu, seeded into a new map of that kind, or the
+  center of a *Think it through* map: *Develop an idea* the light bulb, *Analyze a problem* the puppet
+  hand, *Make a decision* the yin-yang yo-yo, a retrospective the heart and mirror or the clock heads,
+  and *Plan a goal* one of the three clock paintings, picked at random each time
+  (`MAP_KIND_PICTURES` in `utils/pictureTemplates.ts`, `utils/structurePicture.ts`). Offline the
+  node simply comes without it.
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
   in the panel; the inline inputs grow taller with the text, never wider. Text **pasted** past the
   limit isn't cut silently: what fits goes in (cut between words), and an offer
