@@ -467,7 +467,8 @@ export function DashboardPage() {
           onClose={() => setShowCreate(false)}
           onCreated={(map) => {
             setShowCreate(false);
-            navigate(`/maps/${map.mapId}`);
+            // The map opens offering to take its starter questions back (MapPage).
+            navigate(`/maps/${map.mapId}`, { state: { seeded: true } });
           }}
         />
       )}

@@ -3,7 +3,6 @@ import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { CANVAS_W, CANVAS_H, isDescendant } from "../utils/canvasLayout";
 import { closestToCentroidIndex } from "../utils/mapGraph";
-import { nodeRefId } from "../utils/nodeType";
 import type { Translation } from "../i18n/translations";
 import type { EdgeDoc, NodeDoc } from "../types";
 import { useConfirm } from "../context/ConfirmContext";
@@ -17,8 +16,8 @@ interface Params {
   multiSelectIds: Set<string>;
   isOwnNode: (node: NodeDoc) => boolean;
   upsertNode: (node: NodeDoc) => void;
-  setNodes: Dispatch<SetStateAction<NodeDoc[]>>;
-  setEdges: Dispatch<SetStateAction<EdgeDoc[]>>;
+  /** useDeletedNodes' delete: the nodes go into the map's Deleted list. Resolves to what really went. */
+  deleteNodes: (ids: string[]) => Promise<string[]>;
   setMultiSelectIds: Dispatch<SetStateAction<Set<string>>>;
   setSelectedId: Dispatch<SetStateAction<string | null>>;
   showNodes: (ids: string[]) => void;
@@ -36,8 +35,7 @@ export function useSelectionActions({
   multiSelectIds,
   isOwnNode,
   upsertNode,
-  setNodes,
-  setEdges,
+  deleteNodes,
   setMultiSelectIds,
   setSelectedId,
   showNodes,
@@ -62,21 +60,9 @@ export function useSelectionActions({
     if (!(await confirm(t.ui.selection.deleteConfirm(ids.length), { confirmLabel: t.ui.common.delete, danger: true }))) return;
     setActionError(null);
     try {
-      const { deleted } = await nodesApi.deleteManyNodes(ids);
-      const deletedIds = new Set(deleted.map((d) => d.deletedId));
-      // Any protection node in the batch releases its own banked damage
-      // onto whatever it was defending — see Backend's deleteNodeDao.
-      deleted.forEach(({ damagedProtectedNode }) => {
-        if (damagedProtectedNode) upsertNode(damagedProtectedNode);
-      });
-      setNodes((prev) => prev.filter((n) => !deletedIds.has(n.nodeId)));
-      setEdges((prev) =>
-        prev.filter(
-          (e) => !deletedIds.has(nodeRefId(e.fromNodeId) ?? "") && !deletedIds.has(nodeRefId(e.toNodeId) ?? ""),
-        ),
-      );
+      // What went can be put back from the map's Deleted list (useDeletedNodes).
+      await deleteNodes(ids);
       setMultiSelectIds(new Set());
-      if (mapId) refreshInsights(mapId);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.deleteSelected);
     }

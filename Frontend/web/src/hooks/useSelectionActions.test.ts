@@ -5,7 +5,7 @@ import { makeNode } from "../test/fixtures";
 import { TRANSLATIONS } from "../i18n/translations";
 import type { NodeDoc } from "../types";
 
-vi.mock("../api/nodes", () => ({ updateNode: vi.fn(), deleteManyNodes: vi.fn() }));
+vi.mock("../api/nodes", () => ({ updateNode: vi.fn() }));
 import * as nodesApi from "../api/nodes";
 
 const t = TRANSLATIONS.en;
@@ -18,8 +18,7 @@ function setup(nodes: NodeDoc[], picked: string[]) {
     multiSelectIds: new Set(picked),
     isOwnNode: (n: NodeDoc) => n.userId === "u1",
     upsertNode: vi.fn(),
-    setNodes: vi.fn(),
-    setEdges: vi.fn(),
+    deleteNodes: vi.fn(async (ids: string[]) => ids),
     setMultiSelectIds: vi.fn(),
     setSelectedId: vi.fn(),
     showNodes: vi.fn(),
@@ -62,14 +61,12 @@ describe("useSelectionActions", () => {
     expect(params.setActionError).not.toHaveBeenCalledWith(expect.stringMatching(/./));
   });
 
-  it("deletes only what the server says it deleted", async () => {
+  it("deletes the chosen nodes through the Deleted list and clears the choice", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    vi.mocked(nodesApi.deleteManyNodes).mockResolvedValue({ deleted: [{ deletedId: "a" }] } as never);
     const nodes = [makeNode({ nodeId: "a" }), makeNode({ nodeId: "b" })];
     const { result, params } = setup(nodes, ["a", "b"]);
     await act(() => result.current.deleteSelection());
-    const filter = vi.mocked(params.setNodes).mock.calls[0][0] as (prev: NodeDoc[]) => NodeDoc[];
-    expect(filter(nodes).map((n) => n.nodeId)).toEqual(["b"]);
-    expect(params.refreshInsights).toHaveBeenCalledWith("m1");
+    expect(params.deleteNodes).toHaveBeenCalledWith(["a", "b"]);
+    expect(params.setMultiSelectIds).toHaveBeenCalledWith(new Set());
   });
 });

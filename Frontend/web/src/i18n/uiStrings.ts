@@ -37,6 +37,14 @@ export interface UiStrings {
   search: { title: string; placeholder: string; none: string; found: (count: number) => string; byType: string; clearTypes: string; filtered: (count: number) => string };
   compact: { label: string; hint: string };
   types: Record<NodeType, string>;
+  /** The toolbar's 🗑 list of what was deleted on this map since it was opened (map/DeletedMenu.tsx). */
+  deleted: {
+    button: (count: number) => string;
+    hint: string;
+    restore: string;
+    untitled: string;
+    more: (count: number) => string;
+  };
   templates: {
     section: string;
     problem: { button: string; hint: string };
@@ -45,6 +53,10 @@ export interface UiStrings {
     idea: { button: string; hint: string };
     created: (count: number) => string;
     failed: string;
+    /** The notice's button that takes a template or picture back in one step. */
+    undo: string;
+    /** A map that just opened with its starter questions (a new map of a kind). */
+    seeded: string;
     nodes: Record<TemplateNodeKey, string>;
   };
   /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
@@ -699,6 +711,13 @@ const en: UiStrings = {
     Idea: "Idea",
     unknown: "Question (unknown)",
   },
+  deleted: {
+    button: (n) => `Deleted on this map: ${n}`,
+    hint: "Deleted since you opened this map. They stay here until you close it.",
+    restore: "Restore",
+    untitled: "(empty)",
+    more: (n) => `+${n} more`,
+  },
   templates: {
     section: "Templates",
     problem: { button: "Analyze this problem", hint: "Adds sub-problems, the risk of doing nothing, past experience, ways to solve, a plan and its result." },
@@ -707,6 +726,8 @@ const en: UiStrings = {
     idea: { button: "Develop this idea", hint: "Adds the need it meets, how it would work and a first try, what would prove it, what could kill it, what is unknown, and another idea." },
     created: (n) => `Added ${n} ${n === 1 ? "node" : "nodes"}`,
     failed: "Could not add the template",
+    undo: "Undo",
+    seeded: "Started with the template questions",
     nodes: {
       subProblem1: "Which part of the problem is broken? (one cause per node)",
       subProblem2: "What else contributes to it?",
@@ -927,7 +948,7 @@ const en: UiStrings = {
     expandTitle: "Expand to show the whole text, no inner scrollbar",
     collapseTitle: "Collapse back to a scrollable box",
     deleteConfirm: "Delete this node?",
-    deletedUndo: "Deleted. Press Ctrl+Z or Undo to bring it back.",
+    deletedUndo: "Deleted. Ctrl+Z, Undo or 🗑 brings it back until you close the map.",
     selectToSeeHealth: "Select to see health",
     circleParent: (s) => `Circle parent (${s})`,
     variantParent: (s) => `Variant parent (${s})`,

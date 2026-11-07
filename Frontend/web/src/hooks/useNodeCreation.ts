@@ -94,6 +94,11 @@ interface Params {
   showNotice: (message: string) => void;
   /** Called once a node is made (see confirmPendingCreate). */
   onCreated: (node: NodeDoc, at: Pt) => void;
+  /**
+   * A template or a picture has grown: every node it made, to take back in one
+   * step (Undo, or the notice's own button), with the notice to show.
+   */
+  onStructureMade?: (ids: string[], message: string) => void;
   t: Translation;
 }
 
@@ -115,6 +120,7 @@ export function useNodeCreation({
   showPoints,
   showNotice,
   onCreated,
+  onStructureMade,
   drawnBoxOf,
   t,
 }: Params) {
@@ -127,7 +133,9 @@ export function useNodeCreation({
   // effect confirmPendingCreate uses) and a deliberate pause before the
   // next, so growing a whole template branch reads as it building itself
   // step by step instead of popping in as a single flash.
-  async function applyTemplate(kind: TemplateKind, root: NodeDoc, at?: Pt) {
+  // `made` collects each node's id as it lands, so a template cut short can
+  // still be taken back.
+  async function growTemplate(kind: TemplateKind, root: NodeDoc, made: string[], at?: Pt) {
     if (!mapId) return;
     // `at`: a root created a moment ago isn't in `positions` yet.
     const rootPos = at ?? positions.get(root.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
@@ -153,6 +161,7 @@ export function useNodeCreation({
         parentId: p.parentKey ? ids.get(p.parentKey) : root.nodeId,
       });
       ids.set(p.key, node.nodeId);
+      made.push(node.nodeId);
       upsertNode(node);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
       if (i < placed.length - 1) await sleep(TEMPLATE_NODE_STAGGER_MS);
@@ -160,7 +169,24 @@ export function useNodeCreation({
     // Brings the whole newly-grown ring into view — spiraling out from root
     // can easily land later nodes past whatever's currently on-screen.
     showNodes(Array.from(ids.values()));
-    showNotice(t.ui.templates.created(placed.length));
+  }
+
+  // Whatever a template or picture made, offered back in one step.
+  function structureMade(made: string[]) {
+    if (made.length === 0) return;
+    const message = t.ui.templates.created(made.length);
+    if (onStructureMade) onStructureMade(made, message);
+    else showNotice(message);
+  }
+
+  // A template grown from a node already on the map (its panel): the node stays if it's undone.
+  async function applyTemplate(kind: TemplateKind, root: NodeDoc, at?: Pt) {
+    const made: string[] = [];
+    try {
+      await growTemplate(kind, root, made, at);
+    } finally {
+      structureMade(made);
+    }
   }
 
   // Fires once the inline pending-node input (see PendingNodeCard) actually
@@ -324,6 +350,7 @@ export function useNodeCreation({
     setActionError(null);
     const root = MAP_KIND_ROOTS[kind];
     const pos = placeNode(desired, [{ nodeId: NEW_NODE_ID, parentId: null }]);
+    const made: string[] = [];
     try {
       const rootNode = await nodesApi.createNode(mapId, {
         text: "",
@@ -333,15 +360,18 @@ export function useNodeCreation({
         y: pos.y,
         parentId: null,
       });
+      made.push(rootNode.nodeId);
       upsertNode(rootNode);
       setCelebrateIds((prev) => new Set(prev).add(rootNode.nodeId));
       setSelectedId(null);
       // The kind's painting on the root, fetched while the rest grows round it.
       void addStructurePicture(rootNode.nodeId, kind).then((pictured) => pictured && upsertNode(pictured));
       await sleep(TEMPLATE_NODE_STAGGER_MS);
-      await applyTemplate(root.template, rootNode, pos);
+      await growTemplate(root.template, rootNode, made, pos);
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
+    } finally {
+      structureMade(made);
     }
   }
 
@@ -364,6 +394,7 @@ export function useNodeCreation({
     setMultiSelectIds(new Set());
     // The whole picture in view before its first dot lands, so it is seen being dotted out.
     showPoints(dots);
+    const made: string[] = [];
     try {
       for (let dot = 0; dot < dots.length; dot++) {
         const node = await nodesApi.createNode(mapId, {
@@ -375,12 +406,15 @@ export function useNodeCreation({
           parentId: null,
           picture: { id, kind, dot },
         });
+        made.push(node.nodeId);
         upsertNode(node);
         setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
         await sleep(PICTURE_DOT_STAGGER_MS);
       }
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.pictures.failed);
+    } finally {
+      structureMade(made);
     }
   }
 
