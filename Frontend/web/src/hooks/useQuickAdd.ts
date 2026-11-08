@@ -98,6 +98,27 @@ export function useQuickAdd({
     }
   }
 
+  // Double-tap on empty canvas (docs/gestures/double-tap-new-node.md): a
+  // blank node is saved right where the finger was (the zone rules nudge it
+  // if needed) and handed back, so the caller can open it with its panel and
+  // ring of ghosts. No text field, so no keyboard pops up on a phone.
+  async function createBlankNodeAt(at: Pt, parentId: string | null = null): Promise<NodeDoc | null> {
+    if (!mapId) return null;
+    setActionError(null);
+    const pos = placeNode(at, [{ nodeId: NEW_NODE_ID, parentId }]);
+    setInlineEditId(null);
+    try {
+      const node = await nodesApi.createNode(mapId, { text: "", type: "unknown", x: pos.x, y: pos.y, parentId });
+      track({ name: "node_created", props: { type: "unknown" } });
+      upsertNode(node);
+      setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
+      return node;
+    } catch (err) {
+      setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
+      return null;
+    }
+  }
+
   // The right-click menu's Create branch: starts on the anchor itself;
   // placeNode moves it just clear of it (and of anything else the zone rules
   // keep it from), so the new child appears right beside its parent.
@@ -125,5 +146,5 @@ export function useQuickAdd({
     startNodeAt({ x: (view.minX + view.maxX) / 2, y: (view.minY + view.maxY) / 2 }, "unknown");
   }
 
-  return { startQuickAdd, addBranchFromCard, sketchBranch, startBranchOf, startNodeAt, startCreateNodeInView };
+  return { startQuickAdd, addBranchFromCard, sketchBranch, startBranchOf, startNodeAt, startCreateNodeInView, createBlankNodeAt };
 }

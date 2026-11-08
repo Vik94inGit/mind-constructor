@@ -108,8 +108,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   has built itself up, a small card asks once which of the three views to use (`map/ViewPrompt.tsx`);
   the answer is kept (per browser, closing the card keeps the view as it is) and every map opens in
   it from then on.
-- **Double-tap or double-click on empty canvas** — a blank new node opens right there with its name
-  field ready (type *unknown*, picked later from the ring). Inside a zone whose parent is your own, the
+- **Double-tap or double-click on empty canvas** — a blank node (type *unknown*) is saved right
+  there and opened: its panel and its ring of ghosts, so the type or a starter phrase is one tap away.
+  No text field is focused, so a phone's keyboard stays down until the user taps into the text. Inside a zone whose parent is your own, the
   node joins that zone; anywhere else the zone rules place it as usual. Two clicks or taps within
   350 ms and 24 px count, read off the canvas's own clicks so Safari's taps work too
   (`hooks/useCanvasDoubleTap.ts`). Off while drawing, choosing, packing, changing a parent, naming a

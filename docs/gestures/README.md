@@ -42,7 +42,7 @@ node) must be told apart by something the user can see before they let go.
 | Node, not Move mode | Swipe | Drag | Pans the map |
 | Empty canvas | Drag | Drag | Pans (touch) / marquee-selects (mouse) |
 | Empty canvas | Hold (½ s) | Right-click | Canvas menu: paste here, new node, templates, draw a picture, text → nodes ([sketch](canvas-tap-menu.md)) |
-| Empty canvas or a zone | Double-tap | Double-click | A blank new node right there (inside your own zone it joins the zone) ([sketch](double-tap-new-node.md)) |
+| Empty canvas or a zone | Double-tap | Double-click | Saves a blank node right there and opens it (panel and ring of ghosts, no keyboard); inside your own zone it joins the zone ([sketch](double-tap-new-node.md)) |
 | Card side handle | Drag onto a card | Drag onto a card | Links the two cards |
 | Zone | Hold | Right-click | Zone menu: copy text, shape, delete, look |
 | Change-parent mode | Tap a node | Click a node | Hangs the child from it (own parent: swap) |
