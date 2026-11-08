@@ -42,6 +42,7 @@ node) must be told apart by something the user can see before they let go.
 | Node, not Move mode | Swipe | Drag | Pans the map |
 | Empty canvas | Drag | Drag | Pans (touch) / marquee-selects (mouse) |
 | Empty canvas | Hold (½ s) | Right-click | Canvas menu: paste here, new node, templates, draw a picture, text → nodes ([sketch](canvas-tap-menu.md)) |
+| Empty canvas or a zone | Double-tap | Double-click | A blank new node right there (inside your own zone it joins the zone) ([sketch](double-tap-new-node.md)) |
 | Card side handle | Drag onto a card | Drag onto a card | Links the two cards |
 | Zone | Hold | Right-click | Zone menu: copy text, shape, delete, look |
 | Change-parent mode | Tap a node | Click a node | Hangs the child from it (own parent: swap) |
@@ -54,5 +55,5 @@ node) must be told apart by something the user can see before they let go.
 | Canvas, first open | Tap | Click or wheel | Skip the entrance |
 
 Sources: [Frontend/web/README.md](../../Frontend/web/README.md), `hooks/useNodeDragAndDrop.ts`,
-`hooks/useMarqueeSelect.ts`, `hooks/useCanvasMode.ts`, `hooks/useTapChomp.ts`,
+`hooks/useMarqueeSelect.ts`, `hooks/useCanvasDoubleTap.ts`, `hooks/useCanvasMode.ts`, `hooks/useTapChomp.ts`,
 `hooks/useMapKeyboard.ts`, `hooks/usePictureEdit.ts`, `map/ZoneMenu.tsx`.
