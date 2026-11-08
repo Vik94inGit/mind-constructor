@@ -98,7 +98,7 @@ describe("CanvasBackdrop zone menu", () => {
     fireEvent.click(zone);
     act(() => vi.advanceTimersByTime(ZONE_HOLD_MS));
     expect(props.onZoneMenu).not.toHaveBeenCalled();
-    expect(props.onCircleClick).toHaveBeenCalledWith("root");
+    expect(props.onCircleClick).toHaveBeenCalledWith("root", expect.objectContaining({ clientX: expect.any(Number) }));
   });
 });
 

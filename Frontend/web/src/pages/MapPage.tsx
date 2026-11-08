@@ -18,6 +18,7 @@ import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { useVisualViewportOffset } from "../hooks/useVisualViewportOffset";
 import { isEditableTarget } from "../utils/editable";
 import { canvasHoldAllowed, useCanvasHoldMenu } from "../hooks/useCanvasHoldMenu";
+import { canvasDoubleTapAllowed, useCanvasDoubleTap } from "../hooks/useCanvasDoubleTap";
 import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
 import { useChosenCircle } from "../hooks/useChosenCircle";
 import { usePackMode } from "../hooks/usePackMode";
@@ -1190,6 +1191,28 @@ export function MapPage() {
     onCanvasPointerDown(e);
   }
 
+  // Double-click / double-tap on empty canvas, or inside a zone, opens a
+  // blank new node right there (docs/gestures/double-tap-new-node.md). Inside
+  // a zone whose parent is the user's own, the node joins that zone. Returns
+  // true when this tap was the second of a pair and made the node.
+  const canvasDoubleTap = useCanvasDoubleTap();
+  function doubleTapNewNode(clientX: number, clientY: number, timeStamp: number, zoneRootId: string | null): boolean {
+    if (!canvasDoubleTap.tap({ x: clientX, y: clientY, t: timeStamp, target: zoneRootId ?? "" })) return false;
+    const allowed = canvasDoubleTapAllowed({
+      busyMode: drawMode || chooseMode || packMode || reparentMode || !!pendingCreate || !!inlineEditId,
+      entranceActive,
+      canEdit: !timeLapse && !presenting,
+    });
+    if (!allowed) return false;
+    const root = zoneRootId ? nodes.find((n) => n.nodeId === zoneRootId) : undefined;
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    setContextMenu(null);
+    setCanvasContextMenu(null);
+    startNodeAt(screenToCanvas(clientX, clientY), "unknown", root && isOwnNode(root) ? root.nodeId : null);
+    return true;
+  }
+
   function onCanvasContextMenu(e: ReactMouseEvent<HTMLDivElement>) {
     // A long press in a text field on the canvas (a new node's name) is the
     // tablet's own Paste/Select bubble: left to the browser.
@@ -1815,6 +1838,7 @@ export function MapPage() {
                 return;
               }
               if (packMode || reparentMode) return;
+              if (doubleTapNewNode(e.clientX, e.clientY, e.timeStamp, null)) return;
               setSelectedId(null);
               setMultiSelectIds(new Set());
               releaseChosenCircleIfOutside();
@@ -1842,7 +1866,7 @@ export function MapPage() {
               chosenNodeIds={chosenNodeIds}
               // The node whose parent is changing stays ringed while the new one is picked.
               pendingLink={reparentChild ? [reparentChild] : pendingLink}
-              onCircleClick={(rootId) => {
+              onCircleClick={(rootId, at) => {
                 // A zone's own polygon stops the click from ever reaching the
                 // canvas div's onClick (see its own chooseMode branch above)
                 // — so without this, choosing was only exitable by clicking
@@ -1855,6 +1879,8 @@ export function MapPage() {
                 // With a node's panel open, a tap on a zone is a tap outside
                 // the panel: it closes it, same as empty canvas, instead of
                 // also stabilizing the zone underneath.
+                // A second quick tap on the zone adds a node to it.
+                if (at && !packMode && !reparentMode && doubleTapNewNode(at.clientX, at.clientY, at.timeStamp, rootId)) return;
                 if (selectedId) {
                   setSelectedId(null);
                   return;

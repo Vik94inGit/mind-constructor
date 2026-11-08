@@ -109,10 +109,12 @@ export function useQuickAdd({
 
   // A parent-less node of `type` at `at` (the empty canvas's right-click
   // menu) — nudged only if it would cover another node or break a zone rule.
-  function startNodeAt(at: Pt, type: NodeType) {
-    const pos = placeNode(at, [{ nodeId: NEW_NODE_ID, parentId: null }]);
+  // `parentId` hangs it from a zone's parent, so it joins that zone
+  // (a double-tap inside a zone, docs/gestures/double-tap-new-node.md).
+  function startNodeAt(at: Pt, type: NodeType, parentId: string | null = null) {
+    const pos = placeNode(at, [{ nodeId: NEW_NODE_ID, parentId }]);
     setInlineEditId(null);
-    setPendingCreate({ x: pos.x, y: pos.y, type, parentId: null });
+    setPendingCreate({ x: pos.x, y: pos.y, type, parentId });
   }
 
   // "+" menu > Create node: a blank node input at a free spot in view, as

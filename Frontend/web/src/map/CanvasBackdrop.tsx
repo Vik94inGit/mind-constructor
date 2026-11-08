@@ -27,7 +27,8 @@ interface Props {
   chosenNodeIds: Set<string> | null;
   /** The nodes a link is being confirmed for — kept ringed while the sentiment modal is open. */
   pendingLink: NodeDoc[] | null;
-  onCircleClick: (rootId: string) => void;
+  /** `at` is where a zone itself was tapped (screen coordinates and event time), for the double-tap that adds a node to it. */
+  onCircleClick: (rootId: string, at?: { clientX: number; clientY: number; timeStamp: number }) => void;
   /** Right-click (long-press on touch) on a zone: opens that zone's menu at that screen spot. */
   onZoneMenu?: (rootId: string, clientX: number, clientY: number) => void;
   /** Separator lines drawn on the map. */
@@ -219,7 +220,7 @@ export function CanvasBackdrop({
                   swallowClick.current = false;
                   return;
                 }
-                onCircleClick(g.rootId);
+                onCircleClick(g.rootId, { clientX: e.clientX, clientY: e.clientY, timeStamp: e.timeStamp });
               }}
               // The zone's own menu (view, layout, look): right-click, or hold
               // a finger on it. Android also fires contextmenu for a hold —

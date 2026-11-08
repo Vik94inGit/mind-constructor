@@ -44,7 +44,7 @@ before                          after (tap, tap)
 | Empty canvas, tap: closes the panel | The first tap still does exactly that; only the second quick one creates. |
 | Empty canvas, hold ½ s: canvas menu | A double-tap lifts long before ½ s. |
 | Empty canvas, drag: pans / marquee | A tap that moves more than ~8 px isn't a tap, so a pan or marquee never counts. |
-| Browser's own double-tap zoom (phones) | Turned off on the canvas (`touch-action: manipulation` on the canvas wrap); the map's zoom stays pinch and − / +. |
+| Browser's own double-tap zoom (phones) | Already off on the canvas (its wrap is `touch-action: pan-x pan-y`); the map's zoom stays pinch and − / +. |
 | Pinch: zoom | A second finger cancels it. |
 
 Ignored (does nothing) while drawing a picture, choosing, packing, changing a parent, in the
@@ -56,9 +56,14 @@ replaying or presenting. Also ignored for a viewer who can't add nodes to the ma
 | Person | Tried first | Stuck on | Changed |
 |---|---|---|---|
 | Viktor | double-tap / double-click on empty canvas | no gesture did it | asked for it as sketched |
+| Viktor, a day later | double-tap on a tablet and a phone | it wasn't built yet | built with the defaults: a zone's empty area counts, the node starts blank |
 
 ## Decision
 
-Double-click (mouse) or double-tap (touch) on empty canvas starts a blank new node at that spot,
-through the same `startNodeAt(at, "unknown")` the canvas menu's *New node* uses. Built after the
-quick test above is confirmed.
+Double-click (mouse) or double-tap (touch, pen) on empty canvas, or on a zone's empty area, starts a
+blank new node at that spot through the same `startNodeAt` the canvas menu's *New node* uses
+(`hooks/useCanvasDoubleTap.ts`). The pair is read off the canvas's own click events (two within 350 ms
+and 24 px), since Safari doesn't reliably send `dblclick` for taps. Inside a zone whose parent is the
+user's own, the node hangs from that parent and joins the zone; otherwise it is parentless and the
+zone rules place it. The first tap still does what a tap does (closes a panel, picks a zone). The
+first-map hint mentions it in all four languages.
