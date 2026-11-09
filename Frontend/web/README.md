@@ -239,6 +239,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   it's a banner at the top of the map; in the new-node panel and the dashboard's Quick note, saying
   yes sends the rest along when the node (or note) is made. It works with a tablet's paste bubble
   too, since it reads the paste event rather than keys.
+- **Formulas** — maths typed or pasted into a node's title or text shows as real formulas on its
+  card, under its icon, in the panel, on presentation slides and in the time-lapse replay
+  (`map/MathText.tsx`, KaTeX). It reads the LaTeX that copied text already carries: `$…$` and
+  `\(…\)` inside a sentence, `$$…$$` and `\[…\]` on a line of their own (as ChatGPT, Overleaf and
+  lecture notes copy it), and Wikipedia's `{\displaystyle …}`. A `$` that looks like money (`$5 and
+  $10`) stays text (`utils/mathText.ts`). While the panel's text box holds a formula, a *Formulas
+  preview* under it shows how it will read. The stored text stays plain, so search, export and the
+  length cap are unchanged, and KaTeX is a separate download fetched only when a text has a formula.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
 - **Hiding the ghosts** — the ring of ghosts comes up round every node you open; the 👻 at the top of

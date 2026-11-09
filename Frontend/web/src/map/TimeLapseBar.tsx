@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import type { NodeDoc } from "../types";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
+import { MathText } from "./MathText";
 
 /** A map's nodes in the order they were written, oldest first — what the time-lapse replays. */
 export function timeLapseOrder(nodes: NodeDoc[]): NodeDoc[] {
@@ -157,10 +158,10 @@ function TimeLapseInfo({ node }: { node: NodeDoc }) {
         <NodeTypeSymbol type={node.type} size={17} />
         <span>{t.ui.types[node.type]}</span>
       </div>
-      {node.title && <div className="mt-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>}
+      {node.title && <div className="mt-2 text-[0.95rem] font-semibold text-ink"><MathText text={node.title} /></div>}
       {text && (
         <p className={`m-0 mt-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[0.9rem] whitespace-pre-wrap break-words ${node.text ? "text-ink" : "text-ink-soft italic"}`}>
-          {text}
+          <MathText text={text} />
         </p>
       )}
     </div>
