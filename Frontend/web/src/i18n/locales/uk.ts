@@ -448,6 +448,7 @@ const ui: UiStrings = {
     byUser: (name) => `від ${name}`,
     prevNode: "Попередній вузол (←)",
     textLabel: "Текст вузла",
+    formulaPreview: "Попередній перегляд формул",
     tabsLabel: "Розділи вузла",
     nextNode: "Наступний вузол (→)",
     root: "корінь",

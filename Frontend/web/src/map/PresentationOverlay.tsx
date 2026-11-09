@@ -8,6 +8,7 @@ import { useState } from "react";
 import type { NodeDoc } from "../types";
 import { slideHeadSize, slideSubSize } from "../utils/presentation";
 import type { SlideGroup } from "../utils/presentation";
+import { MathText } from "./MathText";
 
 interface Props {
   /** One slide per parent, with its children — see computeSlideGroups (utils/presentation.ts). */
@@ -272,7 +273,7 @@ function SlideHead({ node, compact }: { node: NodeDoc; compact: boolean }) {
           head.align === "left" ? "text-left" : "text-center"
         }`}
       >
-        {headline}
+        <MathText text={headline} />
       </h1>
       {node.title && node.text && (
         <p
@@ -280,7 +281,7 @@ function SlideHead({ node, compact }: { node: NodeDoc; compact: boolean }) {
             sub.align === "left" ? "text-left" : "text-center"
           }`}
         >
-          {node.text}
+          <MathText text={node.text} />
         </p>
       )}
     </>
