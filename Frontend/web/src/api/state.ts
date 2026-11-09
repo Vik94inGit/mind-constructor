@@ -1,3 +1,4 @@
+import type { QuizMarks } from "../utils/quiz";
 import { apiRequest } from "./client";
 import * as offline from "../offline/sync";
 import type { ReadingMode } from "../utils/readingMode";
@@ -32,6 +33,8 @@ export interface MapViewState {
   cardFills?: CardFills;
   /** The viewer's own feeling per node (utils/feeling.ts). */
   feelings?: Feelings;
+  /** The viewer's own Quiz me mark per node (utils/quiz.ts). */
+  quizMarks?: QuizMarks;
   /** How the viewer felt about this map before and after thinking it through. */
   checkIn?: CheckIn | null;
   /** Locked puzzle pieces' nodeIds. */

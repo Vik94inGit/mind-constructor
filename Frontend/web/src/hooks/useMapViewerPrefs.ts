@@ -24,6 +24,8 @@ import { clampNodeFade, loadNodeFade, saveNodeFade } from "../utils/nodeFade";
 import type { NodeFade } from "../utils/nodeFade";
 import type { NodeType } from "../types";
 import { track } from "../utils/usage";
+import { loadQuizMarks, parseQuizMarks, saveQuizMarks } from "../utils/quiz";
+import type { QuizMark, QuizMarks } from "../utils/quiz";
 
 const SAVE_DELAY_MS = 800;
 
@@ -155,6 +157,16 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
       return next;
     });
   }
+  // The viewer's own Quiz me marks — see utils/quiz.ts.
+  const [quizMarks, setQuizMarks] = useState<QuizMarks>(() => loadQuizMarks(mapId));
+  function setQuizMark(nodeId: string, mark: QuizMark) {
+    setQuizMarks((prev) => {
+      if (prev[nodeId] === mark) return prev;
+      const next = { ...prev, [nodeId]: mark };
+      saveQuizMarks(mapId, next);
+      return next;
+    });
+  }
   // How they felt about the map before and after thinking it through — only
   // the server keeps it; undefined until it has answered.
   const [checkIn, setCheckInState] = useState<CheckIn | null | undefined>(undefined);
@@ -177,6 +189,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     zoneLayouts?: unknown;
     cardFills?: unknown;
     feelings?: unknown;
+    quizMarks?: unknown;
     blockLocks?: unknown;
     detachedPieces?: unknown;
   }>({});
@@ -216,9 +229,10 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
           const zl = parseZoneLayouts(view.zoneLayout);
           const cf = view.cardFills ?? {};
           const fe = parseFeelings(view.feelings);
+          const qm = parseQuizMarks(view.quizMarks);
           const bl: BlockLocks = Object.fromEntries((view.blockLocks ?? []).map((id) => [id, true as const]));
           const dp: DetachedPieces = Object.fromEntries((view.detachedPieces ?? []).map((id) => [id, true as const]));
-          fromServerRef.current = { nodeDisplay: nd, zoneDisplay: zd, zoneLayouts: zl, cardFills: cf, feelings: fe, blockLocks: bl, detachedPieces: dp };
+          fromServerRef.current = { nodeDisplay: nd, zoneDisplay: zd, zoneLayouts: zl, cardFills: cf, feelings: fe, quizMarks: qm, blockLocks: bl, detachedPieces: dp };
           setNodeDisplay(nd);
           saveNodeDisplay(mapId, nd);
           setZoneDisplay(zd);
@@ -229,6 +243,8 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
           saveCardFills(mapId, cf);
           setFeelings(fe);
           saveFeelings(mapId, fe);
+          setQuizMarks(qm);
+          saveQuizMarks(mapId, qm);
           setCheckInState(parseCheckIn(view.checkIn));
           setBlockLocks(bl);
           saveBlockLocks(mapId, bl);
@@ -246,6 +262,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
               zoneLayout: loadZoneLayouts(mapId),
               cardFills: loadCardFills(mapId),
               feelings: loadFeelings(mapId),
+              quizMarks: loadQuizMarks(mapId),
               blockLocks: Object.keys(loadBlockLocks(mapId)),
               detachedPieces: Object.keys(loadDetachedPieces(mapId)),
             })
@@ -277,6 +294,7 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
   useEffect(() => sendIfChanged("zoneLayouts", zoneLayouts, { zoneLayout: zoneLayouts }), [zoneLayouts]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("cardFills", cardFills, { cardFills }), [cardFills]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("feelings", feelings, { feelings }), [feelings]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => sendIfChanged("quizMarks", quizMarks, { quizMarks }), [quizMarks]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => sendIfChanged("blockLocks", blockLocks, { blockLocks: Object.keys(blockLocks) }), [blockLocks]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(
     () => sendIfChanged("detachedPieces", detachedPieces, { detachedPieces: Object.keys(detachedPieces) }),
@@ -316,6 +334,8 @@ export function useMapViewerPrefs(mapId: string | undefined, enabled = true) {
     setCardFill,
     feelings,
     setFeeling,
+    quizMarks,
+    setQuizMark,
     checkIn,
     setCheckIn,
     detachedPieces,

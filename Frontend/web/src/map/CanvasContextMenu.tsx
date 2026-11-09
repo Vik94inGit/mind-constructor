@@ -19,6 +19,8 @@ interface Props {
   onDrawPicture: () => void;
   /** Opens "Text → nodes": a text cut into nodes right at the click point. */
   onTextToNodes: () => void;
+  /** Starts Quiz me on the whole map (hooks/useQuiz.ts). */
+  onQuiz?: () => void;
   /** Opens "Text → map". */
   onTextToMap: () => void;
   /** How many nodes are on the clipboard right now — 0 hides "Paste here". */
@@ -55,7 +57,7 @@ function TypeSymbol({ type }: { type: NodeType }) {
 // viewport coordinates). The submenu flies out to the side on a wide screen
 // (on hover or click) and opens in place on a phone, where there's no room
 // beside the menu.
-export function CanvasContextMenu({ x, y, onPick, onGrow, onDrawPicture, onTextToNodes, onTextToMap, pasteCount, onPasteHere, onClose }: Props) {
+export function CanvasContextMenu({ x, y, onPick, onGrow, onDrawPicture, onTextToNodes, onTextToMap, onQuiz, pasteCount, onPasteHere, onClose }: Props) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   const [typesOpen, setTypesOpen] = useState(false);
@@ -78,7 +80,7 @@ export function CanvasContextMenu({ x, y, onPick, onGrow, onDrawPicture, onTextT
 
   // Same on-screen clamping as NodeContextMenu — keeps the menu (and its
   // submenu) fully visible even when the click landed near a screen edge.
-  const rows = (pasteCount > 0 ? 1 : 0) + 1 + MAP_KINDS.length + 3 + (inline && typesOpen ? NODE_TYPES.length : 0);
+  const rows = (pasteCount > 0 ? 1 : 0) + 1 + MAP_KINDS.length + 3 + (onQuiz ? 1 : 0) + (inline && typesOpen ? NODE_TYPES.length : 0);
   const MENU_H = rows * ITEM_H + 24;
   const left = Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8));
   const top = Math.max(8, Math.min(y, window.innerHeight - MENU_H - 8));
@@ -170,6 +172,11 @@ export function CanvasContextMenu({ x, y, onPick, onGrow, onDrawPicture, onTextT
       <button role="menuitem" className={item} onClick={onTextToMap}>
         {t.split.entry}
       </button>
+      {onQuiz && (
+        <button role="menuitem" className={item} onClick={onQuiz}>
+          {t.ui.quiz.entry}
+        </button>
+      )}
     </div>
   );
 }
