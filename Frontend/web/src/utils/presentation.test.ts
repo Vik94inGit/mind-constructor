@@ -27,6 +27,21 @@ describe("computeSlideOrder", () => {
     expect(ids(computeSlideOrder(nodes))).toEqual(["a", "a1", "b"]);
   });
 
+  it("shows a sliced text's numbered pieces in step order, wherever they sit on the canvas", () => {
+    const nodes = [
+      makeNode({ nodeId: "text", order: 1, x: 500 }),
+      // Carried-on pieces placed in two rows: their x order is 4, 2, 5, 3.
+      makeNode({ nodeId: "p2", parentId: "text", order: 2, x: 300 }),
+      makeNode({ nodeId: "p3", parentId: "text", order: 3, x: 700 }),
+      makeNode({ nodeId: "p4", parentId: "text", order: 4, x: 100 }),
+      makeNode({ nodeId: "p5", parentId: "text", order: 5, x: 500 }),
+      // An unnumbered child comes after the numbered ones.
+      makeNode({ nodeId: "loose", parentId: "text", x: 0 }),
+    ];
+    expect(ids(computeSlideOrder(nodes))).toEqual(["text", "p2", "p3", "p4", "p5", "loose"]);
+    expect(computeSlideGroups(nodes)[0].children.map((n) => n.nodeId)).toEqual(["p2", "p3", "p4", "p5", "loose"]);
+  });
+
   it("still shows nodes caught in a parent loop", () => {
     const nodes = [makeNode({ nodeId: "p", parentId: "q" }), makeNode({ nodeId: "q", parentId: "p" })];
     expect(ids(computeSlideOrder(nodes)).sort()).toEqual(["p", "q"]);
