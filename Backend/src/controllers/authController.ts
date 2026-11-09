@@ -43,24 +43,42 @@ const saveSession = (req: Request): Promise<void> =>
     req.session.save((err) => (err ? reject(err) : resolve()));
   });
 
+// A fresh session id at every sign-in (no session fixation), saved before
+// the reply so the very next request already finds it in the store.
+const startSession = async (req: Request, userId: string) => {
+  await regenerateSession(req);
+  req.session.userId = userId;
+  await saveSession(req);
+};
+
+// What a sign-in answers with about the user: never the password hash or
+// anything else on the document.
+type SignedInUser = {
+  _id: unknown;
+  username: string;
+  email: string;
+  role: string;
+  isDemo: boolean;
+  usernameConfirmed?: boolean;
+};
+const publicUser = (user: SignedInUser) => ({
+  _id: user._id,
+  username: user.username,
+  email: user.email,
+  role: user.role,
+  isDemo: user.isDemo,
+  usernameConfirmed: user.usernameConfirmed,
+});
+
 // ========== REGISTER ==========
 export const register = async (req: Request, res: Response) => {
   try {
     const { user } = await registerAbl(req.body);
-    await regenerateSession(req);
-    req.session.userId = user._id.toString();
-    await saveSession(req);
+    await startSession(req, user._id.toString());
 
     return res.status(201).json({
       success: true,
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        isDemo: user.isDemo,
-        usernameConfirmed: user.usernameConfirmed,
-      },
+      user: publicUser(user),
     });
   } catch (error) {
     return handleAblError(
@@ -79,20 +97,11 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { user } = await loginAbl(req.body);
-    await regenerateSession(req);
-    req.session.userId = user._id.toString();
-    await saveSession(req);
+    await startSession(req, user._id.toString());
 
     return res.status(200).json({
       success: true,
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        isDemo: user.isDemo,
-        usernameConfirmed: user.usernameConfirmed,
-      },
+      user: publicUser(user),
     });
   } catch (error) {
     return handleAblError(
@@ -112,20 +121,11 @@ export const login = async (req: Request, res: Response) => {
 export const googleAuth = async (req: Request, res: Response) => {
   try {
     const { user } = await googleAuthAbl(req.body);
-    await regenerateSession(req);
-    req.session.userId = user._id.toString();
-    await saveSession(req);
+    await startSession(req, user._id.toString());
 
     return res.status(200).json({
       success: true,
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        isDemo: user.isDemo,
-        usernameConfirmed: user.usernameConfirmed,
-      },
+      user: publicUser(user),
     });
   } catch (error) {
     return handleAblError(
@@ -147,20 +147,11 @@ export const googleAuth = async (req: Request, res: Response) => {
 export const demoAuth = async (req: Request, res: Response) => {
   try {
     const { user, map } = await createDemoSessionAbl();
-    await regenerateSession(req);
-    req.session.userId = user._id.toString();
-    await saveSession(req);
+    await startSession(req, user._id.toString());
 
     return res.status(201).json({
       success: true,
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        isDemo: user.isDemo,
-        usernameConfirmed: user.usernameConfirmed,
-      },
+      user: publicUser(user),
       map: { mapId: map.mapId },
     });
   } catch (error) {

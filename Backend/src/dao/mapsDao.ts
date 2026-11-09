@@ -1,6 +1,6 @@
 import { NodeRevision } from "../models/NodeRevision.js";
 import type mongoose from "mongoose";
-import { Map } from "../models/Map.js";
+import { Map, type MAP_KINDS } from "../models/Map.js";
 import { Node, NODE_TYPES, type NodeType } from "../models/Node.js";
 import { Edge } from "../models/Edge.js";
 import { Line } from "../models/Line.js";
@@ -215,7 +215,7 @@ export const createMapDao = async (mapData: {
   color?: string;
   members?: string[];
   discussionMode?: boolean;
-  kind?: string;
+  kind?: (typeof MAP_KINDS)[number];
 }) => {
   const publicMapId = nanoid(10);
   return await Map.create({

@@ -96,6 +96,15 @@ export const param = (req: { params: unknown }, name: string): string => {
 export const publicMapIdOf = (doc: { mapId?: unknown } | null | undefined): string | null =>
   (doc?.mapId as { mapId?: string } | null | undefined)?.mapId ?? null;
 
-/** True for a non-empty array of strings (bulk id lists in request bodies). */
+// Bulk id lists come straight from a request body (up to the 3 MB JSON limit),
+// so they are capped: a few thousand is more than any map's selection, and an
+// id is a short nanoid, never a long string.
+export const MAX_ID_LIST = 5000;
+const MAX_ID_LENGTH = 64;
+
+/** True for a non-empty array of short strings, at most MAX_ID_LIST long (bulk id lists in request bodies). */
 export const isIdList = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.length > 0 && value.every((id) => typeof id === "string");
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.length <= MAX_ID_LIST &&
+  value.every((id) => typeof id === "string" && id.length > 0 && id.length <= MAX_ID_LENGTH);

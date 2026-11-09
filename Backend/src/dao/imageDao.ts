@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
-import { Image, IMAGE_URL_PREFIX } from "../models/Image.js";
+import { Image, IMAGE_URL_PREFIX, type IMAGE_MIME_TYPES } from "../models/Image.js";
 import { fileStorageEnabled, putFile, getFile, deleteFiles } from "../config/fileStorage.js";
 
 type InternalId = mongoose.Types.ObjectId | string;
@@ -15,7 +15,10 @@ export const createImageDao = async (fields: {
   data: Buffer;
 }): Promise<string> => {
   const imageId = nanoid(16);
-  const { data, ...meta } = fields;
+  const { data, ...rest } = fields;
+  // Callers pass a mime they already checked against IMAGE_MIME_TYPES (the
+  // data-URL regexes in nodeAbl/mapAbl); the schema's enum rejects any other.
+  const meta = { ...rest, mime: rest.mime as (typeof IMAGE_MIME_TYPES)[number] };
   if (fileStorageEnabled()) {
     const storageKey = `images/${imageId}`;
     await putFile(storageKey, data, meta.mime);

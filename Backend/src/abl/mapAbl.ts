@@ -16,6 +16,7 @@ import { createNodeAbl } from "./nodeAbl.js";
 import { ZONE_PALETTE } from "../models/palette.js";
 import type { NodeType } from "../models/Node.js";
 import { MAP_BACKGROUNDS, MAP_KINDS } from "../models/Map.js";
+import { escapeRegExp } from "../utils/escapeRegExp.js";
 
 // A Mongo ObjectId is always exactly 24 hex characters — cheap to check
 // before ever handing the value to Mongoose, which would otherwise throw its
@@ -300,8 +301,6 @@ const searchSchema = z.object({
   q: z.string().trim().min(2, "q must be at least 2 characters").max(100, "q must be at most 100 characters"),
 });
 
-const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 /** The part of `text` around the first match, so a long note shows where the words are. */
 export const snippetAround = (text: string, query: string): string => {
   const flat = text.replace(/\s+/g, " ").trim();
@@ -318,7 +317,7 @@ export const snippetAround = (text: string, query: string): string => {
 // insensitive; the full text never leaves the server, only a snippet.
 export const searchNodesAbl = async (userId: string, input: unknown) => {
   const { q } = parseOrThrow(searchSchema, input);
-  const rows = await searchNodesDao(userId, new RegExp(escapeRegex(q), "i"), SEARCH_LIMIT);
+  const rows = await searchNodesDao(userId, new RegExp(escapeRegExp(q), "i"), SEARCH_LIMIT);
   return rows.map(({ text, prompt, ...rest }) => ({
     ...rest,
     snippet: snippetAround(text || prompt, q),

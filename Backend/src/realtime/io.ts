@@ -70,18 +70,26 @@ export function initRealtime(httpServer: HTTPServer, sessionMiddleware: RequestH
     // A tab can have several maps open across its lifetime (navigating
     // the dashboard, back to a map, a different map) — join/leave per map
     // rather than binding a whole connection to one room.
-    socket.on("join-map", async (publicMapId: string, ack?: (ok: boolean) => void) => {
+    socket.on("join-map", async (publicMapId: string, rawAck?: unknown) => {
+      // Whatever a client sends as the second argument, only a real callback is called.
+      const ack = typeof rawAck === "function" ? (rawAck as (ok: boolean) => void) : undefined;
       const userId = socket.data.userId as string;
       if (typeof publicMapId !== "string" || !publicMapId) return ack?.(false);
 
       // Same membership check the REST endpoints use — a non-member can't
       // listen in on a map's live updates any more than they could GET it.
-      const map = await getMapByIdDao(publicMapId, userId);
-      if (!map) return ack?.(false);
+      try {
+        const map = await getMapByIdDao(publicMapId, userId);
+        if (!map) return ack?.(false);
 
-      socket.join(roomFor(publicMapId));
-      if (map.ownerId.toString() === userId) socket.join(ownerRoomFor(publicMapId));
-      ack?.(true);
+        socket.join(roomFor(publicMapId));
+        if (map.ownerId.toString() === userId) socket.join(ownerRoomFor(publicMapId));
+        ack?.(true);
+      } catch (err) {
+        // A failed lookup refuses the join rather than escaping the handler.
+        console.error("join-map failed:", err);
+        ack?.(false);
+      }
     });
 
     socket.on("leave-map", (publicMapId: string) => {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type mongoose from "mongoose";
-import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS, NODE_SHAPES, ZONE_PATTERNS, ZONE_PALETTE, CARD_SHAPES, CARD_SIZE_MIN, CARD_SIZE_MAX, CARD_FONT_MIN, CARD_FONT_MAX } from "../models/Node.js";
+import { NODE_TYPES, SYMBOL_OVERRIDES, SIZE_TIERS, MANUAL_ZONE_COLORS, NODE_SHAPES, ZONE_PATTERNS, ZONE_PALETTE, CARD_SHAPES, CARD_SIZE_MIN, CARD_SIZE_MAX, CARD_FONT_MIN, CARD_FONT_MAX, type ZonePaletteColor } from "../models/Node.js";
 import { getMapByIdDao, getMapByInternalIdDao } from "../dao/mapsDao.js";
 import { recordEditAbl } from "./historyAbl.js";
 import {
@@ -48,7 +48,9 @@ const zoneNameSchema = z.string().trim().max(40, "zone name must be at most 40 c
 const emojiSchema = z
   .string()
   .trim()
-  .max(32, "emoji must be at most 32 characters")
+  // .length (UTF-16 units), not z.max: newer zod counts code points there,
+  // which would let twenty emoji through.
+  .refine((v) => v.length <= 32, "emoji must be at most 32 characters")
   .refine((v) => v === "" || !/[\p{L}\p{N}]/u.test(v), "emoji must be an emoji, not text");
 
 // Node.picture — which dot of a picture a node is ("Draw a picture").
@@ -339,7 +341,7 @@ export const updateNodeAbl = async (
 
   if (typeof definedUpdates.zoneColor === "string") {
     const node = await findNodeByPublicIdDao(publicNodeId);
-    if (node && (await zoneColorTakenDao(node.mapId, definedUpdates.zoneColor, userId))) throw new ZoneColorTakenError();
+    if (node && (await zoneColorTakenDao(node.mapId, definedUpdates.zoneColor as ZonePaletteColor, userId))) throw new ZoneColorTakenError();
   }
 
   // In a discussion, a change to what a node says goes into the map's
