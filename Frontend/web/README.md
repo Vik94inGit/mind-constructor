@@ -415,7 +415,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
   slides in a full-screen view. *Present this zone* in a zone's menu starts one with just that zone:
   its parent and every node below it, nested zones included (`usePresentation` `presentZone`). Each node gets a slide, with its children on it as
-  cards, left to right as they sit on the canvas; tapping a card opens that child's slide, and the
+  cards, numbered steps in step order (so a long text carried on into pieces reads as written) and the rest left to right as they sit on the canvas; tapping a card opens that child's slide, and the
   *Under …* line goes back up to the parent's. The show goes a parent, then all of its own children one
   by one, then the next parent and its children, and so on (level by level, so a grandchild never
   interrupts its parent's siblings). The node and every child have a

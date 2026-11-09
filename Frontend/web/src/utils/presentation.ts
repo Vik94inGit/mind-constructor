@@ -53,17 +53,22 @@ function byCreation(indexById: Map<string, number>) {
   };
 }
 
-// Children read left to right, the way they sit on the canvas (their stored
-// x), so the slideshow and the org chart it tidies into agree with what the
+// Children in their numbered steps first (Node.order: a text that ran past a
+// node's limit and was carried on into numbered pieces, a template's steps),
+// so a sliced text reads in the order it was written however its pieces
+// ended up placed. Unnumbered children then read left to right, the way they
+// sit on the canvas (their stored x), so the slideshow agrees with what the
 // user laid out. Ties fall back to the sibling order.
 function leftToRight(indexById: Map<string, number>) {
   const sibling = bySibling(indexById);
-  return (a: NodeDoc, b: NodeDoc) => (a.x ?? 0) - (b.x ?? 0) || sibling(a, b);
+  const rank = (n: NodeDoc) => n.order ?? Number.MAX_SAFE_INTEGER;
+  return (a: NodeDoc, b: NodeDoc) => rank(a) - rank(b) || (a.x ?? 0) - (b.x ?? 0) || sibling(a, b);
 }
 
 // The order a presentation slideshow steps through a map's nodes: the
 // parents (every node with children, and every root) in the order they were
-// made, each followed straight away by its own children, left to right — so
+// made, each followed straight away by its own children (numbered steps in
+// step order, the rest left to right) — so
 // a slide's parent has just been shown, and the overlay names it. A child
 // that is itself a parent shows among its siblings, and its own children
 // follow when its turn as a parent comes. Each node shows once. A root
