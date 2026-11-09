@@ -41,7 +41,7 @@ node) must be told apart by something the user can see before they let go.
 | Group member | Drag | Drag | Moves the group, the others following its path |
 | Node, not Move mode | Swipe | Drag | Pans the map |
 | Empty canvas | Drag | Drag | Pans (touch) / marquee-selects (mouse) |
-| Empty canvas | Hold (½ s) | Right-click | Canvas menu: paste here, new node, templates, draw a picture, text → nodes ([sketch](canvas-tap-menu.md)) |
+| Empty canvas | Hold (½ s) | Right-click | Canvas menu: paste here, new node, templates, draw a picture, text → nodes, Quiz me ([sketch](canvas-tap-menu.md)) |
 | Empty canvas or a zone | Double-tap | Double-click | A blank new node right there (inside your own zone it joins the zone) ([sketch](double-tap-new-node.md)) |
 | Card side handle | Drag onto a card | Drag onto a card | Links the two cards |
 | Zone | Hold | Right-click | Zone menu: copy text, shape, delete, look |
@@ -53,6 +53,7 @@ node) must be told apart by something the user can see before they let go.
 | Panel | Its arrows | Arrow keys | Step node to node |
 | Panel, zone chosen | Its arrows | Arrow keys | Step through the zone newest thought first, back into the past ([sketch](zone-creation-order.md)) |
 | Canvas, first open | Tap | Click or wheel | Skip the entrance |
+| Quiz me card | Tap, then Not yet / Shaky / Know it | Click or Space, then 1 / 2 / 3; ← back, Esc leaves | Turns the card to its answer, marks it and brings the next ([sketch](quiz-me.md)) |
 
 Sources: [Frontend/web/README.md](../../Frontend/web/README.md), `hooks/useNodeDragAndDrop.ts`,
 `hooks/useMarqueeSelect.ts`, `hooks/useCanvasDoubleTap.ts`, `hooks/useCanvasMode.ts`, `hooks/useTapChomp.ts`,

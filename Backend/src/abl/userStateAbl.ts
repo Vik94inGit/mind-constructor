@@ -15,6 +15,7 @@ import {
   CHECK_IN_STRENGTH_MIN,
   DRAFT_KINDS,
   FEELINGS,
+  QUIZ_MARKS,
   LANGUAGES, READING_MODES, THEMES, ZONE_LAYOUTS, ZONE_MODES } from "../models/UserState.js";
 import { NODE_TYPES } from "../models/Node.js";
 import type { DraftKind } from "../models/UserState.js";
@@ -77,6 +78,7 @@ const mapViewSchema = z
     zoneLayout: idRecord(z.enum(ZONE_LAYOUTS)),
     cardFills: idRecord(z.string().regex(/^#[0-9a-fA-F]{6}$/, "a fill is a #rrggbb color")),
     feelings: idRecord(z.enum(FEELINGS)),
+    quizMarks: idRecord(z.enum(QUIZ_MARKS)),
     checkIn: checkInSchema.nullable(),
     blockLocks: z.array(z.string().max(64)).max(MAX_ENTRIES),
     detachedPieces: z.array(z.string().max(64)).max(MAX_ENTRIES),

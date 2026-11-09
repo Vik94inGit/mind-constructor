@@ -247,6 +247,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   $10`) stays text (`utils/mathText.ts`). While the panel's text box holds a formula, a *Formulas
   preview* under it shows how it will read. The stored text stays plain, so search, export and the
   length cap are unchanged, and KaTeX is a separate download fetched only when a text has a formula.
+- **Quiz me** — the map tests its reader ([sketch](../../docs/gestures/quiz-me.md)). Started from the
+  empty-canvas menu (hold or right-click empty canvas) or the layers menu, it shows one card at a time
+  over the map: a parent asks and its children answer, a title asks and its text answers, an answered
+  ghost's question asks and what was written answers (`utils/quiz.ts`). Tap the card (Space) to turn
+  it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. A round starts
+  with what isn't known yet, and its end counts the marks and offers *Go over the shaky ones*
+  (`map/QuizOverlay.tsx`, `hooks/useQuiz.ts`). Marks are the viewer's own, like feelings, kept in their
+  view of the map (`MapViewState.quizMarks`), and draw nothing on the map. Formulas show as maths.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
 - **Hiding the ghosts** — the ring of ghosts comes up round every node you open; the 👻 at the top of

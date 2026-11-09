@@ -66,6 +66,7 @@ export const FEATURES = [
   "minimap",
   "opponent_turn",
   "quick_add",
+  "quiz",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

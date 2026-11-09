@@ -114,6 +114,8 @@ import { hasPictures, usePictureView } from "../hooks/usePictureView";
 import { useMapControls } from "../hooks/useMapControls";
 import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
+import { QuizOverlay } from "../map/QuizOverlay";
+import { useQuiz } from "../hooks/useQuiz";
 import {
   computeAttackPairIds,
   collectDescendants,
@@ -245,6 +247,8 @@ export function MapPage() {
     setCardFill,
     feelings,
     setFeeling,
+    quizMarks,
+    setQuizMark,
     checkIn,
     setCheckIn,
     detachedPieces,
@@ -558,6 +562,14 @@ export function MapPage() {
     dispatchMode,
     setActionError,
     emptyMessage: t.ui.presentation.empty,
+  });
+  // Quiz me — the map asks, the viewer marks what they know (hooks/useQuiz.ts).
+  const { quizCards, startQuiz, exitQuiz } = useQuiz({
+    visibleNodes,
+    hiddenBranchIds,
+    ensureNodeText,
+    setActionError,
+    emptyMessage: t.ui.quiz.empty,
   });
 
   // How many nodes are currently packed into each container — NodeCard's
@@ -1748,6 +1760,7 @@ export function MapPage() {
       onRestoreDeleted={(id) => void restoreEntry(id)}
       onTimeLapse={startTimeLapse}
       onPresent={enterPresentation}
+      onQuiz={startQuiz}
     />
   );
 
@@ -2216,6 +2229,9 @@ export function MapPage() {
             </>
           )}
 
+          {quizCards && (
+            <QuizOverlay cards={quizCards} marks={quizMarks} onMark={setQuizMark} onExit={exitQuiz} />
+          )}
           {presenting && (
             <PresentationOverlay
               slides={slideGroups}
@@ -2593,6 +2609,10 @@ export function MapPage() {
             setCanvasContextMenu(null);
             setInlineEditId(null);
             void growStructure(kind, at);
+          }}
+          onQuiz={() => {
+            setCanvasContextMenu(null);
+            startQuiz();
           }}
           onDrawPicture={() => {
             setCanvasContextMenu(null);
