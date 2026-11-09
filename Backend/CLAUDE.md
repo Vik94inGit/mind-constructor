@@ -134,8 +134,18 @@ payload)` is the one function controllers call after a mutation commits; it's a 
 - **`src/abl/errors.ts`** — shared `ValidationError` + `parseOrThrow`.
 - **`src/middleware/rateLimit.ts`** + `helmet` in `server.ts` — the sign-in routes (`/register`, `/login`,
   `/google`, `/demo`) allow `AUTH_MAX_ATTEMPTS` (20) per address per 15 minutes (in-memory store, `429`
-  after); every response carries helmet's security headers, with `Cross-Origin-Resource-Policy:
-  cross-origin` so the frontend's own origin can still load `/api/images`.
+  after); every other `/api` call is capped by `apiLimiter` at `API_MAX_REQUESTS` (1200) a minute,
+  counted per signed-in user (`apiKey`; production traffic arrives through Vercel's rewrite, so many
+  people can share one address) and per address without a session; every response carries helmet's
+  security headers, with `Cross-Origin-Resource-Policy: cross-origin` so the frontend's own origin can
+  still load `/api/images`.
+- **Hardening rules worth keeping:** a failed login always runs one bcrypt comparison (a dummy hash
+  when the email is unknown), so reply time doesn't reveal registered emails; new passwords are 6 to 72
+  bytes (bcrypt ignores the rest); bulk id lists in bodies go through `isIdList`
+  (`controllers/errorHandling.ts`, at most `MAX_ID_LIST` = 5000 short ids); user text that goes into a
+  RegExp goes through `src/utils/escapeRegExp.ts`; socket handlers catch their own errors, and
+  `server.ts` logs an unhandled rejection instead of letting it stop the server. Note that zod's
+  string `.max()` counts code points, not `.length`.
 - **`src/abl/authAbl.ts`** `googleAuthAbl` — "Sign in with Google" is one endpoint
   (`POST /api/auth/google`) for both registering and logging in: the frontend hands it a Google ID
   token (never a password), the backend verifies it against `GOOGLE_CLIENT_ID` via

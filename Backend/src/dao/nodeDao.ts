@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
-import { Node, type NodeType, type WeaponIcon } from "../models/Node.js";
+import { Node, type NodeType, type WeaponIcon, type ZonePaletteColor } from "../models/Node.js";
 import { Edge } from "../models/Edge.js";
 import { isMapMemberDao, getMapByInternalIdDao } from "./mapsDao.js";
 import { getHiddenNodesDao } from "./visibilityDao.js";
@@ -75,7 +75,7 @@ export const createNodeMutationDao = async (
     x?: number;
     y?: number;
     color?: string;
-    picture?: { id: string; kind: string; dot: number; color?: string | null } | null;
+    picture?: { id: string; kind: string; dot: number; color?: ZonePaletteColor | null } | null;
     isFirstNode: boolean;
     parentId?: mongoose.Types.ObjectId | string | null;
     userId: string;
@@ -458,6 +458,6 @@ export const hasOpponentMovesDao = async (mapInternalId: MapInternalId) => {
 
 // Whether another member's node on the map already wears this zone colour —
 // each person's zones keep a colour of their own (nodeAbl's ZoneColorTakenError).
-export const zoneColorTakenDao = async (mapInternalId: MapInternalId, zoneColor: string, userId: string) => {
+export const zoneColorTakenDao = async (mapInternalId: MapInternalId, zoneColor: ZonePaletteColor, userId: string) => {
   return !!(await Node.exists({ mapId: mapInternalId, zoneColor, userId: { $ne: userId } }));
 };

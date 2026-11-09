@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import request from "supertest";
 import bcrypt from "bcryptjs";
-import { AUTH_MAX_ATTEMPTS } from "../src/middleware/rateLimit.js";
+import { API_MAX_REQUESTS, AUTH_MAX_ATTEMPTS, apiKey } from "../src/middleware/rateLimit.js";
 
 // Runs against the real app and its real session cookie, with an in-memory
 // stand-in for the user DAO instead of MongoDB (like every other test here),
@@ -131,6 +131,16 @@ describe("Auth", () => {
     const res = await request(app).get("/api/auth/me");
     expect(res.headers["x-content-type-options"]).toBe("nosniff");
     expect(res.headers["cross-origin-resource-policy"]).toBe("cross-origin");
+  });
+
+  it("counts general API calls per signed-in user, not per address", () => {
+    expect(apiKey({ session: { userId: "u1" }, ip: "1.2.3.4" })).toBe("user:u1");
+    expect(apiKey({ session: {}, ip: "1.2.3.4" })).toBe("ip:1.2.3.4");
+  });
+
+  it("answers API calls with a rate-limit header", async () => {
+    const res = await request(app).get("/api/auth/me");
+    expect(res.headers["ratelimit-policy"]).toContain(`${API_MAX_REQUESTS}`);
   });
 
   // Last: it spends this address's whole sign-in budget.

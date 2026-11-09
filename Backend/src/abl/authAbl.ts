@@ -54,8 +54,19 @@ const registerSchema = z.object({
     .min(1, "email is required")
     .transform(normalizeEmail)
     .pipe(z.string().email("must be a valid email")),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    // bcrypt reads only the first 72 bytes of a password; anything after
+    // that would be silently ignored, so say so instead.
+    .refine((p) => Buffer.byteLength(p, "utf8") <= 72, "Password must be at most 72 bytes"),
 });
+
+// A hash of a random string nobody knows, made at the same cost as real
+// passwords (userDao.ts), compared against when the account doesn't exist.
+// Made on first use, so starting the server (or a test) doesn't wait on it.
+let dummyHash: Promise<string> | null = null;
+const getDummyHash = () => (dummyHash ??= bcrypt.hash(Math.random().toString(36), 12));
 
 const loginSchema = z.object({
   email: z.string().min(1, "email is required").transform(normalizeEmail),
@@ -125,15 +136,15 @@ export const loginAbl = async (input: unknown) => {
   const { email, password } = parseOrThrow(loginSchema, input);
 
   const user = await findUserByEmailDao(email);
-  if (!user) throw new InvalidCredentialsError();
 
-  // A Google-only account (see googleAuthAbl) has no passwordHash at all —
-  // same outward error as a wrong password, so this doesn't leak "that
-  // email exists but only signs in via Google" to anyone probing it.
-  if (!user.passwordHash) throw new InvalidCredentialsError();
-
-  const isMatch = await bcrypt.compare(password, user.passwordHash);
-  if (!isMatch) throw new InvalidCredentialsError();
+  // Always pay for one bcrypt comparison, even when there's no such account:
+  // otherwise "unknown email" answers far faster than "wrong password", and
+  // the reply time alone would tell anyone whether an email is registered.
+  // A Google-only account (see googleAuthAbl) has no passwordHash at all and
+  // gets the same outward error as a wrong password, so this doesn't leak
+  // "that email exists but only signs in via Google" either.
+  const isMatch = await bcrypt.compare(password, user?.passwordHash || (await getDummyHash()));
+  if (!user || !user.passwordHash || !isMatch) throw new InvalidCredentialsError();
 
   // Checked only after the password is confirmed correct — same reasoning as
   // `protect` re-checking on every request: a blocked user's credentials are
