@@ -12,16 +12,17 @@ Today the same thing takes two steps: hold (touch) or right-click (mouse) on emp
 
 ## The gesture
 
-- **Touch:** two quick taps on the same empty spot (second tap within ~300 ms and ~24 px of the
-  first). A blank new node opens right there with its name field focused and the keyboard up, the
-  same input *+ > Create node* gives (type *unknown*, picked later from the ring of ghosts).
+- **Touch:** two quick taps on the same empty spot (second tap within ~350 ms and ~24 px of the
+  first). A blank node (type *unknown*) is saved right there and opened: its panel and its ring of
+  ghosts, as if it had been tapped. No text field is focused, so the keyboard stays down until the
+  user taps into the text.
 - **Mouse:** double-click on empty canvas, same result.
 - **What the user sees:** the first tap does what a tap does today (closes an open panel). On the
   second tap the blank node appears under the finger. If that spot breaks the zone rules (inside a
   zone it doesn't belong to, on top of a node), it lands at the nearest free spot, as every new node
   does (`placeNode`).
-- **How to leave or undo it:** Esc, ✕, or tapping away with the name still empty drops the new node,
-  as it does today for a blank node input. Nothing is saved until a name is typed.
+- **How to leave or undo it:** tap away to close it (the blank node stays, like a ghost dragged out
+  of the ring), or delete it from its panel; it is then in the map's Deleted list.
 
 ## Sketch
 
@@ -30,10 +31,10 @@ before                          after (tap, tap)
 +---------------------+         +---------------------+
 |  (o)        (o)     |         |  (o)        (o)     |
 |                     |         |      +-----------+  |
-|      [tap tap]      |         |      | ? |_      |  |
+|      [tap tap]      |         |   ○  |     ?     |  ○ |
 |  (o)                |         |  (o) +-----------+  |
-+---------------------+         +---------------------+
-                                  name field focused
++---------------------+         +----- ring of ghosts +
+                                  + its panel, no keyboard
 ```
 
 ## Could be confused with
@@ -57,12 +58,14 @@ replaying or presenting. Also ignored for a viewer who can't add nodes to the ma
 |---|---|---|---|
 | Viktor | double-tap / double-click on empty canvas | no gesture did it | asked for it as sketched |
 | Viktor, a day later | double-tap on a tablet and a phone | it wasn't built yet | built with the defaults: a zone's empty area counts, the node starts blank |
+| Viktor, with it built (#213) | double-tap on a phone | the keyboard popped up for the name field | the blank node is saved and opened instead: panel, node and ring of ghosts, no keyboard |
 
 ## Decision
 
 Double-click (mouse) or double-tap (touch, pen) on empty canvas, or on a zone's empty area, starts a
-blank new node at that spot through the same `startNodeAt` the canvas menu's *New node* uses
-(`hooks/useCanvasDoubleTap.ts`). The pair is read off the canvas's own click events (two within 350 ms
+blank node of type *unknown* at that spot, saves it straight away (`createBlankNodeAt` in
+`hooks/useQuickAdd.ts`) and opens it: its panel and ring of ghosts, with no text field focused, so a
+phone's keyboard stays down (`hooks/useCanvasDoubleTap.ts`). The pair is read off the canvas's own click events (two within 350 ms
 and 24 px), since Safari doesn't reliably send `dblclick` for taps. Inside a zone whose parent is the
 user's own, the node hangs from that parent and joins the zone; otherwise it is parentless and the
 zone rules place it. The first tap still does what a tap does (closes a panel, picks a zone). The

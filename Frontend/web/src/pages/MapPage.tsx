@@ -1203,8 +1203,8 @@ export function MapPage() {
     onCanvasPointerDown(e);
   }
 
-  // Double-click / double-tap on empty canvas, or inside a zone, opens a
-  // blank new node right there (docs/gestures/double-tap-new-node.md). Inside
+  // Double-click / double-tap on empty canvas, or inside a zone, saves a
+  // blank new node right there and opens it (docs/gestures/double-tap-new-node.md). Inside
   // a zone whose parent is the user's own, the node joins that zone. Returns
   // true when this tap was the second of a pair and made the node.
   const canvasDoubleTap = useCanvasDoubleTap();
@@ -1221,7 +1221,11 @@ export function MapPage() {
     setMultiSelectIds(new Set());
     setContextMenu(null);
     setCanvasContextMenu(null);
-    startNodeAt(screenToCanvas(clientX, clientY), "unknown", root && isOwnNode(root) ? root.nodeId : null);
+    // Saved straight away and opened (panel + ring of ghosts), with no
+    // text field, so a phone's keyboard stays down.
+    void createBlankNodeAt(screenToCanvas(clientX, clientY), root && isOwnNode(root) ? root.nodeId : null).then((node) => {
+      if (node) setSelectedId(node.nodeId);
+    });
     return true;
   }
 
@@ -1366,7 +1370,7 @@ export function MapPage() {
   });
 
   // Starting a new node from the canvas — see hooks/useQuickAdd.ts.
-  const { startQuickAdd, addBranchFromCard, sketchBranch, startBranchOf, startNodeAt, startCreateNodeInView } = useQuickAdd({
+  const { startQuickAdd, addBranchFromCard, sketchBranch, startBranchOf, startNodeAt, startCreateNodeInView, createBlankNodeAt } = useQuickAdd({
     mapId,
     emojiFirst,
     placeNode,
