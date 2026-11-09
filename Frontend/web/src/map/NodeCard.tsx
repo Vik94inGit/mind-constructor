@@ -32,6 +32,7 @@ import { chompMouth } from "../utils/pacman";
 import type { ChompMove } from "../utils/pacman";
 import type { ReadingMode } from "../utils/readingMode";
 import { isEditableTarget } from "../utils/editable";
+import { MathText } from "./MathText";
 
 
 // Reading modes (see utils/readingMode.ts). A puzzle card is as wide
@@ -685,7 +686,7 @@ export const NodeCard = memo(function NodeCard({
               <img src={imageSrc(node.cardImage)} alt="" className="mx-auto mb-[0.3rem] block h-auto max-h-[110px] w-auto max-w-full rounded-[4px]" draggable={false} />
             )}
             {trimmedTitle && (
-              <div className={`text-[1.08em] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}>{trimmedTitle}</div>
+              <div className={`text-[1.08em] leading-[1.3] font-semibold break-words ${cardFill ? "" : "text-ink"}`}><MathText text={trimmedTitle} /></div>
             )}
             <div
               data-testid="puzzle-card-text"
@@ -697,7 +698,7 @@ export const NodeCard = memo(function NodeCard({
               // wheel from scrolling the canvas once it reaches the end.
               style={selected || node.cardH ? undefined : { maxHeight: `${(PUZZLE_TEXT_MAX_LINES * 1.35).toFixed(2)}em` }}
             >
-              {node.text || (trimmedTitle ? "" : "…")}
+              {node.text ? <MathText text={node.text} /> : trimmedTitle ? "" : "…"}
             </div>
             {showHealth && (
               <div className="mt-[0.35rem] h-[3px] overflow-hidden rounded-[2px] bg-surface-2">
@@ -796,10 +797,10 @@ export const NodeCard = memo(function NodeCard({
         >
           {(iconText || replayCaption) && trimmedTitle && node.text ? (
             <>
-              <span className="font-semibold">{trimmedTitle}</span> {node.text}
+              <span className="font-semibold"><MathText text={trimmedTitle} /></span> <MathText text={node.text} />
             </>
           ) : (
-            captionLabel
+            <MathText text={captionLabel} />
           )}
         </div>
       )}

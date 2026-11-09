@@ -175,6 +175,8 @@ export interface UiStrings {
     prevNode: string;
     /** Screen-reader names: the panel's text field, and its row of tabs. */
     textLabel: string;
+    /** Over the live preview of the formulas typed or pasted into a node's text ($…$, \\(…\\), $$…$$). */
+    formulaPreview: string;
     tabsLabel: string;
     nextNode: string;
     root: string;
@@ -500,6 +502,28 @@ export interface UiStrings {
     ghostHint: string;
     ghostPlaceholder: string;
     createGhost: string;
+  };
+  /** Quiz me (map/QuizOverlay.tsx, utils/quiz.ts): the map asks, the reader answers in their head and marks it. */
+  quiz: {
+    /** The layers menu and the empty-canvas menu row that starts it. */
+    entry: string;
+    exit: string;
+    count: (current: number, total: number) => string;
+    showAnswer: string;
+    /** Under the question while the card is still hidden. */
+    hint: string;
+    notYet: string;
+    shaky: string;
+    know: string;
+    back: string;
+    roundDone: string;
+    /** "Know it 11 · Shaky 4 · Not yet 3". */
+    tally: (know: number, shaky: number, notYet: number) => string;
+    again: string;
+    restart: string;
+    done: string;
+    /** The map has no card to ask: no parent with children, no title with a text. */
+    empty: string;
   };
   presentation: {
     exit: string;
@@ -907,6 +931,7 @@ const en: UiStrings = {
     byUser: (name) => `by ${name}`,
     prevNode: "Previous node (←)",
     textLabel: "Node text",
+    formulaPreview: "Formulas preview",
     tabsLabel: "Node sections",
     nextNode: "Next node (→)",
     root: "root",
@@ -1238,6 +1263,23 @@ const en: UiStrings = {
     failed: "Couldn't make the new node for the rest",
   },
   newNode: { title: "New node", placeholder: "Write your thought…", create: "Create", hint: "Enter creates it, Shift+Enter adds a line", ghost: "Ghost", ghostHint: "Write a question instead of an answer: the node stays faded until someone fills it in", ghostPlaceholder: "Write the question to answer later…", createGhost: "Create ghost" },
+  quiz: {
+    entry: "Quiz me",
+    exit: "Exit",
+    count: (c, n) => `${c} / ${n}`,
+    showAnswer: "Show answer",
+    hint: "Answer in your head, then turn the card",
+    notYet: "Not yet",
+    shaky: "Shaky",
+    know: "Know it",
+    back: "Back",
+    roundDone: "Round done",
+    tally: (k, s, y) => `Know it ${k} · Shaky ${s} · Not yet ${y}`,
+    again: "Go over the shaky ones",
+    restart: "Start again",
+    done: "Done",
+    empty: "Nothing to quiz yet: give a node children, or a title and a text",
+  },
   presentation: {
     exit: "Exit",
     prev: "Prev",
@@ -1459,6 +1501,7 @@ const en: UiStrings = {
         minimap: "Turned the minimap on or off",
         opponent_turn: "Played the imitated opponent",
         quick_add: "Added a node from the ring",
+        quiz: "Quizzed themselves (Quiz me)",
       },
     },
   },

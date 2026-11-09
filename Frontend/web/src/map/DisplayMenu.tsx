@@ -44,6 +44,8 @@ interface Props {
   /** Enters presentation mode — folded into this same dropdown rather than
    *  its own toolbar button (see MapToolbar's own comment). */
   onPresent: () => void;
+  /** Starts Quiz me — the map's own questions, one card at a time. */
+  onQuiz?: () => void;
   /** Starts the time-lapse — the map replayed node by node, oldest first. */
   onTimeLapse?: () => void;
   onClose: () => void;
@@ -79,6 +81,7 @@ export function DisplayMenu({
   backgroundShade,
   onPickBackgroundShade,
   onPresent,
+  onQuiz,
   onTimeLapse,
   onClose,
   side = "below",
@@ -306,6 +309,16 @@ export function DisplayMenu({
         <span aria-hidden>▶</span>
         <span className="flex-1">{t.map.toolbar.presentation}</span>
       </button>
+      {onQuiz && (
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
+          onClick={onQuiz}
+        >
+          <span aria-hidden>?</span>
+          <span className="flex-1">{t.ui.quiz.entry}</span>
+        </button>
+      )}
       {onTimeLapse && (
         <button
           type="button"

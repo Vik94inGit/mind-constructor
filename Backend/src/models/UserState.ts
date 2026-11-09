@@ -31,6 +31,8 @@ export const FEELINGS = [
   "calm",
   "relieved",
 ] as const;
+// What the viewer last said about a card in Quiz me (MapViewState.quizMarks; the frontend's utils/quiz.ts).
+export const QUIZ_MARKS = ["notYet", "shaky", "know"] as const;
 export const CHECK_IN_STRENGTH_MIN = 1;
 export const CHECK_IN_STRENGTH_MAX = 5;
 export const DRAFT_KINDS = ["think", "textSplit"] as const;
@@ -71,6 +73,7 @@ const MapViewStateSchema = new mongoose.Schema(
     zoneLayout: { type: mongoose.Schema.Types.Mixed, default: {} }, // parent nodeId (or "*": the whole map) -> zone layout
     cardFills: { type: mongoose.Schema.Types.Mixed, default: {} }, // nodeId -> #rrggbb
     feelings: { type: mongoose.Schema.Types.Mixed, default: {} }, // nodeId -> feeling, this viewer's own
+    quizMarks: { type: mongoose.Schema.Types.Mixed, default: {} }, // nodeId -> QUIZ_MARKS, this viewer's own
     // { before, after }: each { feeling, strength 1-5, at (ms) } or null
     checkIn: { type: mongoose.Schema.Types.Mixed, default: null },
     blockLocks: { type: [String], default: [] }, // locked puzzle pieces' nodeIds

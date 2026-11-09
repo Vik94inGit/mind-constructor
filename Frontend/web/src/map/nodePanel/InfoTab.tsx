@@ -14,6 +14,8 @@ import type { CardShape } from "../../types";
 import { useI18n } from "../../i18n/I18nContext";
 import type { NodeDoc } from "../../types";
 import { feature } from "../../utils/usage";
+import { MathText } from "../MathText";
+import { hasMath } from "../../utils/mathText";
 
 export type CardLookPatch = Pick<Partial<NodeDoc>, "cardW" | "cardH" | "cardFont" | "cardShape">;
 /** A card's own look, for its owner to change (Node.cardFont/cardShape/cardW/cardH). */
@@ -83,7 +85,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
     <div className="mt-2">
       {/* The node's title, when it has one — read-only here for
           everyone; the owner edits it under Modify. */}
-      {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink">{node.title}</div>}
+      {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink"><MathText text={node.title} /></div>}
       {/* The text and its pictures share one box, like a post: write, then
           paste, drop or pick a picture right under the words. */}
       <div
@@ -106,6 +108,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
         }}
       >
         {isCreator && !textLocked ? (
+          <>
           <textarea
             id="node-text"
             ref={textareaRef}
@@ -157,6 +160,15 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             onBlur={() => void onTextSave()}
             className={`block min-h-[8rem] w-full resize-y border-0 bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline-none ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
           />
+          {hasMath(textDraft) && (
+            // How the formulas in the text will read, as the user types or
+            // pastes them (utils/mathText.ts says what counts as one).
+            <div data-testid="formula-preview" className="border-t border-line px-[0.7rem] py-[0.45rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap break-words text-ink">
+              <div className="mb-[0.2rem] text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase">{t.ui.node.formulaPreview}</div>
+              <MathText text={textDraft} />
+            </div>
+          )}
+          </>
         ) : (
           // Focusable so the keyboard can scroll a long text.
           <div
@@ -167,7 +179,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             className={`min-h-[8rem] w-full overflow-y-auto bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
             style={!expanded && textHeight != null ? { height: textHeight } : undefined}
           >
-            {node.text || (node.prompt ? <span className="text-ink-soft italic">{node.prompt}</span> : null)}
+            {node.text ? <MathText text={node.text} /> : node.prompt ? <span className="text-ink-soft italic">{node.prompt}</span> : null}
           </div>
         )}
         {imagesSection}

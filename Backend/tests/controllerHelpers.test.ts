@@ -7,7 +7,7 @@ vi.mock("../src/dao/userDao.js", () => ({
 }));
 
 import * as userDao from "../src/dao/userDao.js";
-import { authed, isIdList, param, publicMapIdOf } from "../src/controllers/errorHandling.js";
+import { authed, isIdList, MAX_ID_LIST, param, publicMapIdOf } from "../src/controllers/errorHandling.js";
 import { getAllUsers } from "../src/controllers/userController.js";
 import { MapFinishedError, ValidationError } from "../src/abl/errors.js";
 
@@ -109,6 +109,13 @@ describe("small helpers", () => {
     expect(isIdList([])).toBe(false);
     expect(isIdList(["a", 1])).toBe(false);
     expect(isIdList("a")).toBe(false);
+  });
+
+  it("isIdList refuses an oversized list or a long id", () => {
+    expect(isIdList(Array.from({ length: MAX_ID_LIST }, (_, i) => `n${i}`))).toBe(true);
+    expect(isIdList(Array.from({ length: MAX_ID_LIST + 1 }, (_, i) => `n${i}`))).toBe(false);
+    expect(isIdList(["x".repeat(65)])).toBe(false);
+    expect(isIdList([""])).toBe(false);
   });
 });
 

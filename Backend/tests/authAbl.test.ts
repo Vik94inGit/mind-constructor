@@ -44,6 +44,12 @@ describe("authAbl", () => {
       ).rejects.toThrow(ValidationError);
     });
 
+    it("rejects a password longer than bcrypt reads (72 bytes)", async () => {
+      await expect(
+        registerAbl({ username: "alice", email: "alice@test.com", password: "x".repeat(73) }),
+      ).rejects.toThrow(ValidationError);
+    });
+
     it("rejects a duplicate email", async () => {
       vi.mocked(findUserByEmailDao).mockResolvedValue({ _id: "u1" } as never);
 
@@ -166,6 +172,17 @@ describe("authAbl", () => {
       await expect(
         loginAbl({ email: "nobody@test.com", password: "secret123" }),
       ).rejects.toThrow(InvalidCredentialsError);
+    });
+
+    it("still checks a password when the email is unknown, so timing doesn't tell", async () => {
+      vi.mocked(findUserByEmailDao).mockResolvedValue(null as never);
+      const compare = vi.spyOn(bcrypt, "compare");
+
+      await expect(loginAbl({ email: "nobody@test.com", password: "secret123" })).rejects.toThrow(
+        InvalidCredentialsError,
+      );
+      expect(compare).toHaveBeenCalledTimes(1);
+      compare.mockRestore();
     });
 
     it("logs in with a different-cased email than what was stored", async () => {

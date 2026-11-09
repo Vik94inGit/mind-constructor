@@ -21,6 +21,7 @@ import userStateRoute from "./src/routes/userStateRoute.js";
 import usageRoute from "./src/routes/usageRoute.js";
 import { initRealtime } from "./src/realtime/io.js";
 import { createRedisClient } from "./src/config/redis.js";
+import { apiLimiter } from "./src/middleware/rateLimit.js";
 
 console.log(
   "Checking MONGO_URI:",
@@ -128,6 +129,10 @@ app.use(sessionMiddleware);
 // MAX_DRAFT_BYTES).
 app.use(express.json({ limit: "3mb" }));
 
+// A ceiling on every API call, per signed-in user (middleware/rateLimit.ts).
+// After the session, so it can tell who is asking.
+app.use("/api", apiLimiter);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/nodes", nodeRoute);
 app.use("/api/edges", edgeRoute);
@@ -150,6 +155,13 @@ app.use("/api", mapRoute);
 // handshake against the same store.
 const httpServer = http.createServer(app);
 initRealtime(httpServer, sessionMiddleware);
+
+// A promise that fails with nobody listening (a database hiccup inside a
+// socket handler, say) would otherwise stop the whole server on Node's
+// default. Log it and keep serving everyone else.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
 
 async function run() {
   try {

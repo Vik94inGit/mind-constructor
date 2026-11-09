@@ -240,6 +240,22 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   it's a banner at the top of the map; in the new-node panel and the dashboard's Quick note, saying
   yes sends the rest along when the node (or note) is made. It works with a tablet's paste bubble
   too, since it reads the paste event rather than keys.
+- **Formulas** — maths typed or pasted into a node's title or text shows as real formulas on its
+  card, under its icon, in the panel, on presentation slides and in the time-lapse replay
+  (`map/MathText.tsx`, KaTeX). It reads the LaTeX that copied text already carries: `$…$` and
+  `\(…\)` inside a sentence, `$$…$$` and `\[…\]` on a line of their own (as ChatGPT, Overleaf and
+  lecture notes copy it), and Wikipedia's `{\displaystyle …}`. A `$` that looks like money (`$5 and
+  $10`) stays text (`utils/mathText.ts`). While the panel's text box holds a formula, a *Formulas
+  preview* under it shows how it will read. The stored text stays plain, so search, export and the
+  length cap are unchanged, and KaTeX is a separate download fetched only when a text has a formula.
+- **Quiz me** — the map tests its reader ([sketch](../../docs/gestures/quiz-me.md)). Started from the
+  empty-canvas menu (hold or right-click empty canvas) or the layers menu, it shows one card at a time
+  over the map: a parent asks and its children answer, a title asks and its text answers, an answered
+  ghost's question asks and what was written answers (`utils/quiz.ts`). Tap the card (Space) to turn
+  it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. A round starts
+  with what isn't known yet, and its end counts the marks and offers *Go over the shaky ones*
+  (`map/QuizOverlay.tsx`, `hooks/useQuiz.ts`). Marks are the viewer's own, like feelings, kept in their
+  view of the map (`MapViewState.quizMarks`), and draw nothing on the map. Formulas show as maths.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
   node lands and the map is in view again.
 - **Hiding the ghosts** — the ring of ghosts comes up round every node you open; the 👻 at the top of
@@ -400,7 +416,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Presentation** — the toolbar's Present steps through the map (or the chosen nodes or zone) as
   slides in a full-screen view. *Present this zone* in a zone's menu starts one with just that zone:
   its parent and every node below it, nested zones included (`usePresentation` `presentZone`). Each node gets a slide, with its children on it as
-  cards, left to right as they sit on the canvas; tapping a card opens that child's slide, and the
+  cards, numbered steps in step order (so a long text carried on into pieces reads as written) and the rest left to right as they sit on the canvas; tapping a card opens that child's slide, and the
   *Under …* line goes back up to the parent's. The show goes a parent, then all of its own children one
   by one, then the next parent and its children, and so on (level by level, so a grandchild never
   interrupts its parent's siblings). The node and every child have a

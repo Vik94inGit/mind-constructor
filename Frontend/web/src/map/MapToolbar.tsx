@@ -86,6 +86,8 @@ interface Props {
   onDeleteMap: () => void;
   /** Enters presentation mode (see MapPage's own presenting/PresentationOverlay) — offered from the display (layers icon) menu below. Not owner-gated — anyone viewing a map should be able to self-present it. */
   onPresent: () => void;
+  /** Starts Quiz me (hooks/useQuiz.ts) — in the same display menu, under Presentation. */
+  onQuiz?: () => void;
   /** Puts the last move back (hooks/useMoveUndo.ts); the button greys out with nothing to undo. */
   onUndo?: () => void;
   onTimeLapse?: () => void;
@@ -157,6 +159,7 @@ export function MapToolbar({
   onExportText,
   onDeleteMap,
   onPresent,
+  onQuiz,
   onUndo,
   onTimeLapse,
   canUndo = false,
@@ -363,6 +366,13 @@ export function MapToolbar({
                   setShowDisplayMenu(false);
                   onPresent();
                 }}
+                onQuiz={
+                  onQuiz &&
+                  (() => {
+                    setShowDisplayMenu(false);
+                    onQuiz();
+                  })
+                }
                 onTimeLapse={
                   onTimeLapse &&
                   (() => {

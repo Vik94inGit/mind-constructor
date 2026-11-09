@@ -119,6 +119,20 @@ describe("userStateAbl", () => {
     });
   });
 
+  describe("quiz marks", () => {
+    beforeEach(() => vi.mocked(getMapByIdDao).mockResolvedValue({ mapId: "m1" } as never));
+
+    it("saves the viewer's own Quiz me mark per node", async () => {
+      const fields = { quizMarks: { a: "notYet", b: "shaky", c: "know" } };
+      await updateMapViewStateAbl("m1", fields, "u1");
+      expect(updateMapViewStateDao).toHaveBeenCalledWith("u1", "m1", fields);
+    });
+
+    it("rejects a mark that isn't one of the three", async () => {
+      await expect(updateMapViewStateAbl("m1", { quizMarks: { a: "maybe" } }, "u1")).rejects.toThrow(ValidationError);
+    });
+  });
+
   describe("feelings and check-ins", () => {
     beforeEach(() => vi.mocked(getMapByIdDao).mockResolvedValue({ mapId: "m1" } as never));
 

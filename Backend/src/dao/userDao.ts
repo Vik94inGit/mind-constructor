@@ -4,6 +4,7 @@ import { User } from "../models/User.js";
 import { Map } from "../models/Map.js";
 import { Node } from "../models/Node.js";
 import { Image } from "../models/Image.js";
+import { escapeRegExp } from "../utils/escapeRegExp.js";
 
 interface CreateUserInput {
   username: string;
@@ -18,9 +19,6 @@ interface CreateGoogleUserInput {
   usernameConfirmed?: boolean;
 }
 
-// User input goes into a RegExp below — escape it so "a.b" or "(" match
-// themselves instead of being read as a pattern (or throwing).
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 interface UpdateUserInput {
   username?: string;
