@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useKeepOnScreen } from "../hooks/useKeepOnScreen";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
+import { useDismiss } from "../hooks/useDismiss";
 
 interface Props {
   isOwner: boolean;
@@ -47,20 +48,7 @@ export function AddMenu({
   // Read once as the menu opens — it mounts fresh each time, so this is what is on the clipboard right now.
   const [pasteCount] = useState(nodeClipboardSize);
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismiss(ref, onClose);
 
   const item =
     "block w-full cursor-pointer rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2";

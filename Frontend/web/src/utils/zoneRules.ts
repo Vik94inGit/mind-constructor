@@ -1,6 +1,7 @@
 import { NODE_FOOTPRINT, avoidOverlap, getZoneReach, zoneMemberships, zoneShape } from "./canvasLayout";
 import type { Obstacle, ViewportBounds, ZoneMembership } from "./canvasLayout";
 import type { ZoneLayouts } from "./zoneLayout";
+import { pointInPolygon } from "./drawLine";
 import { idOf, zoneParentId } from "./nodeType";
 import type { NodeDoc } from "../types";
 
@@ -63,16 +64,6 @@ interface Zone {
   outline: Pt[];
 }
 
-function insidePolygon(p: Pt, poly: Pt[]): boolean {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i];
-    const b = poly[j];
-    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
-  }
-  return inside;
-}
-
 function distToSegment(p: Pt, a: Pt, b: Pt): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -89,7 +80,7 @@ function distToOutline(p: Pt, poly: Pt[]): number {
 
 /** In the zone, or too close to its lines. */
 function intrudes(p: Pt, zone: Zone): boolean {
-  return insidePolygon(p, zone.outline) || distToOutline(p, zone.outline) < ZONE_LINE_CLEARANCE;
+  return pointInPolygon(p, zone.outline) || distToOutline(p, zone.outline) < ZONE_LINE_CLEARANCE;
 }
 
 function cross(o: Pt, a: Pt, b: Pt): number {

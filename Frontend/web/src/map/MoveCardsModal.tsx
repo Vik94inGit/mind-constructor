@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import * as mapsApi from "../api/maps";
 import { ApiRequestError } from "../api/client";
 import { Modal } from "../components/Modal";
-import { MapIcon } from "../dashboard/LibraryTile";
-import { primaryBtn, secondaryBtn } from "../dashboard/FolderModal";
+import { MapTargetList } from "../dashboard/MapTargetList";
+import { primaryBtn } from "../dashboard/FolderModal";
 import { useI18n } from "../i18n/I18nContext";
 import { moveNoteToMap, moveTargets } from "../utils/inbox";
 import type { MapDoc } from "../types";
@@ -76,27 +76,15 @@ export function MoveCardsModal({
       <button type="button" disabled={busy} className={`${primaryBtn} mb-3 w-full`} onClick={() => void moveTo(newMap)}>
         {c.newMap}
       </button>
-      {!list && !error && <p className="text-[0.85rem] text-ink-soft">{s.loading}</p>}
-      <div className="flex max-h-[50vh] flex-col gap-1 overflow-y-auto">
-        {targets.map((m) => (
-          <button
-            key={m.mapId}
-            type="button"
-            disabled={busy}
-            className="flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left text-[0.9rem] text-ink hover:bg-surface-2 disabled:cursor-wait"
-            onClick={() => void moveTo(async () => m)}
-          >
-            <MapIcon color={m.color} />
-            <span className="truncate">{m.name}</span>
-          </button>
-        ))}
-      </div>
-      <div className="mt-[1.2rem] flex items-center justify-end gap-3">
-        {busy && <span className="text-[0.8rem] text-ink-soft">{s.moving}</span>}
-        <button type="button" className={secondaryBtn} onClick={onClose}>
-          {s.cancel}
-        </button>
-      </div>
+      <MapTargetList
+        list={list}
+        targets={targets}
+        loadFailed={!!error && !list}
+        busy={busy}
+        listClassName="max-h-[50vh] overflow-y-auto"
+        onPick={(m) => void moveTo(async () => m)}
+        onCancel={onClose}
+      />
     </Modal>
   );
 }

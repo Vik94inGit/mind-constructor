@@ -3,6 +3,7 @@ import {
   closestToCentroidIndex,
   collectBranchIds,
   collectDescendants,
+  treeFrom,
   computeAttackPairIds,
   computeHiddenBranchIds,
   computeSolved,
@@ -96,6 +97,21 @@ describe("collectBranchIds", () => {
     ];
     const isOwn = (n: { userId: unknown }) => n.userId === "u1";
     expect(collectBranchIds("r", pool, isOwn)).toEqual(["a", "a2", "deep"]);
+  });
+});
+
+describe("treeFrom", () => {
+  it("walks the root and everything below it level by level, by the given parent", () => {
+    const nodes = [
+      makeNode({ nodeId: "grand", parentId: "kid" }),
+      makeNode({ nodeId: "kid", parentId: "root" }),
+      makeNode({ nodeId: "root" }),
+      makeNode({ nodeId: "skip", parentId: "root" }),
+      makeNode({ nodeId: "other" }),
+    ];
+    const parentOf = (n: { nodeId: string; parentId?: unknown }) => (n.nodeId === "skip" ? null : (n.parentId as string));
+    expect(treeFrom("root", nodes, parentOf).map((n) => n.nodeId)).toEqual(["root", "kid", "grand"]);
+    expect(treeFrom("missing", nodes, parentOf)).toEqual([]);
   });
 });
 
