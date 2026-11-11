@@ -1091,6 +1091,14 @@ const translation: Translation = {
       foldersError: "Nepodařilo se načíst složky",
       deleteMapError: "Mapu se nepodařilo smazat",
       resume: { title: "Pokračujte, kde jste skončili", open: "Otevřít" },
+      firstMap: {
+        title: "Vaše mapa",
+        open: "Otevřít mapu",
+        latest: "Poslední myšlenky",
+        none: "Zatím nic napsaného. Otevřete mapu a odpovězte na její otázky.",
+        inMap: (mapName) => `v „${mapName}“`,
+        error: "Myšlenky této mapy se nepodařilo načíst",
+      },
       folderMenu: { open: "Otevřít", rename: "Přejmenovat", delete: "Smazat" },
       deleteFolderConfirm: (name) => `Smazat složku „${name}“? Mapy v ní zůstanou — vrátí se do Všech map.`,
       folderModal: {

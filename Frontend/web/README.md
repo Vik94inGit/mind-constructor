@@ -56,6 +56,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   from it and the links inside that branch) is made there on a free spot and taken off the Inbox.
   The same **Move to a map** sits in a note's Info tab when the Inbox map is open
   (`src/dashboard/InboxTray.tsx`, `src/dashboard/MoveNoteModal.tsx`, `src/utils/inbox.ts`).
+  Once you've made your **first map from a template**, the dashboard opens with that map on top,
+  drawn small (ghost questions faded), and your **latest thoughts** right under it, newest first:
+  that map's and the Inbox's quick notes, each opening the map at that thought. It stays until you
+  make a second template map (`src/dashboard/FirstMapCard.tsx`, `src/dashboard/firstMap.ts`).
 - **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
   with the quick-add ghosts or the toolbar, link nodes explicitly, draw separator lines, attack
   other members' nodes with the three combat weapons, shield your own, pack nodes into a
