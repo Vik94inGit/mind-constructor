@@ -76,6 +76,13 @@ function renderPage() {
   );
 }
 
+// A tap on a node picks it; a second tap on the picked node opens its panel.
+// The picked node hides its caption, so the second tap lands on its icon.
+async function openNodePanel(user: ReturnType<typeof userEvent.setup>, nodeId: string) {
+  await user.click(nodeEl(nodeId).querySelector<HTMLElement>(".pointer-events-auto")!);
+  await user.click(nodeEl(nodeId).querySelector<HTMLElement>(".pointer-events-auto")!);
+}
+
 function nodeEl(nodeId: string) {
   const el = document.querySelector(`[data-reveal-node="${nodeId}"]`);
   if (!el) throw new Error(`node ${nodeId} not drawn`);
@@ -100,12 +107,16 @@ describe("MapPage", () => {
     expect(screen.getAllByText("Gamma").length).toBeGreaterThan(0);
   });
 
-  it("opens a node's panel on click and closes it from empty canvas", async () => {
+  it("picks a node on the first click, opens its panel on the second, and closes it from empty canvas", async () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => nodeEl("a"));
     expect(screen.queryByDisplayValue("some text")).toBeNull();
     await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    // Give the panel every chance to open: one click only picks the node.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByDisplayValue("some text")).toBeNull();
+    await user.click(nodeEl("a").querySelector<HTMLElement>(".pointer-events-auto")!);
     expect(await screen.findByDisplayValue("some text")).toBeInTheDocument();
     await user.click(nodeEl("a").parentElement!);
     await waitFor(() => expect(screen.queryByDisplayValue("some text")).toBeNull());
@@ -119,7 +130,7 @@ describe("MapPage", () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => nodeEl("a"));
-    await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    await openNodePanel(user, "a");
     const ta = (await screen.findByDisplayValue("text A")) as HTMLTextAreaElement;
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);
@@ -148,14 +159,14 @@ describe("MapPage", () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => nodeEl("b"));
-    await user.click(within(nodeEl("b")).getAllByText("Beta")[0]);
+    await openNodePanel(user, "b");
     await user.click(await screen.findByText(/Change parent/));
     expect(await screen.findByText("Tap the new parent for “Beta”")).toBeInTheDocument();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByText("Tap the new parent for “Beta”")).toBeNull());
     expect(nodesApi.updateNode).not.toHaveBeenCalled();
 
-    await user.click(within(nodeEl("b")).getAllByText("Beta")[0]);
+    await openNodePanel(user, "b");
     await user.click(await screen.findByText(/Change parent/));
     await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
     await waitFor(() => expect(nodesApi.updateNode).toHaveBeenCalledWith("b", expect.objectContaining({ parentId: "a" })));

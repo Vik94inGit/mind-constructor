@@ -199,6 +199,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
+- **A tap picks, a second tap opens** — tapping or clicking a node only picks it: it's highlighted,
+  centered and its ring of ghosts comes up, with the map still in view. Tapping or clicking it again
+  (or a double-tap / double-click, or *Edit* in its right-click menu) opens its panel. The reading
+  arrows, search and creating a node still open the panel straight away (`pages/MapPage.tsx`
+  `panelHiddenFor`, [sketch](../../docs/gestures/tap-picks-node.md)).
 - **Node panel under the node** — the node panel (and the pack picker and new-node panel) is a bottom
   sheet, half the screen, with the node's text first and its type's symbol in its header; the chosen node
   is centered in the half above it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
