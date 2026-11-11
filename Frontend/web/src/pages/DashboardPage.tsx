@@ -28,6 +28,8 @@ import { libraryItems, paginate } from "../dashboard/library";
 import { useConfirm } from "../context/ConfirmContext";
 import * as stateApi from "../api/state";
 import { CheckInModal } from "../dashboard/CheckInModal";
+import { FirstMapCard } from "../dashboard/FirstMapCard";
+import { firstTemplateMap } from "../dashboard/firstMap";
 import { MenuNode } from "../dashboard/MenuNode";
 import type { MenuGhost } from "../dashboard/MenuNode";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
@@ -139,6 +141,8 @@ export function DashboardPage() {
 
   // The Inbox quick notes land in, and how many of them still wait to be sorted (InboxTray).
   const inbox = user ? findInbox(maps, user._id, t.dashboard.quickNote.inboxName) : null;
+  // Their first map made from a template goes on top, the latest thoughts right under it (FirstMapCard).
+  const firstMap = user && !loading ? firstTemplateMap(maps, user._id, inbox?.mapId ?? null) : null;
 
   const openFolder = folders.find((f) => f.folderId === openFolderId) ?? null;
   const items = useMemo(() => libraryItems(maps, folders, openFolderId, query), [maps, folders, openFolderId, query]);
@@ -308,6 +312,8 @@ export function DashboardPage() {
           </div>
         )}
       </div>
+
+      {firstMap && !query.trim() && <FirstMapCard map={firstMap} inbox={inbox} />}
 
       <div className="lg:grid lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] lg:items-start lg:gap-8">
         {desktop ? (

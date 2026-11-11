@@ -1102,6 +1102,14 @@ const translation: Translation = {
       foldersError: "Не вдалося завантажити папки",
       deleteMapError: "Не вдалося видалити карту",
       resume: { title: "Продовжте з того місця, де зупинилися", open: "Відкрити" },
+      firstMap: {
+        title: "Ваша карта",
+        open: "Відкрити карту",
+        latest: "Останні думки",
+        none: "Поки нічого не написано. Відкрийте карту й дайте відповіді на її запитання.",
+        inMap: (mapName) => `у «${mapName}»`,
+        error: "Не вдалося завантажити думки цієї карти",
+      },
       folderMenu: { open: "Відкрити", rename: "Перейменувати", delete: "Видалити" },
       deleteFolderConfirm: (name) => `Видалити папку «${name}»? Карти з неї залишаться — повернуться в Усі карти.`,
       folderModal: {

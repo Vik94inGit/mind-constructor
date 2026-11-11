@@ -94,6 +94,8 @@ export interface Translation {
       foldersError: string;
       deleteMapError: string;
       resume: { title: string; open: string };
+      /** The first map made from a template, on top of the dashboard, with the latest thoughts under it (dashboard/FirstMapCard.tsx). */
+      firstMap: { title: string; open: string; latest: string; none: string; inMap: (mapName: string) => string; error: string };
       folderMenu: { open: string; rename: string; delete: string };
       deleteFolderConfirm: (name: string) => string;
       folderModal: {
@@ -315,6 +317,14 @@ const en: Translation = {
       foldersError: "Failed to load folders",
       deleteMapError: "Couldn't delete the map",
       resume: { title: "Continue where you left off", open: "Open" },
+      firstMap: {
+        title: "Your map",
+        open: "Open map",
+        latest: "Latest thoughts",
+        none: "Nothing written yet. Open the map and answer its questions.",
+        inMap: (mapName) => `in “${mapName}”`,
+        error: "Couldn't load this map's thoughts",
+      },
       folderMenu: { open: "Open", rename: "Rename", delete: "Delete" },
       deleteFolderConfirm: (name) => `Delete folder "${name}"? The maps in it stay — they go back to All maps.`,
       folderModal: {
