@@ -22,7 +22,7 @@ function setup(nodes: NodeDoc[], edges: EdgeDoc[] = []) {
     upsertEdge: vi.fn(),
     refreshInsights: vi.fn(),
     setActionError: vi.fn(),
-    setContextMenu: vi.fn(),
+    closeMenu: vi.fn(),
     setPendingLink: vi.fn(),
     linkFailedMessage: "link failed",
   };

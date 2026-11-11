@@ -32,7 +32,7 @@ function setup(mode: CanvasMode, opts: { owner?: (id: string) => boolean } = {})
     upsertEdge: vi.fn(),
     refreshInsights: vi.fn(),
     setActionError: vi.fn(),
-    setContextMenu: vi.fn(),
+    closeMenu: vi.fn(),
     setSelectedId: vi.fn(),
     setMultiSelectIds: vi.fn(),
     t,
@@ -48,7 +48,7 @@ describe("useReparent", () => {
     const { result, params } = setup({ kind: "none" });
     act(() => result.current.startReparent(makeNode({ nodeId: "child" })));
     expect(params.setSelectedId).toHaveBeenCalledWith(null);
-    expect(params.setContextMenu).toHaveBeenCalledWith(null);
+    expect(params.closeMenu).toHaveBeenCalled();
     expect(params.dispatchMode).toHaveBeenCalledWith({ type: "reparentStart", childId: "child" });
   });
 

@@ -20,8 +20,7 @@ function setup(overrides: Partial<Parameters<typeof useLineDrawing>[0]> = {}) {
   const setActionError = vi.fn();
   const setSelectedId = vi.fn();
   const setMultiSelectIds = vi.fn();
-  const setContextMenu = vi.fn();
-  const setCanvasContextMenu = vi.fn();
+  const closeMenu = vi.fn();
   const setPendingCreate = vi.fn();
 
   const { result } = renderHook(() =>
@@ -43,8 +42,7 @@ function setup(overrides: Partial<Parameters<typeof useLineDrawing>[0]> = {}) {
       screenToCanvas: (x, y) => ({ x, y }),
       setSelectedId,
       setMultiSelectIds,
-      setContextMenu,
-      setCanvasContextMenu,
+      closeMenu,
       setPendingCreate,
       currentUserId: "me",
       mapOwnerId: "owner",
@@ -63,8 +61,7 @@ function setup(overrides: Partial<Parameters<typeof useLineDrawing>[0]> = {}) {
     setActionError,
     setSelectedId,
     setMultiSelectIds,
-    setContextMenu,
-    setCanvasContextMenu,
+    closeMenu,
     setPendingCreate,
   };
 }
@@ -80,13 +77,12 @@ describe("useLineDrawing", () => {
 
   describe("toggleDrawMode / exitDrawMode", () => {
     it("closes every other panel/menu and starts drawing when not already in draw mode", () => {
-      const { result, dispatchMode, setSelectedId, setMultiSelectIds, setContextMenu, setCanvasContextMenu, setPendingCreate } =
+      const { result, dispatchMode, setSelectedId, setMultiSelectIds, closeMenu, setPendingCreate } =
         setup({ drawMode: false });
       act(() => result.current.toggleDrawMode());
       expect(setSelectedId).toHaveBeenCalledWith(null);
       expect(setMultiSelectIds).toHaveBeenCalledWith(new Set());
-      expect(setContextMenu).toHaveBeenCalledWith(null);
-      expect(setCanvasContextMenu).toHaveBeenCalledWith(null);
+      expect(closeMenu).toHaveBeenCalled();
       expect(setPendingCreate).toHaveBeenCalledWith(null);
       expect(dispatchMode).toHaveBeenCalledWith({ type: "drawStart" });
     });
