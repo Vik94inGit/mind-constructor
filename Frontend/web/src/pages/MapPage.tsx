@@ -430,6 +430,15 @@ export function MapPage() {
   // Nodes glide to a changed resting spot instead of jumping — see posFor.
   const glide = usePositionGlide(positions);
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
+  // A tap or click on a node only picks it (highlighted, centered, its ring of
+  // ghosts up); its panel waits for a second tap, a double-tap, or the node's
+  // menu (docs/gestures/tap-picks-node.md). Anything else that picks a node —
+  // the reading arrows, search, creating one — opens the panel as before.
+  const [panelHiddenFor, setPanelHiddenFor] = useState<string | null>(null);
+  useEffect(() => {
+    setPanelHiddenFor((prev) => (prev === selectedId ? prev : null));
+  }, [selectedId]);
+  const panelNode = selectedNode && panelHiddenFor !== selectedNode.nodeId ? selectedNode : null;
   // ?node=<id> (a search result on the dashboard): the map opens on that node.
   const [searchParams] = useSearchParams();
   const focusNodeId = searchParams.get("node");
@@ -437,7 +446,7 @@ export function MapPage() {
   // third (half on mobile) of the screen while it's open. Skipped for the
   // group-selection footer (multiSelectIds), which is a slim bar, not a tall
   // sheet.
-  const sheetOpen = chooseMode || packMode || reparentMode || !!pendingCreate || (!!selectedNode && multiSelectIds.size === 0);
+  const sheetOpen = chooseMode || packMode || reparentMode || !!pendingCreate || (!!panelNode && multiSelectIds.size === 0);
   // Where the map opens: back at the spot left last time when that spot
   // shows a node, else on the map's first parent (utils/openingFocus.ts),
   // never on empty canvas.
@@ -980,6 +989,7 @@ export function MapPage() {
     setPendingCreate(null);
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
     setSelectedId(node.nodeId);
+    setPanelHiddenFor(null);
     centerOnNode(node.nodeId);
     if (!canEditNode(node)) return;
     await ensureNodeText([node.nodeId]);
@@ -1050,7 +1060,24 @@ export function MapPage() {
       openPictureView(node);
       return;
     }
+    // The first tap picks the node; a tap on the node already picked opens it.
+    const opening = node.nodeId === selectedId;
     selectNodeFromClick(node);
+    setPanelHiddenFor(opening ? null : node.nodeId);
+  }
+
+  // Opens a node's panel on purpose (its menu's Edit), not just picking it.
+  function openNode(node: NodeDoc) {
+    setContextMenu(null);
+    if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
+    selectNodeFromClick(node);
+    setPanelHiddenFor(null);
+  }
+
+  // Closing a node's pictures leaves it picked, not opened.
+  function pickNodeQuietly(node: NodeDoc) {
+    selectNodeFromClick(node);
+    setPanelHiddenFor(node.nodeId);
   }
 
   // Replaying the map from its first node — see hooks/useTimeLapse.ts.
@@ -1106,7 +1133,7 @@ export function MapPage() {
   }
 
   // A node's pictures, full size before its panel — see hooks/usePictureView.ts.
-  const { pictureView, openPictureView, closePictureView, clearPictureView } = usePictureView(nodes, selectNodeFromClick);
+  const { pictureView, openPictureView, closePictureView, clearPictureView } = usePictureView(nodes, pickNodeQuietly);
 
   function selectNodeFromClick(node: NodeDoc) {
     setSelectedId(node.nodeId);
@@ -1263,11 +1290,14 @@ export function MapPage() {
   // node (see canAttackNode).
   function handleNodeContextMenu(node: NodeDoc, e: ReactMouseEvent) {
     const own = isOwnNode(node);
+    // The menu picks the node without opening its panel; the menu's Edit
+    // opens it (and a node with no menu just opens).
     if (!own && !canAttackNode(node)) {
       setContextMenu(null);
       setSelectedId(node.nodeId);
       return;
     }
+    if (node.nodeId !== selectedId) setPanelHiddenFor(node.nodeId);
     setSelectedId(node.nodeId);
     setContextMenu({ node, x: e.clientX, y: e.clientY });
   }
@@ -2347,6 +2377,7 @@ export function MapPage() {
           // case anything else (e.g. a queued search-result pick) ever
           // re-selects a node while presenting.
           !presenting &&
+          panelNode &&
           selectedNode &&
           user && (
             <>
@@ -2557,7 +2588,7 @@ export function MapPage() {
             setContextMenu(null);
             startBranchOf(anchor);
           }}
-          onEdit={() => handleNodeClick(contextMenu.node)}
+          onEdit={() => openNode(contextMenu.node)}
           onChangeType={(type) => handleChangeNodeType(contextMenu.node, type)}
           onDelete={() => {
             const node = contextMenu.node;
