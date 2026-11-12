@@ -4,6 +4,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { buildTreeExport } from "../utils/textExport";
 import type { NodeDoc } from "../types";
 import { feature } from "../utils/usage";
+import { ErrorBanner } from "./ErrorBanner";
 
 interface Props {
   mapName: string;
@@ -55,9 +56,7 @@ export function ExportTextModal({ mapName, nodes, positions, onClose }: Props) {
 
   return (
     <Modal title={t.ui.exportText.title(mapName)} onClose={onClose}>
-      {copyError && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{copyError}</div>
-      )}
+      <ErrorBanner message={copyError} />
       <textarea
         readOnly
         value={text}

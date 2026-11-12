@@ -204,10 +204,11 @@ export function MapPage() {
   // The time-lapse (TimeLapseBar): how many nodes, oldest first, are shown,
   // and whether it's playing. `null` when it's off.
   const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
-  // The opponent's turn (SiegePanel) is open — discussion mode only.
-  const [siegeOpen, setSiegeOpen] = useState(false);
-  // The discussion's history of changes (HistoryPanel) is open.
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // The discussion's side panel: its history of changes (HistoryPanel) or the
+  // opponent's turn (SiegePanel), discussion mode only. One value, so opening
+  // one closes the other.
+  const [sidePanel, setSidePanel] = useState<"history" | "siege" | null>(null);
+  const closeSiege = () => setSidePanel((p) => (p === "siege" ? null : p));
   // Every attack on the map, fetched when a replay starts, so the replay can
   // show health as it was at each step (utils/finish.ts healthAt).
   const [replayAttacks, setReplayAttacks] = useState<MapAttack[]>([]);
@@ -1090,7 +1091,7 @@ export function MapPage() {
       setSelectedId(null);
       setMultiSelectIds(new Set());
       clearPictureView();
-      setSiegeOpen(false);
+      closeSiege();
     },
   });
 
@@ -1569,7 +1570,7 @@ export function MapPage() {
     online,
     discussionOn,
     setActionError,
-    setSiegeOpen,
+    closeSiege,
     logout,
     t,
   });
@@ -1758,13 +1759,11 @@ export function MapPage() {
       }
       onHistory={() => {
         setSelectedId(null);
-        setSiegeOpen(false);
-        setHistoryOpen(true);
+        setSidePanel("history");
       }}
       onOpponentTurn={finish.isFinished ? undefined : () => {
         setSelectedId(null);
-        setHistoryOpen(false);
-        setSiegeOpen(true);
+        setSidePanel("siege");
       }}
       onExitDemo={exitDemo}
       onInvite={() => setShowInvite(true)}
@@ -2280,14 +2279,14 @@ export function MapPage() {
             onStepBy={stepTimeLapse}
             onExit={() => setTimeLapse(null)}
           />
-        ) : historyOpen && isDiscussionMode && mapId ? (
+        ) : sidePanel === "history" && isDiscussionMode && mapId ? (
           <HistoryPanel
             mapId={mapId}
             liveIds={new Set(nodes.map((n) => n.nodeId))}
             onShow={centerOnNode}
-            onExit={() => setHistoryOpen(false)}
+            onExit={() => setSidePanel(null)}
           />
-        ) : siegeOpen && isDiscussionMode && !finish.isFinished ? (
+        ) : sidePanel === "siege" && isDiscussionMode && !finish.isFinished ? (
           <SiegePanel
             holds={holds}
             nodes={nodes}
@@ -2298,11 +2297,11 @@ export function MapPage() {
             }}
             onFocus={centerOnNode}
             onStrikeBack={(id) => {
-              setSiegeOpen(false);
+              closeSiege();
               setSelectedId(id);
               centerOnNode(id);
             }}
-            onExit={() => setSiegeOpen(false)}
+            onExit={() => setSidePanel(null)}
           />
         ) : drawMode ? (
           <DrawLineBar

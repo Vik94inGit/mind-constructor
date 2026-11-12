@@ -7,6 +7,7 @@ import { primaryBtn } from "../dashboard/FolderModal";
 import { useI18n } from "../i18n/I18nContext";
 import { moveNoteToMap, moveTargets } from "../utils/inbox";
 import type { MapDoc } from "../types";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // The cards view's "Move N to another map" (utils/cardFit.ts): the top cards
 // past what fits the screen go, each with its branch, to a map picked here or
@@ -70,9 +71,7 @@ export function MoveCardsModal({
 
   return (
     <Modal title={c.moveTitle(rootIds.length)} onClose={onClose}>
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} />
       <button type="button" disabled={busy} className={`${primaryBtn} mb-3 w-full`} onClick={() => void moveTo(newMap)}>
         {c.newMap}
       </button>

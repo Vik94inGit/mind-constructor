@@ -8,6 +8,7 @@ import type { MapDoc, MapKind } from "../types";
 import { seedMapKind } from "../utils/seedMap";
 import { useI18n } from "../i18n/I18nContext";
 import { track } from "../utils/usage";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // Mirrors the backend's MAP_TEMPLATES keys (see abl/mapAbl.ts) — the
 // label/description pairs shown in CreateMapModal's "Starting point"
@@ -46,9 +47,7 @@ export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; on
 
   return (
     <Modal title={t.dashboard.createModal.title} onClose={onClose}>
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} />
       <form onSubmit={onSubmit}>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label htmlFor="map-name" className="text-[0.8rem] font-semibold text-ink-soft">

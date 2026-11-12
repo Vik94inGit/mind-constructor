@@ -6,6 +6,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { moveNoteToMap, moveTargets } from "../utils/inbox";
 import type { MapDoc, NodeDoc } from "../types";
 import { MapTargetList } from "./MapTargetList";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // "Move to a map" on an Inbox note: pick the map, one tap moves the note (and
 // anything hanging from it) there. `maps` is the dashboard's list when it has
@@ -57,9 +58,7 @@ export function MoveNoteModal({
   return (
     <Modal title={s.moveTitle} onClose={onClose}>
       <p className="mb-3 line-clamp-3 text-[0.85rem] text-ink-soft">{noteText.trim() || s.untitled}</p>
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} />
       <MapTargetList
         list={list}
         targets={targets}
