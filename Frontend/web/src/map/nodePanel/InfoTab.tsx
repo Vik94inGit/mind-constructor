@@ -81,6 +81,8 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
   const [overflow, setOverflow] = useState<string | null>(null);
   const [carrying, setCarrying] = useState(false);
   useEffect(() => setOverflow(null), [node.nodeId]);
+  // What saving would change (NodePanel's saveField skips empty or unchanged text).
+  const textChanged = textDraft.trim() !== "" && textDraft.trim() !== node.text;
   return (
     <div className="mt-2">
       {/* The node's title, when it has one — read-only here for
@@ -209,12 +211,28 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
         >
           {expanded ? t.ui.node.collapse : t.ui.node.expand}
         </button>
-        {isCreator && (
+        {isCreator && !textLocked && (
+          // Edit, then confirm: before any change it puts the cursor in the
+          // text; once the text differs from what's saved it becomes "Save
+          // change", which saves and closes the panel like Enter does — the
+          // one way to confirm an edit on a phone, where Enter is a newline.
           <button
-            className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={() => textareaRef.current?.focus()}
+            type="button"
+            data-text-edit
+            className={`inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold transition-[background-color,border-color,opacity] duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50 ${
+              textChanged ? "border-accent bg-accent text-white enabled:hover:opacity-90" : "border-line bg-surface text-ink enabled:hover:bg-surface-2"
+            }`}
+            // Keeps the text box from blurring first: its blur would save and
+            // lock the buttons mid-tap, losing the click.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              if (textChanged) void onTextSave().then((ok) => ok && onClose());
+              else textareaRef.current?.focus();
+            }}
+            disabled={busy && textChanged}
+            title={textChanged ? t.ui.node.saveTextTitle : undefined}
           >
-            {t.ui.common.edit}
+            {textChanged ? t.ui.node.saveText : t.ui.common.edit}
           </button>
         )}
         <button

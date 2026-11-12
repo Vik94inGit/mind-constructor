@@ -193,6 +193,9 @@ export interface UiStrings {
     orderBadge: (order: number) => string;
     edit: string;
     editTitle: string;
+    /** Info tab: the Edit button once the text has changed — saves it. */
+    saveText: string;
+    saveTextTitle: string;
     pack: string;
     packTitle: string;
     size: string;
@@ -949,6 +952,8 @@ const en: UiStrings = {
     orderBadge: (n) => `Step ${n}`,
     edit: "Edit",
     editTitle: "Open the canvas's own inline editor (text + type)",
+    saveText: "Save change",
+    saveTextTitle: "Save the edited text",
     pack: "Pack…",
     packTitle: "Fold other linked/branched nodes into this one",
     size: "Size:",

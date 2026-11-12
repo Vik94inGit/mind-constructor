@@ -173,6 +173,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   the same marking step on the node's own text; each piece becomes a node hanging from it, placed
   beside it. By default the node keeps only the text no piece took (`utils/textSplit.ts`
   `textWithoutPieces`), or the whole text when that box is unticked or nothing would be left.
+- **Edit, then Save change** — under the text in the node panel's Info tab, **Edit** puts the cursor
+  in the text; as soon as the text differs from what's saved the same button reads **Save change**,
+  and pressing it saves the edit and closes the panel, like Enter on a computer. It's the way to
+  confirm an edit on a phone, where Enter adds a new line (`src/map/nodePanel/InfoTab.tsx`).
 - **Pictures on nodes** — the node panel's Info tab shows the text and its pictures in one box, like
   a post: screenshots pasted with Ctrl+V, images dropped on the box or picked with its 🖼️ button land
   under the text; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in

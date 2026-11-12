@@ -458,6 +458,8 @@ const ui: UiStrings = {
     orderBadge: (n) => `Krok ${n}`,
     edit: "Upravit",
     editTitle: "Otevřít vestavěný editor na plátně (text + typ)",
+    saveText: "Uložit změnu",
+    saveTextTitle: "Uložit upravený text",
     pack: "Sbalit…",
     packTitle: "Sbalit do tohoto uzlu další propojené nebo navazující uzly",
     size: "Velikost:",
