@@ -431,8 +431,10 @@ export const setLockedNodesDao = async (
 // Takes the map's internal _id (not the public mapId) — the caller is
 // expected to have already looked the map up, e.g. as part of a membership
 // check, rather than this doing a second lookup of its own.
+// Only ever asked "are there none yet?" (createNodeAbl's first-node check),
+// so it stops at the first node: 0 or 1, however big the map is.
 export const countNodesByMapInternalIdDao = async (mapInternalId: MapInternalId) => {
-  return await Node.countDocuments({ mapId: mapInternalId });
+  return await Node.countDocuments({ mapId: mapInternalId }, { limit: 1 });
 };
 
 // Minimal projection for translating internal _ids back to public nodeIds —

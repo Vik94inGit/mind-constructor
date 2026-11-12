@@ -201,6 +201,25 @@ export function resolveId(id: string): string {
   return idMap[id] ?? id;
 }
 
+/**
+ * A temporary id the map showed while its create was still on its way (see
+ * useNodeCreation) now has its real one: later requests naming the temporary
+ * id go to the real one, and the node isn't taken for one that left the map.
+ */
+export function noteSaved(localId: string, realId: string): void {
+  shownAs.set(realId, localId);
+  void rememberIdMapping(localId, realId);
+}
+
+// Saved node → the temporary id it was first shown under (noteSaved), for
+// this page only: lets the canvas keep drawing it as the same card.
+const shownAs = new Map<string, string>();
+
+/** The temporary id a node saved from this page was first shown under, if any. */
+export function firstShownAs(realId: string): string | undefined {
+  return shownAs.get(realId);
+}
+
 /** Swaps every already-known temporary id in a path. */
 export function remapPath(path: string): string {
   return path.replace(LOCAL_ID_RE, (id) => idMap[id] ?? id);

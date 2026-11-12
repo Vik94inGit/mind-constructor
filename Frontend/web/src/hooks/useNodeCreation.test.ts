@@ -7,7 +7,12 @@ import { TRANSLATIONS } from "../i18n/translations";
 import { FULL_CANVAS_BOUNDS } from "../utils/canvasLayout";
 import type { NodeDoc } from "../types";
 
-vi.mock("../api/nodes", () => ({ createNode: vi.fn(), packNodes: vi.fn(), updateNode: vi.fn() }));
+vi.mock("../api/nodes", async (importOriginal) => ({
+  draftNode: (await importOriginal<typeof import("../api/nodes")>()).draftNode,
+  createNode: vi.fn(),
+  packNodes: vi.fn(),
+  updateNode: vi.fn(),
+}));
 import * as nodesApi from "../api/nodes";
 vi.mock("../utils/sleep", () => ({ sleep: () => Promise.resolve() }));
 import { PICTURES } from "../utils/pictures";
@@ -31,6 +36,7 @@ function setup(pendingCreate: PendingCreate | null = null, overrides: Partial<Pa
     showPoints: vi.fn(),
     showNotice: vi.fn(),
     onCreated: vi.fn(),
+    replaceNode: vi.fn(),
     t: TRANSLATIONS.en,
     ...overrides,
   };
@@ -53,9 +59,41 @@ describe("useNodeCreation", () => {
     const { result, params } = setup({ x: 10, y: 20, type: "Problem", parentId: "p" });
     await act(() => result.current.confirmPendingCreate("Hello", "Option"));
     expect(nodesApi.createNode).toHaveBeenCalledWith("m1", { text: "Hello", type: "Option", x: 10, y: 20, parentId: "p" });
-    expect(params.upsertNode).toHaveBeenCalled();
-    expect(params.onCreated).toHaveBeenCalledWith(expect.objectContaining({ nodeId: "n1" }), { x: 10, y: 20 });
+    expect(params.onCreated).toHaveBeenCalledWith(expect.objectContaining({ text: "Hello", x: 10, y: 20 }), { x: 10, y: 20 });
     expect(params.setPendingCreate).toHaveBeenCalledWith(null);
+    expect(params.replaceNode).toHaveBeenCalledWith(expect.stringMatching(/^local_/), expect.objectContaining({ nodeId: "n1" }));
+  });
+
+  it("shows the node and closes the panel before the server answers", async () => {
+    let answer: (node: NodeDoc) => void = () => {};
+    vi.mocked(nodesApi.createNode).mockImplementationOnce(() => new Promise<NodeDoc>((resolve) => (answer = resolve)));
+    const { result, params } = setup({ x: 10, y: 20, type: "Idea", parentId: null, emoji: "🙂" });
+    let done: Promise<void> = Promise.resolve();
+    act(() => {
+      done = result.current.confirmPendingCreate("Quick", "Idea");
+    });
+    // Nothing back from the server yet, and the node is already on the map.
+    const draft = vi.mocked(params.upsertNode).mock.calls[0][0] as NodeDoc;
+    expect(draft).toMatchObject({ text: "Quick", type: "Idea", x: 10, y: 20, emoji: "🙂", parentId: null });
+    expect(draft.nodeId).toMatch(/^local_/);
+    expect(params.setPendingCreate).toHaveBeenCalledWith(null);
+    expect(params.onCreated).toHaveBeenCalled();
+    expect(params.replaceNode).not.toHaveBeenCalled();
+    // The saved node takes the draft's place.
+    await act(async () => {
+      answer(makeNode({ nodeId: "saved", text: "Quick", type: "Idea" }) as NodeDoc);
+      await done;
+    });
+    expect(params.replaceNode).toHaveBeenCalledWith(draft.nodeId, expect.objectContaining({ nodeId: "saved" }));
+  });
+
+  it("takes the draft away and shows the error when the server refuses", async () => {
+    vi.mocked(nodesApi.createNode).mockRejectedValueOnce(new Error("nope"));
+    const { result, params } = setup({ x: 1, y: 2, type: "Idea", parentId: null });
+    await act(() => result.current.confirmPendingCreate("Lost", "Idea"));
+    const draft = vi.mocked(params.upsertNode).mock.calls[0][0] as NodeDoc;
+    expect(params.replaceNode).toHaveBeenCalledWith(draft.nodeId, null);
+    expect(params.setActionError).toHaveBeenLastCalledWith(TRANSLATIONS.en.ui.errors.createNode);
   });
 
   it("carries a long text on into numbered children of the first node, clear of its card", async () => {
