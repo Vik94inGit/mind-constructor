@@ -100,6 +100,32 @@ describe("NodePanel", () => {
     expect(props.onClose).toHaveBeenCalled();
   });
 
+  it("turns Edit into Save change once the text is edited, and saves on it", async () => {
+    const user = userEvent.setup();
+    const updated = makeNode({ nodeId: "a", text: "The claim, edited" });
+    vi.mocked(nodesApi.updateNode).mockClear();
+    vi.mocked(nodesApi.updateNode).mockResolvedValue(updated);
+    const props = renderPanel();
+    expect(screen.getByRole("button", { name: en.ui.common.edit })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.ui.node.saveText })).toBeNull();
+    await user.type(screen.getByDisplayValue("The claim"), ", edited");
+    await user.click(screen.getByRole("button", { name: en.ui.node.saveText }));
+    expect(nodesApi.updateNode).toHaveBeenCalledTimes(1);
+    expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { text: "The claim, edited" });
+    expect(props.onUpdated).toHaveBeenCalledWith(updated);
+    expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it("keeps Edit, putting the cursor in the text, while nothing has changed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(nodesApi.updateNode).mockClear();
+    const props = renderPanel();
+    await user.click(screen.getByRole("button", { name: en.ui.common.edit }));
+    expect(screen.getByDisplayValue("The claim")).toHaveFocus();
+    expect(nodesApi.updateNode).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
   it("shows each tab's content", async () => {
     const user = userEvent.setup();
     renderPanel();
