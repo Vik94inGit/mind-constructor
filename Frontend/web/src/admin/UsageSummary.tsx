@@ -5,6 +5,7 @@ import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
 import { browserOptedOut } from "../utils/usage";
 import { featureRows } from "./featureRows";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 const WINDOWS = [7, 30, 90] as const;
 
@@ -75,7 +76,7 @@ export function UsageSummary() {
       {browserOptedOut() && (
         <div className="mb-3 rounded-lg bg-accent-soft px-[0.9rem] py-[0.6rem] text-[0.82rem] text-accent-ink">{s.optedOut}</div>
       )}
-      {error && <div className="mb-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>}
+      <ErrorBanner message={error} className="mb-3" />
       {!summary && !error && <div className="p-6 text-center text-ink-soft">{s.loading}</div>}
 
       {summary && (

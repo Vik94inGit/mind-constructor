@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { MAP_VIEWS } from "../utils/viewPrompt";
 import type { MapView } from "../utils/viewPrompt";
+import { useDismiss } from "../hooks/useDismiss";
 
 interface Props {
   minimapShown: boolean;
@@ -55,21 +56,7 @@ export function ViewCorner({ minimapShown, onToggleMinimap, view, onViewChange, 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [open]);
+  useDismiss(ref, () => setOpen(false), { enabled: open });
 
   return (
     // With the minimap shown it takes the corner itself (~122px tall with its

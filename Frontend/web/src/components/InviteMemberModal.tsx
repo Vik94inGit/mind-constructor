@@ -6,6 +6,7 @@ import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
 import type { MapDoc, UserSearchResult } from "../types";
 import { track } from "../utils/usage";
+import { ErrorBanner } from "./ErrorBanner";
 
 // How long typing has to pause before the search goes out — one request per
 // word typed, not one per keystroke.
@@ -84,7 +85,7 @@ export function InviteMemberModal({
 
   return (
     <Modal title={t.ui.invite.title(map.name)} onClose={onClose}>
-      {error && <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>}
+      <ErrorBanner message={error} />
       {success && (
         <div className="mb-4 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">{success}</div>
       )}

@@ -25,6 +25,7 @@ import { usePackMode } from "../hooks/usePackMode";
 import type { PendingCreate } from "../hooks/useNodeCreation";
 import { useCanvasViewport } from "../hooks/useCanvasViewport";
 import { useCanvasMode } from "../hooks/useCanvasMode";
+import { useCanvasMenu } from "../hooks/useCanvasMenu";
 import { useZoneGroups } from "../hooks/useZoneGroups";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
@@ -203,10 +204,11 @@ export function MapPage() {
   // The time-lapse (TimeLapseBar): how many nodes, oldest first, are shown,
   // and whether it's playing. `null` when it's off.
   const [timeLapse, setTimeLapse] = useState<{ step: number; playing: boolean } | null>(null);
-  // The opponent's turn (SiegePanel) is open — discussion mode only.
-  const [siegeOpen, setSiegeOpen] = useState(false);
-  // The discussion's history of changes (HistoryPanel) is open.
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // The discussion's side panel: its history of changes (HistoryPanel) or the
+  // opponent's turn (SiegePanel), discussion mode only. One value, so opening
+  // one closes the other.
+  const [sidePanel, setSidePanel] = useState<"history" | "siege" | null>(null);
+  const closeSiege = () => setSidePanel((p) => (p === "siege" ? null : p));
   // Every attack on the map, fetched when a replay starts, so the replay can
   // show health as it was at each step (utils/finish.ts healthAt).
   const [replayAttacks, setReplayAttacks] = useState<MapAttack[]>([]);
@@ -294,17 +296,8 @@ export function MapPage() {
   const [movingNote, setMovingNote] = useState<NodeDoc | null>(null);
   const [celebrateIds, setCelebrateIds] = useState<Set<string>>(new Set());
   const { shotState, triggerWeaponShot } = useWeaponReplay();
-  const [contextMenu, setContextMenu] = useState<{ node: NodeDoc; x: number; y: number } | null>(null);
-  // A zone's pattern/colour menu (right-click or hold on the zone, CanvasBackdrop's onZoneMenu).
-  const [zoneMenu, setZoneMenu] = useState<{ rootId: string; x: number; y: number } | null>(null);
-  // Right-click on empty canvas: the new-node menu, at screen coordinates
-  // (the menu) and canvas ones (where the node goes).
-  const [canvasContextMenu, setCanvasContextMenu] = useState<{
-    screenX: number;
-    screenY: number;
-    canvasX: number;
-    canvasY: number;
-  } | null>(null);
+  // The node, zone and canvas menus: one open at a time (hooks/useCanvasMenu.ts).
+  const { nodeMenu, zoneMenu, canvasMenu, openMenu, closeMenu } = useCanvasMenu();
   // Which node currently has its caption swapped for an inline text input —
   // see startInlineEdit. Null means no node is being edited.
   const [inlineEditId, setInlineEditId] = useState<string | null>(null);
@@ -785,7 +778,7 @@ export function MapPage() {
     upsertEdge,
     refreshInsights,
     setActionError,
-    setContextMenu,
+    closeMenu,
     setPendingLink,
     linkFailedMessage: t.ui.link.failed,
     isDetached: (id) => !!detachedPieces[id],
@@ -877,7 +870,7 @@ export function MapPage() {
       if (!isOwnNode(node) || !drawnAsCard(node)) return false;
       suppressNextClick.current = true;
       setSelectedId(node.nodeId);
-      setContextMenu({ node, x: clientX, y: clientY });
+      openMenu({ kind: "node", node, x: clientX, y: clientY });
       return true;
     },
     isBlockLocked: (id) => !!blockLocks[id],
@@ -900,7 +893,7 @@ export function MapPage() {
     upsertEdge,
     refreshInsights,
     setActionError,
-    setContextMenu,
+    closeMenu,
     setSelectedId,
     setMultiSelectIds,
     t,
@@ -985,7 +978,7 @@ export function MapPage() {
   // message if needed) and, when allowed, opens it on its text field
   // (NodePanel's autoFocusText). From a double-click or the panel's Edit.
   async function startInlineEdit(node: NodeDoc) {
-    setContextMenu(null);
+    closeMenu();
     setPendingCreate(null);
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
     setSelectedId(node.nodeId);
@@ -997,7 +990,7 @@ export function MapPage() {
   }
 
   function handleNodeClick(node: NodeDoc, shiftKey = false) {
-    setContextMenu(null);
+    closeMenu();
     // The time-lapse is only for watching; its nodes can't be opened.
     if (timeLapse) return;
     // While drawing a line a node is just something in the way (a click on it
@@ -1068,7 +1061,7 @@ export function MapPage() {
 
   // Opens a node's panel on purpose (its menu's Edit), not just picking it.
   function openNode(node: NodeDoc) {
-    setContextMenu(null);
+    closeMenu();
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
     selectNodeFromClick(node);
     setPanelHiddenFor(null);
@@ -1098,7 +1091,7 @@ export function MapPage() {
       setSelectedId(null);
       setMultiSelectIds(new Set());
       clearPictureView();
-      setSiegeOpen(false);
+      closeSiege();
     },
   });
 
@@ -1212,10 +1205,8 @@ export function MapPage() {
   const canvasHold = useCanvasHoldMenu((clientX, clientY) => {
     setSelectedId(null);
     setMultiSelectIds(new Set());
-    setContextMenu(null);
-    setZoneMenu(null);
     const at = screenToCanvas(clientX, clientY);
-    setCanvasContextMenu({ screenX: clientX, screenY: clientY, canvasX: at.x, canvasY: at.y });
+    openMenu({ kind: "canvas", screenX: clientX, screenY: clientY, canvasX: at.x, canvasY: at.y });
   });
   function onCanvasPointerDownWithHold(e: ReactPointerEvent<HTMLDivElement>) {
     canvasHold.start(
@@ -1246,8 +1237,7 @@ export function MapPage() {
     const root = zoneRootId ? nodes.find((n) => n.nodeId === zoneRootId) : undefined;
     setSelectedId(null);
     setMultiSelectIds(new Set());
-    setContextMenu(null);
-    setCanvasContextMenu(null);
+    closeMenu();
     // Saved straight away and opened (panel + ring of ghosts), with no
     // text field, so a phone's keyboard stays down.
     void createBlankNodeAt(screenToCanvas(clientX, clientY), root && isOwnNode(root) ? root.nodeId : null).then((node) => {
@@ -1267,10 +1257,9 @@ export function MapPage() {
       return;
     }
     setSelectedId(null);
-    setContextMenu(null);
     setMultiSelectIds(new Set());
     const canvasPos = screenToCanvas(e.clientX, e.clientY);
-    setCanvasContextMenu({ screenX: e.clientX, screenY: e.clientY, canvasX: canvasPos.x, canvasY: canvasPos.y });
+    openMenu({ kind: "canvas", screenX: e.clientX, screenY: e.clientY, canvasX: canvasPos.x, canvasY: canvasPos.y });
   }
 
   // Rubber-band (marquee) select on empty canvas — see
@@ -1293,13 +1282,13 @@ export function MapPage() {
     // The menu picks the node without opening its panel; the menu's Edit
     // opens it (and a node with no menu just opens).
     if (!own && !canAttackNode(node)) {
-      setContextMenu(null);
+      closeMenu();
       setSelectedId(node.nodeId);
       return;
     }
     if (node.nodeId !== selectedId) setPanelHiddenFor(node.nodeId);
     setSelectedId(node.nodeId);
-    setContextMenu({ node, x: e.clientX, y: e.clientY });
+    openMenu({ kind: "node", node, x: e.clientX, y: e.clientY });
   }
 
   // An attack landed, from a node's panel or the opponent's turn.
@@ -1446,8 +1435,7 @@ export function MapPage() {
     screenToCanvas,
     setSelectedId,
     setMultiSelectIds,
-    setContextMenu,
-    setCanvasContextMenu,
+    closeMenu,
     setPendingCreate,
     currentUserId: user?._id,
     mapOwnerId: map?.ownerId,
@@ -1582,7 +1570,7 @@ export function MapPage() {
     online,
     discussionOn,
     setActionError,
-    setSiegeOpen,
+    closeSiege,
     logout,
     t,
   });
@@ -1771,13 +1759,11 @@ export function MapPage() {
       }
       onHistory={() => {
         setSelectedId(null);
-        setSiegeOpen(false);
-        setHistoryOpen(true);
+        setSidePanel("history");
       }}
       onOpponentTurn={finish.isFinished ? undefined : () => {
         setSelectedId(null);
-        setHistoryOpen(false);
-        setSiegeOpen(true);
+        setSidePanel("siege");
       }}
       onExitDemo={exitDemo}
       onInvite={() => setShowInvite(true)}
@@ -1897,11 +1883,7 @@ export function MapPage() {
             {view !== "cards" && <PictureLayer pictures={pictures} posFor={posFor} />}
             <CanvasBackdrop
               replaying={!!timeLapse}
-              onZoneMenu={(rootId, x, y) => {
-                setContextMenu(null);
-                setCanvasContextMenu(null);
-                setZoneMenu({ rootId, x, y });
-              }}
+              onZoneMenu={(rootId, x, y) => openMenu({ kind: "zone", rootId, x, y })}
               nodeGroups={nodeGroups}
               selectedCircle={map?.selectedCircle}
               focusedZones={activeFocusedZones}
@@ -2297,14 +2279,14 @@ export function MapPage() {
             onStepBy={stepTimeLapse}
             onExit={() => setTimeLapse(null)}
           />
-        ) : historyOpen && isDiscussionMode && mapId ? (
+        ) : sidePanel === "history" && isDiscussionMode && mapId ? (
           <HistoryPanel
             mapId={mapId}
             liveIds={new Set(nodes.map((n) => n.nodeId))}
             onShow={centerOnNode}
-            onExit={() => setHistoryOpen(false)}
+            onExit={() => setSidePanel(null)}
           />
-        ) : siegeOpen && isDiscussionMode && !finish.isFinished ? (
+        ) : sidePanel === "siege" && isDiscussionMode && !finish.isFinished ? (
           <SiegePanel
             holds={holds}
             nodes={nodes}
@@ -2315,11 +2297,11 @@ export function MapPage() {
             }}
             onFocus={centerOnNode}
             onStrikeBack={(id) => {
-              setSiegeOpen(false);
+              closeSiege();
               setSelectedId(id);
               centerOnNode(id);
             }}
-            onExit={() => setSiegeOpen(false)}
+            onExit={() => setSidePanel(null)}
           />
         ) : drawMode ? (
           <DrawLineBar
@@ -2531,77 +2513,77 @@ export function MapPage() {
 
       {pictureView && <PictureViewer key={pictureView.nodeId} images={pictureView.images} onClose={closePictureView} />}
 
-      {contextMenu && (
+      {nodeMenu && (
         <NodeContextMenu
           // Remounts fresh (back to the root menu, not stuck on whatever
           // submenu the previous node's menu was showing) whenever the
           // target node changes.
-          key={contextMenu.node.nodeId}
-          x={contextMenu.x}
-          y={contextMenu.y}
-          isOwner={isOwnNode(contextMenu.node)}
-          canAttack={canAttackNode(contextMenu.node)}
-          blockLocked={!!blockLocks[contextMenu.node.nodeId]}
-          onToggleBlockLock={isOwnNode(contextMenu.node) ? () => toggleBlockLock(contextMenu.node.nodeId) : undefined}
+          key={nodeMenu.node.nodeId}
+          x={nodeMenu.x}
+          y={nodeMenu.y}
+          isOwner={isOwnNode(nodeMenu.node)}
+          canAttack={canAttackNode(nodeMenu.node)}
+          blockLocked={!!blockLocks[nodeMenu.node.nodeId]}
+          onToggleBlockLock={isOwnNode(nodeMenu.node) ? () => toggleBlockLock(nodeMenu.node.nodeId) : undefined}
           puzzle={
-            isOwnNode(contextMenu.node) && drawnAsCard(contextMenu.node)
+            isOwnNode(nodeMenu.node) && drawnAsCard(nodeMenu.node)
               ? {
-                  detached: !!detachedPieces[contextMenu.node.nodeId],
-                  assembled: puzzleClusterFor(contextMenu.node).length > 1,
-                  onDetach: () => detachPieces([contextMenu.node.nodeId]),
-                  onTakeApart: () => detachPieces(puzzleClusterFor(contextMenu.node)),
-                  onAttach: () => attachPiece(contextMenu.node.nodeId),
+                  detached: !!detachedPieces[nodeMenu.node.nodeId],
+                  assembled: puzzleClusterFor(nodeMenu.node).length > 1,
+                  onDetach: () => detachPieces([nodeMenu.node.nodeId]),
+                  onTakeApart: () => detachPieces(puzzleClusterFor(nodeMenu.node)),
+                  onAttach: () => attachPiece(nodeMenu.node.nodeId),
                 }
               : undefined
           }
-          nodeType={contextMenu.node.type}
-          links={isOwnNode(contextMenu.node) ? nodeLinkItems(contextMenu.node) : undefined}
-          onRemoveAllLinks={() => void runUnlinks(nodeLinkActions(contextMenu.node))}
+          nodeType={nodeMenu.node.type}
+          links={isOwnNode(nodeMenu.node) ? nodeLinkItems(nodeMenu.node) : undefined}
+          onRemoveAllLinks={() => void runUnlinks(nodeLinkActions(nodeMenu.node))}
           zoneLayout={
-            nodes.some((n) => nodeRefId(n.parentId) === contextMenu.node.nodeId)
+            nodes.some((n) => nodeRefId(n.parentId) === nodeMenu.node.nodeId)
               ? {
-                  value: zoneLayouts[contextMenu.node.nodeId] ?? null,
-                  onPick: (layout) => setZoneLayout(contextMenu.node.nodeId, layout),
+                  value: zoneLayouts[nodeMenu.node.nodeId] ?? null,
+                  onPick: (layout) => setZoneLayout(nodeMenu.node.nodeId, layout),
                 }
               : undefined
           }
           zoneStyle={
-            zoneStyleFor(contextMenu.node.nodeId) && {
-              ...zoneStyleFor(contextMenu.node.nodeId)!,
-              onChange: (patch) => setZoneStyle(contextMenu.node.nodeId, patch),
+            zoneStyleFor(nodeMenu.node.nodeId) && {
+              ...zoneStyleFor(nodeMenu.node.nodeId)!,
+              onChange: (patch) => setZoneStyle(nodeMenu.node.nodeId, patch),
             }
           }
           // A zone's parent: how this viewer reads its zone, same as the zone's own menu.
           zoneView={
-            nodeGroups.some((g) => g.rootId === contextMenu.node.nodeId)
-              ? { value: zoneDisplay[contextMenu.node.nodeId] ?? null, onPick: (m) => setZoneMode(contextMenu.node.nodeId, m) }
+            nodeGroups.some((g) => g.rootId === nodeMenu.node.nodeId)
+              ? { value: zoneDisplay[nodeMenu.node.nodeId] ?? null, onPick: (m) => setZoneMode(nodeMenu.node.nodeId, m) }
               : undefined
           }
           feeling={
-            contextMenu.node.isWeapon
+            nodeMenu.node.isWeapon
               ? undefined
-              : { value: feelings[contextMenu.node.nodeId], onPick: (f) => setFeeling(contextMenu.node.nodeId, f) }
+              : { value: feelings[nodeMenu.node.nodeId], onPick: (f) => setFeeling(nodeMenu.node.nodeId, f) }
           }
-          onClose={() => setContextMenu(null)}
+          onClose={closeMenu}
           onCreate={() => {
-            const anchor = contextMenu.node;
-            setContextMenu(null);
+            const anchor = nodeMenu.node;
+            closeMenu();
             startBranchOf(anchor);
           }}
-          onEdit={() => openNode(contextMenu.node)}
-          onChangeType={(type) => handleChangeNodeType(contextMenu.node, type)}
+          onEdit={() => openNode(nodeMenu.node)}
+          onChangeType={(type) => handleChangeNodeType(nodeMenu.node, type)}
           onDelete={() => {
-            const node = contextMenu.node;
-            setContextMenu(null);
+            const node = nodeMenu.node;
+            closeMenu();
             handleDeleteNode(node);
           }}
           onChoose={() => {
-            const anchor = contextMenu.node;
-            setContextMenu(null);
+            const anchor = nodeMenu.node;
+            closeMenu();
             startChooseFrom(anchor.nodeId);
           }}
-          onAttack={() => setContextMenu(null)}
-          onSplit={canSplitNode(contextMenu.node) ? () => openSplit(contextMenu.node) : undefined}
+          onAttack={closeMenu}
+          onSplit={canSplitNode(nodeMenu.node) ? () => openSplit(nodeMenu.node) : undefined}
         />
       )}
 
@@ -2620,48 +2602,48 @@ export function MapPage() {
           }
           actions={zoneActionsFor(zoneMenu.rootId)}
           onPresent={() => presentZone(zoneMenu.rootId)}
-          onClose={() => setZoneMenu(null)}
+          onClose={closeMenu}
         />
       )}
-      {canvasContextMenu && (
+      {canvasMenu && (
         <CanvasContextMenu
-          x={canvasContextMenu.screenX}
-          y={canvasContextMenu.screenY}
-          onClose={() => setCanvasContextMenu(null)}
+          x={canvasMenu.screenX}
+          y={canvasMenu.screenY}
+          onClose={closeMenu}
           pasteCount={nodeClipboardSize()}
           onPasteHere={() => {
-            const at = { x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY };
-            setCanvasContextMenu(null);
+            const at = { x: canvasMenu.canvasX, y: canvasMenu.canvasY };
+            closeMenu();
             pasteClipboard(at);
           }}
           onPick={(type) => {
             // Where the user right-clicked.
-            setCanvasContextMenu(null);
-            startNodeAt({ x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY }, type);
+            closeMenu();
+            startNodeAt({ x: canvasMenu.canvasX, y: canvasMenu.canvasY }, type);
           }}
           onGrow={(kind) => {
-            const at = { x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY };
-            setCanvasContextMenu(null);
+            const at = { x: canvasMenu.canvasX, y: canvasMenu.canvasY };
+            closeMenu();
             setInlineEditId(null);
             void growStructure(kind, at);
           }}
           onQuiz={() => {
-            setCanvasContextMenu(null);
+            closeMenu();
             startQuiz();
           }}
           onDrawPicture={() => {
-            setCanvasContextMenu(null);
+            closeMenu();
             setInlineEditId(null);
-            setPicturePickerAt({ x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY });
+            setPicturePickerAt({ x: canvasMenu.canvasX, y: canvasMenu.canvasY });
           }}
           onTextToNodes={() => {
-            setCanvasContextMenu(null);
+            closeMenu();
             setInlineEditId(null);
             setSplitNode(null);
-            setTextNodesAt({ x: canvasContextMenu.canvasX, y: canvasContextMenu.canvasY });
+            setTextNodesAt({ x: canvasMenu.canvasX, y: canvasMenu.canvasY });
           }}
           onTextToMap={() => {
-            setCanvasContextMenu(null);
+            closeMenu();
             navigate("/split");
           }}
         />

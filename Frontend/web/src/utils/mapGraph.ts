@@ -63,6 +63,32 @@ export function computeAttackPairIds(selectedId: string | null, nodes: NodeDoc[]
   return attackers.length > 0 ? new Set([selected.nodeId, ...attackers.map((a) => a.nodeId)]) : null;
 }
 
+/**
+ * `rootId`'s node and every node below it, level by level from the top, where
+ * `parentOf` says which node each one hangs from (null for none, or to leave
+ * it out). The realm walls and the siege's holds walk the tree this way, each
+ * with its own idea of a parent.
+ */
+export function treeFrom(rootId: string, nodes: NodeDoc[], parentOf: (n: NodeDoc) => string | null | undefined): NodeDoc[] {
+  const children = new Map<string, NodeDoc[]>();
+  for (const n of nodes) {
+    const p = parentOf(n);
+    if (p) children.set(p, [...(children.get(p) ?? []), n]);
+  }
+  const root = nodes.find((n) => n.nodeId === rootId);
+  if (!root) return [];
+  const out = [root];
+  const seen = new Set([rootId]);
+  for (let i = 0; i < out.length; i++) {
+    for (const c of children.get(out[i].nodeId) ?? []) {
+      if (seen.has(c.nodeId)) continue;
+      seen.add(c.nodeId);
+      out.push(c);
+    }
+  }
+  return out;
+}
+
 // Every id reachable from `rootIds` by walking parentId forward (children,
 // grandchildren, ...) within `pool` — used to expand a chosen zone's own
 // [rootId, ...directChildIds] (see SelectedCircle) into its *whole* branch

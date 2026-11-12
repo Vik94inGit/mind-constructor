@@ -6,6 +6,7 @@ import { ColorPicker } from "../components/ColorPicker";
 import { ApiRequestError } from "../api/client";
 import type { MapDoc } from "../types";
 import { useI18n } from "../i18n/I18nContext";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // Rename the map / change its board color — the first real UI on top of
 // PATCH /api/:mapId (updateMap), which until now had no caller anywhere in
@@ -48,9 +49,7 @@ export function EditMapModal({
 
   return (
     <Modal title={t.dashboard.editModal.title(map.name)} onClose={onClose}>
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} />
       <form onSubmit={onSubmit}>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label htmlFor="edit-map-name" className="text-[0.8rem] font-semibold text-ink-soft">

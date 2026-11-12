@@ -5,6 +5,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { ApiRequestError } from "../api/client";
 import * as edgesApi from "../api/edges";
 import type { EdgeDoc, EdgeSentiment, NodeDoc } from "../types";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // `nodes` is the ordered pick list from the canvas's multi-select link
 // picker — 2 nodes is the classic "link A to B" case (one edge, a line).
@@ -55,9 +56,7 @@ export function CreateEdgeModal({
 
   return (
     <Modal title={nodes.length > 2 ? t.ui.link.titleN(nodes.length) : t.ui.link.titleTwo} onClose={onClose}>
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} />
       <p className="text-[0.85rem] text-ink-soft">
         {nodes.map((n) => n.text.slice(0, 24)).join(" → ")}
         {nodes.length > 2 && ` → ${nodes[0].text.slice(0, 24)}`}

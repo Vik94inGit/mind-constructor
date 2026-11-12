@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { ApiRequestError } from "../api/client";
 import { GoogleSignInButton } from "../components/GoogleSignInButton";
 import { useI18n } from "../i18n/I18nContext";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 export function RegisterPage() {
   const { register, loginWithGoogle } = useAuth();
@@ -52,9 +53,7 @@ export function RegisterPage() {
       <div className="w-full max-w-[380px] rounded-card border border-line bg-surface p-8 shadow-card">
         <h1 className="mb-[0.3rem] text-[1.4rem] font-bold">{t.auth.register.title}</h1>
         <p className="mb-6 text-[0.88rem] text-ink-soft">{t.auth.register.subtitle}</p>
-        {error && (
-          <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-        )}
+        <ErrorBanner message={error} />
         <form onSubmit={onSubmit}>
           <div className="mb-4 flex flex-col gap-[0.35rem]">
             <label htmlFor="username" className="text-[0.8rem] font-semibold text-ink-soft">

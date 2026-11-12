@@ -32,8 +32,8 @@ interface Params {
   // MapPage follows.
   setSelectedId: Dispatch<SetStateAction<string | null>>;
   setMultiSelectIds: Dispatch<SetStateAction<Set<string>>>;
-  setContextMenu: (value: null) => void;
-  setCanvasContextMenu: (value: null) => void;
+  /** Closes whichever of the node, zone and canvas menus is open. */
+  closeMenu: () => void;
   setPendingCreate: (value: null) => void;
   currentUserId: string | undefined;
   mapOwnerId: string | undefined;
@@ -64,8 +64,7 @@ export function useLineDrawing({
   screenToCanvas,
   setSelectedId,
   setMultiSelectIds,
-  setContextMenu,
-  setCanvasContextMenu,
+  closeMenu,
   setPendingCreate,
   currentUserId,
   mapOwnerId,
@@ -88,8 +87,7 @@ export function useLineDrawing({
     }
     setSelectedId(null);
     setMultiSelectIds(new Set());
-    setContextMenu(null);
-    setCanvasContextMenu(null);
+    closeMenu();
     setPendingCreate(null);
     dispatchMode({ type: "drawStart" });
   }

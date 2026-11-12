@@ -36,6 +36,7 @@ import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { checkInShift } from "../utils/feeling";
 import type { CheckIns } from "../utils/feeling";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 type Filter = mapsApi.MapFilter;
 
@@ -391,9 +392,7 @@ export function DashboardPage() {
             </nav>
           )}
 
-          {error && (
-            <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-          )}
+          <ErrorBanner message={error} />
           {notice && (
             <div className="mb-4 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">{notice}</div>
           )}

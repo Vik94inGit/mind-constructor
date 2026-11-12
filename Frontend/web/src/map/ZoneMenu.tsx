@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { ZoneMenuBody } from "./ZoneMenuBody";
 import type { ComponentProps } from "react";
+import { useDismiss } from "../hooks/useDismiss";
 
 type Props = Omit<ComponentProps<typeof ZoneMenuBody>, "idPrefix" | "onPicked"> & {
   rootId: string;
@@ -46,20 +47,7 @@ export function ZoneMenu({ rootId, x, y, onClose, ...body }: Props) {
     };
   }, [y]);
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismiss(ref, onClose);
 
   return (
     <div

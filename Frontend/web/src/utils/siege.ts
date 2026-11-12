@@ -1,4 +1,5 @@
 import { nodeRefId } from "./nodeType";
+import { treeFrom } from "./mapGraph";
 import type { AttackNodeType, NodeDoc, NodeType, Weapon } from "../types";
 
 // Discussion mode read as a realm under siege. Every zone is a hold: one whose
@@ -43,24 +44,7 @@ export function holdsOf(rootIds: string[], nodes: NodeDoc[]): Hold[] {
 
 /** A hold's keep and everything below it, weapon and protection nodes left out. */
 export function holdMembers(rootId: string, nodes: NodeDoc[]): NodeDoc[] {
-  const children = new Map<string, NodeDoc[]>();
-  for (const n of nodes) {
-    if (!isPiece(n)) continue;
-    const p = nodeRefId(n.parentId);
-    if (p) children.set(p, [...(children.get(p) ?? []), n]);
-  }
-  const root = nodes.find((n) => n.nodeId === rootId);
-  if (!root) return [];
-  const out = [root];
-  const seen = new Set([rootId]);
-  for (let i = 0; i < out.length; i++) {
-    for (const c of children.get(out[i].nodeId) ?? []) {
-      if (seen.has(c.nodeId)) continue;
-      seen.add(c.nodeId);
-      out.push(c);
-    }
-  }
-  return out;
+  return treeFrom(rootId, nodes, (n) => (isPiece(n) ? nodeRefId(n.parentId) : null));
 }
 
 /** Nodes an undefeated protection node currently guards. */

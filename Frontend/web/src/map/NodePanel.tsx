@@ -24,6 +24,7 @@ import { ImagesSection } from "./nodePanel/ImagesSection";
 import { MAX_NODE_TEXT } from "../utils/nodeText";
 import { moveRovingFocus } from "../utils/roving";
 import { track } from "../utils/usage";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // A bottom sheet over the canvas at every screen size; tapping empty canvas
 // closes it too (MapPage's onClick). Docked at half the screen so it opens
@@ -607,9 +608,7 @@ export function NodePanel({
         </div>
       </div>
 
-      {error && (
-        <div className="mt-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} className="mt-3" />
 
       <div
         id={`${tabIdBase}-panel`}

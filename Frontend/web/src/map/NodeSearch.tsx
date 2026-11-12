@@ -5,6 +5,7 @@ import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { filterNodes, isFiltering, toggleType } from "../utils/nodeFilter";
 import { NODE_TYPES } from "../types";
 import type { NodeDoc, NodeType } from "../types";
+import { useDismiss } from "../hooks/useDismiss";
 
 interface Props {
   nodes: NodeDoc[];
@@ -49,20 +50,7 @@ export function NodeSearch({ nodes, onLoadTexts, onMatches, onPick, types, onTyp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismiss(ref, onClose);
 
   const filtering = isFiltering(query, types);
   const matches = useMemo(() => {

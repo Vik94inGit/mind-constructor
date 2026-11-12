@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useKeepOnScreen } from "../hooks/useKeepOnScreen";
 import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
@@ -11,6 +11,7 @@ import { imageSrc } from "../utils/images";
 import type { NodeType } from "../types";
 import type { TypeEmoji } from "../utils/emojiFace";
 import { TypeEmojiPicker } from "./TypeEmojiPicker";
+import { useDismiss } from "../hooks/useDismiss";
 
 interface Props {
   compact: boolean;
@@ -90,20 +91,7 @@ export function DisplayMenu({
   const ref = useRef<HTMLDivElement | null>(null);
   const onScreen = useKeepOnScreen(ref);
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismiss(ref, onClose);
 
   return (
     <div
