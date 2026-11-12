@@ -29,7 +29,7 @@ import { useZoneGroups } from "../hooks/useZoneGroups";
 import { useWeaponReplay } from "../hooks/useWeaponReplay";
 import { useNotice } from "../hooks/useNotice";
 import { useStableActions } from "../hooks/useStableActions";
-import { getSyncStatus, subscribeSyncStatus } from "../offline/sync";
+import { firstShownAs, getSyncStatus, subscribeSyncStatus } from "../offline/sync";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { computeBasePositions } from "../utils/nodePositions";
 import { cardSpaceIds, spotFields, withCardSpots } from "../utils/cardSpace";
@@ -1567,6 +1567,14 @@ export function MapPage() {
       setMultiSelectIds(new Set());
       setSelectedId(null);
     },
+    replaceNode: (draftId, saved) =>
+      setNodes((prev) => {
+        if (!saved) return prev.filter((n) => n.nodeId !== draftId);
+        // The socket's echo of the create may have brought the saved node in first.
+        if (prev.some((n) => n.nodeId === saved.nodeId)) return prev.filter((n) => n.nodeId !== draftId);
+        if (!prev.some((n) => n.nodeId === draftId)) return [...prev, saved];
+        return prev.map((n) => (n.nodeId === draftId ? saved : n));
+      }),
     onStructureMade: offerStructureUndo,
     drawnBoxOf: (nodeId) => drawnBox(nodeId, screenToCanvas),
     t,
@@ -1985,7 +1993,8 @@ export function MapPage() {
               }
               return (
                 <CanvasNodeCard
-                  key={node.nodeId}
+                  // A node written here keeps the card it was drawn with as a draft (useNodeCreation).
+                  key={firstShownAs(node.nodeId) ?? node.nodeId}
                   node={node}
                   emojiFirst={emojiFirst}
                   typeEmoji={typeEmoji}

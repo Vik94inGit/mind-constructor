@@ -206,16 +206,21 @@ export const createNodeAbl = async (
   // internal ObjectId ref, so it has to be resolved the same way edgeAbl
   // resolves fromNodeId/toNodeId. A branch can only start from a node the
   // caller created, same rule as linking.
+  // The parent and the first-node check don't depend on each other, so they
+  // go to the database together: one round trip less on every new node.
+  const [parent, nodeCount] = await Promise.all([
+    publicParentId ? findNodeByPublicIdDao(publicParentId) : Promise.resolve(null),
+    countNodesByMapInternalIdDao(map._id),
+  ]);
   let parentObjectId: mongoose.Types.ObjectId | null = null;
   if (publicParentId) {
-    const parent = await findNodeByPublicIdDao(publicParentId);
     if (!parent) throw new ParentNotFoundError();
     if (parent.mapId.toString() !== map._id.toString()) throw new CrossMapParentError();
     if (parent.userId.toString() !== userId.toString()) throw new ParentNotOwnedError();
     parentObjectId = parent._id;
   }
 
-  const isFirstNode = (await countNodesByMapInternalIdDao(map._id)) === 0;
+  const isFirstNode = nodeCount === 0;
 
   return await createNodeMutationDao(map._id, {
     ...parsed,

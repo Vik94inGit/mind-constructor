@@ -15,25 +15,58 @@ export async function getNode(nodeId: string): Promise<NodeDoc> {
   return res.node;
 }
 
-export async function createNode(
-  mapId: string,
-  input: {
-    text: string;
-    title?: string;
-    prompt?: string;
-    emoji?: string;
-    order?: number | null;
-    type: NodeType;
-    x?: number;
-    y?: number;
-    color?: string;
-    parentId?: string | null;
-    symbolOverride?: NodeDoc["symbolOverride"];
-    sizeTier?: NodeDoc["sizeTier"];
-    manualZone?: NodeDoc["manualZone"];
-    picture?: NodeDoc["picture"];
-  },
-): Promise<NodeDoc> {
+export interface NewNodeInput {
+  text: string;
+  title?: string;
+  prompt?: string;
+  emoji?: string;
+  order?: number | null;
+  type: NodeType;
+  x?: number;
+  y?: number;
+  color?: string;
+  parentId?: string | null;
+  symbolOverride?: NodeDoc["symbolOverride"];
+  sizeTier?: NodeDoc["sizeTier"];
+  manualZone?: NodeDoc["manualZone"];
+  picture?: NodeDoc["picture"];
+}
+
+/**
+ * A node as it will look once saved, before the server has answered: the same
+ * defaults the backend's Node model fills in, under a temporary id. What an
+ * offline create shows, and what the map shows the moment a node is written
+ * while the create is still on its way (useNodeCreation).
+ */
+export function draftNode(mapId: string, input: NewNodeInput, localId: string = offline.newLocalId()): NodeDoc {
+  const now = new Date().toISOString();
+  return {
+    title: "",
+    emoji: "",
+    order: null,
+    zoneName: "",
+    sizeTier: null,
+    symbolOverride: null,
+    manualZone: null,
+    prompt: "",
+    ghost: input.text.trim() === "",
+    ...input,
+    parentId: input.parentId ?? null,
+    nodeId: localId,
+    mapId,
+    userId: offline.getOfflineUserId() ?? "",
+    health: 100,
+    defeated: false,
+    blockedDamage: 0,
+    packedIntoNodeId: null,
+    locked: false,
+    hiddenFromMembers: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export async function createNode(mapId: string, input: NewNodeInput): Promise<NodeDoc> {
   const localId = offline.newLocalId();
   const node = await apiRequest<NodeDoc>(`/api/nodes/${mapId}`, {
     method: "POST",
@@ -41,33 +74,8 @@ export async function createNode(
     offline: {
       localId,
       idKey: "nodeId",
-      // Same defaults the backend's Node model fills in.
       optimistic: async () => {
-        const now = new Date().toISOString();
-        const draft: NodeDoc = {
-          title: "",
-          emoji: "",
-          order: null,
-          zoneName: "",
-          sizeTier: null,
-          symbolOverride: null,
-          manualZone: null,
-          prompt: "",
-          ghost: input.text.trim() === "",
-          ...input,
-          parentId: input.parentId ?? null,
-          nodeId: localId,
-          mapId,
-          userId: offline.getOfflineUserId() ?? "",
-          health: 100,
-          defeated: false,
-          blockedDamage: 0,
-          packedIntoNodeId: null,
-          locked: false,
-          hiddenFromMembers: false,
-          createdAt: now,
-          updatedAt: now,
-        };
+        const draft = draftNode(mapId, input, localId);
         // So the map opens with it even if the canvas isn't up yet (a map made and seeded offline).
         await offline.upsertCached<NodeDoc[]>(`/api/${mapId}/nodes`, [], (list) =>
           upsertBy(list, draft, (n) => n.nodeId),

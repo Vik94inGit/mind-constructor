@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { nodeRefId, sentimentOf } from "../utils/nodeType";
 import { BURST_MS } from "../map/NodeBurst";
 import type { NodeDoc } from "../types";
+import { resolveId } from "../offline/sync";
 
 export interface Burst {
   id: string;
@@ -30,7 +31,9 @@ export function useNodeBursts(
     lastNodesRef.current = { mapId, nodes, positions };
     if (last.mapId !== mapId || last.nodes.length === 0) return;
     const now = new Set(nodes.map((n) => n.nodeId));
-    const gone = last.nodes.filter((n) => !now.has(n.nodeId) && !nodeRefId(n.packedIntoNodeId));
+    // A node shown under a temporary id until it was saved hasn't left: it's
+    // still there under its real one.
+    const gone = last.nodes.filter((n) => !now.has(n.nodeId) && !now.has(resolveId(n.nodeId)) && !nodeRefId(n.packedIntoNodeId));
     if (gone.length === 0 || gone.length > 25 || gone.length === last.nodes.length) return;
     const fresh = gone.flatMap((n) => {
       const at = last.positions.get(n.nodeId);

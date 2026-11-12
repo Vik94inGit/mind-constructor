@@ -266,7 +266,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (`map/QuizOverlay.tsx`, `hooks/useQuiz.ts`). Marks are the viewer's own, like feelings, kept in their
   view of the map (`MapViewState.quizMarks`), and draw nothing on the map. Formulas show as maths.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
-  node lands and the map is in view again.
+  node lands and the map is in view again. It lands at once, without waiting for the server: it's drawn
+  under a temporary id while its save is on the way, and the saved node takes its place on the same card
+  (`hooks/useNodeCreation.ts`); if the save fails, it goes again and the error shows.
 - **Hiding the ghosts** — the ring of ghosts comes up round every node you open; the 👻 at the top of
   its panel hides it for that node, and opening another brings the ghosts back. Cancelling a node
   picked from the ring hides it the same way, so it doesn't pop straight back up.
