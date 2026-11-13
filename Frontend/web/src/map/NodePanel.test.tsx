@@ -243,4 +243,15 @@ describe("NodePanel", () => {
     renderPanel();
     expect(document.querySelector("[data-swap-parent]")).toBeNull();
   });
+
+  it("offers Extract text on a zone's parent's Info tab", async () => {
+    const props = renderPanel({ isClusterParent: true });
+    await userEvent.click(screen.getByRole("button", { name: en.ui.node.extractText }));
+    expect(props.onExtractText).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no Extract text on a node that heads no zone", () => {
+    renderPanel();
+    expect(screen.queryByRole("button", { name: en.ui.node.extractText })).not.toBeInTheDocument();
+  });
 });

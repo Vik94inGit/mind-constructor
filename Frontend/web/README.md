@@ -336,8 +336,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`), or its name chip's menu, offers
   *Present this zone* (a presentation of only that zone, castles inside it included), *Copy as text* (every
-  node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
-  layout and look.
+  node in it, in map order), *Extract text…* (the zone and the castles inside it as one document to read or
+  copy, the same export as the Info tab of the zone's parent), one *Shape* for your nodes in it, and
+  *Delete* for them, above its view, layout and look.
 - **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
   node or group and Ctrl/Cmd+V pastes it, on this map or another, with its text, pictures, picture
   icon and card, emoji, shape and card size (`utils/nodeClipboard.ts`, `hooks/useClipboardActions.ts`);

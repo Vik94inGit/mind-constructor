@@ -96,7 +96,7 @@ interface Props {
   onStartPack: () => void;
   /** One packed member got unpacked back to a normal, visible node. */
   onUnpacked: (node: NodeDoc) => void;
-  /** True when this node is a circle's own root/parent (2+ direct parentId-children — MapPage's circleRootSentimentByNode). Gates the "Extract text" button below: the whole-map export lives in the "+" toolbar menu only, so a plain non-parent node's panel offers no text export at all. */
+  /** True when this node is a circle's own root/parent (2+ direct parentId-children — MapPage's circleRootSentimentByNode). Gates the Info tab's "Extract text" button (the zone's own right-click menu has it too): the whole-map export lives in the "+" toolbar menu only, so a plain non-parent node's panel offers no text export at all. */
   isClusterParent: boolean;
   /** Asks MapPage to open a text export scoped to this node's own cluster — plus, recursively, any cluster rooted at one of its children (see MapPage's collectClusterSubtree). Only ever called when isClusterParent is true. */
   onExtractText: () => void;
@@ -665,6 +665,7 @@ export function NodePanel({
           onCarryText={onCarryText}
           onStepNode={onStepNode}
           onCopyText={handleCopyText}
+          onExtractText={isClusterParent ? onExtractText : undefined}
           onDelete={handleDelete}
           onTemplate={handleTemplate}
           onClose={onClose}
@@ -730,7 +731,6 @@ export function NodePanel({
           onEdit={onEdit}
           onStartPack={onStartPack}
           onStartChoose={onStartChoose}
-          onExtractText={onExtractText}
           onClose={onClose}
         />
       )}

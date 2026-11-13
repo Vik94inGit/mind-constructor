@@ -56,6 +56,8 @@ interface Props {
   /** Resolves true unless the save failed. */
   onTextSave: () => Promise<boolean>;
   onCopyText: () => void;
+  /** "Extract text…" for a zone's parent: the zone's text as one document. Unset on a node that heads no zone. */
+  onExtractText?: () => void;
   onDelete: () => void;
   onTemplate: (kind: NodeTemplateKind) => void;
   onClose: () => void;
@@ -78,7 +80,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   // Pasted text that didn't fit (utils/nodeText.ts), offered for a new node.
@@ -245,6 +247,17 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
         >
           {copied ? t.ui.common.copied : t.ui.common.copy}
         </button>
+        {onExtractText && (
+          <button
+            type="button"
+            data-extract-text
+            className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+            title={t.ui.node.extractTextTitle}
+            onClick={onExtractText}
+          >
+            {t.ui.node.extractText}
+          </button>
+        )}
         {onSplitText && (
           <button
             type="button"

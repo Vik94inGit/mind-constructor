@@ -2661,7 +2661,11 @@ export function MapPage() {
               onChange: (patch) => setZoneStyle(zoneMenu.rootId, patch),
             }
           }
-          actions={zoneActionsFor(zoneMenu.rootId)}
+          actions={(() => {
+            const actions = zoneActionsFor(zoneMenu.rootId);
+            const rootId = zoneMenu.rootId;
+            return actions && { ...actions, onExtractText: () => void extractClusterText(rootId) };
+          })()}
           onPresent={() => presentZone(zoneMenu.rootId)}
           onClose={closeMenu}
         />
