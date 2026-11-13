@@ -36,7 +36,11 @@ export function QuizOverlay({ cards, marks, onMark, onExit }: Props) {
   const [turned, setTurned] = useState(false);
   // What was given this round, for the tally at its end.
   const [given, setGiven] = useState<QuizMarks>({});
+  // What the reader wrote down before turning each card, by node, kept for
+  // the round so ← back still shows it beside the answer. Never saved.
+  const [guesses, setGuesses] = useState<Record<string, string>>({});
   const card = round[index];
+  const guess = card ? (guesses[card.nodeId] ?? "") : "";
   const finished = index >= round.length;
   const tally = useMemo(() => roundTally(given), [given]);
   const weakLeft = tally.notYet + tally.shaky;
@@ -56,6 +60,7 @@ export function QuizOverlay({ cards, marks, onMark, onExit }: Props) {
   function startRound(weakOnly: boolean) {
     setRound(roundOrder(cards, { ...marks, ...given }, weakOnly));
     setGiven({});
+    setGuesses({});
     setIndex(0);
     setTurned(false);
   }
@@ -72,6 +77,14 @@ export function QuizOverlay({ cards, marks, onMark, onExit }: Props) {
         return;
       }
       if (finished) return;
+      // Writing a guess: keys are letters, not shortcuts. Ctrl/Cmd+Enter turns.
+      if (e.target instanceof HTMLTextAreaElement) {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          setTurned(true);
+        }
+        return;
+      }
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
         setTurned(true);
@@ -137,7 +150,21 @@ export function QuizOverlay({ cards, marks, onMark, onExit }: Props) {
                   <MathText text={card.question} />
                 </div>
                 {turned ? (
-                  <div className="mt-4 border-t border-line pt-4 text-left text-[1.05rem] leading-relaxed text-ink" data-quiz-answer>
+                  <div
+                    className={`mt-4 grid gap-4 border-t border-line pt-4 text-left text-[1.05rem] leading-relaxed text-ink ${guess.trim() ? "sm:grid-cols-2" : ""}`}
+                  >
+                    {guess.trim() && (
+                      <div className="rounded-xl bg-surface-2 px-4 py-3" data-quiz-guess>
+                        <div className="mb-1 text-[0.75rem] font-semibold tracking-wide text-ink-soft uppercase">{q.yourGuess}</div>
+                        <p className="m-0 break-words whitespace-pre-line">
+                          <MathText text={guess.trim()} />
+                        </p>
+                      </div>
+                    )}
+                    <div className={guess.trim() ? "rounded-xl border border-success px-4 py-3" : ""} data-quiz-answer>
+                    {guess.trim() && (
+                      <div className="mb-1 text-[0.75rem] font-semibold tracking-wide text-success uppercase">{q.trueAnswer}</div>
+                    )}
                     {card.answer && (
                       <p className="m-0 break-words whitespace-pre-line">
                         <MathText text={card.answer} />
@@ -152,11 +179,25 @@ export function QuizOverlay({ cards, marks, onMark, onExit }: Props) {
                         ))}
                       </ul>
                     )}
+                    </div>
                   </div>
                 ) : (
                   <div className="mt-4 text-[0.85rem] text-ink-soft">{q.hint}</div>
                 )}
               </button>
+
+              {!turned && (
+                <textarea
+                  key={card.nodeId}
+                  data-quiz-guess-input
+                  value={guess}
+                  onChange={(e) => setGuesses((g) => ({ ...g, [card.nodeId]: e.target.value }))}
+                  placeholder={q.guessPlaceholder}
+                  aria-label={q.yourGuess}
+                  rows={3}
+                  className="w-full max-w-[720px] resize-y rounded-xl border border-line bg-surface px-4 py-3 text-[1rem] text-ink outline-none placeholder:text-ink-soft focus:border-accent"
+                />
+              )}
 
               {turned ? (
                 <div className="flex flex-wrap justify-center gap-2" role="group">

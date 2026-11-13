@@ -53,7 +53,7 @@ node) must be told apart by something the user can see before they let go.
 | Panel | Its arrows | Arrow keys | Step node to node |
 | Panel, zone chosen | Its arrows | Arrow keys | Step through the zone newest thought first, back into the past ([sketch](zone-creation-order.md)) |
 | Canvas, first open | Tap | Click or wheel | Skip the entrance |
-| Quiz me card | Tap, then Not yet / Shaky / Know it | Click or Space, then 1 / 2 / 3; ← back, Esc leaves | Turns the card to its answer, marks it and brings the next ([sketch](quiz-me.md)) |
+| Quiz me card | Tap, then Not yet / Shaky / Know it | Click or Space, then 1 / 2 / 3; ← back, Esc leaves; Ctrl/Cmd+Enter turns from the guess field | Turns the card to its answer (beside the reader's own written guess, if any), marks it and brings the next ([sketch](quiz-me.md)) |
 
 Sources: [Frontend/web/README.md](../../Frontend/web/README.md), `hooks/useNodeDragAndDrop.ts`,
 `hooks/useMarqueeSelect.ts`, `hooks/useCanvasDoubleTap.ts`, `hooks/useCanvasMode.ts`, `hooks/useTapChomp.ts`,

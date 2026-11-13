@@ -22,6 +22,7 @@ Date: 2026-11-09 · PR: <link once it exists>
   - After turning: the answer below the question, with formulas drawn as maths.
   - At the end: how many cards got each mark, a **Go over the shaky ones** button (Not yet + Shaky only) and **Done**.
 - **Marks:** each mark is private to the user, the way feelings are, so a shared class map works for everyone. They are saved to the user's own state, so they follow the user to other devices. Nothing changes on the map itself. The next round starts with the nodes marked Not yet or Shaky.
+- **Writing a guess (added 2026-11-13):** under the hidden card is an optional field, *Write your answer*. Keys typed there stay letters (Space, 1 / 2 / 3 don't turn or mark); Ctrl/Cmd+Enter turns the card. Once turned, a written guess sits beside the true answer (*Your answer* | *Answer*, stacked on a phone) so the reader compares by eye before marking. The guess is kept for the round (← back still shows it), never saved.
 - **How to leave:** the ✕ in the corner or Esc. Marks already given are kept.
 
 ## Sketch

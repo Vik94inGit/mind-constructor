@@ -517,6 +517,11 @@ export interface UiStrings {
     showAnswer: string;
     /** Under the question while the card is still hidden. */
     hint: string;
+    /** The optional field under the card where the reader writes a guess before turning it. */
+    guessPlaceholder: string;
+    /** Headings of the two columns once a card with a written guess is turned. */
+    yourGuess: string;
+    trueAnswer: string;
     notYet: string;
     shaky: string;
     know: string;
@@ -1281,7 +1286,10 @@ const en: UiStrings = {
     exit: "Exit",
     count: (c, n) => `${c} / ${n}`,
     showAnswer: "Show answer",
-    hint: "Answer in your head, then turn the card",
+    hint: "Answer in your head or write it below, then turn the card",
+    guessPlaceholder: "Write your answer (optional)…",
+    yourGuess: "Your answer",
+    trueAnswer: "Answer",
     notYet: "Not yet",
     shaky: "Shaky",
     know: "Know it",
