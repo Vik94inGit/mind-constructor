@@ -105,7 +105,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   last details go. Any parent can also be packed or opened on its own, right on the map: a selected
   parent (or one under the mouse) shows a "−" pill that packs its children in, and a packed parent
   shows a "+N" pill that opens them again (beside a round icon, above a card; also *Pack its branch*
-  in its panel's Info tab). The eye menu has *Pack all* (every parent packs, so only the top of
+  in its panel's Info tab). A double-click or double-tap on the packed node itself opens it too. The eye menu has *Pack all* (every parent packs, so only the top of
   each branch is left and each +N opens one level) and *Unpack all*. Auto-pack
   is only a way of looking, per browser and per map, and changes nothing on the map
   (`utils/autoPack.ts`), unlike packing nodes into a container. Once a map of six or more nodes
