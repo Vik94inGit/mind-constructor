@@ -269,7 +269,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   empty-canvas menu (hold or right-click empty canvas) or the layers menu, it shows one card at a time
   over the map: a parent asks and its children answer, a title asks and its text answers, an answered
   ghost's question asks and what was written answers (`utils/quiz.ts`). Tap the card (Space) to turn
-  it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. A round starts
+  it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. Under the
+  card the reader can write their own answer first (Ctrl/Cmd+Enter turns the card from the field); the
+  turned card then shows *Your answer* beside the true one to compare by eye. What's written is kept
+  only for the round and never saved. A round starts
   with what isn't known yet, and its end counts the marks and offers *Go over the shaky ones*
   (`map/QuizOverlay.tsx`, `hooks/useQuiz.ts`). Marks are the viewer's own, like feelings, kept in their
   view of the map (`MapViewState.quizMarks`), and draw nothing on the map. Formulas show as maths.
