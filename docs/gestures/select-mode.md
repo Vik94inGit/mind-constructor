@@ -1,6 +1,6 @@
 # Select mode: tap nodes only to pick them
 
-Date: 2026-11-07 · PR: (after the quick test)
+Date: 2026-11-07 · Built 2026-11-13
 
 ## What the user wants to do
 
@@ -75,10 +75,14 @@ deselect, do they expect a tap on a parent to bring its children.
 
 | Person | Tried first | Stuck on | Changed |
 |---|---|---|---|
-| | | | |
+| Viktor (asked for it, 2026-11-13) | "a select mode what is cancelled only by exit button" | | Esc and Enter don't leave either: only *Done* or ☑ |
 
 ## Decision
 
-(After the test.) Build Select mode as above: a ☑ toolbar button on phone, tablet and desktop that
-reuses the group selection (`multiSelectIds`), `SelectionBar` and the choose branch of `useCanvasMode`
-(extended to any node, one at a time, zone taps, and no exit on empty canvas), with Choose… opening it.
+Built: a ☑ button in the map toolbar beside ✥ turns Select mode on (Move mode and line drawing off,
+nothing picked). A tap or click on any node picks or drops just that node, of any type and anyone's;
+it never opens a panel, shows the ring of ghosts or drags. A tap on empty canvas or a zone does
+nothing, and so do Enter and Esc: only the bar's *Done* or ☑ again leaves, and leaving drops the
+selection. The bar's Actions work as before; *Delete* deletes only your own picked nodes. *Choose…*
+from a node opens the same mode with that node's branch already picked. Not built yet: a tap on a
+zone selecting its nodes, and *Add their branches*.

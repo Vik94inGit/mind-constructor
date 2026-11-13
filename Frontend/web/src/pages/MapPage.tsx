@@ -1014,19 +1014,12 @@ export function MapPage() {
       return;
     }
     if (chooseMode) {
-      // Tapping a node chooses it together with its whole branch (see
-      // branchIds); tapping one that is already chosen drops it and its branch
-      // again. Shift+tap acts on just that one node.
-      if (!isOwnNode(node)) {
-        setActionError(t.ui.errors.chooseOwn);
-        return;
-      }
-      setActionError(null);
-      const affected = shiftKey ? [node.nodeId] : [node.nodeId, ...branchIds(node.nodeId)];
+      // Select mode (docs/gestures/select-mode.md): a tap picks or drops just
+      // that one node, of any kind and anyone's; it never opens or moves it.
       setMultiSelectIds((prev) => {
         const next = new Set(prev);
-        if (next.has(node.nodeId)) affected.forEach((id) => next.delete(id));
-        else affected.forEach((id) => next.add(id));
+        if (next.has(node.nodeId)) next.delete(node.nodeId);
+        else next.add(node.nodeId);
         return next;
       });
       return;
@@ -1049,6 +1042,21 @@ export function MapPage() {
     // show in the Info tab) — docs/gestures/tap-opens-node.md.
     selectNodeFromClick(node);
     setPanelHiddenFor(null);
+  }
+
+  // The toolbar's ☑: Select mode on with nothing picked yet, or off again.
+  function toggleSelectMode() {
+    closeMenu();
+    if (chooseMode) {
+      exitChooseMode();
+      return;
+    }
+    if (drawMode) toggleDrawMode();
+    setMoveMode(false);
+    setPendingCreate(null);
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    dispatchMode({ type: "chooseStart" });
   }
 
   // Opens a node's panel on purpose (its menu's Edit), not just picking it.
@@ -1709,6 +1717,8 @@ export function MapPage() {
       onExpand={() => setForceShowToolbar(true)}
       moveMode={moveMode}
       onToggleMove={() => setMoveMode((v) => !v)}
+      selectMode={chooseMode}
+      onToggleSelect={toggleSelectMode}
       drawMode={drawMode}
       onToggleDraw={toggleDrawMode}
       compact={compactView}
@@ -1853,12 +1863,9 @@ export function MapPage() {
                 addDrawPoint(screenToCanvas(e.clientX, e.clientY));
                 return;
               }
-              // Tapping empty canvas while choosing finishes it (and closes the
-              // Actions menu with it) — same as Done / Enter.
-              if (chooseMode) {
-                exitChooseMode();
-                return;
-              }
+              // Select mode is left only by its Done or ☑: a tap on empty
+              // canvas does nothing, so a slip never loses the selection.
+              if (chooseMode) return;
               if (packMode || reparentMode) return;
               if (doubleTapNewNode(e.clientX, e.clientY, e.timeStamp, null)) return;
               setSelectedId(null);
@@ -1885,15 +1892,9 @@ export function MapPage() {
               // The node whose parent is changing stays ringed while the new one is picked.
               pendingLink={reparentChild ? [reparentChild] : pendingLink}
               onCircleClick={(rootId, at) => {
-                // A zone's own polygon stops the click from ever reaching the
-                // canvas div's onClick (see its own chooseMode branch above)
-                // — so without this, choosing was only exitable by clicking
-                // truly empty canvas, not a zone. Choosing wins over the
-                // zone's normal stabilize/release behavior while it's active.
-                if (chooseMode) {
-                  exitChooseMode();
-                  return;
-                }
+                // Select mode: a tap on a zone does nothing either (see the
+                // canvas's own onClick); only Done or ☑ leaves it.
+                if (chooseMode) return;
                 // With a node's panel open, a tap on a zone is a tap outside
                 // the panel: it closes it, same as empty canvas, instead of
                 // also stabilizing the zone underneath.
@@ -2328,7 +2329,8 @@ export function MapPage() {
             onCopy={copySelection}
             onCopyText={() => void copySelectionAsText()}
             onGroupCircle={groupSelectionIntoCircle}
-            onDelete={() => void deleteSelection()}
+            // Select mode picks anyone's nodes; only your own can be deleted.
+            onDelete={() => void deleteSelection(nodes.filter((n) => multiSelectIds.has(n.nodeId) && isOwnNode(n)).map((n) => n.nodeId))}
             onDone={exitChooseMode}
           />
         ) : pendingCreate && !presenting ? (

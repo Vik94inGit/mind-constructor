@@ -134,9 +134,16 @@ describe("useMapKeyboard", () => {
     expect(p.exitDrawMode).toHaveBeenCalledTimes(1);
   });
 
-  it("finishes a choice on Enter", () => {
-    const p = setup({ chooseMode: true });
+  it("leaves Select mode alone on Enter and Escape: only its Done button ends it", () => {
+    const p = setup({ chooseMode: true, hasGroupSelection: true });
     press("Enter");
+    press("Escape");
+    expect(p.exitChooseMode).not.toHaveBeenCalled();
+  });
+
+  it("drops a plain group selection on Escape", () => {
+    const p = setup({ hasGroupSelection: true });
+    press("Escape");
     expect(p.exitChooseMode).toHaveBeenCalledTimes(1);
   });
 });

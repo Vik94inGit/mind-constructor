@@ -376,8 +376,8 @@ const ui: UiStrings = {
     zones: "Zóny",
   },
   selection: {
-    tapToChoose: "Klepnutím na své uzly je vyberete",
-    finishHint: "Rodič vezme celou svou větev (Shift+klepnutí: jen tento uzel). Hotovo: klepněte mimo nebo stiskněte Enter.",
+    tapToChoose: "Klepnutím vyberete uzly",
+    finishHint: "Každé klepnutí přidá nebo odebere jeden uzel. Odejdete tlačítkem Hotovo.",
     chosen: (n) => `Vybráno: ${csNodes(n)}`,
     selected: (n) => `Označeno: ${csNodes(n)}`,
     actions: "Akce",
@@ -1160,6 +1160,8 @@ const translation: Translation = {
       add: "Přidat",
       moveOn: "Přesouvání uzlů: zapnuto — klepnutím na Hotovo se vrátíte jen k výběru",
       moveOff: "Přesouvání uzlů: vypnuto — zapněte pro přetahování uzlů",
+      selectOn: "Režim výběru: zapnuto — klepnutím vybíráte uzly; odejdete tlačítkem Hotovo",
+      selectOff: "Režim výběru: vypnuto — zapněte pro výběr uzlů klepnutím",
       discussionTooltip:
         "Bojový režim: zapnuto — útoky způsobují poškození a členové kromě vlastníka jsou omezeni v tom, čím mohou útočit. Klepnutím přepnete do tvůrčího režimu.",
       personalTooltip:

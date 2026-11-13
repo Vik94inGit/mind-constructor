@@ -32,6 +32,9 @@ interface Props {
   onExpand: () => void;
   moveMode: boolean;
   onToggleMove: () => void;
+  /** Select mode (docs/gestures/select-mode.md): taps only pick nodes. */
+  selectMode?: boolean;
+  onToggleSelect?: () => void;
   /** Drawing a separator line (see DrawLineBar). */
   drawMode: boolean;
   onToggleDraw: () => void;
@@ -121,6 +124,8 @@ export function MapToolbar({
   expanded,
   onExpand,
   moveMode,
+  selectMode = false,
+  onToggleSelect,
   onToggleMove,
   drawMode,
   onToggleDraw,
@@ -281,6 +286,19 @@ export function MapToolbar({
           >
             ✥
           </button>
+          {onToggleSelect && (
+            <button
+              type="button"
+              data-select-mode
+              className={`${iconBtn} ${selectMode ? pressed : idle}`}
+              title={selectMode ? t.map.toolbar.selectOn : t.map.toolbar.selectOff}
+              aria-label={selectMode ? t.map.toolbar.selectOn : t.map.toolbar.selectOff}
+              aria-pressed={selectMode}
+              onClick={onToggleSelect}
+            >
+              ☑
+            </button>
+          )}
           {onUndo && (
             <button
               type="button"

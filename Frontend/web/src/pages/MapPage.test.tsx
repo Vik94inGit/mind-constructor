@@ -148,6 +148,26 @@ describe("MapPage", () => {
     expect(await screen.findByText("2 nodes selected")).toBeInTheDocument();
   });
 
+  it("Select mode: taps pick anyone's nodes, empty canvas and Escape don't leave, Done does", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => nodeEl("a"));
+    await user.click(document.querySelector<HTMLElement>("[data-select-mode]")!);
+    expect(await screen.findByText("Tap nodes to select them")).toBeInTheDocument();
+    await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    await user.click(within(nodeEl("c")).getAllByText("Gamma")[0]);
+    expect(await screen.findByText("2 nodes chosen")).toBeInTheDocument();
+    // No panel opened for either tap.
+    expect(screen.queryByRole("tab", { name: "Info" })).toBeNull();
+    await user.click(within(nodeEl("c")).getAllByText("Gamma")[0]);
+    expect(await screen.findByText("1 node chosen")).toBeInTheDocument();
+    await user.click(nodeEl("a").parentElement!);
+    await user.keyboard("{Escape}");
+    expect(screen.getByText("1 node chosen")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByText("1 node chosen")).toBeNull());
+  });
+
   it("changes a node's parent by tapping the new one, and Escape leaves without changing it", async () => {
     vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, patch) => makeNode({ nodeId, ...patch }));
     const user = userEvent.setup();

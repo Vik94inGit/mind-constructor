@@ -179,7 +179,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   confirm an edit on a phone, where Enter adds a new line (`src/map/nodePanel/InfoTab.tsx`).
 - **Pictures on nodes** — the node panel's Info tab shows the text and its buttons (*Edit* / *Save
   change*) first and the pictures after them: screenshots pasted with Ctrl+V, images dropped on the
-  text or the pictures box or picked with its 🖼️ button land there; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
+  text or the pictures box or picked with its 🖼️ button land there (a node shown as a picture card
+  doesn't open its pictures full size on a tap); each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
@@ -207,6 +208,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
+- **Select mode (☑)** — the toolbar's ☑ (beside ✥) turns it on: a tap on any node, of any type and
+  anyone's, picks or drops just that node, with no panel and no drag; the bottom bar counts them and
+  offers Actions (delete only takes your own). A tap on empty canvas or a zone, Enter and Esc do
+  nothing, so only *Done* or ☑ again leaves it. *Choose…* on a node opens the same mode with its
+  branch already picked (`pages/MapPage.tsx` `toggleSelectMode`, [sketch](../../docs/gestures/select-mode.md)).
 - **A tap opens the node** — tapping or clicking any node opens its panel on the Info tab straight
   away: an attack, a node under attack, a card in the cards view and a node with pictures alike (the
   pictures show in the Info tab, and an attack on your own node keeps its Attack tab ready to strike
