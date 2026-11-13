@@ -266,7 +266,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   preview* under it shows how it will read. The stored text stays plain, so search, export and the
   length cap are unchanged, and KaTeX is a separate download fetched only when a text has a formula.
 - **Quiz me** — the map tests its reader ([sketch](../../docs/gestures/quiz-me.md)). Started from the
-  empty-canvas menu (hold or right-click empty canvas) or the layers menu, it shows one card at a time
+  empty-canvas menu (hold or right-click empty canvas) or the layers menu (at its top, with Present and
+  Time-lapse, so a short window never hides it; a menu beside the computer's toolbar lifts to stay on
+  screen and scrolls what doesn't fit, `hooks/useKeepOnScreen.ts`), it shows one card at a time
   over the map: a parent asks and its children answer, a title asks and its text answers, an answered
   ghost's question asks and what was written answers (`utils/quiz.ts`). Tap the card (Space) to turn
   it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. Under the
