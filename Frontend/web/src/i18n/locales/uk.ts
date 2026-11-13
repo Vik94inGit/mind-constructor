@@ -1188,6 +1188,7 @@ const translation: Translation = {
       fitMap: "Показати всю мапу",
       zoomIn: "Збільшити",
       expandToolbar: "Показати панель інструментів",
+      more: "Ще інструменти",
       displayMenu: "Параметри відображення",
       undo: "Скасувати останнє переміщення (Ctrl+Z)",
       timeLapse: "Таймлапс — подивіться, як росте мапа",

@@ -379,6 +379,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
   floating top-left cluster.
 - **Templates in the node panel** — the button saves the text just typed and grows the template in one tap.
+- **Toolbar on a phone** — the floating cluster folds to three buttons: ← Back, + Add and ⋯ More. More
+  opens a tray with everything else (move, select, undo, deleted, line, picture, layers, search; the
+  owner's mode, opponent, history and finish; language and theme). A tool that acts at once folds the
+  tray away; a dot on ⋯ shows a mode or search filter is still on. Tablets and computers are unchanged.
 - **Toolbar while a node is open** — on a phone it folds to one ⋮ so it doesn't cover the ring of ghosts; on a tablet or wider it stays whole (`isMobileViewport`).
 - **Phones and tablets with the keyboard up** — the floating toolbar follows the part of the page
   still on screen, so the keyboard sliding the page up doesn't carry it off the top, and the page is put

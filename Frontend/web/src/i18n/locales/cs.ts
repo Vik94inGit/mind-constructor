@@ -1177,6 +1177,7 @@ const translation: Translation = {
       fitMap: "Zobrazit celou mapu",
       zoomIn: "Přiblížit",
       expandToolbar: "Zobrazit panel nástrojů",
+      more: "Další nástroje",
       displayMenu: "Možnosti zobrazení",
       undo: "Vrátit poslední přesun (Ctrl+Z)",
       timeLapse: "Časosběr — sledujte, jak mapa roste",
