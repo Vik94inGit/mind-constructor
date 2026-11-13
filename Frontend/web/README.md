@@ -218,6 +218,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   pictures show in the Info tab, and an attack on your own node keeps its Attack tab ready to strike
   back). Only the node's right-click or hold menu picks it without opening it; the menu's *Edit*
   opens it (`pages/MapPage.tsx` `handleNodeClick`, [sketch](../../docs/gestures/tap-opens-node.md)).
+- **Several panels at once** — tapping another node opens its panel beside the ones already open
+  instead of replacing them: up to 2 on a phone, 6 on a tablet and 8 on a computer, the oldest
+  closing past that. They tile the bottom half without overlapping (a computer fits 4 in a row, a
+  tablet 3, a phone 1, then a second row). The node tapped last is the active one: centered, an accent
+  border, its arrows step inside that panel; a press in another panel makes that one active. Each ✕
+  closes just its panel; empty canvas or Esc closes them all (`utils/openPanels.ts`,
+  [sketch](../../docs/gestures/several-panels.md)).
 - **A picture's dot opens on its picture** — the Info tab of a dot of *Draw a picture* shows the
   picture's dots first (as they sit on the map, the written ones filled, this one ringed), then the
   text, then the picture's other dots as a list with their text or question; a tap on a dot in either
