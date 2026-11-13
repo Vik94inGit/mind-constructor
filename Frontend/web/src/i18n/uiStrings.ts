@@ -877,8 +877,8 @@ const en: UiStrings = {
     zones: "Zones",
   },
   selection: {
-    tapToChoose: "Tap your nodes to choose them",
-    finishHint: "A parent brings its whole branch (Shift+tap: only that node). Tap outside or press Enter when done.",
+    tapToChoose: "Tap nodes to select them",
+    finishHint: "Each tap picks or drops one node. Press Done to leave.",
     chosen: (n) => `${n} node${n === 1 ? "" : "s"} chosen`,
     selected: (n) => `${n} node${n === 1 ? "" : "s"} selected`,
     actions: "Actions",

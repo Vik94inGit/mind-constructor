@@ -149,6 +149,9 @@ export interface Translation {
       add: string;
       moveOn: string;
       moveOff: string;
+      /** Select mode (☑): taps only pick nodes; left only by Done or ☑ again. */
+      selectOn: string;
+      selectOff: string;
       discussionTooltip: string;
       personalTooltip: string;
       /** Battle mode while offline: paused, the toggle can't be used. */
@@ -378,6 +381,8 @@ const en: Translation = {
       add: "Add",
       moveOn: "Move nodes: on — tap Done to go back to just selecting",
       moveOff: "Move nodes: off — turn on to drag nodes around",
+      selectOn: "Select mode: on — tap nodes to pick them; press Done to leave",
+      selectOff: "Select mode: off — turn on to pick nodes with taps",
       discussionTooltip:
         "Battle mode: on — attacks do damage, and members other than the owner are limited in what they can attack with. Click to switch to Creating mode.",
       personalTooltip:

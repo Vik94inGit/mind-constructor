@@ -10,7 +10,7 @@ function matches(query: string): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.(query).matches;
 }
 
-function useMediaQuery(query: string): boolean {
+export function useMediaQuery(query: string): boolean {
   const [match, setMatch] = useState(() => matches(query));
   useEffect(() => {
     const mq = window.matchMedia?.(query);
