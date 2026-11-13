@@ -343,6 +343,12 @@ const ui: UiStrings = {
     done: (name) => `${name} · hotovo!`,
     minimap: (percent) => `Obrázky nakresleny z ${percent} %`,
     failed: "Obrázek se nepodařilo nakreslit.",
+    panel: {
+      map: (name) => `${name}: jeho body, tento označený`,
+      rest: "Zbytek obrázku",
+      dot: (n) => `Bod ${n}`,
+      open: (label) => `Otevřít ${label}`,
+    },
     edit: {
       open: "Klepnutím obrázek zvětšíte, zmenšíte, obarvíte nebo přesunete",
       bar: "Velikost a místo obrázku",
@@ -370,8 +376,8 @@ const ui: UiStrings = {
     zones: "Zóny",
   },
   selection: {
-    tapToChoose: "Klepnutím na své uzly je vyberete",
-    finishHint: "Rodič vezme celou svou větev (Shift+klepnutí: jen tento uzel). Hotovo: klepněte mimo nebo stiskněte Enter.",
+    tapToChoose: "Klepnutím vyberete uzly",
+    finishHint: "Každé klepnutí přidá nebo odebere jeden uzel. Odejdete tlačítkem Hotovo.",
     chosen: (n) => `Vybráno: ${csNodes(n)}`,
     selected: (n) => `Označeno: ${csNodes(n)}`,
     actions: "Akce",
@@ -458,6 +464,8 @@ const ui: UiStrings = {
     orderBadge: (n) => `Krok ${n}`,
     edit: "Upravit",
     editTitle: "Otevřít vestavěný editor na plátně (text + typ)",
+    saveText: "Uložit změnu",
+    saveTextTitle: "Uložit upravený text",
     pack: "Sbalit…",
     packTitle: "Sbalit do tohoto uzlu další propojené nebo navazující uzly",
     size: "Velikost:",
@@ -777,7 +785,10 @@ const ui: UiStrings = {
     exit: "Konec",
     count: (c, n) => `${c} / ${n}`,
     showAnswer: "Ukázat odpověď",
-    hint: "Odpověz si v duchu, pak kartu otoč",
+    hint: "Odpověz si v duchu nebo to napiš níže, pak kartu otoč",
+    guessPlaceholder: "Napiš svou odpověď (nepovinné)…",
+    yourGuess: "Tvoje odpověď",
+    trueAnswer: "Správná odpověď",
     notYet: "Ještě ne",
     shaky: "Nejistě",
     know: "Umím",
@@ -1091,6 +1102,14 @@ const translation: Translation = {
       foldersError: "Nepodařilo se načíst složky",
       deleteMapError: "Mapu se nepodařilo smazat",
       resume: { title: "Pokračujte, kde jste skončili", open: "Otevřít" },
+      firstMap: {
+        title: "Vaše mapa",
+        open: "Otevřít mapu",
+        latest: "Poslední myšlenky",
+        none: "Zatím nic napsaného. Otevřete mapu a odpovězte na její otázky.",
+        inMap: (mapName) => `v „${mapName}“`,
+        error: "Myšlenky této mapy se nepodařilo načíst",
+      },
       folderMenu: { open: "Otevřít", rename: "Přejmenovat", delete: "Smazat" },
       deleteFolderConfirm: (name) => `Smazat složku „${name}“? Mapy v ní zůstanou — vrátí se do Všech map.`,
       folderModal: {
@@ -1144,6 +1163,8 @@ const translation: Translation = {
       add: "Přidat",
       moveOn: "Přesouvání uzlů: zapnuto — klepnutím na Hotovo se vrátíte jen k výběru",
       moveOff: "Přesouvání uzlů: vypnuto — zapněte pro přetahování uzlů",
+      selectOn: "Režim výběru: zapnuto — klepnutím vybíráte uzly; odejdete tlačítkem Hotovo",
+      selectOff: "Režim výběru: vypnuto — zapněte pro výběr uzlů klepnutím",
       discussionTooltip:
         "Bojový režim: zapnuto — útoky způsobují poškození a členové kromě vlastníka jsou omezeni v tom, čím mohou útočit. Klepnutím přepnete do tvůrčího režimu.",
       personalTooltip:

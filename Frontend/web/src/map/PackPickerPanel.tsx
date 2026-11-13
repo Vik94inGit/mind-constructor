@@ -1,5 +1,6 @@
 import { useI18n } from "../i18n/I18nContext";
 import type { NodeDoc } from "../types";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // Same bottom-sheet slot NodePanel uses (the half-screen cap is kept in sync
 // with panelReserveFrac()) — this takes
@@ -46,9 +47,7 @@ export function PackPickerPanel({ containerText, picks, error, onRemove, onConfi
         </button>
       </div>
 
-      {error && (
-        <div className="mt-3 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} className="mt-3" />
 
       {picks.length > 0 && (
         <div className="mt-4 flex flex-col gap-[0.35rem]">

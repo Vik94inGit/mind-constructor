@@ -42,6 +42,8 @@ interface Props {
   actions?: {
     /** Copies every node's text in the zone, in map order. */
     onCopyText: () => void;
+    /** Opens the zone's text as one document to read or copy (MapPage's extract-text modal). */
+    onExtractText?: () => void;
     /** One outline for every node of yours in the zone — undefined when they differ, null the usual circle. */
     shape?: { value: NodeShape | null | undefined; onPick: (shape: NodeShape | null) => void };
     /** Deletes the zone's nodes that are yours. */
@@ -55,7 +57,7 @@ interface Props {
   onPicked?: () => void;
 }
 
-// Everything about one zone in one place — presenting it on its own, copying its text, its nodes'
+// Everything about one zone in one place — presenting it on its own, copying or extracting its text, its nodes'
 // shape and deleting them, its view, its layout, and (for the parent's
 // owner) its pattern, colour and edge brightness. The same body
 // opens from right-clicking or holding the zone itself (ZoneMenu), from the
@@ -114,6 +116,23 @@ export function ZoneMenuBody({ idPrefix, view, layout, style, actions, onPresent
             </span>
             {t.ui.selection.copyText}
           </button>
+          {actions.onExtractText && (
+            <button
+              type="button"
+              role="menuitem"
+              className={row(false)}
+              title={t.ui.node.extractTextTitle}
+              onClick={() => {
+                actions.onExtractText!();
+                onPicked?.();
+              }}
+            >
+              <span className="w-6 text-center text-[0.72rem]" aria-hidden>
+                ☰
+              </span>
+              {t.ui.node.extractText}
+            </button>
+          )}
           {actions.shape && (
             <div className="flex items-center gap-[0.35rem] px-[0.6rem] py-[0.3rem] text-[0.82rem] text-ink">
               <span className="flex-1">{t.ui.node.shape}</span>

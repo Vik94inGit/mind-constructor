@@ -7,6 +7,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { FolderIcon } from "./LibraryTile";
 import { folderOfMap } from "./library";
 import { secondaryBtn } from "./FolderModal";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // Pick which of your folders a map goes in — or none. One tap moves it.
 export function MoveToFolderModal({
@@ -46,9 +47,7 @@ export function MoveToFolderModal({
 
   return (
     <Modal title={copy.moveModal.title(map.name)} onClose={onClose}>
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} />
       <div className="flex flex-col gap-1">
         {options.map((o) => (
           <button

@@ -31,7 +31,8 @@ interface Params {
   upsertEdge: (edge: EdgeDoc) => void;
   refreshInsights: (mapId: string) => void;
   setActionError: (message: string | null) => void;
-  setContextMenu: (value: null) => void;
+  /** Closes whichever of the node, zone and canvas menus is open. */
+  closeMenu: () => void;
   /** Opens the link dialog for the two cards a connect drag joined. */
   setPendingLink: Dispatch<SetStateAction<NodeDoc[] | null>>;
   linkFailedMessage: string;
@@ -52,7 +53,7 @@ export function usePuzzleConnect({
   upsertEdge,
   refreshInsights,
   setActionError,
-  setContextMenu,
+  closeMenu,
   setPendingLink,
   linkFailedMessage,
   isDetached = () => false,
@@ -174,7 +175,7 @@ export function usePuzzleConnect({
   }
 
   function startPuzzleConnect(from: NodeDoc, e: ReactPointerEvent) {
-    setContextMenu(null);
+    closeMenu();
     const track = (clientX: number, clientY: number) => {
       const id = nodeIdAt(clientX, clientY);
       const overId = id && id !== from.nodeId ? id : null;

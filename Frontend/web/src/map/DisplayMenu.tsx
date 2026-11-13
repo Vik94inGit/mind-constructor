@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useKeepOnScreen } from "../hooks/useKeepOnScreen";
 import { ZONE_LAYOUTS, zoneLayoutLabel } from "../utils/zoneLayout";
@@ -11,6 +11,7 @@ import { imageSrc } from "../utils/images";
 import type { NodeType } from "../types";
 import type { TypeEmoji } from "../utils/emojiFace";
 import { TypeEmojiPicker } from "./TypeEmojiPicker";
+import { useDismiss } from "../hooks/useDismiss";
 
 interface Props {
   compact: boolean;
@@ -90,27 +91,45 @@ export function DisplayMenu({
   const ref = useRef<HTMLDivElement | null>(null);
   const onScreen = useKeepOnScreen(ref);
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismiss(ref, onClose);
 
   return (
     <div
       ref={ref}
       style={onScreen}
-      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0" : "left-0 top-[calc(100%+0.4rem)]"} z-[60] flex max-h-[calc(100dvh-6rem)] min-w-[210px] flex-col gap-[0.15rem] overflow-y-auto rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
+      className={`absolute ${side === "right" ? "left-[calc(100%+0.5rem)] top-0 max-h-[calc(100dvh-1rem)]" : "left-0 top-[calc(100%+0.4rem)] max-h-[calc(100dvh-6rem)]"} z-[60] flex min-w-[210px] flex-col gap-[0.15rem] overflow-y-auto rounded-card border border-line bg-surface p-[0.35rem] shadow-card`}
     >
+      {/* The things to do with the map come first, so a short window never
+          hides them below the settings (Quiz me used to sit at the very foot). */}
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
+        onClick={onPresent}
+      >
+        <span aria-hidden>▶</span>
+        <span className="flex-1">{t.map.toolbar.presentation}</span>
+      </button>
+      {onQuiz && (
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
+          onClick={onQuiz}
+        >
+          <span aria-hidden>?</span>
+          <span className="flex-1">{t.ui.quiz.entry}</span>
+        </button>
+      )}
+      {onTimeLapse && (
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
+          onClick={onTimeLapse}
+        >
+          <span aria-hidden>⏱</span>
+          <span className="flex-1">{t.map.toolbar.timeLapse}</span>
+        </button>
+      )}
+      <div className="my-[0.15rem] border-t border-line" />
       <button
         type="button"
         role="switch"
@@ -299,35 +318,6 @@ export function DisplayMenu({
             </label>
           )}
         </>
-      )}
-      <div className="my-[0.15rem] border-t border-line" />
-      <button
-        type="button"
-        className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
-        onClick={onPresent}
-      >
-        <span aria-hidden>▶</span>
-        <span className="flex-1">{t.map.toolbar.presentation}</span>
-      </button>
-      {onQuiz && (
-        <button
-          type="button"
-          className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
-          onClick={onQuiz}
-        >
-          <span aria-hidden>?</span>
-          <span className="flex-1">{t.ui.quiz.entry}</span>
-        </button>
-      )}
-      {onTimeLapse && (
-        <button
-          type="button"
-          className="flex w-full cursor-pointer items-center gap-[0.5rem] rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2"
-          onClick={onTimeLapse}
-        >
-          <span aria-hidden>⏱</span>
-          <span className="flex-1">{t.map.toolbar.timeLapse}</span>
-        </button>
       )}
     </div>
   );

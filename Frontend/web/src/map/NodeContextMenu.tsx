@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
@@ -11,6 +11,7 @@ import { ZONE_MODES } from "../utils/zoneDisplay";
 import { FEELINGS, FEELING_EMOJI } from "../utils/feeling";
 import type { Feeling } from "../utils/feeling";
 import type { ZoneMode } from "../utils/zoneDisplay";
+import { useDismiss } from "../hooks/useDismiss";
 
 /** One of the node's links, as a row in the "Remove links" submenu. */
 export interface NodeLinkItem {
@@ -111,26 +112,11 @@ export function NodeContextMenu({
   // position, and this menu only ever needs the one extra level.
   const [mode, setMode] = useState<"root" | "type" | "links" | "zones" | "feeling">("root");
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      // Escape backs out of the type list first, same as most drill-down
-      // menus — only a second Escape (or a click outside) actually closes.
-      if (mode !== "root") setMode("root");
-      else onClose();
-    }
-    // Capture phase: this menu is the newest thing on the page, so it should
-    // see the dismiss-triggering click/Escape before anything else does.
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose, mode]);
+  useDismiss(ref, onClose, {
+    // Escape backs out of a submenu first, same as most drill-down menus;
+    // only a second Escape (or a press outside) actually closes.
+    onEscape: () => (mode !== "root" ? setMode("root") : onClose()),
+  });
 
   // Keep the menu on-screen even when the click was near an edge. Owner
   // actions (5 items: Create/Edit/Change type/Choose/Delete) and Attack (1

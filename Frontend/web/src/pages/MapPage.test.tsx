@@ -76,6 +76,11 @@ function renderPage() {
   );
 }
 
+// A tap on a node opens its panel.
+async function openNodePanel(user: ReturnType<typeof userEvent.setup>, nodeId: string) {
+  await user.click(nodeEl(nodeId).querySelector<HTMLElement>(".pointer-events-auto")!);
+}
+
 function nodeEl(nodeId: string) {
   const el = document.querySelector(`[data-reveal-node="${nodeId}"]`);
   if (!el) throw new Error(`node ${nodeId} not drawn`);
@@ -100,7 +105,7 @@ describe("MapPage", () => {
     expect(screen.getAllByText("Gamma").length).toBeGreaterThan(0);
   });
 
-  it("opens a node's panel on click and closes it from empty canvas", async () => {
+  it("opens a node's panel on the first click, and closes it from empty canvas", async () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => nodeEl("a"));
@@ -111,6 +116,35 @@ describe("MapPage", () => {
     await waitFor(() => expect(screen.queryByDisplayValue("some text")).toBeNull());
   });
 
+  it("keeps panels open side by side, two on a phone, each closed by its own ✕", async () => {
+    vi.mocked(nodesApi.listNodes).mockResolvedValue([
+      makeNode({ nodeId: "a", title: "Alpha", text: "text A", x: 900, y: 600 }),
+      makeNode({ nodeId: "b", title: "Beta", text: "text B", x: 1300, y: 700 }),
+      makeNode({ nodeId: "c", title: "Gamma", text: "text C", x: 1100, y: 900 }),
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => nodeEl("a"));
+    await openNodePanel(user, "a");
+    expect(await screen.findByDisplayValue("text A")).toBeInTheDocument();
+    await openNodePanel(user, "b");
+    expect(await screen.findByDisplayValue("text B")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("text A")).toBeInTheDocument();
+    expect(document.querySelectorAll("[data-node-panel]")).toHaveLength(2);
+    // A third on a phone: the oldest closes.
+    await openNodePanel(user, "c");
+    expect(await screen.findByDisplayValue("text C")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByDisplayValue("text A")).toBeNull());
+    expect(screen.getByDisplayValue("text B")).toBeInTheDocument();
+    // The active panel's ✕ closes just it; the other becomes active.
+    const active = document.querySelector<HTMLElement>("[data-node-panel][data-active-panel]")!;
+    expect(within(active).getByDisplayValue("text C")).toBeInTheDocument();
+    await user.click(within(active).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByDisplayValue("text C")).toBeNull());
+    expect(screen.getByDisplayValue("text B")).toBeInTheDocument();
+    expect(document.querySelectorAll("[data-node-panel]")).toHaveLength(1);
+  });
+
   it("steps to the next and previous node with the arrow keys at the ends of the text", async () => {
     vi.mocked(nodesApi.listNodes).mockResolvedValue([
       makeNode({ nodeId: "a", title: "Alpha", text: "text A", x: 900, y: 600 }),
@@ -119,7 +153,7 @@ describe("MapPage", () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => nodeEl("a"));
-    await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    await openNodePanel(user, "a");
     const ta = (await screen.findByDisplayValue("text A")) as HTMLTextAreaElement;
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);
@@ -143,19 +177,39 @@ describe("MapPage", () => {
     expect(await screen.findByText("2 nodes selected")).toBeInTheDocument();
   });
 
+  it("Select mode: taps pick anyone's nodes, empty canvas and Escape don't leave, Done does", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => nodeEl("a"));
+    await user.click(document.querySelector<HTMLElement>("[data-select-mode]")!);
+    expect(await screen.findByText("Tap nodes to select them")).toBeInTheDocument();
+    await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
+    await user.click(within(nodeEl("c")).getAllByText("Gamma")[0]);
+    expect(await screen.findByText("2 nodes chosen")).toBeInTheDocument();
+    // No panel opened for either tap.
+    expect(screen.queryByRole("tab", { name: "Info" })).toBeNull();
+    await user.click(within(nodeEl("c")).getAllByText("Gamma")[0]);
+    expect(await screen.findByText("1 node chosen")).toBeInTheDocument();
+    await user.click(nodeEl("a").parentElement!);
+    await user.keyboard("{Escape}");
+    expect(screen.getByText("1 node chosen")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByText("1 node chosen")).toBeNull());
+  });
+
   it("changes a node's parent by tapping the new one, and Escape leaves without changing it", async () => {
     vi.mocked(nodesApi.updateNode).mockImplementation(async (nodeId, patch) => makeNode({ nodeId, ...patch }));
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => nodeEl("b"));
-    await user.click(within(nodeEl("b")).getAllByText("Beta")[0]);
+    await openNodePanel(user, "b");
     await user.click(await screen.findByText(/Change parent/));
     expect(await screen.findByText("Tap the new parent for “Beta”")).toBeInTheDocument();
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByText("Tap the new parent for “Beta”")).toBeNull());
     expect(nodesApi.updateNode).not.toHaveBeenCalled();
 
-    await user.click(within(nodeEl("b")).getAllByText("Beta")[0]);
+    await openNodePanel(user, "b");
     await user.click(await screen.findByText(/Change parent/));
     await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
     await waitFor(() => expect(nodesApi.updateNode).toHaveBeenCalledWith("b", expect.objectContaining({ parentId: "a" })));

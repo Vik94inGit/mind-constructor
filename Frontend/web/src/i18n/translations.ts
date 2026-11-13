@@ -94,6 +94,8 @@ export interface Translation {
       foldersError: string;
       deleteMapError: string;
       resume: { title: string; open: string };
+      /** The first map made from a template, on top of the dashboard, with the latest thoughts under it (dashboard/FirstMapCard.tsx). */
+      firstMap: { title: string; open: string; latest: string; none: string; inMap: (mapName: string) => string; error: string };
       folderMenu: { open: string; rename: string; delete: string };
       deleteFolderConfirm: (name: string) => string;
       folderModal: {
@@ -147,6 +149,9 @@ export interface Translation {
       add: string;
       moveOn: string;
       moveOff: string;
+      /** Select mode (☑): taps only pick nodes; left only by Done or ☑ again. */
+      selectOn: string;
+      selectOff: string;
       discussionTooltip: string;
       personalTooltip: string;
       /** Battle mode while offline: paused, the toggle can't be used. */
@@ -315,6 +320,14 @@ const en: Translation = {
       foldersError: "Failed to load folders",
       deleteMapError: "Couldn't delete the map",
       resume: { title: "Continue where you left off", open: "Open" },
+      firstMap: {
+        title: "Your map",
+        open: "Open map",
+        latest: "Latest thoughts",
+        none: "Nothing written yet. Open the map and answer its questions.",
+        inMap: (mapName) => `in “${mapName}”`,
+        error: "Couldn't load this map's thoughts",
+      },
       folderMenu: { open: "Open", rename: "Rename", delete: "Delete" },
       deleteFolderConfirm: (name) => `Delete folder "${name}"? The maps in it stay — they go back to All maps.`,
       folderModal: {
@@ -368,6 +381,8 @@ const en: Translation = {
       add: "Add",
       moveOn: "Move nodes: on — tap Done to go back to just selecting",
       moveOff: "Move nodes: off — turn on to drag nodes around",
+      selectOn: "Select mode: on — tap nodes to pick them; press Done to leave",
+      selectOff: "Select mode: off — turn on to pick nodes with taps",
       discussionTooltip:
         "Battle mode: on — attacks do damage, and members other than the owner are limited in what they can attack with. Click to switch to Creating mode.",
       personalTooltip:

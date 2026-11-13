@@ -8,6 +8,7 @@ import type { Sentiment } from "./nodeType";
 import type { EdgeDoc, NodeDoc, NodeType } from "../types";
 import { zoneLayoutResolver } from "./zoneLayout";
 import type { ZoneLayouts } from "./zoneLayout";
+import { treeFrom } from "./mapGraph";
 
 export const CANVAS_W = 2400;
 export const CANVAS_H = 1600;
@@ -778,24 +779,10 @@ export function realmOutline(pts: Pt[], pad = 70): Pt[] {
 
 /** A tree's nodes: `rootId` and everything below it by parentId, plus shields guarding any of them. Attacks are left out. */
 export function realmMembers(rootId: string, nodes: NodeDoc[]): NodeDoc[] {
-  const children = new Map<string, NodeDoc[]>();
-  for (const n of nodes) {
-    // Attacks stay outside the realm they hit (see computeNodeGroups).
-    const p = zoneParentId(n);
-    if (p) children.set(p, [...(children.get(p) ?? []), n]);
-  }
-  const root = nodes.find((n) => n.nodeId === rootId);
-  if (!root) return [];
-  const out = [root];
-  const seen = new Set([rootId]);
-  for (let i = 0; i < out.length; i++) {
-    for (const c of children.get(out[i].nodeId) ?? []) {
-      if (!seen.has(c.nodeId)) {
-        seen.add(c.nodeId);
-        out.push(c);
-      }
-    }
-  }
+  // Attacks stay outside the realm they hit (see computeNodeGroups).
+  const out = treeFrom(rootId, nodes, zoneParentId);
+  if (out.length === 0) return [];
+  const seen = new Set(out.map((n) => n.nodeId));
   for (const n of nodes) {
     const guards = nodeRefId(n.protectsNodeId);
     if (n.isProtection && guards && seen.has(guards) && !seen.has(n.nodeId)) {

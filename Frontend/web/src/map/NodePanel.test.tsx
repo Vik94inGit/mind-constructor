@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NodePanel } from "./NodePanel";
 import { I18nProvider } from "../i18n/I18nContext";
@@ -100,6 +100,32 @@ describe("NodePanel", () => {
     expect(props.onClose).toHaveBeenCalled();
   });
 
+  it("turns Edit into Save change once the text is edited, and saves on it", async () => {
+    const user = userEvent.setup();
+    const updated = makeNode({ nodeId: "a", text: "The claim, edited" });
+    vi.mocked(nodesApi.updateNode).mockClear();
+    vi.mocked(nodesApi.updateNode).mockResolvedValue(updated);
+    const props = renderPanel();
+    expect(screen.getByRole("button", { name: en.ui.common.edit })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.ui.node.saveText })).toBeNull();
+    await user.type(screen.getByDisplayValue("The claim"), ", edited");
+    await user.click(screen.getByRole("button", { name: en.ui.node.saveText }));
+    expect(nodesApi.updateNode).toHaveBeenCalledTimes(1);
+    expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { text: "The claim, edited" });
+    expect(props.onUpdated).toHaveBeenCalledWith(updated);
+    expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it("keeps Edit, putting the cursor in the text, while nothing has changed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(nodesApi.updateNode).mockClear();
+    const props = renderPanel();
+    await user.click(screen.getByRole("button", { name: en.ui.common.edit }));
+    expect(screen.getByDisplayValue("The claim")).toHaveFocus();
+    expect(nodesApi.updateNode).not.toHaveBeenCalled();
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
   it("shows each tab's content", async () => {
     const user = userEvent.setup();
     renderPanel();
@@ -149,19 +175,50 @@ describe("NodePanel", () => {
     expect(screen.queryAllByRole("radio")).toHaveLength(0);
   });
 
-  it("opens an attack on your node on its Attack tab", () => {
+  it("opens an attack on your node on Info, its Attack tab set to strike back", async () => {
     const attack = makeNode({ nodeId: "w", text: "Their objection", type: "Problem", userId: "u2", isWeapon: true, weaponIcon: "spear", targetNodeId: "b", parentId: "b" });
     const nodes = [makeNode({ nodeId: "b", text: "Mine" }), attack];
     renderPanel({ node: attack, nodes, edges: [] });
+    expect(document.querySelector("#attack-text")).toBeNull();
+    expect(screen.getByText("Their objection")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: en.map.panelTabs.attack }));
     expect(document.querySelector("#attack-text")).not.toBeNull();
   });
 
-  it("opens an attack reached with the arrows on Info", () => {
-    const attack = makeNode({ nodeId: "w", text: "Their objection", type: "Problem", userId: "u2", isWeapon: true, weaponIcon: "spear", targetNodeId: "b", parentId: "b" });
-    const nodes = [makeNode({ nodeId: "b", text: "Mine" }), attack];
-    renderPanel({ node: attack, nodes, edges: [], stepped: true });
-    expect(document.querySelector("#attack-text")).toBeNull();
-    expect(screen.getByText("Their objection")).toBeInTheDocument();
+  it("shows the text and its Edit / Save change before the pictures", () => {
+    renderPanel();
+    const pictures = screen.getByTestId("info-pictures");
+    const edit = document.querySelector("[data-text-edit]")!;
+    const text = document.querySelector("#node-text")!;
+    expect(text.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(edit.compareDocumentPosition(pictures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("opens a picture's dot on its dots, then the text, then the rest of the picture", async () => {
+    const pic = (dot: number) => ({ id: "p1", kind: "heart", dot });
+    const here = makeNode({ nodeId: "d0", text: "Family", x: 0, y: 0, picture: pic(0) });
+    const nodes = [
+      here,
+      makeNode({ nodeId: "d1", text: "", prompt: "Who do you love?", ghost: true, x: 50, y: 20, picture: pic(1) }),
+      makeNode({ nodeId: "d2", text: "Music", x: 80, y: 60, picture: pic(2) }),
+    ];
+    const onSelectNode = vi.fn();
+    renderPanel({ node: here, nodes, edges: [], onSelectNode });
+    const map = screen.getByTestId("picture-dots-map");
+    const text = document.querySelector("#node-text")!;
+    const list = screen.getByTestId("picture-dots-list");
+    expect(map.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(text.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(list.textContent).toContain("Who do you love?");
+    expect(list.textContent).not.toContain("Family");
+    await userEvent.click(within(list).getByRole("button", { name: /Music/ }));
+    expect(onSelectNode).toHaveBeenCalledWith("d2");
+  });
+
+  it("shows no picture dots for an ordinary node", () => {
+    renderPanel();
+    expect(screen.queryByTestId("picture-dots-map")).toBeNull();
+    expect(screen.queryByTestId("picture-dots-list")).toBeNull();
   });
 
   it("hides Protect in Personal mode", () => {
@@ -185,5 +242,16 @@ describe("NodePanel", () => {
   it("has no Swap with parent without a parent to swap with", () => {
     renderPanel();
     expect(document.querySelector("[data-swap-parent]")).toBeNull();
+  });
+
+  it("offers Extract text on a zone's parent's Info tab", async () => {
+    const props = renderPanel({ isClusterParent: true });
+    await userEvent.click(screen.getByRole("button", { name: en.ui.node.extractText }));
+    expect(props.onExtractText).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no Extract text on a node that heads no zone", () => {
+    renderPanel();
+    expect(screen.queryByRole("button", { name: en.ui.node.extractText })).not.toBeInTheDocument();
   });
 });

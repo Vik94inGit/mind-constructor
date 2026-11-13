@@ -22,6 +22,7 @@ import { StepHeader, StepNav } from "../think/StepChrome";
 import { MessageText, SelectionPicker, TypePicker, useTapMarking } from "../think/TextMarking";
 import { useConfirm } from "../context/ConfirmContext";
 import { track } from "../utils/usage";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // "Text → map": the whole text becomes the map's main node; pieces of it,
 // marked by tapping where each starts and ends and given a type, become the
@@ -119,7 +120,7 @@ export function SplitTextPage() {
         )}
       </div>
 
-      {error && <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>}
+      <ErrorBanner message={error} />
 
       {draft.step === 0 ? (
         <>

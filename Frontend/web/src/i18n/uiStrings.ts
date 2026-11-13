@@ -82,6 +82,8 @@ export interface UiStrings {
     failed: string;
     /** The bar a tap on a picture's caption opens (hooks/usePictureEdit.ts). */
     edit: { open: string; bar: string; bigger: string; smaller: string; move: string; close: string; color: string; resizeFailed: string };
+    /** A dot's node panel (map/nodePanel/PictureDots.tsx): the picture's dots on top, its other dots in a list under the text. */
+    panel: { map: (name: string) => string; rest: string; dot: (n: number) => string; open: (label: string) => string };
   };
   contextMenu: {
     createBranch: string;
@@ -193,6 +195,9 @@ export interface UiStrings {
     orderBadge: (order: number) => string;
     edit: string;
     editTitle: string;
+    /** Info tab: the Edit button once the text has changed — saves it. */
+    saveText: string;
+    saveTextTitle: string;
     pack: string;
     packTitle: string;
     size: string;
@@ -512,6 +517,11 @@ export interface UiStrings {
     showAnswer: string;
     /** Under the question while the card is still hidden. */
     hint: string;
+    /** The optional field under the card where the reader writes a guess before turning it. */
+    guessPlaceholder: string;
+    /** Headings of the two columns once a card with a written guess is turned. */
+    yourGuess: string;
+    trueAnswer: string;
     notYet: string;
     shaky: string;
     know: string;
@@ -834,6 +844,12 @@ const en: UiStrings = {
     done: (name) => `${name} · done!`,
     minimap: (percent) => `Pictures ${percent}% drawn`,
     failed: "Couldn't draw the picture.",
+    panel: {
+      map: (name) => `${name}: its dots, this one marked`,
+      rest: "The rest of the picture",
+      dot: (n) => `Dot ${n}`,
+      open: (label) => `Open ${label}`,
+    },
     edit: {
       open: "Tap to resize it, colour it or move it",
       bar: "Picture size and place",
@@ -861,8 +877,8 @@ const en: UiStrings = {
     zones: "Zones",
   },
   selection: {
-    tapToChoose: "Tap your nodes to choose them",
-    finishHint: "A parent brings its whole branch (Shift+tap: only that node). Tap outside or press Enter when done.",
+    tapToChoose: "Tap nodes to select them",
+    finishHint: "Each tap picks or drops one node. Press Done to leave.",
     chosen: (n) => `${n} node${n === 1 ? "" : "s"} chosen`,
     selected: (n) => `${n} node${n === 1 ? "" : "s"} selected`,
     actions: "Actions",
@@ -949,6 +965,8 @@ const en: UiStrings = {
     orderBadge: (n) => `Step ${n}`,
     edit: "Edit",
     editTitle: "Open the canvas's own inline editor (text + type)",
+    saveText: "Save change",
+    saveTextTitle: "Save the edited text",
     pack: "Pack…",
     packTitle: "Fold other linked/branched nodes into this one",
     size: "Size:",
@@ -1268,7 +1286,10 @@ const en: UiStrings = {
     exit: "Exit",
     count: (c, n) => `${c} / ${n}`,
     showAnswer: "Show answer",
-    hint: "Answer in your head, then turn the card",
+    hint: "Answer in your head or write it below, then turn the card",
+    guessPlaceholder: "Write your answer (optional)…",
+    yourGuess: "Your answer",
+    trueAnswer: "Answer",
     notYet: "Not yet",
     shaky: "Shaky",
     know: "Know it",

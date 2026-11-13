@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "../i18n/I18nContext";
+import { useDismiss } from "../hooks/useDismiss";
 
 export interface CardMenuItem {
   label: string;
@@ -30,23 +31,7 @@ export function CardMenu({ items }: { items: CardMenuItem[] }) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      const target = e.target as Node;
-      if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
-      setOpen(false);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [open]);
+  useDismiss([menuRef, triggerRef], () => setOpen(false), { enabled: open });
 
   function toggle() {
     if (!open && triggerRef.current) {

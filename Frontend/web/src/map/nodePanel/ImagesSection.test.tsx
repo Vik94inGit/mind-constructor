@@ -49,3 +49,24 @@ describe("ImagesSection templates", () => {
     expect(screen.queryByRole("button", { name: s.templates })).toBeNull();
   });
 });
+
+describe("ImagesSection on a picture card", () => {
+  it("opens a picture full size on a tap", async () => {
+    render(
+      <I18nProvider>
+        <ImagesSection images={["data:image/png;base64,AA"]} canEdit={false} busy={false} onAdd={vi.fn()} onRemove={vi.fn()} />
+      </I18nProvider>,
+    );
+    expect(screen.getByRole("button", { name: s.open })).toBeInTheDocument();
+  });
+
+  it("doesn't open the pictures of a node shown as a picture card", () => {
+    render(
+      <I18nProvider>
+        <ImagesSection images={["data:image/png;base64,AA"]} canEdit={false} busy={false} onAdd={vi.fn()} onRemove={vi.fn()} cardImage="data:image/png;base64,BB" />
+      </I18nProvider>,
+    );
+    expect(screen.queryByRole("button", { name: s.open })).toBeNull();
+    expect(screen.getByTestId("picture-no-zoom")).toBeInTheDocument();
+  });
+});

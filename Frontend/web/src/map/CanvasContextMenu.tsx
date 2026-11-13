@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { MAP_KINDS, NODE_TYPES } from "../types";
 import type { MapKind, NodeType } from "../types";
@@ -8,6 +8,7 @@ import { NodeTypeIcon } from "./NodeTypeIcon";
 import { PictureIcon } from "./PicturePicker";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
+import { useDismiss } from "../hooks/useDismiss";
 
 interface Props {
   x: number;
@@ -63,20 +64,7 @@ export function CanvasContextMenu({ x, y, onPick, onGrow, onDrawPicture, onTextT
   const [typesOpen, setTypesOpen] = useState(false);
   const inline = isMobileViewport();
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismiss(ref, onClose);
 
   // Same on-screen clamping as NodeContextMenu — keeps the menu (and its
   // submenu) fully visible even when the click landed near a screen edge.

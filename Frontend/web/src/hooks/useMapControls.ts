@@ -20,14 +20,15 @@ interface Params {
   discussionOn: boolean;
   setActionError: (message: string | null) => void;
   /** Finishing closes the opponent's turn. */
-  setSiegeOpen: (open: boolean) => void;
+  /** Closes the opponent's turn, if it's open. */
+  closeSiege: () => void;
   logout: () => Promise<void>;
   t: Translation;
 }
 
 // The map-wide controls on the toolbar: its mode and background (owner
 // only), ending the discussion, deleting the map and leaving a demo.
-export function useMapControls({ map, setMap, nodes, userId, online, discussionOn, setActionError, setSiegeOpen, logout, t }: Params) {
+export function useMapControls({ map, setMap, nodes, userId, online, discussionOn, setActionError, closeSiege, logout, t }: Params) {
   const confirm = useConfirm();
   const navigate = useNavigate();
   const mapId = map?.mapId;
@@ -189,7 +190,7 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
       return;
     }
     if (!(await confirm(fs.confirm))) return;
-    setSiegeOpen(false);
+    closeSiege();
     void runFinish(async () => {
       const res = await mapsApi.finishMap(mapId);
       track({ name: "map_finished" });

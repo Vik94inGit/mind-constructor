@@ -6,6 +6,7 @@ import { useI18n } from "../i18n/I18nContext";
 import type { User } from "../types";
 import { useConfirm } from "../context/ConfirmContext";
 import { UsageSummary } from "../admin/UsageSummary";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 export function AdminPage() {
   const confirm = useConfirm();
@@ -88,9 +89,7 @@ export function AdminPage() {
 
       <UsageSummary />
 
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} />
 
       {loading ? (
         <div className="p-12 text-center text-ink-soft">{t.ui.admin.loading}</div>

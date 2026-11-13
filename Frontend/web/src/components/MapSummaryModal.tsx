@@ -8,6 +8,7 @@ import { NodeTypeIcon } from "../map/NodeTypeIcon";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { NODE_TYPES } from "../types";
 import type { MapDoc } from "../types";
+import { ErrorBanner } from "./ErrorBanner";
 
 // Horizontal bar chart of node counts by type — each bar carries three
 // identity channels (icon shape, text label, color), not just color, since
@@ -36,7 +37,7 @@ export function MapSummaryModal({ map, onClose }: { map: MapDoc; onClose: () => 
 
   return (
     <Modal title={t.ui.summary.title(map.name)} onClose={onClose}>
-      {error && <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>}
+      <ErrorBanner message={error} />
       {!summary && !error ? (
         <div className="p-12 text-center text-ink-soft">{t.ui.common.loading}</div>
       ) : summary ? (

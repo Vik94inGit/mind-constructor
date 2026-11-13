@@ -26,7 +26,8 @@ interface Params {
   upsertEdge: (edge: EdgeDoc) => void;
   refreshInsights: (mapId: string) => void;
   setActionError: (message: string | null) => void;
-  setContextMenu: (menu: null) => void;
+  /** Closes whichever of the node, zone and canvas menus is open. */
+  closeMenu: () => void;
   setSelectedId: Dispatch<SetStateAction<string | null>>;
   setMultiSelectIds: Dispatch<SetStateAction<Set<string>>>;
   t: Translation;
@@ -50,7 +51,7 @@ export function useReparent({
   upsertEdge,
   refreshInsights,
   setActionError,
-  setContextMenu,
+  closeMenu,
   setSelectedId,
   setMultiSelectIds,
   t,
@@ -78,7 +79,7 @@ export function useReparent({
     return t.ui.errors.parentNotOwn;
   }
   function startReparent(child: NodeDoc) {
-    setContextMenu(null);
+    closeMenu();
     setActionError(null);
     setSelectedId(null);
     setMultiSelectIds(new Set());

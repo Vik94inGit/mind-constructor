@@ -1,6 +1,7 @@
 import { useI18n } from "../i18n/I18nContext";
 import { btnPrimary, btnGhost, inputCls } from "./thinkStyles";
 import { StepHeader, StepNav } from "./StepChrome";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 export function BuildStep({
   count,
@@ -32,7 +33,7 @@ export function BuildStep({
   return (
     <>
       <StepHeader title={tt.build.title} hint={tt.build.hint} />
-      {error && <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>}
+      <ErrorBanner message={error} />
 
       <label htmlFor="think-name" className="mb-2 block text-[0.8rem] font-semibold text-ink-soft">
         {tt.build.name}

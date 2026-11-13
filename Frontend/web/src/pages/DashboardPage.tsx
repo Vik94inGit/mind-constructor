@@ -28,12 +28,15 @@ import { libraryItems, paginate } from "../dashboard/library";
 import { useConfirm } from "../context/ConfirmContext";
 import * as stateApi from "../api/state";
 import { CheckInModal } from "../dashboard/CheckInModal";
+import { FirstMapCard } from "../dashboard/FirstMapCard";
+import { firstTemplateMap } from "../dashboard/firstMap";
 import { MenuNode } from "../dashboard/MenuNode";
 import type { MenuGhost } from "../dashboard/MenuNode";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { checkInShift } from "../utils/feeling";
 import type { CheckIns } from "../utils/feeling";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 type Filter = mapsApi.MapFilter;
 
@@ -139,6 +142,8 @@ export function DashboardPage() {
 
   // The Inbox quick notes land in, and how many of them still wait to be sorted (InboxTray).
   const inbox = user ? findInbox(maps, user._id, t.dashboard.quickNote.inboxName) : null;
+  // Their first map made from a template goes on top, the latest thoughts right under it (FirstMapCard).
+  const firstMap = user && !loading ? firstTemplateMap(maps, user._id, inbox?.mapId ?? null) : null;
 
   const openFolder = folders.find((f) => f.folderId === openFolderId) ?? null;
   const items = useMemo(() => libraryItems(maps, folders, openFolderId, query), [maps, folders, openFolderId, query]);
@@ -309,6 +314,8 @@ export function DashboardPage() {
         )}
       </div>
 
+      {firstMap && !query.trim() && <FirstMapCard map={firstMap} inbox={inbox} />}
+
       <div className="lg:grid lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] lg:items-start lg:gap-8">
         {desktop ? (
           // A computer keeps the dashboard as it was: last stop, the quick
@@ -385,9 +392,7 @@ export function DashboardPage() {
             </nav>
           )}
 
-          {error && (
-            <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-          )}
+          <ErrorBanner message={error} />
           {notice && (
             <div className="mb-4 rounded-lg bg-success-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-success">{notice}</div>
           )}

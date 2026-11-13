@@ -18,6 +18,7 @@ import type { CanvasBox } from "../utils/drawnBox";
 import type { Translation } from "../i18n/translations";
 import type { MapKind, NodeDoc, NodeType } from "../types";
 import { track } from "../utils/usage";
+import * as offline from "../offline/sync";
 
 type Pt = { x: number; y: number };
 
@@ -92,8 +93,13 @@ interface Params {
   /** Frames the view on these canvas points (useCanvasFraming's showPoints). */
   showPoints: (pts: Pt[]) => void;
   showNotice: (message: string) => void;
-  /** Called once a node is made (see confirmPendingCreate). */
+  /** Called once a node is made (see confirmPendingCreate): the moment it's written, before the server has answered. */
   onCreated: (node: NodeDoc, at: Pt) => void;
+  /**
+   * Puts the saved node in place of the draft shown while it was on its way
+   * (`node` null: takes the draft away, the create failed).
+   */
+  replaceNode: (draftId: string, node: NodeDoc | null) => void;
   /**
    * A template or a picture has grown: every node it made, to take back in one
    * step (Undo, or the notice's own button), with the notice to show.
@@ -120,6 +126,7 @@ export function useNodeCreation({
   showPoints,
   showNotice,
   onCreated,
+  replaceNode,
   onStructureMade,
   drawnBoxOf,
   t,
@@ -193,28 +200,40 @@ export function useNodeCreation({
   // confirms with non-empty text — the one place any node-creation path
   // (toolbar, double-click, "Create branch", quick-add) ends up.
   // Empty text with a prompt makes a ghost (see NodeDoc.ghost).
+  // The node lands on the map at once, as a draft under a temporary id
+  // (api/nodes.ts draftNode), and the panel closes: nobody waits on the
+  // server to see what they just wrote. Once the server answers, the saved
+  // node takes the draft's place (same card, no second burst); if it
+  // refuses, the draft goes and the error shows.
   // `overflow`: pasted text that didn't fit (utils/nodeText.ts), to go into
   // new nodes carrying on from this one once it's made (see carryText).
   async function confirmPendingCreate(text: string, type: NodeType, images: string[] = [], prompt?: string, overflow?: string) {
     if (!pendingCreate || !mapId) return;
     const { x, y, parentId, emoji } = pendingCreate;
     setActionError(null);
+    const input = { text, type, x, y, parentId, ...(emoji ? { emoji } : {}), ...(prompt ? { prompt } : {}) };
+    const draft: NodeDoc = { ...nodesApi.draftNode(mapId, input), ...(images.length ? { images } : {}) };
+    track({ name: "node_created", props: { type } });
+    upsertNode(draft);
+    setCelebrateIds((prev) => new Set(prev).add(draft.nodeId));
+    setPendingCreate(null);
+    // The text was written in NewNodePanel already, so nothing opens
+    // after it: the node lands and the map is in view again.
+    onCreated(draft, { x, y });
     let made: NodeDoc | null = null;
     try {
-      let node = await nodesApi.createNode(mapId, { text, type, x, y, parentId, ...(emoji ? { emoji } : {}), ...(prompt ? { prompt } : {}) });
+      let node = await nodesApi.createNode(mapId, input);
       // Pictures added while writing it (NewNodePanel) go on once it exists.
       if (images.length) node = await nodesApi.updateNode(node.nodeId, { images });
-      track({ name: "node_created", props: { type } });
-      upsertNode(node);
-      setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-      // The text was written in NewNodePanel already, so nothing opens
-      // after it: the node lands and the map is in view again.
-      onCreated(node, { x, y });
+      offline.noteSaved(draft.nodeId, node.nodeId);
+      replaceNode(draft.nodeId, node);
+      setSelectedId((prev) => (prev === draft.nodeId ? node.nodeId : prev));
+      setMultiSelectIds((prev) => (prev.has(draft.nodeId) ? new Set([...prev].map((id) => (id === draft.nodeId ? node.nodeId : id))) : prev));
       made = node;
     } catch (err) {
+      replaceNode(draft.nodeId, null);
+      setSelectedId((prev) => (prev === draft.nodeId ? null : prev));
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
-    } finally {
-      setPendingCreate(null);
     }
     if (made && overflow) await carryText(made, overflow, { x, y });
   }

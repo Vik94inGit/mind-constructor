@@ -4,6 +4,7 @@ import { Modal } from "./Modal";
 import { ApiRequestError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
+import { ErrorBanner } from "./ErrorBanner";
 
 // Pick your own username. Opened by itself once after a first Google sign-in
 // (prefilled with the name picked from the Google profile, or the email up to
@@ -42,7 +43,7 @@ export function UsernameModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title={t.ui.username.title} onClose={keep}>
       {firstTime && <p className="mb-4 text-[0.85rem] text-ink-soft">{t.ui.username.intro}</p>}
-      {error && <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>}
+      <ErrorBanner message={error} />
       <form onSubmit={onSubmit}>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label htmlFor="username-pick" className="text-[0.8rem] font-semibold text-ink-soft">

@@ -8,6 +8,7 @@ import type { Sentiment } from "../utils/nodeType";
 import type { ZonePaletteColor, ZonePattern } from "../types";
 import { MODE_GLYPH, ZoneMenuBody } from "./ZoneMenuBody";
 import type { ZoneStylePatch } from "./ZoneMenuBody";
+import { useDismiss } from "../hooks/useDismiss";
 
 export interface NamedZone {
   rootId: string;
@@ -74,21 +75,7 @@ export function ZoneNames({
   // clip it).
   const [menu, setMenu] = useState<{ rootId: string; left: number; bottom: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!menu) return;
-    function onPointerDown(e: PointerEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(null);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenu(null);
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [menu]);
+  useDismiss(menuRef, () => setMenu(null), { enabled: !!menu });
   const [view, setView] = useState({ left: 0, top: 0, width: 0, height: 0 });
 
   useEffect(() => {

@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import type { ReadingMode } from "../utils/readingMode";
+import { useDismiss } from "../hooks/useDismiss";
 
 interface Props {
   count: number;
@@ -33,20 +34,7 @@ export function SelectionMenu({ count, canGroupCircle, canLink, onLink, onNumber
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [onClose]);
+  useDismiss(ref, onClose);
 
   const item =
     "block w-full cursor-pointer rounded-[6px] px-[0.7rem] py-[0.5rem] text-left text-[0.85rem] text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent";

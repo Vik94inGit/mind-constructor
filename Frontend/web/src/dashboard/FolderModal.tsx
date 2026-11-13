@@ -5,6 +5,7 @@ import { Modal } from "../components/Modal";
 import { ApiRequestError } from "../api/client";
 import type { FolderDoc } from "../types";
 import { useI18n } from "../i18n/I18nContext";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 // Create a folder, or rename `folder` when one is given.
 export function FolderModal({
@@ -38,9 +39,7 @@ export function FolderModal({
 
   return (
     <Modal title={folder ? copy.renameTitle : copy.createTitle} onClose={onClose}>
-      {error && (
-        <div className="mb-4 rounded-lg bg-danger-bg px-[0.9rem] py-[0.7rem] text-[0.85rem] text-danger">{error}</div>
-      )}
+      <ErrorBanner message={error} />
       <form onSubmit={onSubmit}>
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label htmlFor="folder-name" className="text-[0.8rem] font-semibold text-ink-soft">

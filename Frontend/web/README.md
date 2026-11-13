@@ -56,6 +56,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   from it and the links inside that branch) is made there on a free spot and taken off the Inbox.
   The same **Move to a map** sits in a note's Info tab when the Inbox map is open
   (`src/dashboard/InboxTray.tsx`, `src/dashboard/MoveNoteModal.tsx`, `src/utils/inbox.ts`).
+  Once you've made your **first map from a template**, the dashboard opens with that map on top,
+  drawn small (ghost questions faded), and your **latest thoughts** right under it, newest first:
+  that map's and the Inbox's quick notes, each opening the map at that thought. It stays until you
+  make a second template map (`src/dashboard/FirstMapCard.tsx`, `src/dashboard/firstMap.ts`).
 - **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
   with the quick-add ghosts or the toolbar, link nodes explicitly, draw separator lines, attack
   other members' nodes with the three combat weapons, shield your own, pack nodes into a
@@ -169,9 +173,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   the same marking step on the node's own text; each piece becomes a node hanging from it, placed
   beside it. By default the node keeps only the text no piece took (`utils/textSplit.ts`
   `textWithoutPieces`), or the whole text when that box is unticked or nothing would be left.
-- **Pictures on nodes** — the node panel's Info tab shows the text and its pictures in one box, like
-  a post: screenshots pasted with Ctrl+V, images dropped on the box or picked with its 🖼️ button land
-  under the text; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
+- **Edit, then Save change** — under the text in the node panel's Info tab, **Edit** puts the cursor
+  in the text; as soon as the text differs from what's saved the same button reads **Save change**,
+  and pressing it saves the edit and closes the panel, like Enter on a computer. It's the way to
+  confirm an edit on a phone, where Enter adds a new line (`src/map/nodePanel/InfoTab.tsx`).
+- **Pictures on nodes** — the node panel's Info tab shows the text and its buttons (*Edit* / *Save
+  change*) first and the pictures after them: screenshots pasted with Ctrl+V, images dropped on the
+  text or the pictures box or picked with its 🖼️ button land there (a node shown as a picture card
+  doesn't open its pictures full size on a tap); each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
@@ -199,6 +208,27 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
+- **Select mode (☑)** — the toolbar's ☑ (beside ✥) turns it on: a tap on any node, of any type and
+  anyone's, picks or drops just that node, with no panel and no drag; the bottom bar counts them and
+  offers Actions (delete only takes your own). A tap on empty canvas or a zone, Enter and Esc do
+  nothing, so only *Done* or ☑ again leaves it. *Choose…* on a node opens the same mode with its
+  branch already picked (`pages/MapPage.tsx` `toggleSelectMode`, [sketch](../../docs/gestures/select-mode.md)).
+- **A tap opens the node** — tapping or clicking any node opens its panel on the Info tab straight
+  away: an attack, a node under attack, a card in the cards view and a node with pictures alike (the
+  pictures show in the Info tab, and an attack on your own node keeps its Attack tab ready to strike
+  back). Only the node's right-click or hold menu picks it without opening it; the menu's *Edit*
+  opens it (`pages/MapPage.tsx` `handleNodeClick`, [sketch](../../docs/gestures/tap-opens-node.md)).
+- **Several panels at once** — tapping another node opens its panel beside the ones already open
+  instead of replacing them: up to 2 on a phone, 6 on a tablet and 8 on a computer, the oldest
+  closing past that. They tile the bottom half without overlapping (a computer fits 4 in a row, a
+  tablet 3, a phone 1, then a second row). The node tapped last is the active one: centered, an accent
+  border, its arrows step inside that panel; a press in another panel makes that one active. Each ✕
+  closes just its panel; empty canvas or Esc closes them all (`utils/openPanels.ts`,
+  [sketch](../../docs/gestures/several-panels.md)).
+- **A picture's dot opens on its picture** — the Info tab of a dot of *Draw a picture* shows the
+  picture's dots first (as they sit on the map, the written ones filled, this one ringed), then the
+  text, then the picture's other dots as a list with their text or question; a tap on a dot in either
+  opens that one (`map/nodePanel/PictureDots.tsx`).
 - **Node panel under the node** — the node panel (and the pack picker and new-node panel) is a bottom
   sheet, half the screen, with the node's text first and its type's symbol in its header; the chosen node
   is centered in the half above it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
@@ -249,15 +279,22 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   preview* under it shows how it will read. The stored text stays plain, so search, export and the
   length cap are unchanged, and KaTeX is a separate download fetched only when a text has a formula.
 - **Quiz me** — the map tests its reader ([sketch](../../docs/gestures/quiz-me.md)). Started from the
-  empty-canvas menu (hold or right-click empty canvas) or the layers menu, it shows one card at a time
+  empty-canvas menu (hold or right-click empty canvas) or the layers menu (at its top, with Present and
+  Time-lapse, so a short window never hides it; a menu beside the computer's toolbar lifts to stay on
+  screen and scrolls what doesn't fit, `hooks/useKeepOnScreen.ts`), it shows one card at a time
   over the map: a parent asks and its children answer, a title asks and its text answers, an answered
   ghost's question asks and what was written answers (`utils/quiz.ts`). Tap the card (Space) to turn
-  it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. A round starts
+  it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. Under the
+  card the reader can write their own answer first (Ctrl/Cmd+Enter turns the card from the field); the
+  turned card then shows *Your answer* beside the true one to compare by eye. What's written is kept
+  only for the round and never saved. A round starts
   with what isn't known yet, and its end counts the marks and offers *Go over the shaky ones*
   (`map/QuizOverlay.tsx`, `hooks/useQuiz.ts`). Marks are the viewer's own, like feelings, kept in their
   view of the map (`MapViewState.quizMarks`), and draw nothing on the map. Formulas show as maths.
 - **After creating** — once a node is created from `map/NewNodePanel.tsx`, nothing stays open: the
-  node lands and the map is in view again.
+  node lands and the map is in view again. It lands at once, without waiting for the server: it's drawn
+  under a temporary id while its save is on the way, and the saved node takes its place on the same card
+  (`hooks/useNodeCreation.ts`); if the save fails, it goes again and the error shows.
 - **Hiding the ghosts** — the ring of ghosts comes up round every node you open; the 👻 at the top of
   its panel hides it for that node, and opening another brings the ghosts back. Cancelling a node
   picked from the ring hides it the same way, so it doesn't pop straight back up.
@@ -304,8 +341,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`), or its name chip's menu, offers
   *Present this zone* (a presentation of only that zone, castles inside it included), *Copy as text* (every
-  node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
-  layout and look.
+  node in it, in map order), *Extract text…* (the zone and the castles inside it as one document to read or
+  copy, the same export as the Info tab of the zone's parent), one *Shape* for your nodes in it, and
+  *Delete* for them, above its view, layout and look.
 - **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
   node or group and Ctrl/Cmd+V pastes it, on this map or another, with its text, pictures, picture
   icon and card, emoji, shape and card size (`utils/nodeClipboard.ts`, `hooks/useClipboardActions.ts`);

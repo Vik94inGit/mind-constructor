@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useKeepOnScreen } from "../hooks/useKeepOnScreen";
 import type { DeletedEntry } from "../hooks/useDeletedNodes";
+import { useDismiss } from "../hooks/useDismiss";
 
 interface Props {
   entries: DeletedEntry[];
@@ -21,21 +22,7 @@ export function DeletedMenu({ entries, onRestore, side = "below", buttonClass }:
   const menuRef = useRef<HTMLDivElement | null>(null);
   const onScreen = useKeepOnScreen(menuRef);
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [open]);
+  useDismiss(ref, () => setOpen(false), { enabled: open });
 
   useEffect(() => {
     if (entries.length === 0) setOpen(false);
