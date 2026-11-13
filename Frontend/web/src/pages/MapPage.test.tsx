@@ -76,10 +76,8 @@ function renderPage() {
   );
 }
 
-// A tap on a node picks it; a second tap on the picked node opens its panel.
-// The picked node hides its caption, so the second tap lands on its icon.
+// A tap on a node opens its panel.
 async function openNodePanel(user: ReturnType<typeof userEvent.setup>, nodeId: string) {
-  await user.click(nodeEl(nodeId).querySelector<HTMLElement>(".pointer-events-auto")!);
   await user.click(nodeEl(nodeId).querySelector<HTMLElement>(".pointer-events-auto")!);
 }
 
@@ -107,16 +105,12 @@ describe("MapPage", () => {
     expect(screen.getAllByText("Gamma").length).toBeGreaterThan(0);
   });
 
-  it("picks a node on the first click, opens its panel on the second, and closes it from empty canvas", async () => {
+  it("opens a node's panel on the first click, and closes it from empty canvas", async () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => nodeEl("a"));
     expect(screen.queryByDisplayValue("some text")).toBeNull();
     await user.click(within(nodeEl("a")).getAllByText("Alpha")[0]);
-    // Give the panel every chance to open: one click only picks the node.
-    await new Promise((r) => setTimeout(r, 300));
-    expect(screen.queryByDisplayValue("some text")).toBeNull();
-    await user.click(nodeEl("a").querySelector<HTMLElement>(".pointer-events-auto")!);
     expect(await screen.findByDisplayValue("some text")).toBeInTheDocument();
     await user.click(nodeEl("a").parentElement!);
     await waitFor(() => expect(screen.queryByDisplayValue("some text")).toBeNull());

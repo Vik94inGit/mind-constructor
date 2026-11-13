@@ -1241,14 +1241,14 @@ const en: UiStrings = {
   gestureHint: {
     title: "How to use the map",
     touch: [
-      "Tap a node to pick it, tap it again to open it; tap a ring around it to add a thought.",
+      "Tap a node to open it; tap a ring around it to add a thought.",
       "Drag a node to move it. Hold and lift to pick it, pick more for a group, then drag the group.",
       "Hold a zone for its menu: copy its text, shape, delete, look.",
       "Double-tap empty space for a new node; hold it for a menu: templates, paste.",
       "Pinch to zoom; the eye sets how much detail you see.",
     ],
     mouse: [
-      "Click a node to pick it, click it again to open it; click a ring around it to add a thought.",
+      "Click a node to open it; click a ring around it to add a thought.",
       "Shift+click or drag on empty space to pick a group, then drag the group.",
       "Right-click a zone for its menu: copy its text, shape, delete, look.",
       "Double-click empty space for a new node; right-click it for a menu: templates, paste.",

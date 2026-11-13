@@ -175,19 +175,23 @@ describe("NodePanel", () => {
     expect(screen.queryAllByRole("radio")).toHaveLength(0);
   });
 
-  it("opens an attack on your node on its Attack tab", () => {
+  it("opens an attack on your node on Info, its Attack tab set to strike back", async () => {
     const attack = makeNode({ nodeId: "w", text: "Their objection", type: "Problem", userId: "u2", isWeapon: true, weaponIcon: "spear", targetNodeId: "b", parentId: "b" });
     const nodes = [makeNode({ nodeId: "b", text: "Mine" }), attack];
     renderPanel({ node: attack, nodes, edges: [] });
+    expect(document.querySelector("#attack-text")).toBeNull();
+    expect(screen.getByText("Their objection")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: en.map.panelTabs.attack }));
     expect(document.querySelector("#attack-text")).not.toBeNull();
   });
 
-  it("opens an attack reached with the arrows on Info", () => {
-    const attack = makeNode({ nodeId: "w", text: "Their objection", type: "Problem", userId: "u2", isWeapon: true, weaponIcon: "spear", targetNodeId: "b", parentId: "b" });
-    const nodes = [makeNode({ nodeId: "b", text: "Mine" }), attack];
-    renderPanel({ node: attack, nodes, edges: [], stepped: true });
-    expect(document.querySelector("#attack-text")).toBeNull();
-    expect(screen.getByText("Their objection")).toBeInTheDocument();
+  it("shows the text and its Edit / Save change before the pictures", () => {
+    renderPanel();
+    const pictures = screen.getByTestId("info-pictures");
+    const edit = document.querySelector("[data-text-edit]")!;
+    const text = document.querySelector("#node-text")!;
+    expect(text.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(edit.compareDocumentPosition(pictures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("hides Protect in Personal mode", () => {

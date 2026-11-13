@@ -27,11 +27,11 @@ interface Props {
 const pictureBtn =
   "cursor-pointer rounded-full border border-line bg-surface px-[0.45rem] py-[0.1rem] text-[0.68rem] font-semibold text-ink shadow-card hover:bg-surface-2 disabled:opacity-50";
 
-// The lower half of the Info tab's "post" box (see InfoTab): the node's
-// pictures laid out under its text the way a post shows them (tap one to see
-// it full size) and, for the node's owner, a small toolbar to add more. A
-// picture can also be pasted anywhere in the panel (NodePanel's own onPaste)
-// or dropped anywhere on the post box (InfoTab).
+// The Info tab's pictures box, under the text and its buttons (see InfoTab):
+// the node's pictures the way a post shows them (tap one to see it full size)
+// and, for the node's owner, a small toolbar to add more. A picture can also
+// be pasted anywhere in the panel (NodePanel's own onPaste) or dropped on the
+// text box or this one (InfoTab).
 export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, iconImage = "", onSetIcon, cardImage = "", onSetCard }: Props) {
   const { t } = useI18n();
   const s = t.ui.images;

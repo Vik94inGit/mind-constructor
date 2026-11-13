@@ -59,7 +59,7 @@ interface Props {
   onDelete: () => void;
   onTemplate: (kind: NodeTemplateKind) => void;
   onClose: () => void;
-  /** The node's pictures (ImagesSection), shown under the text inside the same box, like a post. */
+  /** The node's pictures (ImagesSection), shown after the text and its buttons (Save change). */
   imagesSection?: ReactNode;
   /** Pictures dropped anywhere on the post box. Unset when this viewer can't add any. */
   onDropImages?: (files: File[]) => void;
@@ -88,8 +88,8 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
       {/* The node's title, when it has one — read-only here for
           everyone; the owner edits it under Modify. */}
       {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink"><MathText text={node.title} /></div>}
-      {/* The text and its pictures share one box, like a post: write, then
-          paste, drop or pick a picture right under the words. */}
+      {/* The text box; a picture dropped on it joins the node's pictures,
+          which are shown under the buttons below. */}
       <div
         className={`overflow-hidden rounded-lg border focus-within:outline focus-within:-outline-offset-1 focus-within:outline-2 focus-within:outline-accent ${
           dragOver ? "border-accent bg-accent-soft" : `border-line ${isCreator && !textLocked ? "bg-surface" : "bg-surface-2"}`
@@ -184,7 +184,6 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             {node.text ? <MathText text={node.text} /> : node.prompt ? <span className="text-ink-soft italic">{node.prompt}</span> : null}
           </div>
         )}
-        {imagesSection}
       </div>
       {overflow && onCarryText && (
         <TextOverflowOffer
@@ -268,6 +267,30 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
           </button>
         )}
       </div>
+      {/* The pictures come after the text and its Save change, so the words
+          are read and confirmed first. Pictures dropped here land too. */}
+      {imagesSection && (
+        <div
+          data-testid="info-pictures"
+          className={`mt-2 overflow-hidden rounded-lg border ${dragOver ? "border-accent bg-accent-soft" : "border-line"}`}
+          onDragOver={(e) => {
+            if (!onDropImages || !Array.from(e.dataTransfer.types).includes("Files")) return;
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            setDragOver(false);
+            if (!onDropImages) return;
+            const files = imageFilesFrom(e.dataTransfer);
+            if (files.length === 0) return;
+            e.preventDefault();
+            onDropImages(files);
+          }}
+        >
+          {imagesSection}
+        </div>
+      )}
     <div className="mt-3">
       {(onChangeParent || onSwapWithParent || onMoveToMap || onAutoPack) && (
         <div className="mb-2 flex flex-wrap items-center gap-2">

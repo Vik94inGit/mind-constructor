@@ -1,5 +1,7 @@
 # Tap picks a node, it doesn't open it
 
+> **Replaced** on 2026-11-13 by [tap-opens-node.md](tap-opens-node.md): a tap opens the node again.
+
 Date: 2026-11-11 · PR: <link once it exists>
 
 ## What the user wants to do

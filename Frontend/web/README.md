@@ -177,9 +177,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   in the text; as soon as the text differs from what's saved the same button reads **Save change**,
   and pressing it saves the edit and closes the panel, like Enter on a computer. It's the way to
   confirm an edit on a phone, where Enter adds a new line (`src/map/nodePanel/InfoTab.tsx`).
-- **Pictures on nodes** — the node panel's Info tab shows the text and its pictures in one box, like
-  a post: screenshots pasted with Ctrl+V, images dropped on the box or picked with its 🖼️ button land
-  under the text; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
+- **Pictures on nodes** — the node panel's Info tab shows the text and its buttons (*Edit* / *Save
+  change*) first and the pictures after them: screenshots pasted with Ctrl+V, images dropped on the
+  text or the pictures box or picked with its 🖼️ button land there; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
@@ -207,11 +207,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
-- **A tap picks, a second tap opens** — tapping or clicking a node only picks it: it's highlighted,
-  centered and its ring of ghosts comes up, with the map still in view. Tapping or clicking it again
-  (or a double-tap / double-click, or *Edit* in its right-click menu) opens its panel. The reading
-  arrows, search and creating a node still open the panel straight away (`pages/MapPage.tsx`
-  `panelHiddenFor`, [sketch](../../docs/gestures/tap-picks-node.md)).
+- **A tap opens the node** — tapping or clicking any node opens its panel on the Info tab straight
+  away: an attack, a node under attack, a card in the cards view and a node with pictures alike (the
+  pictures show in the Info tab, and an attack on your own node keeps its Attack tab ready to strike
+  back). Only the node's right-click or hold menu picks it without opening it; the menu's *Edit*
+  opens it (`pages/MapPage.tsx` `handleNodeClick`, [sketch](../../docs/gestures/tap-opens-node.md)).
 - **Node panel under the node** — the node panel (and the pack picker and new-node panel) is a bottom
   sheet, half the screen, with the node's text first and its type's symbol in its header; the chosen node
   is centered in the half above it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
