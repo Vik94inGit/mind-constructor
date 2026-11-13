@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
@@ -44,12 +45,27 @@ export function useNodeStyling({
   // (now removed) type dropdown used to cover, for picking a type without
   // opening either of those. Owner-only, same as every other context-menu
   // action on someone else's node (see NodeContextMenu's own isOwner gate).
+  // Shown at once, saved behind it: waiting on the server made a pick feel
+  // dead for a moment. Only the type is put back if the save fails, and only
+  // when it is still the last one picked for that node, so a quick second
+  // pick is never undone by the first one's late answer.
+  const latestType = useRef(new Map<string, NodeType>());
   async function handleChangeNodeType(node: NodeDoc, type: NodeType) {
     setActionError(null);
+    const live = nodes.find((n) => n.nodeId === node.nodeId) ?? node;
+    const before = live.type;
+    if (before === type) return;
+    latestType.current.set(node.nodeId, type);
+    const isLatest = () => latestType.current.get(node.nodeId) === type;
+    setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId ? { ...n, type } : n)));
     try {
       const updated = await nodesApi.updateNode(node.nodeId, { type });
-      upsertNode(updated);
+      if (isLatest()) upsertNode(updated);
     } catch (err) {
+      if (isLatest()) {
+        latestType.current.delete(node.nodeId);
+        setNodes((prev) => prev.map((n) => (n.nodeId === node.nodeId && n.type === type ? { ...n, type: before } : n)));
+      }
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.type);
     }
   }
