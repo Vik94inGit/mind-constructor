@@ -60,4 +60,13 @@ describe("ZoneMenuBody", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith({ zoneEdge: 0.85 });
   });
+
+  it("extracts the zone's text from its menu, then reports the pick", () => {
+    const onExtractText = vi.fn();
+    const onPicked = vi.fn();
+    renderBody({ actions: { onCopyText: vi.fn(), onExtractText }, onPicked });
+    fireEvent.click(screen.getByRole("menuitem", { name: new RegExp(t.ui.node.extractText) }));
+    expect(onExtractText).toHaveBeenCalledTimes(1);
+    expect(onPicked).toHaveBeenCalledTimes(1);
+  });
 });
