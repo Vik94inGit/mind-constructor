@@ -162,6 +162,7 @@ export interface Translation {
       fitMap: string;
       zoomIn: string;
       expandToolbar: string;
+      more: string;
       displayMenu: string;
       undo: string;
       /** The display menu's entry and the bar that replays the map node by node, oldest first. */
@@ -395,6 +396,7 @@ const en: Translation = {
       fitMap: "Fit the whole map on screen",
       zoomIn: "Zoom in",
       expandToolbar: "Show toolbar",
+      more: "More tools",
       displayMenu: "Display options",
       undo: "Undo last move (Ctrl+Z)",
       timeLapse: "Time-lapse — watch the map grow",

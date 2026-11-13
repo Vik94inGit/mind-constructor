@@ -170,6 +170,8 @@ export function MapPage() {
   const desktopLayout = useDesktopLayout();
   // Wider than a phone: a tablet when not in the desktop layout (utils/openPanels.ts).
   const widerThanPhone = useMediaQuery("(min-width: 640px)");
+  // A phone: the top-left toolbar folds to three buttons (see MapToolbar).
+  const phoneToolbar = useMediaQuery("(max-width: 639.98px)");
   const viewportOffset = useVisualViewportOffset();
   // A back swipe / back button doesn't leave the map — only the toolbar's ←
   // does (see useBackGuard).
@@ -1868,6 +1870,8 @@ export function MapPage() {
   const renderToolbar = (vertical: boolean) => (
     <MapToolbar
       vertical={vertical}
+      // A phone folds the cluster to three buttons, the rest behind "⋯".
+      phone={phoneToolbar}
       viewportOffset={viewportOffset}
       isDemo={!!user?.isDemo}
       isOwner={isOwner}
