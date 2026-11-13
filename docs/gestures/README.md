@@ -33,8 +33,7 @@ node) must be told apart by something the user can see before they let go.
 
 | Where | Touch | Mouse | Does |
 |---|---|---|---|
-| Node | Tap | Click | Picks it: highlighted, centered, its ring of ghosts up; no panel ([sketch](tap-picks-node.md)) |
-| Picked node | Tap again, or double-tap | Click again, or double-click | Opens its panel ([sketch](tap-picks-node.md)) |
+| Node (any: an attack, a card, one with pictures) | Tap | Click, or double-click on the text to edit | Opens its panel on Info, centered, its ring of ghosts up ([sketch](tap-opens-node.md)) |
 | Ring of ghosts | Tap a ghost | Click a ghost | Picks it out: *Make this a …* (change the node's type), *New …*, or a starter phrase; tap again adds a thought of that type ([sketch](ghost-change-type.md)) |
 | Ring of ghosts | Drag a type out | Drag a type out | Sketches a new branch where it's let go |
 | Node, Move mode (✥) | Drag | Drag | Moves it; glues to a card it lands beside; joins a zone it's dropped on (a card in the cards view only moves clear of other cards) |

@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf } from "../utils/nodeType";
 import { NODE_TYPE_TEMPLATE } from "../utils/templates";
+import { PictureDotsList, PictureDotsMap, pictureGroupOf } from "./nodePanel/PictureDots";
 import type { NodeTemplateKind, TemplateKind } from "../utils/templates";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ringKindFor } from "./OutcomeBadge";
@@ -133,13 +134,10 @@ interface Props {
   /** Opens the previous (-1) or next (1) node in reading order (utils/nodeOrder.ts) — the text's arrow keys. */
   /** Read the previous / next node; `focusText: false` keeps focus where it is (the header's buttons). */
   onStepNode?: (dir: -1 | 1, focusText?: boolean) => void;
-  /** This node was reached with the ← / → arrows: it opens on Info, even an attack you could strike back at. */
-  stepped?: boolean;
 }
 
 export function NodePanel({
   onStepNode,
-  stepped = false,
   node,
   nodes,
   edges,
@@ -233,7 +231,7 @@ export function NodePanel({
   const targetId = node.isWeapon ? nodeRefId(node.targetNodeId) : undefined;
   const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
   // An attack from the other side (another member's, or the imitated
-  // opponent's) on one of your own nodes: its panel opens ready to strike back.
+  // opponent's) on one of your own nodes: its Attack tab is set to strike back.
   const strikeBack = discussionMode && !!target && idOf(target.userId) === currentUserId && (!!node.byOpponent || !isCreator);
 
   // Same idea, for a protection node's own protectsNodeId — surfaced as a
@@ -269,6 +267,8 @@ export function NodePanel({
   // Growing a template branch — only offered on a node that has no branch
   // yet (Problem, Solution or Idea: a ready structure; Fail: analyze and retry).
   const hasChildren = nodes.some((n) => nodeRefId(n.parentId) === node.nodeId);
+  // A dot of a "Draw a picture": its Info tab opens on the picture's dots.
+  const pictureGroup = useMemo(() => pictureGroupOf(node, nodes), [node, nodes]);
   const templateKind: NodeTemplateKind | null =
     !isCreator || hasChildren || node.isWeapon || node.isProtection ? null : (NODE_TYPE_TEMPLATE[node.type] ?? null);
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
@@ -344,7 +344,9 @@ export function NodePanel({
     setExpanded(false);
     setDragOffset({ x: 0, y: 0 });
     setPanelHeight(null);
-    setTab(strikeBack && !stepped ? "attack" : "info");
+    // Every node opens on Info, an attack you could strike back at too: its
+    // Attack tab is one tap away, already set to answer it.
+    setTab("info");
     nodesApi
       .getAttackHistory(node.nodeId)
       .then(setHistory)
@@ -647,6 +649,8 @@ export function NodePanel({
           onDelete={handleDelete}
           onTemplate={handleTemplate}
           onClose={onClose}
+          pictureMap={pictureGroup && <PictureDotsMap group={pictureGroup} nodeId={node.nodeId} onSelect={onSelectNode} />}
+          pictureList={pictureGroup && <PictureDotsList group={pictureGroup} nodeId={node.nodeId} onSelect={onSelectNode} />}
           imagesSection={
             <ImagesSection
               images={images}

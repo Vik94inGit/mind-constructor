@@ -82,6 +82,8 @@ export interface UiStrings {
     failed: string;
     /** The bar a tap on a picture's caption opens (hooks/usePictureEdit.ts). */
     edit: { open: string; bar: string; bigger: string; smaller: string; move: string; close: string; color: string; resizeFailed: string };
+    /** A dot's node panel (map/nodePanel/PictureDots.tsx): the picture's dots on top, its other dots in a list under the text. */
+    panel: { map: (name: string) => string; rest: string; dot: (n: number) => string; open: (label: string) => string };
   };
   contextMenu: {
     createBranch: string;
@@ -837,6 +839,12 @@ const en: UiStrings = {
     done: (name) => `${name} · done!`,
     minimap: (percent) => `Pictures ${percent}% drawn`,
     failed: "Couldn't draw the picture.",
+    panel: {
+      map: (name) => `${name}: its dots, this one marked`,
+      rest: "The rest of the picture",
+      dot: (n) => `Dot ${n}`,
+      open: (label) => `Open ${label}`,
+    },
     edit: {
       open: "Tap to resize it, colour it or move it",
       bar: "Picture size and place",
@@ -1241,14 +1249,14 @@ const en: UiStrings = {
   gestureHint: {
     title: "How to use the map",
     touch: [
-      "Tap a node to pick it, tap it again to open it; tap a ring around it to add a thought.",
+      "Tap a node to open it; tap a ring around it to add a thought.",
       "Drag a node to move it. Hold and lift to pick it, pick more for a group, then drag the group.",
       "Hold a zone for its menu: copy its text, shape, delete, look.",
       "Double-tap empty space for a new node; hold it for a menu: templates, paste.",
       "Pinch to zoom; the eye sets how much detail you see.",
     ],
     mouse: [
-      "Click a node to pick it, click it again to open it; click a ring around it to add a thought.",
+      "Click a node to open it; click a ring around it to add a thought.",
       "Shift+click or drag on empty space to pick a group, then drag the group.",
       "Right-click a zone for its menu: copy its text, shape, delete, look.",
       "Double-click empty space for a new node; right-click it for a menu: templates, paste.",

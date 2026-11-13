@@ -62,7 +62,6 @@ import { PictureCaptions } from "../map/PictureCaptions";
 import { usePictureEdit } from "../hooks/usePictureEdit";
 import { pictureGroups } from "../utils/pictures";
 import { MiniMap } from "../map/MiniMap";
-import { PictureViewer } from "../map/PictureViewer";
 import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
@@ -111,7 +110,6 @@ import { useQuickAdd } from "../hooks/useQuickAdd";
 import { useZoneDisplay } from "../hooks/useZoneDisplay";
 import { usePlacement } from "../hooks/usePlacement";
 import { useChooseMode } from "../hooks/useChooseMode";
-import { hasPictures, usePictureView } from "../hooks/usePictureView";
 import { useMapControls } from "../hooks/useMapControls";
 import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
@@ -423,10 +421,9 @@ export function MapPage() {
   // Nodes glide to a changed resting spot instead of jumping — see posFor.
   const glide = usePositionGlide(positions);
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
-  // A tap or click on a node only picks it (highlighted, centered, its ring of
-  // ghosts up); its panel waits for a second tap, a double-tap, or the node's
-  // menu (docs/gestures/tap-picks-node.md). Anything else that picks a node —
-  // the reading arrows, search, creating one — opens the panel as before.
+  // A tap or click on a node opens its panel (docs/gestures/tap-opens-node.md).
+  // Only the node's right-click / hold menu picks it without opening it; the
+  // menu's Edit opens it then.
   const [panelHiddenFor, setPanelHiddenFor] = useState<string | null>(null);
   useEffect(() => {
     setPanelHiddenFor((prev) => (prev === selectedId ? prev : null));
@@ -1047,16 +1044,11 @@ export function MapPage() {
       return;
     }
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
-    // While reading (any view but the default icons), a node with pictures
-    // shows them first; closing them opens its panel (closePictureView).
-    if (modeOf(node.nodeId) !== "actual" && node.nodeId !== selectedId && hasPictures(node)) {
-      openPictureView(node);
-      return;
-    }
-    // The first tap picks the node; a tap on the node already picked opens it.
-    const opening = node.nodeId === selectedId;
+    // A tap or click on any node opens its panel on the Info tab: a weapon,
+    // a node under attack, a card in the cards view, one with pictures (they
+    // show in the Info tab) — docs/gestures/tap-opens-node.md.
     selectNodeFromClick(node);
-    setPanelHiddenFor(opening ? null : node.nodeId);
+    setPanelHiddenFor(null);
   }
 
   // Opens a node's panel on purpose (its menu's Edit), not just picking it.
@@ -1065,12 +1057,6 @@ export function MapPage() {
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
     selectNodeFromClick(node);
     setPanelHiddenFor(null);
-  }
-
-  // Closing a node's pictures leaves it picked, not opened.
-  function pickNodeQuietly(node: NodeDoc) {
-    selectNodeFromClick(node);
-    setPanelHiddenFor(node.nodeId);
   }
 
   // Replaying the map from its first node — see hooks/useTimeLapse.ts.
@@ -1090,7 +1076,6 @@ export function MapPage() {
     onStart: () => {
       setSelectedId(null);
       setMultiSelectIds(new Set());
-      clearPictureView();
       closeSiege();
     },
   });
@@ -1118,15 +1103,12 @@ export function MapPage() {
     }
     const next = stepAlong(order, selectedId, dir);
     if (!next) return;
-    clearPictureView();
     setSteppedToId(next);
     setSelectedId(next);
     centerOnNode(next);
     if (focusText) setFocusTextNodeId(next);
   }
 
-  // A node's pictures, full size before its panel — see hooks/usePictureView.ts.
-  const { pictureView, openPictureView, closePictureView, clearPictureView } = usePictureView(nodes, pickNodeQuietly);
 
   function selectNodeFromClick(node: NodeDoc) {
     setSelectedId(node.nodeId);
@@ -1503,8 +1485,7 @@ export function MapPage() {
   // A node just made through the inline input: its panel opens focused on
   // the text (see NodePanel's autoFocusText) — cleared once that's done.
   const [focusTextNodeId, setFocusTextNodeId] = useState<string | null>(null);
-  // The node the ← / → arrows last stepped to: its panel opens on Info, even
-  // for an attack on your own node (which otherwise opens on Attack).
+  // The node the ← / → arrows last stepped to (useChompRuns reads it).
   const [steppedToId, setSteppedToId] = useState<string | null>(null);
   // A node being made is brought to the middle of the screen below its panel,
   // with the emoji ring around it.
@@ -2448,7 +2429,6 @@ export function MapPage() {
                 onApplyTemplate={(kind) => applyTemplate(kind, selectedNode)}
                 onClose={() => setSelectedId(null)}
                 onStepNode={stepReading}
-                stepped={steppedToId === selectedNode.nodeId}
                 onSelectNode={(id) => {
                   setSelectedId(id);
                   // Same "chosen node is always centered" rule handleNodeClick
@@ -2520,7 +2500,6 @@ export function MapPage() {
         />
       )}
 
-      {pictureView && <PictureViewer key={pictureView.nodeId} images={pictureView.images} onClose={closePictureView} />}
 
       {nodeMenu && (
         <NodeContextMenu

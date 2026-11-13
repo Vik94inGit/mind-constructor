@@ -343,6 +343,12 @@ const ui: UiStrings = {
     done: (name) => `${name} · hotovo!`,
     minimap: (percent) => `Obrázky nakresleny z ${percent} %`,
     failed: "Obrázek se nepodařilo nakreslit.",
+    panel: {
+      map: (name) => `${name}: jeho body, tento označený`,
+      rest: "Zbytek obrázku",
+      dot: (n) => `Bod ${n}`,
+      open: (label) => `Otevřít ${label}`,
+    },
     edit: {
       open: "Klepnutím obrázek zvětšíte, zmenšíte, obarvíte nebo přesunete",
       bar: "Velikost a místo obrázku",
@@ -747,14 +753,14 @@ const ui: UiStrings = {
   gestureHint: {
     title: "Jak pracovat s mapou",
     touch: [
-      "Klepnutím uzel vyberete, dalším klepnutím ho otevřete; klepnutím na kruh kolem něj přidáte myšlenku.",
+      "Klepnutím na uzel ho otevřete; klepnutím na kruh kolem něj přidáte myšlenku.",
       "Uzel přesunete tažením. Podržením a puštěním ho vyberete, dalšími vyberete skupinu a pak ji přetáhnete.",
       "Podržením zóny otevřete její menu: kopírovat text, tvar, smazat, vzhled.",
       "Dvojitým klepnutím na prázdné místo vytvoříte nový uzel; podržením otevřete menu: šablony, vložit.",
       "Sevřením prstů měníte přiblížení; oko určuje, kolik detailů vidíte.",
     ],
     mouse: [
-      "Kliknutím uzel vyberete, dalším kliknutím ho otevřete; kliknutím na kruh kolem něj přidáte myšlenku.",
+      "Kliknutím na uzel ho otevřete; kliknutím na kruh kolem něj přidáte myšlenku.",
       "Shift+klik nebo tažení po prázdném místě vybere skupinu, pak ji přetáhněte.",
       "Pravým klikem na zónu otevřete její menu: kopírovat text, tvar, smazat, vzhled.",
       "Dvojklikem na prázdné místo vytvoříte nový uzel; pravým klikem otevřete menu: šablony, vložit.",
