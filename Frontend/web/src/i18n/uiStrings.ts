@@ -82,6 +82,8 @@ export interface UiStrings {
     failed: string;
     /** The bar a tap on a picture's caption opens (hooks/usePictureEdit.ts). */
     edit: { open: string; bar: string; bigger: string; smaller: string; move: string; close: string; color: string; resizeFailed: string };
+    /** A dot's node panel (map/nodePanel/PictureDots.tsx): the picture's dots on top, its other dots in a list under the text. */
+    panel: { map: (name: string) => string; rest: string; dot: (n: number) => string; open: (label: string) => string };
   };
   contextMenu: {
     createBranch: string;
@@ -837,6 +839,12 @@ const en: UiStrings = {
     done: (name) => `${name} · done!`,
     minimap: (percent) => `Pictures ${percent}% drawn`,
     failed: "Couldn't draw the picture.",
+    panel: {
+      map: (name) => `${name}: its dots, this one marked`,
+      rest: "The rest of the picture",
+      dot: (n) => `Dot ${n}`,
+      open: (label) => `Open ${label}`,
+    },
     edit: {
       open: "Tap to resize it, colour it or move it",
       bar: "Picture size and place",

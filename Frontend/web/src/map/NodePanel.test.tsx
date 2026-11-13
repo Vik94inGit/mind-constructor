@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NodePanel } from "./NodePanel";
 import { I18nProvider } from "../i18n/I18nContext";
@@ -192,6 +192,33 @@ describe("NodePanel", () => {
     const text = document.querySelector("#node-text")!;
     expect(text.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(edit.compareDocumentPosition(pictures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("opens a picture's dot on its dots, then the text, then the rest of the picture", async () => {
+    const pic = (dot: number) => ({ id: "p1", kind: "heart", dot });
+    const here = makeNode({ nodeId: "d0", text: "Family", x: 0, y: 0, picture: pic(0) });
+    const nodes = [
+      here,
+      makeNode({ nodeId: "d1", text: "", prompt: "Who do you love?", ghost: true, x: 50, y: 20, picture: pic(1) }),
+      makeNode({ nodeId: "d2", text: "Music", x: 80, y: 60, picture: pic(2) }),
+    ];
+    const onSelectNode = vi.fn();
+    renderPanel({ node: here, nodes, edges: [], onSelectNode });
+    const map = screen.getByTestId("picture-dots-map");
+    const text = document.querySelector("#node-text")!;
+    const list = screen.getByTestId("picture-dots-list");
+    expect(map.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(text.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(list.textContent).toContain("Who do you love?");
+    expect(list.textContent).not.toContain("Family");
+    await userEvent.click(within(list).getByRole("button", { name: /Music/ }));
+    expect(onSelectNode).toHaveBeenCalledWith("d2");
+  });
+
+  it("shows no picture dots for an ordinary node", () => {
+    renderPanel();
+    expect(screen.queryByTestId("picture-dots-map")).toBeNull();
+    expect(screen.queryByTestId("picture-dots-list")).toBeNull();
   });
 
   it("hides Protect in Personal mode", () => {

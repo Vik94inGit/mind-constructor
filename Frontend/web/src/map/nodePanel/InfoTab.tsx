@@ -61,6 +61,10 @@ interface Props {
   onClose: () => void;
   /** The node's pictures (ImagesSection), shown after the text and its buttons (Save change). */
   imagesSection?: ReactNode;
+  /** A picture's dot: the picture's dots, shown first, above the text (nodePanel/PictureDots.tsx). */
+  pictureMap?: ReactNode;
+  /** A picture's dot: its other dots, listed after the text, its buttons and pictures. */
+  pictureList?: ReactNode;
   /** Pictures dropped anywhere on the post box. Unset when this viewer can't add any. */
   onDropImages?: (files: File[]) => void;
   /** Saves the text, then opens the previous (-1) or next (1) node — the arrow keys at either end of the text. */
@@ -74,7 +78,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   // Pasted text that didn't fit (utils/nodeText.ts), offered for a new node.
@@ -85,6 +89,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
   const textChanged = textDraft.trim() !== "" && textDraft.trim() !== node.text;
   return (
     <div className="mt-2">
+      {pictureMap}
       {/* The node's title, when it has one — read-only here for
           everyone; the owner edits it under Modify. */}
       {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink"><MathText text={node.title} /></div>}
@@ -291,6 +296,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
           {imagesSection}
         </div>
       )}
+      {pictureList}
     <div className="mt-3">
       {(onChangeParent || onSwapWithParent || onMoveToMap || onAutoPack) && (
         <div className="mb-2 flex flex-wrap items-center gap-2">

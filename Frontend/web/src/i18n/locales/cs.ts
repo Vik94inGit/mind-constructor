@@ -343,6 +343,12 @@ const ui: UiStrings = {
     done: (name) => `${name} · hotovo!`,
     minimap: (percent) => `Obrázky nakresleny z ${percent} %`,
     failed: "Obrázek se nepodařilo nakreslit.",
+    panel: {
+      map: (name) => `${name}: jeho body, tento označený`,
+      rest: "Zbytek obrázku",
+      dot: (n) => `Bod ${n}`,
+      open: (label) => `Otevřít ${label}`,
+    },
     edit: {
       open: "Klepnutím obrázek zvětšíte, zmenšíte, obarvíte nebo přesunete",
       bar: "Velikost a místo obrázku",

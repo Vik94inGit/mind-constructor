@@ -212,6 +212,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   pictures show in the Info tab, and an attack on your own node keeps its Attack tab ready to strike
   back). Only the node's right-click or hold menu picks it without opening it; the menu's *Edit*
   opens it (`pages/MapPage.tsx` `handleNodeClick`, [sketch](../../docs/gestures/tap-opens-node.md)).
+- **A picture's dot opens on its picture** — the Info tab of a dot of *Draw a picture* shows the
+  picture's dots first (as they sit on the map, the written ones filled, this one ringed), then the
+  text, then the picture's other dots as a list with their text or question; a tap on a dot in either
+  opens that one (`map/nodePanel/PictureDots.tsx`).
 - **Node panel under the node** — the node panel (and the pack picker and new-node panel) is a bottom
   sheet, half the screen, with the node's text first and its type's symbol in its header; the chosen node
   is centered in the half above it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a

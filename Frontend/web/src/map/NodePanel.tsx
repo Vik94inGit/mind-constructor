@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf } from "../utils/nodeType";
 import { NODE_TYPE_TEMPLATE } from "../utils/templates";
+import { PictureDotsList, PictureDotsMap, pictureGroupOf } from "./nodePanel/PictureDots";
 import type { NodeTemplateKind, TemplateKind } from "../utils/templates";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ringKindFor } from "./OutcomeBadge";
@@ -266,6 +267,8 @@ export function NodePanel({
   // Growing a template branch — only offered on a node that has no branch
   // yet (Problem, Solution or Idea: a ready structure; Fail: analyze and retry).
   const hasChildren = nodes.some((n) => nodeRefId(n.parentId) === node.nodeId);
+  // A dot of a "Draw a picture": its Info tab opens on the picture's dots.
+  const pictureGroup = useMemo(() => pictureGroupOf(node, nodes), [node, nodes]);
   const templateKind: NodeTemplateKind | null =
     !isCreator || hasChildren || node.isWeapon || node.isProtection ? null : (NODE_TYPE_TEMPLATE[node.type] ?? null);
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
@@ -646,6 +649,8 @@ export function NodePanel({
           onDelete={handleDelete}
           onTemplate={handleTemplate}
           onClose={onClose}
+          pictureMap={pictureGroup && <PictureDotsMap group={pictureGroup} nodeId={node.nodeId} onSelect={onSelectNode} />}
+          pictureList={pictureGroup && <PictureDotsList group={pictureGroup} nodeId={node.nodeId} onSelect={onSelectNode} />}
           imagesSection={
             <ImagesSection
               images={images}
