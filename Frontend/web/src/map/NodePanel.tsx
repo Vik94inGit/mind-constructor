@@ -134,10 +134,25 @@ interface Props {
   /** Opens the previous (-1) or next (1) node in reading order (utils/nodeOrder.ts) — the text's arrow keys. */
   /** Read the previous / next node; `focusText: false` keeps focus where it is (the header's buttons). */
   onStepNode?: (dir: -1 | 1, focusText?: boolean) => void;
+  // One of several panels open at once (docs/gestures/several-panels.md): it
+  // fills its tile instead of docking as the sheet, and can't be dragged or
+  // resized.
+  tiled?: boolean;
+  // The active panel (the node last tapped): an accent border when tiled.
+  active?: boolean;
+  // A press inside a tiled panel that isn't active makes it the active one.
+  onActivate?: () => void;
 }
+
+// A tile among several open panels (MapPage's grid lays them out).
+const TILE_CLASS =
+  "relative flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border bg-surface shadow-[var(--shadow-card)]";
 
 export function NodePanel({
   onStepNode,
+  tiled = false,
+  active = true,
+  onActivate,
   node,
   nodes,
   edges,
@@ -512,12 +527,14 @@ export function NodePanel({
   return (
     <div
       ref={panelRef}
-      className={PANEL_CLASS}
+      className={tiled ? `${TILE_CLASS} ${active ? "border-2 border-accent" : "border-line"}` : PANEL_CLASS}
       data-node-panel
+      data-active-panel={active ? "" : undefined}
+      onPointerDownCapture={tiled && !active ? onActivate : undefined}
       // A screenshot pasted anywhere in the panel (the text field included)
       // lands on the node as a picture; pasting plain text is left alone.
       onPaste={onPanelPaste}
-      style={{
+      style={tiled ? undefined : {
         ...(dragOffset.x || dragOffset.y ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined),
         // Overrides PANEL_CLASS's own responsive max-height cap the moment
         // someone's actually resized this — see panelHeight's own doc
@@ -531,13 +548,15 @@ export function NodePanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-3">
       {/* Grip: the only way to drag the sheet off its dock, kept apart so the
           tabs and ✕ stay plain tap targets. touch-none stops the page scrolling. */}
-      <div
-        className="-mx-5 mb-2 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
-        onPointerDown={onGripPointerDown}
-        title={t.ui.panelDragHandle}
-      >
-        <div className="h-[0.28rem] w-[2.5rem] rounded-full bg-line" aria-hidden />
-      </div>
+      {!tiled && (
+        <div
+          className="-mx-5 mb-2 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
+          onPointerDown={onGripPointerDown}
+          title={t.ui.panelDragHandle}
+        >
+          <div className="h-[0.28rem] w-[2.5rem] rounded-full bg-line" aria-hidden />
+        </div>
+      )}
       {/* Type, byline and tabs share one row (wrapping on a narrow phone), so
           the node's text shows up sooner. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line pb-[0.7rem]">
@@ -759,25 +778,31 @@ export function NodePanel({
           the panel's content in the markup (order-first draws it on top), so
           Tab reaches the type, the tabs, close and the open tab's content
           before these arrows. */}
+      {(!tiled || onStepNode) && (
       <div className="order-first flex flex-shrink-0 items-center gap-2 px-3 pt-2">
         {onStepNode && (
           <button className={stepBtn} title={t.ui.node.prevNode} aria-label={t.ui.node.prevNode} onClick={() => onStepNode(-1, false)}>
             ←
           </button>
         )}
-        <div
-          className="flex h-[2.75rem] flex-1 touch-none cursor-ns-resize items-center justify-center select-none"
-          onPointerDown={onResizeHandlePointerDown}
-          title={t.ui.panelResizeHandle}
-        >
-          <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
-        </div>
+        {tiled ? (
+          <div className="flex-1" />
+        ) : (
+          <div
+            className="flex h-[2.75rem] flex-1 touch-none cursor-ns-resize items-center justify-center select-none"
+            onPointerDown={onResizeHandlePointerDown}
+            title={t.ui.panelResizeHandle}
+          >
+            <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
+          </div>
+        )}
         {onStepNode && (
           <button className={stepBtn} title={t.ui.node.nextNode} aria-label={t.ui.node.nextNode} onClick={() => onStepNode(1, false)}>
             →
           </button>
         )}
       </div>
+      )}
     </div>
   );
 }

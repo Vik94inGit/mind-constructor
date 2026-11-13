@@ -116,6 +116,35 @@ describe("MapPage", () => {
     await waitFor(() => expect(screen.queryByDisplayValue("some text")).toBeNull());
   });
 
+  it("keeps panels open side by side, two on a phone, each closed by its own ✕", async () => {
+    vi.mocked(nodesApi.listNodes).mockResolvedValue([
+      makeNode({ nodeId: "a", title: "Alpha", text: "text A", x: 900, y: 600 }),
+      makeNode({ nodeId: "b", title: "Beta", text: "text B", x: 1300, y: 700 }),
+      makeNode({ nodeId: "c", title: "Gamma", text: "text C", x: 1100, y: 900 }),
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => nodeEl("a"));
+    await openNodePanel(user, "a");
+    expect(await screen.findByDisplayValue("text A")).toBeInTheDocument();
+    await openNodePanel(user, "b");
+    expect(await screen.findByDisplayValue("text B")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("text A")).toBeInTheDocument();
+    expect(document.querySelectorAll("[data-node-panel]")).toHaveLength(2);
+    // A third on a phone: the oldest closes.
+    await openNodePanel(user, "c");
+    expect(await screen.findByDisplayValue("text C")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByDisplayValue("text A")).toBeNull());
+    expect(screen.getByDisplayValue("text B")).toBeInTheDocument();
+    // The active panel's ✕ closes just it; the other becomes active.
+    const active = document.querySelector<HTMLElement>("[data-node-panel][data-active-panel]")!;
+    expect(within(active).getByDisplayValue("text C")).toBeInTheDocument();
+    await user.click(within(active).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByDisplayValue("text C")).toBeNull());
+    expect(screen.getByDisplayValue("text B")).toBeInTheDocument();
+    expect(document.querySelectorAll("[data-node-panel]")).toHaveLength(1);
+  });
+
   it("steps to the next and previous node with the arrow keys at the ends of the text", async () => {
     vi.mocked(nodesApi.listNodes).mockResolvedValue([
       makeNode({ nodeId: "a", title: "Alpha", text: "text A", x: 900, y: 600 }),
