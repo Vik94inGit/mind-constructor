@@ -23,7 +23,7 @@ describe("ImagesSection templates", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { onAdd, container } = setup();
     await userEvent.click(screen.getByRole("button", { name: s.templates }));
-    expect(container.querySelectorAll("[data-template]")).toHaveLength(10);
+    expect(container.querySelectorAll("[data-template]")).toHaveLength(11);
     await userEvent.click(screen.getByRole("button", { name: s.templateNames.lightbulb }));
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
     expect(fetchMock).toHaveBeenCalledWith("/picture-templates/lightbulb.webp");
@@ -40,7 +40,7 @@ describe("ImagesSection templates", () => {
     await userEvent.click(screen.getByRole("button", { name: s.templateNames.eyes }));
     expect(await screen.findByText(s.templateFailed)).toBeTruthy();
     expect(onAdd).not.toHaveBeenCalled();
-    expect(container.querySelectorAll("[data-template]")).toHaveLength(10);
+    expect(container.querySelectorAll("[data-template]")).toHaveLength(11);
     vi.unstubAllGlobals();
   });
 

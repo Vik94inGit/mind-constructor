@@ -1435,6 +1435,7 @@ const en: UiStrings = {
       puppet: "Puppet hand",
       heartMirror: "Heart and mirror",
       lightbulb: "Light bulb",
+      goalCake: "Cake with a target",
     },
   },
   emoji: {

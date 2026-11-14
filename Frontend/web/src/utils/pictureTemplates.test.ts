@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { MAP_KIND_PICTURES, PICTURE_TEMPLATES, pickMapKindPicture, pictureTemplateFile, pictureTemplateThumb, pictureTemplateUrl } from "./pictureTemplates";
 
 describe("picture templates", () => {
-  it("offers the ten paintings, each once", () => {
-    expect(PICTURE_TEMPLATES).toHaveLength(10);
-    expect(new Set(PICTURE_TEMPLATES).size).toBe(10);
+  it("offers the eleven paintings, each once", () => {
+    expect(PICTURE_TEMPLATES).toHaveLength(11);
+    expect(new Set(PICTURE_TEMPLATES).size).toBe(11);
   });
 
   it("has a thumbnail and a full painting for each", () => {
@@ -39,8 +39,9 @@ describe("structure pictures", () => {
     expect(pickMapKindPicture("retro", () => 0)).toBe("heartMirror");
     expect(pickMapKindPicture("retro", () => 0.99)).toBe("clockHeads");
     expect(pickMapKindPicture("goal", () => 0)).toBe("clockJuice");
-    expect(pickMapKindPicture("goal", () => 0.5)).toBe("orangeClock");
-    expect(pickMapKindPicture("goal", () => 0.999)).toBe("fishing");
+    expect(pickMapKindPicture("goal", () => 0.3)).toBe("orangeClock");
+    expect(pickMapKindPicture("goal", () => 0.6)).toBe("fishing");
+    expect(pickMapKindPicture("goal", () => 0.999)).toBe("goalCake");
   });
 
   it("only offers paintings that exist", () => {

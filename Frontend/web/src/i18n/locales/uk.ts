@@ -904,6 +904,7 @@ const ui: UiStrings = {
       puppet: "Рука лялькаря",
       heartMirror: "Серце і дзеркало",
       lightbulb: "Лампочка",
+      goalCake: "Торт із мішенню",
     },
   },
   emoji: {
