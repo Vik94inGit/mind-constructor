@@ -798,7 +798,7 @@ const ui: UiStrings = {
     again: "Projít ty nejisté",
     restart: "Začít znovu",
     done: "Hotovo",
-    empty: "Zatím není z čeho zkoušet: dej uzlu potomky, nebo název a text",
+    empty: "Zatím není z čeho zkoušet: dej ✅ pod ❓, problémem nebo cílem",
   },
   presentation: {
     exit: "Ukončit",

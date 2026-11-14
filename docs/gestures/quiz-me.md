@@ -9,11 +9,10 @@ Date: 2026-11-09 · PR: <link once it exists>
 ## The gesture
 
 - **How it starts:** a **Quiz me** row in the empty-canvas menu (hold or right-click empty canvas), next to *Text → nodes*, and in the Display (layers) menu next to *Presentation*. It opens a full-screen card over the map, like presentation mode does.
-- **Which nodes become cards:**
-  - A node with a title and a text: the title is the question and the text is the answer.
-  - A parent with children: the parent is the question and its children's titles are the answer, as a list.
-  - An answered ghost: its question (`prompt`) is the question and what the user wrote is the answer.
-  - Nodes with nothing to hide (text only, no children) are skipped.
+- **Which nodes become cards (changed 2026-11-14):**
+  - Only a ❓ (unknown), a Problem or a goal (Solution) node asks. Its title (or text, or a ghost's question) is the question.
+  - The answer is its ✅ (Success) children, as a list. Children of other types are left out of the answer.
+  - Any other node, or an asking node with no ✅ under it, makes no card.
   - Cards come in map order, the same order presentation mode uses.
 - **Touch:** tap the card, or **Show answer**, to turn it over. Then tap one of three buttons under it: **Not yet** (red), **Shaky** (amber) or **Know it** (green). The next card comes up.
 - **Mouse / keyboard:** click works the same way. Space turns the card over, 1 / 2 / 3 pick the mark, and ← steps back one card.
@@ -57,4 +56,4 @@ Task given: "You made this map to learn for a test. Check what you know." (Quiz 
 
 ## Decision
 
-Built as above: Quiz me from the empty-canvas menu and the layers menu, a full-screen card that turns on a tap or Space, three marks (1 / 2 / 3), a round that starts with what isn't known yet, and *Go over the shaky ones* at the end. Marks are private (`MapViewState.quizMarks`) and draw nothing on the map. Cards come from the map alone: parent → children, title → text, ghost prompt → answer.
+Built as above: Quiz me from the empty-canvas menu and the layers menu, a full-screen card that turns on a tap or Space, three marks (1 / 2 / 3), a round that starts with what isn't known yet, and *Go over the shaky ones* at the end. Marks are private (`MapViewState.quizMarks`) and draw nothing on the map. Cards come from the map alone: parent → children, title → text, ghost prompt → answer. Since 2026-11-14 only ❓, Problem and goal nodes ask, and only their ✅ children answer.

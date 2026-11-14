@@ -1299,7 +1299,7 @@ const en: UiStrings = {
     again: "Go over the shaky ones",
     restart: "Start again",
     done: "Done",
-    empty: "Nothing to quiz yet: give a node children, or a title and a text",
+    empty: "Nothing to quiz yet: put a ✅ under a ❓, a problem or a goal",
   },
   presentation: {
     exit: "Exit",

@@ -282,8 +282,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   empty-canvas menu (hold or right-click empty canvas) or the layers menu (at its top, with Present and
   Time-lapse, so a short window never hides it; a menu beside the computer's toolbar lifts to stay on
   screen and scrolls what doesn't fit, `hooks/useKeepOnScreen.ts`), it shows one card at a time
-  over the map: a parent asks and its children answer, a title asks and its text answers, an answered
-  ghost's question asks and what was written answers (`utils/quiz.ts`). Tap the card (Space) to turn
+  over the map: only a ❓ (unknown), a Problem or a goal (Solution) asks, and its ✅ (Success) children
+  answer; other nodes, and an asking node with no ✅ under it, make no card (`utils/quiz.ts`). Tap the card (Space) to turn
   it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. Under the
   card the reader can write their own answer first (Ctrl/Cmd+Enter turns the card from the field); the
   turned card then shows *Your answer* beside the true one to compare by eye. What's written is kept
