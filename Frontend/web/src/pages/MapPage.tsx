@@ -155,6 +155,7 @@ import { TOP_ZONE, useCardFit } from "../hooks/useCardFit";
 import { outlineNumbers, zoneMembers } from "../utils/cardFit";
 import { findInbox, noteBranch } from "../utils/inbox";
 import { feature } from "../utils/usage";
+import { levelLocks } from "../utils/templateLevels";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -360,6 +361,8 @@ export function MapPage() {
   // Packed-away members are left off the canvas (NodePanel still gets every
   // node, for the container's Packed list).
   const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
+  // A leveled template's later rounds, locked until the earlier ones are answered.
+  const levelLockById = useMemo(() => levelLocks(nodes), [nodes]);
   // Parents that tuck their branch in, and the overview — see hooks/useAutoPack.ts.
   const { folded, setFolded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll } = useAutoPack(mapId, unpackedNodes);
   // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.
@@ -594,6 +597,9 @@ export function MapPage() {
     slideIndex,
     setSlideIndex,
     slideGroups,
+    summaryNodes,
+    typeFilter,
+    setTypeFilter,
     enterPresentation,
     presentZone,
     exitPresentation,
@@ -997,6 +1003,12 @@ export function MapPage() {
   // Owner-only — text/type editing isn't otherwise restricted (an earlier
   // version locked it once a node had taken any damage, but that blocked
   // ordinary corrections too aggressively; see NodePanel.tsx's own canEdit).
+  // What a locked ghost of a leveled template tells its reader (utils/templateLevels.ts).
+  function levelLockFor(nodeId: string): string | undefined {
+    const lock = levelLockById.get(nodeId);
+    return lock ? t.ui.templates.locked(lock.waitFor, lock.left) : undefined;
+  }
+
   function canEditNode(node: NodeDoc) {
     return isOwnNode(node) && !blockLocks[node.nodeId];
   }
@@ -1028,7 +1040,7 @@ export function MapPage() {
     setSelectedId(node.nodeId);
     setPanelHiddenFor(null);
     centerOnNode(node.nodeId);
-    if (!canEditNode(node)) return;
+    if (!canEditNode(node) || levelLockById.has(node.nodeId)) return;
     await ensureNodeText([node.nodeId]);
     setFocusTextNodeId(node.nodeId);
   }
@@ -1183,6 +1195,7 @@ export function MapPage() {
         centerOnNode(panelFor.nodeId);
       }}
       textLocked={!!blockLocks[panelFor.nodeId]}
+      levelLock={levelLockFor(panelFor.nodeId)}
       autoFocusText={focusTextNodeId === panelFor.nodeId}
       onAutoFocused={() => setFocusTextNodeId(null)}
       onToggleLock={isOwnNode(panelFor) ? () => toggleBlockLock(panelFor.nodeId) : undefined}
@@ -2191,7 +2204,8 @@ export function MapPage() {
                           : "invalid"
                         : undefined
                   }
-                  inlineEditing={editingThis}
+                  inlineEditing={editingThis && !levelLockById.has(node.nodeId)}
+                  levelLocked={levelLockById.has(node.nodeId)}
                   actions={nodeActions}
                   canResize={canEditNode(node)}
                   cardFill={cardFills[node.nodeId]}
@@ -2411,6 +2425,9 @@ export function MapPage() {
           {presenting && (
             <PresentationOverlay
               slides={slideGroups}
+              summaryNodes={summaryNodes}
+              typeFilter={typeFilter}
+              onTypeFilterChange={setTypeFilter}
               index={Math.min(slideIndex, Math.max(0, slideGroups.length - 1))}
               onIndexChange={setSlideIndex}
               onExit={exitPresentation}

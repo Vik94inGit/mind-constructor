@@ -123,6 +123,17 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+- **Template levels** — a template asks its questions in rounds (`Node.level`, `utils/templates.ts`). Every
+  round's ghosts are on the canvas from the start, but a later round's are fainter, wear a 🔒 before
+  their question and can't be written in until every question of the rounds before it under the same
+  template root is answered or deleted; their panel says which level to answer first and how many are
+  left (`utils/templateLevels.ts`). *Develop an idea* asks: 1) what the idea is, how you feel about it,
+  what problem it solves, why it would work and the profit; 2) the possibilities, the problems and
+  obstacles, the plan and how you feel now; 3) what was done successfully, what failed, what it brings to
+  the table, how you feel about it and whether it is finished as it is, drawn as one ring per round.
+  The other templates are leveled too (problem: parts, then ways and a plan, then results; goal: the
+  criterion, then steps and obstacle, then review; decision: options, then their pros and risks; retro
+  and retry: what happened, then what to change).
 - **Map background** — the map's owner picks it in the display menu (the layers button): dot grid, plain,
   lined paper or soft dark (`Map.background`), plus an optional soft colour from the zones' calm palette
   (`Map.backgroundColor`), mixed into the paper so it stays muted (`softTint` in `src/utils/zoneStyle.ts`,
@@ -471,6 +482,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   if it has one. A slide's text is sized to its length so it fits on the screen: a long thought gets
   smaller and reads left-aligned, and the *Under …* line shows two lines of the parent (`slideHeadSize`). The canvas under
   the slides stays as it was, so *Exit* lands back on exactly the view the presentation started from.
+  Type chips under the header (*All*, then one per type the map has, with its count) narrow the slides
+  and the summary to the picked types. The **Summary** tab gathers the map up instead of stepping
+  through it (`src/utils/mapSummary.ts`, `src/map/PresentationSummary.tsx`): a map without a template
+  lists its nodes grouped by type; a template map (some node still has a ghost's question) lists each
+  question with its answer (or *Not answered yet*), grouped by template level (`Node.level`; the root and
+  unleveled questions first), each level with *N of M answered* and a progress bar, and a lock line on a
+  level whose level before it isn't filled in yet. The user's own nodes in a template map follow as
+  *Your other notes*. Tapping a row opens its slide, or, for an unanswered question, the node on the map.
 - **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
   children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the
   spot that was in the middle of the screen when that spot still shows a node; a search result opens on

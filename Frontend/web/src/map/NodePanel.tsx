@@ -112,6 +112,8 @@ interface Props {
   cardLook?: CardLook;
   /** Its owner locked this text block (utils/blockLock.ts): the text reads as for anyone else's node until unlocked. */
   textLocked?: boolean;
+  /** Set on a locked ghost of a leveled template (utils/templateLevels.ts): why it can't be written in yet. */
+  levelLock?: string;
   /** Locks/unlocks this node — owner only. */
   onToggleLock?: () => void;
   /** Set on a parent with nodes of yours: pulls those outside its zone back in (utils/parentMagnet.ts), resolving to how many moved. */
@@ -179,6 +181,7 @@ export function NodePanel({
   feeling,
   cardLook,
   textLocked = false,
+  levelLock,
   onToggleLock,
   onMagnet,
   onChangeParent,
@@ -644,6 +647,7 @@ export function NodePanel({
           feeling={feeling}
           cardLook={cardLook}
           textLocked={textLocked}
+          levelLock={levelLock}
           onToggleLock={onToggleLock}
           onMagnet={onMagnet}
           onChangeParent={onChangeParent}
@@ -683,7 +687,7 @@ export function NodePanel({
               cardImage={node.cardImage}
               onSetCard={isCreator ? (i) => setImageAs("cardImage", i) : undefined}
               extra={
-                isCreator && !textLocked ? (
+                isCreator && !textLocked && !levelLock ? (
                   <span
                     className={`text-[0.7rem] tabular-nums ${textDraft.length >= MAX_NODE_TEXT ? "font-semibold text-danger" : "text-ink-soft"}`}
                   >

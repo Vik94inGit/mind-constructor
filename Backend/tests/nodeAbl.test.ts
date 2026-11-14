@@ -84,6 +84,18 @@ describe("nodeAbl", () => {
       expect(created.prompt).toBe("What could go wrong?");
     });
 
+    it("keeps which level of a template a ghost belongs to, and refuses a level out of range", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1" } as never);
+      vi.mocked(countNodesByMapInternalIdDao).mockResolvedValue(1 as never);
+      vi.mocked(createNodeMutationDao).mockResolvedValue({ nodeId: "n1" } as never);
+
+      await createNodeAbl({ text: "", type: "Option", prompt: "What is the plan?", level: 2 }, "pub123", "user1");
+      expect(vi.mocked(createNodeMutationDao).mock.calls[0][1].level).toBe(2);
+
+      await expect(createNodeAbl({ text: "", type: "Option", level: 0 }, "pub123", "user1")).rejects.toThrow(ValidationError);
+      await expect(createNodeAbl({ text: "", type: "Option", level: 1.5 }, "pub123", "user1")).rejects.toThrow(ValidationError);
+    });
+
     it("keeps which dot of a picture a node is", async () => {
       vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1" } as never);
       vi.mocked(countNodesByMapInternalIdDao).mockResolvedValue(1 as never);

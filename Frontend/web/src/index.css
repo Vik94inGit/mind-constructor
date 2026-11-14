@@ -169,6 +169,13 @@
 .node-fade-ghost:hover {
   opacity: calc(1 - 0.25 * var(--node-fade, var(--node-fade-auto, 1)));
 }
+/* A ghost whose template round hasn't come yet (utils/templateLevels.ts): fainter than a ghost. */
+.node-fade-locked {
+  opacity: calc(1 - 0.75 * var(--node-fade, var(--node-fade-auto, 1)));
+}
+.node-fade-locked:hover {
+  opacity: calc(1 - 0.5 * var(--node-fade, var(--node-fade-auto, 1)));
+}
 .node-fade-quiet {
   opacity: calc(1 - 0.5 * var(--node-fade, var(--node-fade-auto, 1)));
 }
