@@ -173,6 +173,8 @@ export interface MapDoc {
   backgroundImage?: string;
   /** How much darker (below 0) or lighter (above 0) the wallpaper is drawn, -100..100 (Map.backgroundShade). 0 / absent: as it is. */
   backgroundShade?: number;
+  /** The order the owner chose for the presentation's slides (Map.slideOrder): nodeIds, first slide first. Empty / absent: the automatic order (utils/presentation.ts applySlideOrder). */
+  slideOrder?: string[];
   /** When the owner finished the discussion (Map.finishedAt) — null / absent: still open. A finished map takes no new nodes, attacks or shields until reopened. */
   finishedAt?: string | null;
   /** Members other than the owner who agreed to finish (user ids) — see utils/finish.ts. */

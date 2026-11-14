@@ -870,6 +870,11 @@ const ui: UiStrings = {
     locked: (prev) => `Відкриється, коли рівень ${prev} буде заповнено`,
     otherNotes: "Ваші інші нотатки",
     byTypeTitle: "За типами",
+    orderTab: "Порядок",
+    orderHint: "Порядок, у якому йдуть слайди, для всіх, хто показує цю карту.",
+    moveUp: (slide) => `Підняти вище: ${slide}`,
+    moveDown: (slide) => `Опустити нижче: ${slide}`,
+    automaticOrder: "Повернути автоматичний порядок",
   },
   exportText: { title: (name) => `Експорт тексту — «${name}»`, download: "Завантажити .md" },
   summary: {

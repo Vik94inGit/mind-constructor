@@ -862,6 +862,11 @@ const ui: UiStrings = {
     locked: (prev) => `Otevře se po vyplnění úrovně ${prev}`,
     otherNotes: "Vaše další poznámky",
     byTypeTitle: "Podle typu",
+    orderTab: "Pořadí",
+    orderHint: "Pořadí, ve kterém se snímky promítají, pro každého, kdo tuto mapu prezentuje.",
+    moveUp: (slide) => `Posunout nahoru: ${slide}`,
+    moveDown: (slide) => `Posunout dolů: ${slide}`,
+    automaticOrder: "Zpět na automatické pořadí",
   },
   exportText: { title: (name) => `Export textu — „${name}“`, download: "Stáhnout .md" },
   summary: {

@@ -504,6 +504,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   unleveled questions first), each level with *N of M answered* and a progress bar, and a lock line on a
   level whose level before it isn't filled in yet. The user's own nodes in a template map follow as
   *Your other notes*. Tapping a row opens its slide, or, for an unanswered question, the node on the map.
+  The map's owner also gets an **Order** tab: every slide in the order it plays, each with an up and a
+  down arrow (buttons, so it works the same by mouse, finger or keyboard), and *Back to automatic order*
+  once an order is chosen. The order is saved on the map (`Map.slideOrder`, `useMapControls`
+  `setSlideOrder`, saved once the clicks pause) so everyone who presents the map sees it; a node made
+  later keeps its automatic place, and rearranging a zone's or some types' slides keeps the rest of the
+  saved order (`applySlideOrder`, `mergeSlideOrder` in `src/utils/presentation.ts`,
+  `src/map/SlideOrderList.tsx`).
 - **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
   children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the
   spot that was in the middle of the screen when that spot still shows a node; a search result opens on

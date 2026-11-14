@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSlideGroups, computeSlideOrder, slideHeadSize, slideSubSize } from "./presentation";
+import { applySlideOrder, computeSlideGroups, computeSlideOrder, mergeSlideOrder, moveSlide, slideHeadSize, slideSubSize } from "./presentation";
 import { makeNode } from "../test/fixtures";
 
 const ids = (nodes: { nodeId: string }[]) => nodes.map((n) => n.nodeId);
@@ -96,5 +96,32 @@ describe("slideHeadSize", () => {
   it("does the same for the second line", () => {
     expect(slideSubSize("Short").align).toBe("center");
     expect(slideSubSize("x".repeat(300))).toEqual({ size: "text-[0.95rem]", align: "left" });
+  });
+});
+
+describe("a chosen slide order", () => {
+  const slides = (...idList: string[]) => idList.map((id) => ({ node: { nodeId: id } }));
+  const order = (list: { node: { nodeId: string } }[]) => list.map((s) => s.node.nodeId);
+
+  it("keeps the automatic order when none is saved", () => {
+    expect(order(applySlideOrder(slides("a", "b", "c"), undefined))).toEqual(["a", "b", "c"]);
+    expect(order(applySlideOrder(slides("a", "b", "c"), []))).toEqual(["a", "b", "c"]);
+  });
+
+  it("puts the named slides in the chosen order and leaves a new one at its automatic place", () => {
+    // d was made after the order was saved; gone was deleted.
+    expect(order(applySlideOrder(slides("a", "b", "d", "c"), ["c", "gone", "b", "a"]))).toEqual(["c", "b", "d", "a"]);
+  });
+
+  it("merges a partial show back into the whole saved order", () => {
+    expect(mergeSlideOrder(["a", "b", "c", "d", "e"], ["d", "b"])).toEqual(["a", "d", "b", "c", "e"]);
+    expect(mergeSlideOrder(["x", "y"], ["b", "a"])).toEqual(["x", "y", "b", "a"]);
+    expect(mergeSlideOrder(undefined, ["b", "a"])).toEqual(["b", "a"]);
+  });
+
+  it("moves one slide up or down, clamped to the list", () => {
+    expect(moveSlide(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
+    expect(moveSlide(["a", "b", "c"], 0, 1)).toEqual(["b", "a", "c"]);
+    expect(moveSlide(["a", "b", "c"], 0, -1)).toEqual(["a", "b", "c"]);
   });
 });

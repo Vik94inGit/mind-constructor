@@ -8,6 +8,7 @@ import { useState } from "react";
 import type { NodeDoc, NodeType } from "../types";
 import { PresentationSummary, TypeFilterChips } from "./PresentationSummary";
 import { slideHeadSize, slideSubSize } from "../utils/presentation";
+import { SlideOrderList } from "./SlideOrderList";
 import type { SlideGroup } from "../utils/presentation";
 import { MathText } from "./MathText";
 
@@ -24,6 +25,10 @@ interface Props {
   /** The node types picked in the chips (empty: every type); the slides arrive already narrowed to them. */
   typeFilter?: NodeType[];
   onTypeFilterChange?: (types: NodeType[]) => void;
+  /** The slide order the map's owner saved (Map.slideOrder); empty / absent: automatic. */
+  savedOrder?: string[];
+  /** Saves a new slide order (the whole map's, [] for automatic). Only for the map's owner: without it there is no Order tab. */
+  onOrderChange?: (order: string[]) => void;
 }
 
 const linkCls =
@@ -46,11 +51,13 @@ export function PresentationOverlay({
   summaryNodes = [],
   typeFilter = [],
   onTypeFilterChange,
+  savedOrder,
+  onOrderChange,
 }: Props) {
   const { t } = useI18n();
   // Slides (one node at a time) or Summary (the whole map gathered up, see
   // PresentationSummary). Personal to this presentation, starts on slides.
-  const [tab, setTab] = useState<"slides" | "summary">("slides");
+  const [tab, setTab] = useState<"slides" | "summary" | "order">("slides");
   const slide = slides[index];
   const pictures = useSlidePictures(slide?.node);
   // The picture shown full size, if any: which node's, and which of its
@@ -60,6 +67,8 @@ export function PresentationOverlay({
   const setZoomed = (i: number | null) =>
     setZoom(i === null || !slide ? null : { nodeId: slide.node.nodeId, i });
   const hasSummary = summaryNodes.length > 0;
+  // The owner's Order tab: the slides as a list to rearrange.
+  const canOrder = !!onOrderChange && slides.length > 1;
   if (!slide && !hasSummary) return null;
   const node = slide?.node;
   const children = slide?.children ?? [];
@@ -99,14 +108,21 @@ export function PresentationOverlay({
         <span className="min-w-[3.5rem] text-[0.85rem] text-ink-soft">
           {tab === "slides" && slides.length > 0 && t.ui.presentation.slideCount(index + 1, slides.length)}
         </span>
-        {hasSummary && (
+        {(hasSummary || canOrder) && (
           <div className="flex gap-1 rounded-lg bg-surface-2 p-[3px]" role="tablist">
             <button type="button" role="tab" aria-selected={tab === "slides"} className={tabCls(tab === "slides")} onClick={() => setTab("slides")}>
               {t.ui.presentation.slidesTab}
             </button>
-            <button type="button" role="tab" aria-selected={tab === "summary"} className={tabCls(tab === "summary")} onClick={() => setTab("summary")}>
-              {t.ui.presentation.summaryTab}
-            </button>
+            {hasSummary && (
+              <button type="button" role="tab" aria-selected={tab === "summary"} className={tabCls(tab === "summary")} onClick={() => setTab("summary")}>
+                {t.ui.presentation.summaryTab}
+              </button>
+            )}
+            {canOrder && (
+              <button type="button" role="tab" aria-selected={tab === "order"} className={tabCls(tab === "order")} onClick={() => setTab("order")}>
+                {t.ui.presentation.orderTab}
+              </button>
+            )}
           </div>
         )}
         <button
@@ -137,6 +153,17 @@ export function PresentationOverlay({
           <div className="mx-auto flex w-full flex-col items-center">
             <PresentationSummary nodes={summaryNodes} typeFilter={typeFilter} onPick={pickFromSummary} />
           </div>
+        ) : tab === "order" && canOrder && onOrderChange ? (
+          <SlideOrderList
+            slides={slides}
+            current={index}
+            savedOrder={savedOrder}
+            onChange={onOrderChange}
+            onPick={(i) => {
+              onIndexChange(i);
+              setTab("slides");
+            }}
+          />
         ) : !node ? (
           <p className="my-auto text-center text-ink-soft">{t.ui.presentation.noMatch}</p>
         ) : (

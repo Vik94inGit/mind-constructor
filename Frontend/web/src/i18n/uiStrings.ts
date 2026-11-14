@@ -577,6 +577,12 @@ export interface UiStrings {
     otherNotes: string;
     /** Any map's summary: its nodes grouped by type. */
     byTypeTitle: string;
+    /** The owner's tab for rearranging the slides, its one-line explanation, the arrows on each slide, and the button that drops the chosen order. */
+    orderTab: string;
+    orderHint: string;
+    moveUp: (slide: string) => string;
+    moveDown: (slide: string) => string;
+    automaticOrder: string;
   };
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
@@ -1389,6 +1395,11 @@ const en: UiStrings = {
     locked: (prev) => `Opens once level ${prev} is filled in`,
     otherNotes: "Your other notes",
     byTypeTitle: "By type",
+    orderTab: "Order",
+    orderHint: "The order the slides play in, for everyone who presents this map.",
+    moveUp: (slide) => `Move up: ${slide}`,
+    moveDown: (slide) => `Move down: ${slide}`,
+    automaticOrder: "Back to automatic order",
   },
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
   summary: {
