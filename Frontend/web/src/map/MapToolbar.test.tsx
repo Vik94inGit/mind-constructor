@@ -193,4 +193,47 @@ describe("MapToolbar", () => {
     await vi.waitFor(() => expect(onPickBackgroundImage).toHaveBeenCalledWith(file));
     expect(screen.queryByRole("dialog", { name: t.ui.mapBackground.cropTitle })).not.toBeInTheDocument();
   });
+
+  describe("on a phone", () => {
+    it("shows only Back, + and More, with the rest in the More tray", async () => {
+      const user = userEvent.setup();
+      renderToolbar({ phone: true, isOwner: true, onHistory: vi.fn() });
+      expect(screen.getAllByRole("button").length + screen.getAllByRole("link").length).toBe(3);
+      expect(screen.getByTitle(t.map.toolbar.back)).toBeInTheDocument();
+      expect(screen.getByTitle(t.map.toolbar.add)).toBeInTheDocument();
+      expect(screen.queryByTitle(t.map.toolbar.moveOff)).not.toBeInTheDocument();
+      expect(screen.queryByTitle(t.ui.siege.history.open)).not.toBeInTheDocument();
+
+      await user.click(screen.getByTitle(t.map.toolbar.more));
+      expect(screen.getByTitle(t.map.toolbar.moveOff)).toBeInTheDocument();
+      expect(screen.getByTitle(t.map.toolbar.displayMenu)).toBeInTheDocument();
+      expect(screen.getByTitle(t.ui.search.title)).toBeInTheDocument();
+      expect(screen.getByTitle(t.ui.siege.history.open)).toBeInTheDocument();
+      expect(screen.getByLabelText(t.language.label)).toBeInTheDocument();
+    });
+
+    it("folds the tray away once a tool is picked", async () => {
+      const user = userEvent.setup();
+      const { onToggleMove } = renderToolbar({ phone: true });
+      await user.click(screen.getByTitle(t.map.toolbar.more));
+      await user.click(screen.getByTitle(t.map.toolbar.moveOff));
+      expect(onToggleMove).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTitle(t.map.toolbar.moveOff)).not.toBeInTheDocument();
+    });
+
+    it("keeps the tray open while one of its menus is in use", async () => {
+      const user = userEvent.setup();
+      renderToolbar({ phone: true });
+      await user.click(screen.getByTitle(t.map.toolbar.more));
+      await user.click(screen.getByTitle(t.map.toolbar.displayMenu));
+      expect(screen.getByText(t.map.toolbar.presentation)).toBeInTheDocument();
+      expect(screen.getByTitle(t.map.toolbar.moveOff)).toBeInTheDocument();
+    });
+
+    it("keeps the docked computer panel unfolded", () => {
+      renderToolbar({ phone: true, vertical: true });
+      expect(screen.queryByTitle(t.map.toolbar.more)).not.toBeInTheDocument();
+      expect(screen.getByTitle(t.map.toolbar.moveOff)).toBeInTheDocument();
+    });
+  });
 });

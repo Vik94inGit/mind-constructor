@@ -16,6 +16,8 @@ import { NodeFace } from "./nodeCard/NodeFace";
 import { MAX_NODE_TEXT, pasteKeepingOverflow } from "../utils/nodeText";
 import { CAPTION_WIDTH, nodeZoomScale } from "../utils/canvasLayout";
 import { useI18n } from "../i18n/I18nContext";
+import { isDoubleTap } from "../hooks/useCanvasDoubleTap";
+import type { Tap } from "../hooks/useCanvasDoubleTap";
 import {
   burstParticles,
   ANGEL_PARTICLE_COLORS,
@@ -108,6 +110,10 @@ interface Props {
   quiet?: boolean;
   /** This node's caption would lie over a parent's caption, so it's left out. */
   hideCaption?: boolean;
+  /** A ghost of a leveled template whose round hasn't come yet (utils/templateLevels.ts): drawn fainter, its question behind a 🔒. */
+  levelLocked?: boolean;
+  /** The root of a leveled template: the round it's on, of how many, as a small pill under its icon (utils/templateLevels.ts templateProgress). */
+  levelBadge?: { level: number; levels: number; done: boolean };
   /** The node the time-lapse has just brought back: its caption shows its title and text, up to 5 rows, whatever else would hide it. */
   replayCaption?: boolean;
   /** How many nodes are currently packed into this one (MapPage's packedCountByContainer) — undefined/0 renders no badge. See the corner-badge markup below. */
@@ -201,6 +207,8 @@ export const NodeCard = memo(function NodeCard({
   triumphant = false,
   dropHighlight,
   inlineEditing,
+  levelLocked = false,
+  levelBadge,
   flightVector,
   onInlineConfirm,
   onInlineCancel,
@@ -299,7 +307,7 @@ export const NodeCard = memo(function NodeCard({
   // line-clamp cuts it), else a ghost's prompt in a quieter style.
   const ghost = !!node.ghost && !node.text?.trim();
   const ghostPrompt = ghost && !node.title?.trim() ? (node.prompt?.trim() ?? "") : "";
-  const captionLabel = node.title?.trim() || node.text || ghostPrompt;
+  const captionLabel = node.title?.trim() || node.text || (ghostPrompt && levelLocked ? `🔒 ${ghostPrompt}` : ghostPrompt);
   // An icon with no caption shows its text in a small label on hover (not
   // while selected or editing). Mounted only while hovered.
   const hoverLabel = !showCaption && !puzzle && !selected && !inlineEditing;
@@ -319,7 +327,9 @@ export const NodeCard = memo(function NodeCard({
       : muted
         ? "node-fade-muted"
         : ghost
-          ? "node-fade-ghost"
+          ? levelLocked
+            ? "node-fade-locked"
+            : "node-fade-ghost"
           : quiet
             ? "node-fade-quiet"
             : "";
@@ -357,12 +367,29 @@ export const NodeCard = memo(function NodeCard({
     .filter(Boolean)
     .join(" ");
 
+  // A packed parent opens with a double-click or a double-tap (as the +N pill
+  // does), read off its own clicks so a finger works too: Safari doesn't
+  // reliably send dblclick for two taps. See docs/gestures/double-tap-unpack.md.
+  const lastTap = useRef<Tap | null>(null);
+  const unpackedAt = useRef(-Infinity);
   const handleClick = (e: ReactMouseEvent) => {
     // Without this, the click bubbles to .map-canvas's own onClick, which
     // deselects on any click reaching it — so selecting a node and
     // immediately un-selecting it happened in the same tick, and clicking
     // a node looked like it did nothing at all.
     e.stopPropagation();
+    if (foldedCount && onUnfold) {
+      const tap: Tap = { x: e.clientX, y: e.clientY, t: e.timeStamp, target: node.nodeId };
+      if (isDoubleTap(lastTap.current, tap)) {
+        lastTap.current = null;
+        unpackedAt.current = e.timeStamp;
+        onUnfold();
+        return;
+      }
+      lastTap.current = tap;
+    } else {
+      lastTap.current = null;
+    }
     onClick(e);
   };
 
@@ -379,6 +406,8 @@ export const NodeCard = memo(function NodeCard({
     // only needs to keep the *dblclick* event itself from reaching the
     // canvas, which has no use for it anyway.
     e.stopPropagation();
+    // The double-click that just opened a packed parent isn't also an edit.
+    if (foldedCount || e.timeStamp - unpackedAt.current < 1000) return;
     // Only a mouse double-click starts editing. Safari on iPhone/iPad turns
     // two quick taps into a dblclick, so tapping a node to get its menu
     // opened the text editor instead; on touch, editing stays behind the
@@ -614,6 +643,7 @@ export const NodeCard = memo(function NodeCard({
           isVariantParent={isVariantParent}
           hiddenBranch={hiddenBranch}
           calm={calm}
+          levelBadge={levelBadge}
         />
         {/* Halo/horns (NodeCrown), shared with QuickAddGhosts. */}
         {!puzzle && !showPictureCard && !calm && (!compact || triumphant) && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}

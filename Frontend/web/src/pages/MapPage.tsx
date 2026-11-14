@@ -14,7 +14,8 @@ import { usePuzzleConnect } from "../hooks/usePuzzleConnect";
 import { useMapKeyboard } from "../hooks/useMapKeyboard";
 import { useSelectionActions } from "../hooks/useSelectionActions";
 import { useNodeCreation } from "../hooks/useNodeCreation";
-import { useDesktopLayout } from "../hooks/useDesktopLayout";
+import { useDesktopLayout, useMediaQuery } from "../hooks/useDesktopLayout";
+import { closeOne, keepOpen, panelDevice, panelGrid, PANEL_LIMIT } from "../utils/openPanels";
 import { useVisualViewportOffset } from "../hooks/useVisualViewportOffset";
 import { isEditableTarget } from "../utils/editable";
 import { canvasHoldAllowed, useCanvasHoldMenu } from "../hooks/useCanvasHoldMenu";
@@ -62,7 +63,6 @@ import { PictureCaptions } from "../map/PictureCaptions";
 import { usePictureEdit } from "../hooks/usePictureEdit";
 import { pictureGroups } from "../utils/pictures";
 import { MiniMap } from "../map/MiniMap";
-import { PictureViewer } from "../map/PictureViewer";
 import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
@@ -111,7 +111,6 @@ import { useQuickAdd } from "../hooks/useQuickAdd";
 import { useZoneDisplay } from "../hooks/useZoneDisplay";
 import { usePlacement } from "../hooks/usePlacement";
 import { useChooseMode } from "../hooks/useChooseMode";
-import { hasPictures, usePictureView } from "../hooks/usePictureView";
 import { useMapControls } from "../hooks/useMapControls";
 import { ZoneNames } from "../map/ZoneNames";
 import { PresentationOverlay } from "../map/PresentationOverlay";
@@ -156,6 +155,7 @@ import { TOP_ZONE, useCardFit } from "../hooks/useCardFit";
 import { outlineNumbers, zoneMembers } from "../utils/cardFit";
 import { findInbox, noteBranch } from "../utils/inbox";
 import { feature } from "../utils/usage";
+import { useLevelReveal } from "../hooks/useLevelReveal";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -169,6 +169,10 @@ export function MapPage() {
   const { mapId } = useParams<{ mapId: string }>();
   const navigate = useNavigate();
   const desktopLayout = useDesktopLayout();
+  // Wider than a phone: a tablet when not in the desktop layout (utils/openPanels.ts).
+  const widerThanPhone = useMediaQuery("(min-width: 640px)");
+  // A phone: the top-left toolbar folds to three buttons (see MapToolbar).
+  const phoneToolbar = useMediaQuery("(max-width: 639.98px)");
   const viewportOffset = useVisualViewportOffset();
   // A back swipe / back button doesn't leave the map — only the toolbar's ←
   // does (see useBackGuard).
@@ -354,9 +358,26 @@ export function MapPage() {
   // after onUp has already handled the press; this swallows that one click.
   const suppressNextClick = useRef(false);
 
+  // A leveled template's later rounds: locked, and kept off the canvas, until
+  // the earlier ones are answered; the user is told when one opens.
+  // Answering a template's last level is a small moment of its own, and the
+  // right time to ask "And now?" (CheckInPrompt), not on the next open.
+  const [templateDone, setTemplateDone] = useState(false);
+  useEffect(() => setTemplateDone(false), [mapId]);
+  const { locks: levelLockById, hidden: levelHidden, progress: levelProgressById } = useLevelReveal(
+    nodes,
+    ({ level, count }) => showNotice(t.ui.templates.unlocked(level, count)),
+    (levels) => {
+      showNotice(t.ui.templates.finished(levels));
+      setTemplateDone(true);
+    },
+  );
   // Packed-away members are left off the canvas (NodePanel still gets every
-  // node, for the container's Packed list).
-  const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
+  // node, for the container's Packed list), and so is a round not yet open.
+  const unpackedNodes = useMemo(
+    () => nodes.filter((n) => !n.packedIntoNodeId && !levelHidden.has(n.nodeId)),
+    [nodes, levelHidden],
+  );
   // Parents that tuck their branch in, and the overview — see hooks/useAutoPack.ts.
   const { folded, setFolded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll } = useAutoPack(mapId, unpackedNodes);
   // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.
@@ -423,15 +444,56 @@ export function MapPage() {
   // Nodes glide to a changed resting spot instead of jumping — see posFor.
   const glide = usePositionGlide(positions);
   const selectedNode = nodes.find((n) => n.nodeId === selectedId) ?? null;
-  // A tap or click on a node only picks it (highlighted, centered, its ring of
-  // ghosts up); its panel waits for a second tap, a double-tap, or the node's
-  // menu (docs/gestures/tap-picks-node.md). Anything else that picks a node —
-  // the reading arrows, search, creating one — opens the panel as before.
+  // A tap or click on a node opens its panel (docs/gestures/tap-opens-node.md).
+  // Only the node's right-click / hold menu picks it without opening it; the
+  // menu's Edit opens it then.
   const [panelHiddenFor, setPanelHiddenFor] = useState<string | null>(null);
   useEffect(() => {
     setPanelHiddenFor((prev) => (prev === selectedId ? prev : null));
   }, [selectedId]);
   const panelNode = selectedNode && panelHiddenFor !== selectedNode.nodeId ? selectedNode : null;
+  // Several panels open at once (docs/gestures/several-panels.md): the
+  // active one is selectedId's; `otherPanels` are kept open beside it, oldest
+  // first, up to the device's limit (utils/openPanels.ts).
+  const [otherPanels, setOtherPanels] = useState<string[]>([]);
+  const panelDev = panelDevice(widerThanPhone, desktopLayout);
+  const panelLimit = PANEL_LIMIT[panelDev];
+  useEffect(() => {
+    if (selectedId === null) setOtherPanels([]);
+  }, [selectedId]);
+  useEffect(() => setOtherPanels([]), [mapId]);
+  // The device turned (or the window shrank): keep only what fits now.
+  useEffect(() => {
+    setOtherPanels((prev) => (prev.length > panelLimit - 1 ? prev.slice(prev.length - (panelLimit - 1)) : prev));
+  }, [panelLimit]);
+  // Tiles keep the order they were opened in, so bringing one forward
+  // doesn't shuffle them.
+  const panelOpenedAt = useRef(new Map<string, number>());
+  const openPanelNodes = useMemo(() => {
+    const ids = [...otherPanels.filter((id) => id !== selectedId), ...(panelNode ? [panelNode.nodeId] : [])];
+    const seen = panelOpenedAt.current;
+    for (const id of ids) if (!seen.has(id)) seen.set(id, seen.size + Date.now());
+    for (const id of [...seen.keys()]) if (!ids.includes(id)) seen.delete(id);
+    return ids
+      .map((id) => nodes.find((n) => n.nodeId === id))
+      .filter((n): n is NodeDoc => !!n)
+      .sort((a, b) => (seen.get(a.nodeId) ?? 0) - (seen.get(b.nodeId) ?? 0));
+  }, [otherPanels, selectedId, panelNode, nodes]);
+  // A tap opening `nextId`: the panel open now stays open beside it.
+  function keepPanelOpenFor(nextId: string) {
+    if (panelNode) setOtherPanels((prev) => keepOpen(prev, panelNode.nodeId, nextId, panelLimit));
+    else setOtherPanels((prev) => prev.filter((id) => id !== nextId));
+  }
+  // One panel's ✕: the others stay; closing the active one hands its place
+  // to the most recent other.
+  function closePanel(id: string) {
+    const { others, active } = closeOne(otherPanels, panelNode?.nodeId ?? null, id);
+    setOtherPanels(others);
+    if (active !== (panelNode?.nodeId ?? null)) {
+      setSelectedId(active);
+      if (active) centerOnNode(active);
+    }
+  }
   // ?node=<id> (a search result on the dashboard): the map opens on that node.
   const [searchParams] = useSearchParams();
   const focusNodeId = searchParams.get("node");
@@ -439,7 +501,7 @@ export function MapPage() {
   // third (half on mobile) of the screen while it's open. Skipped for the
   // group-selection footer (multiSelectIds), which is a slim bar, not a tall
   // sheet.
-  const sheetOpen = chooseMode || packMode || reparentMode || !!pendingCreate || (!!panelNode && multiSelectIds.size === 0);
+  const sheetOpen = chooseMode || packMode || reparentMode || !!pendingCreate || (openPanelNodes.length > 0 && multiSelectIds.size === 0);
   // Where the map opens: back at the spot left last time when that spot
   // shows a node, else on the map's first parent (utils/openingFocus.ts),
   // never on empty canvas.
@@ -550,6 +612,9 @@ export function MapPage() {
     slideIndex,
     setSlideIndex,
     slideGroups,
+    summaryNodes,
+    typeFilter,
+    setTypeFilter,
     enterPresentation,
     presentZone,
     exitPresentation,
@@ -564,6 +629,7 @@ export function MapPage() {
     dispatchMode,
     setActionError,
     emptyMessage: t.ui.presentation.empty,
+    slideOrder: map?.slideOrder,
   });
   // Quiz me — the map asks, the viewer marks what they know (hooks/useQuiz.ts).
   const { quizCards, startQuiz, exitQuiz } = useQuiz({
@@ -953,6 +1019,12 @@ export function MapPage() {
   // Owner-only — text/type editing isn't otherwise restricted (an earlier
   // version locked it once a node had taken any damage, but that blocked
   // ordinary corrections too aggressively; see NodePanel.tsx's own canEdit).
+  // What a locked ghost of a leveled template tells its reader (utils/templateLevels.ts).
+  function levelLockFor(nodeId: string): string | undefined {
+    const lock = levelLockById.get(nodeId);
+    return lock ? t.ui.templates.locked(lock.waitFor, lock.left) : undefined;
+  }
+
   function canEditNode(node: NodeDoc) {
     return isOwnNode(node) && !blockLocks[node.nodeId];
   }
@@ -984,7 +1056,7 @@ export function MapPage() {
     setSelectedId(node.nodeId);
     setPanelHiddenFor(null);
     centerOnNode(node.nodeId);
-    if (!canEditNode(node)) return;
+    if (!canEditNode(node) || levelLockById.has(node.nodeId)) return;
     await ensureNodeText([node.nodeId]);
     setFocusTextNodeId(node.nodeId);
   }
@@ -1017,19 +1089,12 @@ export function MapPage() {
       return;
     }
     if (chooseMode) {
-      // Tapping a node chooses it together with its whole branch (see
-      // branchIds); tapping one that is already chosen drops it and its branch
-      // again. Shift+tap acts on just that one node.
-      if (!isOwnNode(node)) {
-        setActionError(t.ui.errors.chooseOwn);
-        return;
-      }
-      setActionError(null);
-      const affected = shiftKey ? [node.nodeId] : [node.nodeId, ...branchIds(node.nodeId)];
+      // Select mode (docs/gestures/select-mode.md): a tap picks or drops just
+      // that one node, of any kind and anyone's; it never opens or moves it.
       setMultiSelectIds((prev) => {
         const next = new Set(prev);
-        if (next.has(node.nodeId)) affected.forEach((id) => next.delete(id));
-        else affected.forEach((id) => next.add(id));
+        if (next.has(node.nodeId)) next.delete(node.nodeId);
+        else next.add(node.nodeId);
         return next;
       });
       return;
@@ -1047,30 +1112,37 @@ export function MapPage() {
       return;
     }
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
-    // While reading (any view but the default icons), a node with pictures
-    // shows them first; closing them opens its panel (closePictureView).
-    if (modeOf(node.nodeId) !== "actual" && node.nodeId !== selectedId && hasPictures(node)) {
-      openPictureView(node);
+    // A tap or click on any node opens its panel on the Info tab: a weapon,
+    // a node under attack, a card in the cards view, one with pictures (they
+    // show in the Info tab) — docs/gestures/tap-opens-node.md. The panel open
+    // now stays open beside it (docs/gestures/several-panels.md).
+    keepPanelOpenFor(node.nodeId);
+    selectNodeFromClick(node);
+    setPanelHiddenFor(null);
+  }
+
+  // The toolbar's ☑: Select mode on with nothing picked yet, or off again.
+  function toggleSelectMode() {
+    closeMenu();
+    if (chooseMode) {
+      exitChooseMode();
       return;
     }
-    // The first tap picks the node; a tap on the node already picked opens it.
-    const opening = node.nodeId === selectedId;
-    selectNodeFromClick(node);
-    setPanelHiddenFor(opening ? null : node.nodeId);
+    if (drawMode) toggleDrawMode();
+    setMoveMode(false);
+    setPendingCreate(null);
+    setSelectedId(null);
+    setMultiSelectIds(new Set());
+    dispatchMode({ type: "chooseStart" });
   }
 
   // Opens a node's panel on purpose (its menu's Edit), not just picking it.
   function openNode(node: NodeDoc) {
     closeMenu();
     if (multiSelectIds.size > 0) setMultiSelectIds(new Set());
+    keepPanelOpenFor(node.nodeId);
     selectNodeFromClick(node);
     setPanelHiddenFor(null);
-  }
-
-  // Closing a node's pictures leaves it picked, not opened.
-  function pickNodeQuietly(node: NodeDoc) {
-    selectNodeFromClick(node);
-    setPanelHiddenFor(node.nodeId);
   }
 
   // Replaying the map from its first node — see hooks/useTimeLapse.ts.
@@ -1090,7 +1162,6 @@ export function MapPage() {
     onStart: () => {
       setSelectedId(null);
       setMultiSelectIds(new Set());
-      clearPictureView();
       closeSiege();
     },
   });
@@ -1118,15 +1189,128 @@ export function MapPage() {
     }
     const next = stepAlong(order, selectedId, dir);
     if (!next) return;
-    clearPictureView();
     setSteppedToId(next);
     setSelectedId(next);
     centerOnNode(next);
     if (focusText) setFocusTextNodeId(next);
   }
 
-  // A node's pictures, full size before its panel — see hooks/usePictureView.ts.
-  const { pictureView, openPictureView, closePictureView, clearPictureView } = usePictureView(nodes, pickNodeQuietly);
+
+  // One node's panel; several sit side by side (docs/gestures/several-panels.md).
+  function renderNodePanel(panelFor: NodeDoc, active: boolean, tiled: boolean) {
+    if (!user) return null;
+    return (
+    <NodePanel
+      key={panelFor.nodeId}
+      node={panelFor}
+      tiled={tiled}
+      active={active}
+      onActivate={() => {
+        keepPanelOpenFor(panelFor.nodeId);
+        setSelectedId(panelFor.nodeId);
+        centerOnNode(panelFor.nodeId);
+      }}
+      textLocked={!!blockLocks[panelFor.nodeId]}
+      levelLock={levelLockFor(panelFor.nodeId)}
+      levelProgress={levelProgressById.get(panelFor.nodeId)}
+      autoFocusText={focusTextNodeId === panelFor.nodeId}
+      onAutoFocused={() => setFocusTextNodeId(null)}
+      onToggleLock={isOwnNode(panelFor) ? () => toggleBlockLock(panelFor.nodeId) : undefined}
+      // The parent's magnet: calls its own far nodes back in (utils/parentMagnet.ts).
+      // Change parent: pick the node to hang this one from (reparent mode).
+      onChangeParent={isOwnNode(panelFor) ? () => startReparent(panelFor) : undefined}
+      // Swap with parent: the child takes its parent's place as head of the zone.
+      onSwapWithParent={
+        isOwnNode(panelFor) && zoneParentId(panelFor) ? () => void headZone(panelFor) : undefined
+      }
+      // Move to a map: only on the Inbox, where quick notes wait to be sorted.
+      onMoveToMap={
+        isInboxMap && isOwnNode(panelFor) && !panelFor.isWeapon && !panelFor.isProtection
+          ? () => setMovingNote(panelFor)
+          : undefined
+      }
+      onAutoPack={mapParents.has(panelFor.nodeId) ? () => toggleFold(panelFor.nodeId) : undefined}
+      autoPacked={folded.has(panelFor.nodeId)}
+      ghostsHidden={ghostsHidden}
+      onToggleGhosts={
+        isOwnNode(panelFor) && !onCardBoard(panelFor)
+          ? () => setGhostsHiddenFor(ghostsHidden ? null : panelFor.nodeId)
+          : undefined
+      }
+      onMagnet={
+        nodes.some((n) => !n.isWeapon && zoneParentId(n) === panelFor.nodeId && isOwnNode(n))
+          ? () => magnetize(panelFor)
+          : undefined
+      }
+      feeling={
+        panelFor.isWeapon
+          ? null
+          : { value: feelings[panelFor.nodeId], onChange: (f) => setFeeling(panelFor.nodeId, f) }
+      }
+      cardFill={(() => {
+        const mode = modeOf(panelFor.nodeId);
+        const isCard =
+          mode === "puzzle" || (mode === "mixed" && circleRootSentimentByNode.has(panelFor.nodeId));
+        return isCard
+          ? {
+              value: cardFills[panelFor.nodeId],
+              onChange: (c: string | null) => setCardFill(panelFor.nodeId, c),
+            }
+          : null;
+      })()}
+      cardLook={
+        onCardBoard(panelFor) && canEditNode(panelFor)
+          ? {
+              font: panelFor.cardFont ?? null,
+              shape: panelFor.cardShape ?? null,
+              sized: panelFor.cardW != null || panelFor.cardH != null,
+              onChange: (patch) => void saveCardLook(panelFor, patch),
+            }
+          : null
+      }
+      nodes={nodes}
+      edges={edges}
+      currentUserId={user._id}
+      discussionMode={isDiscussionMode}
+      isMapOwner={isOwner}
+      onApplyTemplate={(kind) => applyTemplate(kind, panelFor)}
+      onClose={() => closePanel(panelFor.nodeId)}
+      onStepNode={active ? stepReading : undefined}
+      onSelectNode={(id) => {
+        setSelectedId(id);
+        // Same "chosen node is always centered" rule handleNodeClick
+        // applies on the canvas — this is the panel's own path to
+        // choosing a different node (its "Points at" link).
+        centerOnNode(id);
+        // Panel's own "Points at" link is only ever shown on a
+        // weapon node's panel — same click-either-end replay the
+        // canvas gets, just reached from here instead.
+        if (panelFor.isWeapon) triggerWeaponShot(panelFor.nodeId);
+      }}
+      onDelete={deleteNodeWithUndo}
+      onUpdated={upsertNode}
+      onAttacked={(updatedNode, weaponNode, _weapon, healedParent, _blocked, protector) =>
+        applyAttack(updatedNode, weaponNode, healedParent, protector)
+      }
+      onDeleteEdge={(edgeId) => {
+        setEdges((prev) => prev.filter((e) => e.edgeId !== edgeId));
+        if (mapId) refreshInsights(mapId);
+      }}
+      onStartChoose={() => startChooseFrom(panelFor.nodeId)}
+      onEdit={() => startInlineEdit(panelFor)}
+      onProtected={(protectionNode, healedNode) => {
+        upsertNode(protectionNode);
+        upsertNode(healedNode);
+      }}
+      onStartPack={() => startPackFrom(panelFor.nodeId)}
+      onUnpacked={(unpacked) => upsertNode(unpacked)}
+      isClusterParent={circleRootSentimentByNode.has(panelFor.nodeId)}
+      onExtractText={() => extractClusterText(panelFor.nodeId)}
+      onSplitText={canSplitNode(panelFor) ? (text) => openSplit(panelFor, text) : undefined}
+      onCarryText={canCarryText(panelFor) ? (rest) => carryText(panelFor, rest) : undefined}
+    />
+    );
+  }
 
   function selectNodeFromClick(node: NodeDoc) {
     setSelectedId(node.nodeId);
@@ -1287,6 +1471,7 @@ export function MapPage() {
       return;
     }
     if (node.nodeId !== selectedId) setPanelHiddenFor(node.nodeId);
+    keepPanelOpenFor(node.nodeId);
     setSelectedId(node.nodeId);
     openMenu({ kind: "node", node, x: e.clientX, y: e.clientY });
   }
@@ -1503,8 +1688,7 @@ export function MapPage() {
   // A node just made through the inline input: its panel opens focused on
   // the text (see NodePanel's autoFocusText) — cleared once that's done.
   const [focusTextNodeId, setFocusTextNodeId] = useState<string | null>(null);
-  // The node the ← / → arrows last stepped to: its panel opens on Info, even
-  // for an attack on your own node (which otherwise opens on Attack).
+  // The node the ← / → arrows last stepped to (useChompRuns reads it).
   const [steppedToId, setSteppedToId] = useState<string | null>(null);
   // A node being made is brought to the middle of the screen below its panel,
   // with the emoji ring around it.
@@ -1570,7 +1754,7 @@ export function MapPage() {
 
   // The map's mode and background, finishing the discussion, deleting the map
   // — see hooks/useMapControls.ts.
-  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, setMapBackgroundImage, setMapBackgroundShade, deleteThisMap, exitDemo, finish } = useMapControls({
+  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, setMapBackgroundImage, setMapBackgroundShade, setSlideOrder, deleteThisMap, exitDemo, finish } = useMapControls({
     map,
     setMap,
     nodes,
@@ -1716,6 +1900,8 @@ export function MapPage() {
   const renderToolbar = (vertical: boolean) => (
     <MapToolbar
       vertical={vertical}
+      // A phone folds the cluster to three buttons, the rest behind "⋯".
+      phone={phoneToolbar}
       viewportOffset={viewportOffset}
       isDemo={!!user?.isDemo}
       isOwner={isOwner}
@@ -1728,6 +1914,8 @@ export function MapPage() {
       onExpand={() => setForceShowToolbar(true)}
       moveMode={moveMode}
       onToggleMove={() => setMoveMode((v) => !v)}
+      selectMode={chooseMode}
+      onToggleSelect={toggleSelectMode}
       drawMode={drawMode}
       onToggleDraw={toggleDrawMode}
       compact={compactView}
@@ -1826,7 +2014,7 @@ export function MapPage() {
       {finish.isFinished && !timeLapse && (
         <FinishedBanner {...battleTally(nodes)} onReplay={startTimeLapse} onReopen={finish.reopen} busy={finish.busy} />
       )}
-      {mapId && !timeLapse && <CheckInPrompt key={mapId} mapId={mapId} checkIn={checkIn} finished={finish.isFinished} onSave={setCheckIn} />}
+      {mapId && !timeLapse && <CheckInPrompt key={mapId} mapId={mapId} checkIn={checkIn} finished={finish.isFinished || templateDone} onSave={setCheckIn} />}
 
       <div className="flex min-h-0 flex-1">
         {desktopLayout && !presenting && renderToolbar(true)}
@@ -1872,12 +2060,9 @@ export function MapPage() {
                 addDrawPoint(screenToCanvas(e.clientX, e.clientY));
                 return;
               }
-              // Tapping empty canvas while choosing finishes it (and closes the
-              // Actions menu with it) — same as Done / Enter.
-              if (chooseMode) {
-                exitChooseMode();
-                return;
-              }
+              // Select mode is left only by its Done or ☑: a tap on empty
+              // canvas does nothing, so a slip never loses the selection.
+              if (chooseMode) return;
               if (packMode || reparentMode) return;
               if (doubleTapNewNode(e.clientX, e.clientY, e.timeStamp, null)) return;
               setSelectedId(null);
@@ -1904,15 +2089,9 @@ export function MapPage() {
               // The node whose parent is changing stays ringed while the new one is picked.
               pendingLink={reparentChild ? [reparentChild] : pendingLink}
               onCircleClick={(rootId, at) => {
-                // A zone's own polygon stops the click from ever reaching the
-                // canvas div's onClick (see its own chooseMode branch above)
-                // — so without this, choosing was only exitable by clicking
-                // truly empty canvas, not a zone. Choosing wins over the
-                // zone's normal stabilize/release behavior while it's active.
-                if (chooseMode) {
-                  exitChooseMode();
-                  return;
-                }
+                // Select mode: a tap on a zone does nothing either (see the
+                // canvas's own onClick); only Done or ☑ leaves it.
+                if (chooseMode) return;
                 // With a node's panel open, a tap on a zone is a tap outside
                 // the panel: it closes it, same as empty canvas, instead of
                 // also stabilizing the zone underneath.
@@ -1992,7 +2171,9 @@ export function MapPage() {
                     isOwnNode(node) &&
                     !node.locked &&
                     !blockLocks[node.nodeId] &&
-                    (moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))
+                    (chooseMode
+                      ? moveMode && multiSelectIds.has(node.nodeId)
+                      : moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))
                   }
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
                   parentCrownSentiment={circleRootSentimentByNode.get(node.nodeId)}
@@ -2040,7 +2221,9 @@ export function MapPage() {
                           : "invalid"
                         : undefined
                   }
-                  inlineEditing={editingThis}
+                  inlineEditing={editingThis && !levelLockById.has(node.nodeId)}
+                  levelLocked={levelLockById.has(node.nodeId)}
+                  levelBadge={levelProgressById.get(node.nodeId)}
                   actions={nodeActions}
                   canResize={canEditNode(node)}
                   cardFill={cardFills[node.nodeId]}
@@ -2260,6 +2443,11 @@ export function MapPage() {
           {presenting && (
             <PresentationOverlay
               slides={slideGroups}
+              summaryNodes={summaryNodes}
+              typeFilter={typeFilter}
+              onTypeFilterChange={setTypeFilter}
+              savedOrder={map?.slideOrder}
+              onOrderChange={isOwner ? setSlideOrder : undefined}
               index={Math.min(slideIndex, Math.max(0, slideGroups.length - 1))}
               onIndexChange={setSlideIndex}
               onExit={exitPresentation}
@@ -2340,6 +2528,7 @@ export function MapPage() {
           <SelectionBar
             count={multiSelectIds.size}
             chooseMode={chooseMode}
+            moveMode={moveMode}
             onLink={linkSelection}
             onNumber={() => numberSelection(false)}
             onDisplay={setDisplayForChosen}
@@ -2347,7 +2536,8 @@ export function MapPage() {
             onCopy={copySelection}
             onCopyText={() => void copySelectionAsText()}
             onGroupCircle={groupSelectionIntoCircle}
-            onDelete={() => void deleteSelection()}
+            // Select mode picks anyone's nodes; only your own can be deleted.
+            onDelete={() => void deleteSelection(nodes.filter((n) => multiSelectIds.has(n.nodeId) && isOwnNode(n)).map((n) => n.nodeId))}
             onDone={exitChooseMode}
           />
         ) : pendingCreate && !presenting ? (
@@ -2368,122 +2558,29 @@ export function MapPage() {
           // case anything else (e.g. a queued search-result pick) ever
           // re-selects a node while presenting.
           !presenting &&
-          panelNode &&
-          selectedNode &&
-          user && (
-            <>
-              {/* No dimming backdrop behind this: the canvas's own onClick
-                  (see canvasRef below) already deselects on a tap that
-                  reaches empty canvas directly, so a backdrop's only real job
-                  left would be dimming — not worth its cost. Sitting at z-30,
-                  between the canvas content (z-31+) and the panel itself
-                  (z-40), it would be the thing every quick-add ghost, node,
-                  and the pending-create input has to specifically out-rank
-                  just to stay tappable while a node is selected (see their
-                  own z-index comments) — a whole layering workaround for
-                  what would be mostly just visual dimming. */}
-              <NodePanel
-                node={selectedNode}
-                textLocked={!!blockLocks[selectedNode.nodeId]}
-                autoFocusText={focusTextNodeId === selectedNode.nodeId}
-                onAutoFocused={() => setFocusTextNodeId(null)}
-                onToggleLock={isOwnNode(selectedNode) ? () => toggleBlockLock(selectedNode.nodeId) : undefined}
-                // The parent's magnet: calls its own far nodes back in (utils/parentMagnet.ts).
-                // Change parent: pick the node to hang this one from (reparent mode).
-                onChangeParent={isOwnNode(selectedNode) ? () => startReparent(selectedNode) : undefined}
-                // Swap with parent: the child takes its parent's place as head of the zone.
-                onSwapWithParent={
-                  isOwnNode(selectedNode) && zoneParentId(selectedNode) ? () => void headZone(selectedNode) : undefined
-                }
-                // Move to a map: only on the Inbox, where quick notes wait to be sorted.
-                onMoveToMap={
-                  isInboxMap && isOwnNode(selectedNode) && !selectedNode.isWeapon && !selectedNode.isProtection
-                    ? () => setMovingNote(selectedNode)
-                    : undefined
-                }
-                onAutoPack={mapParents.has(selectedNode.nodeId) ? () => toggleFold(selectedNode.nodeId) : undefined}
-                autoPacked={folded.has(selectedNode.nodeId)}
-                ghostsHidden={ghostsHidden}
-                onToggleGhosts={
-                  isOwnNode(selectedNode) && !onCardBoard(selectedNode)
-                    ? () => setGhostsHiddenFor(ghostsHidden ? null : selectedNode.nodeId)
-                    : undefined
-                }
-                onMagnet={
-                  nodes.some((n) => !n.isWeapon && zoneParentId(n) === selectedNode.nodeId && isOwnNode(n))
-                    ? () => magnetize(selectedNode)
-                    : undefined
-                }
-                feeling={
-                  selectedNode.isWeapon
-                    ? null
-                    : { value: feelings[selectedNode.nodeId], onChange: (f) => setFeeling(selectedNode.nodeId, f) }
-                }
-                cardFill={(() => {
-                  const mode = modeOf(selectedNode.nodeId);
-                  const isCard =
-                    mode === "puzzle" || (mode === "mixed" && circleRootSentimentByNode.has(selectedNode.nodeId));
-                  return isCard
-                    ? {
-                        value: cardFills[selectedNode.nodeId],
-                        onChange: (c: string | null) => setCardFill(selectedNode.nodeId, c),
-                      }
-                    : null;
-                })()}
-                cardLook={
-                  onCardBoard(selectedNode) && canEditNode(selectedNode)
-                    ? {
-                        font: selectedNode.cardFont ?? null,
-                        shape: selectedNode.cardShape ?? null,
-                        sized: selectedNode.cardW != null || selectedNode.cardH != null,
-                        onChange: (patch) => void saveCardLook(selectedNode, patch),
-                      }
-                    : null
-                }
-                nodes={nodes}
-                edges={edges}
-                currentUserId={user._id}
-                discussionMode={isDiscussionMode}
-                isMapOwner={isOwner}
-                onApplyTemplate={(kind) => applyTemplate(kind, selectedNode)}
-                onClose={() => setSelectedId(null)}
-                onStepNode={stepReading}
-                stepped={steppedToId === selectedNode.nodeId}
-                onSelectNode={(id) => {
-                  setSelectedId(id);
-                  // Same "chosen node is always centered" rule handleNodeClick
-                  // applies on the canvas — this is the panel's own path to
-                  // choosing a different node (its "Points at" link).
-                  centerOnNode(id);
-                  // Panel's own "Points at" link is only ever shown on a
-                  // weapon node's panel — same click-either-end replay the
-                  // canvas gets, just reached from here instead.
-                  if (selectedNode?.isWeapon) triggerWeaponShot(selectedNode.nodeId);
-                }}
-                onDelete={deleteNodeWithUndo}
-                onUpdated={upsertNode}
-                onAttacked={(updatedNode, weaponNode, _weapon, healedParent, _blocked, protector) =>
-                  applyAttack(updatedNode, weaponNode, healedParent, protector)
-                }
-                onDeleteEdge={(edgeId) => {
-                  setEdges((prev) => prev.filter((e) => e.edgeId !== edgeId));
-                  if (mapId) refreshInsights(mapId);
-                }}
-                onStartChoose={() => startChooseFrom(selectedNode.nodeId)}
-                onEdit={() => startInlineEdit(selectedNode)}
-                onProtected={(protectionNode, healedNode) => {
-                  upsertNode(protectionNode);
-                  upsertNode(healedNode);
-                }}
-                onStartPack={() => startPackFrom(selectedNode.nodeId)}
-                onUnpacked={(unpacked) => upsertNode(unpacked)}
-                isClusterParent={circleRootSentimentByNode.has(selectedNode.nodeId)}
-                onExtractText={() => extractClusterText(selectedNode.nodeId)}
-                onSplitText={canSplitNode(selectedNode) ? (text) => openSplit(selectedNode, text) : undefined}
-                onCarryText={canCarryText(selectedNode) ? (rest) => carryText(selectedNode, rest) : undefined}
-              />
-            </>
-          )
+          user &&
+          openPanelNodes.length > 0 &&
+          // No dimming backdrop behind the panels: the canvas's own onClick
+          // already deselects on a tap that reaches empty canvas directly.
+          (openPanelNodes.length === 1 ? (
+            renderNodePanel(openPanelNodes[0], openPanelNodes[0].nodeId === panelNode?.nodeId, false)
+          ) : (
+            // Several open: tiles sharing the bottom half, never overlapping
+            // (docs/gestures/several-panels.md, utils/openPanels.ts).
+            <div
+              className="fixed inset-x-0 bottom-0 z-[46] grid h-[50dvh] gap-1 p-1"
+              data-node-panels
+              style={(() => {
+                const grid = panelGrid(openPanelNodes.length, panelDev);
+                return {
+                  gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
+                  gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`,
+                };
+              })()}
+            >
+              {openPanelNodes.map((n) => renderNodePanel(n, n.nodeId === panelNode?.nodeId, true))}
+            </div>
+          ))
         )}
       </div>
 
@@ -2520,7 +2617,6 @@ export function MapPage() {
         />
       )}
 
-      {pictureView && <PictureViewer key={pictureView.nodeId} images={pictureView.images} onClose={closePictureView} />}
 
       {nodeMenu && (
         <NodeContextMenu
@@ -2609,7 +2705,11 @@ export function MapPage() {
               onChange: (patch) => setZoneStyle(zoneMenu.rootId, patch),
             }
           }
-          actions={zoneActionsFor(zoneMenu.rootId)}
+          actions={(() => {
+            const actions = zoneActionsFor(zoneMenu.rootId);
+            const rootId = zoneMenu.rootId;
+            return actions && { ...actions, onExtractText: () => void extractClusterText(rootId) };
+          })()}
           onPresent={() => presentZone(zoneMenu.rootId)}
           onClose={closeMenu}
         />

@@ -28,6 +28,8 @@ export type UsageEvent =
   | { name: "node_protected" }
   | { name: "map_finished" }
   | { name: "replay_played" }
+  | { name: "template_level_opened"; props: { level: string } }
+  | { name: "template_finished"; props: { levels: string } }
   | { name: "feature_used"; props: { feature: Feature } };
 
 /**
@@ -60,6 +62,7 @@ export const FEATURES = [
   "folders",
   "history",
   "presentation",
+  "slide_order",
   "copy_paste",
   "undo",
   "export",

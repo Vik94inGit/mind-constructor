@@ -15,15 +15,17 @@ import { ErrorBanner } from "../components/ErrorBanner";
 // picker below, now read from the active translation (t.dashboard.
 // createModal.templates) instead of a hardcoded English pair, so this list
 // only has to know the *order* and which value maps to which translation
-// key.
-const MAP_KIND_KEYS: MapKind[] = ["problem", "decision", "goal", "retro", "idea"];
+// key. "empty" is not a map kind: it creates the map with no kind and seeds
+// nothing, so it opens as a blank canvas.
+type StartingPoint = MapKind | "empty";
+const MAP_KIND_KEYS: StartingPoint[] = ["empty", "problem", "decision", "goal", "retro", "idea", "study"];
 
 export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated: (map: MapDoc) => void }) {
   const { t } = useI18n();
   const [name, setName] = useState("");
   const [ownerColor, setOwnerColor] = useState("#22c55e");
   const [color, setColor] = useState("#e08a3e");
-  const [kind, setKind] = useState<MapKind>("problem");
+  const [kind, setKind] = useState<StartingPoint>("problem");
   // Discussion (battle) or Personal (creating) — the owner can switch it later on the map itself.
   const [discussionMode, setDiscussionMode] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +36,9 @@ export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; on
     setError(null);
     setBusy(true);
     try {
-      const map = await mapsApi.createMap({ name, ownerColor, color, kind, discussionMode });
-      await seedMapKind(map.mapId, kind, t.ui.templates.nodes);
+      const mapKind = kind === "empty" ? undefined : kind;
+      const map = await mapsApi.createMap({ name, ownerColor, color, kind: mapKind, discussionMode });
+      if (mapKind) await seedMapKind(map.mapId, mapKind, t.ui.templates.nodes);
       track({ name: "map_created", props: { template: kind } });
       onCreated(map);
     } catch (err) {

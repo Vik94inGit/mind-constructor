@@ -7,6 +7,8 @@ interface Props {
   count: number;
   /** Choose mode is on (tap nodes to add them) rather than a plain marquee/shift selection. */
   chooseMode: boolean;
+  /** ✥ is on too: dragging a picked node moves every picked node. */
+  moveMode?: boolean;
   onLink: () => void;
   onNumber: () => void;
   onDisplay: (mode: ReadingMode | null) => void;
@@ -29,7 +31,7 @@ const btn =
 // mount for it either way). Move (drag any selected node) plus the Actions
 // dropdown (see SelectionMenu) and Deselect; per-node editing/attacking
 // still needs dropping back to a single selection first.
-export function SelectionBar({ count, chooseMode, onLink, onNumber, onDisplay, onClearNumbers, onCopy, onCopyText, onGroupCircle, onDelete, onDone }: Props) {
+export function SelectionBar({ count, chooseMode, moveMode = false, onLink, onNumber, onDisplay, onClearNumbers, onCopy, onCopyText, onGroupCircle, onDelete, onDone }: Props) {
   const { t } = useI18n();
   // The "Actions" dropdown's own open/closed state.
   const [menuOpen, setMenuOpen] = useState(false);
@@ -45,7 +47,11 @@ export function SelectionBar({ count, chooseMode, onLink, onNumber, onDisplay, o
         <span className="text-[0.88rem] font-semibold text-ink">
           {count === 0 ? t.ui.selection.tapToChoose : chooseMode ? t.ui.selection.chosen(count) : t.ui.selection.selected(count)}
         </span>
-        {chooseMode && <span className="hidden text-[0.72rem] text-ink-soft md:inline">{t.ui.selection.finishHint}</span>}
+        {chooseMode && (
+          <span className="hidden text-[0.72rem] text-ink-soft md:inline">
+            {moveMode && count > 0 ? t.ui.selection.moveHint : t.ui.selection.finishHint}
+          </span>
+        )}
         <div className="relative">
           <button className={btn} disabled={count === 0} onClick={() => setMenuOpen((v) => !v)}>
             {t.ui.selection.actions}

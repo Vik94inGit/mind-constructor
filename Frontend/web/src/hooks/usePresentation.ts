@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { CanvasModeAction } from "./useCanvasMode";
-import { computeSlideGroups, computeSlideOrder } from "../utils/presentation";
+import { applySlideOrder, computeSlideGroups, computeSlideOrder } from "../utils/presentation";
+import { filterByTypes } from "../utils/mapSummary";
 import { collectDescendants } from "../utils/mapGraph";
-import type { NodeDoc } from "../types";
+import type { NodeDoc, NodeType } from "../types";
 import { feature } from "../utils/usage";
 
 interface Params {
@@ -19,6 +20,8 @@ interface Params {
   dispatchMode: Dispatch<CanvasModeAction>;
   setActionError: (message: string | null) => void;
   emptyMessage: string;
+  /** The slide order the map's owner chose (Map.slideOrder); empty / absent: the automatic one. */
+  slideOrder?: string[];
 }
 
 export function usePresentation({
@@ -32,6 +35,7 @@ export function usePresentation({
   dispatchMode,
   setActionError,
   emptyMessage,
+  slideOrder,
 }: Params) {
   // Presentation mode: steps through the map's own nodes as slides (see
   // computeSlideOrder/utils/presentation.ts) in a full-screen overlay
@@ -52,6 +56,28 @@ export function usePresentation({
   // bottom bar doesn't render behind the presentation overlay), which would
   // otherwise erase the very scope slideNodes needs to keep filtering by.
   const [presentationScopeIds, setPresentationScopeIds] = useState<Set<string> | null>(null);
+  // The node types the viewer picked in the overlay's type chips: only those
+  // show, in the slides and in the summary. Empty means every type.
+  const [typeFilter, setTypeFilterState] = useState<NodeType[]>([]);
+  function setTypeFilter(types: NodeType[]) {
+    setTypeFilterState(types);
+    setSlideIndex(0);
+  }
+
+  // Everything in the presentation's scope, unanswered ghosts included: the
+  // Summary tab (utils/mapSummary.ts) lists a template's questions whether
+  // they're answered yet or not, so it reads this rather than slideNodes.
+  const scopedNodes = useMemo(() => {
+    if (!presenting) return [];
+    return visibleNodes.filter(
+      (n) =>
+        !n.isWeapon &&
+        !n.isProtection &&
+        !hiddenBranchIds.has(n.nodeId) &&
+        (!presentationScopeIds || presentationScopeIds.has(n.nodeId)) &&
+        (n.title || n.text || n.prompt),
+    );
+  }, [presenting, visibleNodes, hiddenBranchIds, presentationScopeIds]);
 
   // Presentation mode's own slide order and org-chart target positions —
   // see computeSlideOrder/computeGeometrizedPositions (utils/presentation.ts)
@@ -68,22 +94,18 @@ export function usePresentation({
   // just skipped) while `presenting` is false, so nothing here does real
   // work between presentations.
   const slideNodes = useMemo(() => {
-    if (!presenting) return [];
-    const eligible = visibleNodes.filter(
-      (n) =>
-        !n.isWeapon &&
-        !n.isProtection &&
-        !hiddenBranchIds.has(n.nodeId) &&
-        (!presentationScopeIds || presentationScopeIds.has(n.nodeId)) &&
-        (n.title || n.text),
+    const eligible = filterByTypes(
+      scopedNodes.filter((n) => n.title || n.text),
+      typeFilter,
     );
     return computeSlideOrder(eligible);
-  }, [presenting, visibleNodes, hiddenBranchIds, presentationScopeIds]);
+  }, [scopedNodes, typeFilter]);
 
   // What the overlay steps through: one slide per parent, with its children
   // on the same slide (utils/presentation.ts computeSlideGroups). slideIndex
-  // counts these.
-  const slideGroups = useMemo(() => computeSlideGroups(slideNodes), [slideNodes]);
+  // counts these. In the order the owner chose, when they chose one
+  // (applySlideOrder: a slide it doesn't name keeps its automatic place).
+  const slideGroups = useMemo(() => applySlideOrder(computeSlideGroups(slideNodes), slideOrder), [slideNodes, slideOrder]);
 
   // Guards an empty selection (nothing eligible to present) rather than
   // entering a blank slideshow; computes the eligible set eagerly, on the
@@ -140,6 +162,7 @@ export function usePresentation({
     setPresenting(false);
     setSlideIndex(0);
     setPresentationScopeIds(null);
+    setTypeFilterState([]);
   }
 
   return {
@@ -148,6 +171,9 @@ export function usePresentation({
     setSlideIndex,
     slideNodes,
     slideGroups,
+    summaryNodes: scopedNodes,
+    typeFilter,
+    setTypeFilter,
     enterPresentation,
     presentZone,
     exitPresentation,

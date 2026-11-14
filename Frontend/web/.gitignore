@@ -2,3 +2,6 @@ node_modules
 dist
 .env
 *.local
+# TypeScript build cache (`tsc -b` rewrites it on every build); tracked, it
+# conflicted on almost every pull request.
+*.tsbuildinfo

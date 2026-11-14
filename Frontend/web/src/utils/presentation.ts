@@ -155,6 +155,51 @@ export function computeSlideGroups(nodes: NodeDoc[]): SlideGroup[] {
 }
 
 /**
+ * The slides in the order the map's owner chose (Map.slideOrder, public
+ * nodeIds, first slide first) instead of the automatic one. The slides named
+ * in `order` take the places the automatic order gave them all, in the
+ * chosen order; a slide it doesn't name (a node made after the order was
+ * saved, say) stays at its automatic place, and an id whose node is gone, or
+ * outside this presentation's scope or type filter, is skipped. An empty or
+ * missing order leaves the slides as they are.
+ */
+export function applySlideOrder<T extends { node: { nodeId: string } }>(slides: T[], order: string[] | undefined): T[] {
+  if (!order?.length) return slides;
+  const rank = new Map<string, number>();
+  order.forEach((id, i) => {
+    if (!rank.has(id)) rank.set(id, i);
+  });
+  const named = slides.filter((s) => rank.has(s.node.nodeId)).sort((a, b) => rank.get(a.node.nodeId)! - rank.get(b.node.nodeId)!);
+  let next = 0;
+  return slides.map((s) => (rank.has(s.node.nodeId) ? named[next++] : s));
+}
+
+/**
+ * The order to save once the slides in front of the owner were rearranged to
+ * `shown` (their nodeIds, in the new order). A presentation of one zone or of
+ * some types shows only part of the map, so the rest of the saved order is
+ * kept: the shown slides go where the first of them stood in it (else at the
+ * end), and every other saved id keeps its place around them.
+ */
+export function mergeSlideOrder(saved: string[] | undefined, shown: string[]): string[] {
+  const shownSet = new Set(shown);
+  const prev = saved ?? [];
+  const firstAt = prev.findIndex((id) => shownSet.has(id));
+  const rest = prev.filter((id) => !shownSet.has(id));
+  const at = firstAt < 0 ? rest.length : prev.slice(0, firstAt).filter((id) => !shownSet.has(id)).length;
+  return [...rest.slice(0, at), ...shown, ...rest.slice(at)];
+}
+
+/** `ids` with the one at `from` moved to `to` (both clamped to the list). */
+export function moveSlide(ids: string[], from: number, to: number): string[] {
+  const out = ids.slice();
+  if (from < 0 || from >= out.length) return out;
+  const [id] = out.splice(from, 1);
+  out.splice(Math.max(0, Math.min(out.length, to)), 0, id);
+  return out;
+}
+
+/**
  * How big a slide's headline (its node's title, else its text) is drawn, so a
  * long thought still fits on the screen: the longer the text, the smaller the
  * step, and past a few lines it reads left-aligned like a paragraph instead

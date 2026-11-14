@@ -257,6 +257,7 @@ export const updateMapDao = async (
     backgroundColor?: string | null;
     backgroundImage?: string;
     backgroundShade?: number;
+    slideOrder?: string[];
   },
 ) => {
   return await Map.findOneAndUpdate(

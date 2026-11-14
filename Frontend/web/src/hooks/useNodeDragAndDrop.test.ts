@@ -901,6 +901,81 @@ describe("useNodeDragAndDrop", () => {
       expect(result.current.groupDragState).toBeNull();
     });
 
+    describe("Select mode with ✥ on (docs/gestures/select-move.md)", () => {
+      const a = makeNode({ nodeId: "a", x: 200, y: 200 });
+      const b = makeNode({ nodeId: "b", x: 300, y: 600 });
+      const c = makeNode({ nodeId: "c", x: 900, y: 900 });
+
+      it("dragging a picked node moves every picked node", async () => {
+        const listeners = captureWindowListeners();
+        const { result } = setup({
+          nodes: [a, b, c],
+          chooseMode: true,
+          moveMode: true,
+          multiSelectIds: new Set(["a", "b"]),
+        });
+        act(() => result.current.onNodePointerDown(a, fakePointerDownEvent({ clientX: 200, clientY: 200 })));
+        act(() => listeners.pointermove({ clientX: 400, clientY: 200 }));
+        await act(async () => {
+          listeners.pointerup({ clientX: 400, clientY: 200 });
+          await vi.runAllTimersAsync();
+        });
+        expect(nodesApi.moveNodes).toHaveBeenCalledTimes(1);
+        expect(movedSpot("a")).toEqual({ x: 400, y: 200 });
+        expect(movedSpot("b")).toEqual({ x: 500, y: 600 });
+        expect(movedSpot("c")).toBeUndefined();
+      });
+
+      it("a single picked node drags too", async () => {
+        const listeners = captureWindowListeners();
+        const { result } = setup({ nodes: [a, b], chooseMode: true, moveMode: true, multiSelectIds: new Set(["a"]) });
+        act(() => result.current.onNodePointerDown(a, fakePointerDownEvent({ clientX: 200, clientY: 200 })));
+        act(() => listeners.pointermove({ clientX: 400, clientY: 300 }));
+        await act(async () => {
+          listeners.pointerup({ clientX: 400, clientY: 300 });
+          await vi.runAllTimersAsync();
+        });
+        expect(movedSpot("a")).toEqual({ x: 400, y: 300 });
+        expect(movedSpot("b")).toBeUndefined();
+      });
+
+      it("a node that isn't picked never drags; its tap picks it", () => {
+        const listeners = captureWindowListeners();
+        const { result } = setup({ nodes: [a, b, c], chooseMode: true, moveMode: true, multiSelectIds: new Set(["a", "b"]) });
+        act(() => result.current.onNodePointerDown(c, fakePointerDownEvent({ clientX: 900, clientY: 900 })));
+        expect(listeners.pointermove).toBeUndefined();
+        expect(result.current.groupDragState).toBeNull();
+        expect(result.current.dragState).toBeNull();
+      });
+
+      it("without ✥, picked nodes never drag in Select mode", () => {
+        const listeners = captureWindowListeners();
+        const { result } = setup({ nodes: [a, b], chooseMode: true, moveMode: false, multiSelectIds: new Set(["a", "b"]) });
+        act(() => result.current.onNodePointerDown(a, fakePointerDownEvent({ clientX: 200, clientY: 200 })));
+        expect(listeners.pointermove).toBeUndefined();
+        expect(result.current.groupDragState).toBeNull();
+      });
+
+      it("a finger's jitter on a picked node stays a tap, which drops it", async () => {
+        const listeners = captureWindowListeners();
+        const { result, handleNodeClick } = setup({
+          nodes: [a, b],
+          chooseMode: true,
+          moveMode: true,
+          multiSelectIds: new Set(["a", "b"]),
+        });
+        act(() =>
+          result.current.onNodePointerDown(a, fakePointerDownEvent({ clientX: 200, clientY: 200, pointerType: "touch" })),
+        );
+        act(() => listeners.pointermove({ clientX: 204, clientY: 203 }));
+        await act(async () => {
+          listeners.pointerup({ clientX: 204, clientY: 203 });
+        });
+        expect(handleNodeClick).toHaveBeenCalledWith(a, false);
+        expect(nodesApi.moveNodes).not.toHaveBeenCalled();
+      });
+    });
+
     it("a locked member caught up in the selection never moves, even as the drag's own leader", () => {
       const leader = makeNode({ nodeId: "leader", x: 0, y: 0, locked: true });
       const { result } = setup({

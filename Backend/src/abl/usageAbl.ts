@@ -36,6 +36,8 @@ export const EVENT_PROPS = {
   node_protected: [],
   map_finished: [],
   replay_played: [],
+  template_level_opened: ["level"],
+  template_finished: ["levels"],
   // Every other feature, by name (Frontend/web/src/utils/usage.ts FEATURES).
   feature_used: ["feature"],
 } as const satisfies Record<string, readonly string[]>;

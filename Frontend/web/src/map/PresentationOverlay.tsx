@@ -5,8 +5,10 @@ import { nodeRefId } from "../utils/nodeType";
 import { imageSrc } from "../utils/images";
 import { useSlidePictures } from "../hooks/useSlidePictures";
 import { useState } from "react";
-import type { NodeDoc } from "../types";
+import type { NodeDoc, NodeType } from "../types";
+import { PresentationSummary, TypeFilterChips } from "./PresentationSummary";
 import { slideHeadSize, slideSubSize } from "../utils/presentation";
+import { SlideOrderList } from "./SlideOrderList";
 import type { SlideGroup } from "../utils/presentation";
 import { MathText } from "./MathText";
 
@@ -18,6 +20,15 @@ interface Props {
   onExit: () => void;
   /** Closes the presentation and opens this node on the map. */
   onOpenNode: (nodeId: string) => void;
+  /** Everything in the presentation's scope, unanswered ghosts included: what the Summary tab and the type chips read. */
+  summaryNodes?: NodeDoc[];
+  /** The node types picked in the chips (empty: every type); the slides arrive already narrowed to them. */
+  typeFilter?: NodeType[];
+  onTypeFilterChange?: (types: NodeType[]) => void;
+  /** The slide order the map's owner saved (Map.slideOrder); empty / absent: automatic. */
+  savedOrder?: string[];
+  /** Saves a new slide order (the whole map's, [] for automatic). Only for the map's owner: without it there is no Order tab. */
+  onOrderChange?: (order: string[]) => void;
 }
 
 const linkCls =
@@ -37,8 +48,16 @@ export function PresentationOverlay({
   onIndexChange,
   onExit,
   onOpenNode,
+  summaryNodes = [],
+  typeFilter = [],
+  onTypeFilterChange,
+  savedOrder,
+  onOrderChange,
 }: Props) {
   const { t } = useI18n();
+  // Slides (one node at a time) or Summary (the whole map gathered up, see
+  // PresentationSummary). Personal to this presentation, starts on slides.
+  const [tab, setTab] = useState<"slides" | "summary" | "order">("slides");
   const slide = slides[index];
   const pictures = useSlidePictures(slide?.node);
   // The picture shown full size, if any: which node's, and which of its
@@ -47,10 +66,14 @@ export function PresentationOverlay({
   const zoomed = zoom && zoom.nodeId === slide?.node.nodeId ? zoom.i : null;
   const setZoomed = (i: number | null) =>
     setZoom(i === null || !slide ? null : { nodeId: slide.node.nodeId, i });
-  if (!slide) return null;
-  const { node, children } = slide;
+  const hasSummary = summaryNodes.length > 0;
+  // The owner's Order tab: the slides as a list to rearrange.
+  const canOrder = !!onOrderChange && slides.length > 1;
+  if (!slide && !hasSummary) return null;
+  const node = slide?.node;
+  const children = slide?.children ?? [];
   // The parent the slide's own head hangs from, when that one is in the show.
-  const parentId = nodeRefId(node.parentId);
+  const parentId = node ? nodeRefId(node.parentId) : null;
   const parent = parentId
     ? slides
         .flatMap((s) => [s.node, ...s.children])
@@ -62,14 +85,46 @@ export function PresentationOverlay({
     if (i >= 0) onIndexChange(i);
   };
   const atStart = index === 0;
-  const atEnd = index === slides.length - 1;
+  const atEnd = index >= slides.length - 1;
+  // A summary row: its own slide when it has one, else (an unanswered
+  // question, which never gets a slide) the node on the map.
+  const pickFromSummary = (nodeId: string) => {
+    const i = slides.findIndex((g) => g.node.nodeId === nodeId);
+    if (i >= 0) {
+      onIndexChange(i);
+      setTab("slides");
+    } else {
+      onOpenNode(nodeId);
+    }
+  };
+  const tabCls = (on: boolean) =>
+    `cursor-pointer rounded-md border-0 px-[0.7rem] py-[0.3rem] text-[0.8rem] font-semibold transition-colors duration-[120ms] ${
+      on ? "bg-surface text-ink shadow-sm" : "bg-transparent text-ink-soft hover:text-ink"
+    }`;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-surface">
       <div className="flex items-center justify-between px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
-        <span className="text-[0.85rem] text-ink-soft">
-          {t.ui.presentation.slideCount(index + 1, slides.length)}
+        <span className="min-w-[3.5rem] text-[0.85rem] text-ink-soft">
+          {tab === "slides" && slides.length > 0 && t.ui.presentation.slideCount(index + 1, slides.length)}
         </span>
+        {(hasSummary || canOrder) && (
+          <div className="flex gap-1 rounded-lg bg-surface-2 p-[3px]" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === "slides"} className={tabCls(tab === "slides")} onClick={() => setTab("slides")}>
+              {t.ui.presentation.slidesTab}
+            </button>
+            {hasSummary && (
+              <button type="button" role="tab" aria-selected={tab === "summary"} className={tabCls(tab === "summary")} onClick={() => setTab("summary")}>
+                {t.ui.presentation.summaryTab}
+              </button>
+            )}
+            {canOrder && (
+              <button type="button" role="tab" aria-selected={tab === "order"} className={tabCls(tab === "order")} onClick={() => setTab("order")}>
+                {t.ui.presentation.orderTab}
+              </button>
+            )}
+          </div>
+        )}
         <button
           type="button"
           onClick={onExit}
@@ -78,6 +133,10 @@ export function PresentationOverlay({
           {t.ui.presentation.exit}
         </button>
       </div>
+
+      {onTypeFilterChange && (
+        <TypeFilterChips nodes={summaryNodes} value={typeFilter} onChange={onTypeFilterChange} />
+      )}
 
       {/* min-h-0: a flex child otherwise refuses to shrink below its
           content, so overflow-y-auto never kicks in and the rows above and
@@ -90,6 +149,24 @@ export function PresentationOverlay({
         className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-4 text-center sm:px-8"
         data-slide-body
       >
+        {tab === "summary" ? (
+          <div className="mx-auto flex w-full flex-col items-center">
+            <PresentationSummary nodes={summaryNodes} typeFilter={typeFilter} onPick={pickFromSummary} />
+          </div>
+        ) : tab === "order" && canOrder && onOrderChange ? (
+          <SlideOrderList
+            slides={slides}
+            current={index}
+            savedOrder={savedOrder}
+            onChange={onOrderChange}
+            onPick={(i) => {
+              onIndexChange(i);
+              setTab("slides");
+            }}
+          />
+        ) : !node ? (
+          <p className="my-auto text-center text-ink-soft">{t.ui.presentation.noMatch}</p>
+        ) : (
         <div className="my-auto flex w-full flex-col items-center gap-4">
           {parent && (
             <button
@@ -195,8 +272,10 @@ export function PresentationOverlay({
             </ul>
           )}
         </div>
+        )}
       </div>
 
+      {tab === "slides" && (
       <div className="flex items-center justify-center gap-4 px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
@@ -215,6 +294,7 @@ export function PresentationOverlay({
           {t.ui.presentation.next} →
         </button>
       </div>
+      )}
 
       {zoomed !== null && pictures[zoomed] && (
         // Full-size view, above the slide; a click anywhere closes it.

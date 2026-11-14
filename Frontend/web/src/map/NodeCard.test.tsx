@@ -407,5 +407,34 @@ describe("NodeCard", () => {
       fireEvent.click(screen.getByTestId("auto-pack-count"));
       expect(onUnfold).toHaveBeenCalledTimes(1);
     });
+
+    it("opens a packed parent with a double-click or a double-tap, without editing it", () => {
+      const onUnfold = vi.fn();
+      const onDoubleClick = vi.fn();
+      const { container, onClick } = renderNode({ node: makeNode({ nodeId: "p" }), onUnfold, onDoubleClick, foldedCount: 3 });
+      const el = container.querySelector("[data-reveal-node]")!;
+      fireEvent.pointerDown(el, { pointerType: "touch" });
+      fireEvent.click(el, { clientX: 10, clientY: 10 });
+      expect(onUnfold).not.toHaveBeenCalled();
+      expect(onClick).toHaveBeenCalledTimes(1);
+      fireEvent.click(el, { clientX: 12, clientY: 11 });
+      expect(onUnfold).toHaveBeenCalledTimes(1);
+      expect(onClick).toHaveBeenCalledTimes(1);
+      fireEvent.pointerDown(el, { pointerType: "mouse" });
+      fireEvent.doubleClick(el);
+      expect(onDoubleClick).not.toHaveBeenCalled();
+    });
+
+    it("still edits an open parent on a double-click", () => {
+      const onUnfold = vi.fn();
+      const onDoubleClick = vi.fn();
+      const { container } = renderNode({ node: makeNode({ nodeId: "p" }), onUnfold, onDoubleClick });
+      const el = container.querySelector("[data-reveal-node]")!;
+      fireEvent.click(el);
+      fireEvent.click(el);
+      fireEvent.doubleClick(el);
+      expect(onUnfold).not.toHaveBeenCalled();
+      expect(onDoubleClick).toHaveBeenCalledTimes(1);
+    });
   });
 });

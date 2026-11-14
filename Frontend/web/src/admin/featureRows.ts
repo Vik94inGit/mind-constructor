@@ -19,6 +19,8 @@ export const FEATURE_EVENTS = [
   "node_protected",
   "map_finished",
   "replay_played",
+  "template_level_opened",
+  "template_finished",
 ] as const;
 
 export interface FeatureRow {

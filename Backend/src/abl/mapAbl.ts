@@ -170,6 +170,8 @@ export const createMapAbl = async (input: unknown, ownerId: string) => {
 // something worth silently accepting. Deliberately omits `name`/`members`/
 // `mapId`/`ownerId` — ownership and membership change through their own
 // endpoints (invite, admin actions), not a generic field-by-field PATCH.
+export const MAX_SLIDE_ORDER = 5000;
+
 const updateMapSchema = z
   .object({
     name: z.string().min(1, "Name is required").optional(),
@@ -194,6 +196,8 @@ const updateMapSchema = z
       .optional(),
     // See Map.backgroundShade — negative darkens the picture, positive lightens it.
     backgroundShade: z.number().int().min(-100).max(100).optional(),
+    // See Map.slideOrder — [] goes back to the automatic order.
+    slideOrder: z.array(z.string().min(1).max(64)).max(MAX_SLIDE_ORDER).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No fields to update",

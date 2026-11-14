@@ -10,6 +10,11 @@ export const NODE_TYPES = [
   "Fail",
   "Idea",
   "unknown",
+  // Study types: a topic's heading, and a question to answer about it.
+  // Neither is an outcome, so like "unknown" they draw no halo or horns and
+  // can't be an attack's or a protection's type.
+  "Title",
+  "Question",
 ] as const;
 
 export type NodeType = (typeof NODE_TYPES)[number];
@@ -114,6 +119,20 @@ export const NodeSchema = new mongoose.Schema(
       min: 1,
       max: 9999,
       validate: { validator: (v: number | null) => v === null || Number.isInteger(v), message: "order must be a whole number" },
+    },
+    // Which level of a template this ghost belongs to (1, 2, 3, …): a
+    // template asks its questions in rounds, and the frontend keeps a
+    // level's ghosts locked (drawn but not yet writable) until every ghost of
+    // the levels before it under the same template root has been filled in.
+    // Set at creation only. null (the default) for a template's root and
+    // every node that isn't part of a leveled template. Rides along on the
+    // node list like `order`.
+    level: {
+      type: Number,
+      default: null,
+      min: 1,
+      max: 9,
+      validate: { validator: (v: number | null) => v === null || Number.isInteger(v), message: "level must be a whole number" },
     },
     // Which dot of a picture this node is, for a node made by "Draw a
     // picture": the frontend lays a picture out as ghost nodes, one per dot,

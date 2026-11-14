@@ -27,11 +27,11 @@ interface Props {
 const pictureBtn =
   "cursor-pointer rounded-full border border-line bg-surface px-[0.45rem] py-[0.1rem] text-[0.68rem] font-semibold text-ink shadow-card hover:bg-surface-2 disabled:opacity-50";
 
-// The lower half of the Info tab's "post" box (see InfoTab): the node's
-// pictures laid out under its text the way a post shows them (tap one to see
-// it full size) and, for the node's owner, a small toolbar to add more. A
-// picture can also be pasted anywhere in the panel (NodePanel's own onPaste)
-// or dropped anywhere on the post box (InfoTab).
+// The Info tab's pictures box, under the text and its buttons (see InfoTab):
+// the node's pictures the way a post shows them (tap one to see it full size)
+// and, for the node's owner, a small toolbar to add more. A picture can also
+// be pasted anywhere in the panel (NodePanel's own onPaste) or dropped on the
+// text box or this one (InfoTab).
 export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, iconImage = "", onSetIcon, cardImage = "", onSetCard }: Props) {
   const { t } = useI18n();
   const s = t.ui.images;
@@ -71,13 +71,9 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
           <div className={`grid gap-[0.35rem] ${list.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
             {list.map((src, i) => (
               <div key={i} className="relative">
-                <button
-                  type="button"
-                  className="block w-full cursor-zoom-in overflow-hidden rounded-md border border-line bg-surface-2 p-0"
-                  title={s.open}
-                  aria-label={s.open}
-                  onClick={() => setOpen(i)}
-                >
+                {/* A node shown as a picture card already shows its picture on
+                    the map, so its pictures here don't open full size on a tap. */}
+                <ZoomWrap zoom={!cardImage} label={s.open} onOpen={() => setOpen(i)}>
                   {/* The whole picture, scaled to the panel's width (and
                       held under a share of the screen's height), never
                       cropped. */}
@@ -86,7 +82,7 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
                     alt=""
                     className={`mx-auto block max-w-full object-contain ${list.length === 1 ? "h-auto max-h-[30vh] w-full" : "h-[110px] w-full"}`}
                   />
-                </button>
+                </ZoomWrap>
                 {(onSetIcon || onSetCard) && (
                   // Shows this picture on the map: as the node's round icon
                   // (instead of its type's symbol) or as a card — one or the
@@ -250,5 +246,16 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
         </div>
       )}
     </div>
+  );
+}
+
+// A picture that opens full size on a tap, or, with zoom off, just the picture.
+function ZoomWrap({ zoom, label, onOpen, children }: { zoom: boolean; label: string; onOpen: () => void; children: ReactNode }) {
+  const cls = "block w-full overflow-hidden rounded-md border border-line bg-surface-2 p-0";
+  if (!zoom) return <div className={cls} data-testid="picture-no-zoom">{children}</div>;
+  return (
+    <button type="button" className={`${cls} cursor-zoom-in`} title={label} aria-label={label} onClick={onOpen}>
+      {children}
+    </button>
   );
 }

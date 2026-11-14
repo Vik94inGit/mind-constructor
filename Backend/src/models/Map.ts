@@ -3,7 +3,7 @@ import { ZONE_PALETTE } from "./palette.js";
 
 // What a map is for — picked when it is created, and the frontend seeds a
 // matching starter structure. Purely descriptive: nothing here is enforced.
-export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea"] as const;
+export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea", "study"] as const;
 
 // The canvas behind a map's nodes, picked by the map's owner and seen by every
 // member. null (every map that never picked one) draws the dot grid.
@@ -86,6 +86,12 @@ export const MapSchema = new mongoose.Schema(
     // -100..100 — the frontend lays black or white over it by that much. 0
     // (the default) leaves it as it is.
     backgroundShade: { type: Number, min: -100, max: 100, default: 0 },
+    // The order the owner chose for the map's presentation slides: public
+    // nodeIds, first slide first. Empty (the default) keeps the automatic
+    // order; a node missing from it (made later) keeps its automatic place,
+    // and an id whose node is gone is simply skipped (frontend
+    // utils/presentation.ts applySlideOrder).
+    slideOrder: { type: [String], default: [] },
     // When the discussion on this map was finished (see abl/finishAbl.ts) —
     // null while it's still going. A finished map takes no new nodes,
     // attacks or shields until its owner reopens it.

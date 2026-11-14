@@ -23,7 +23,7 @@ describe("ImagesSection templates", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { onAdd, container } = setup();
     await userEvent.click(screen.getByRole("button", { name: s.templates }));
-    expect(container.querySelectorAll("[data-template]")).toHaveLength(10);
+    expect(container.querySelectorAll("[data-template]")).toHaveLength(11);
     await userEvent.click(screen.getByRole("button", { name: s.templateNames.lightbulb }));
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
     expect(fetchMock).toHaveBeenCalledWith("/picture-templates/lightbulb.webp");
@@ -40,12 +40,33 @@ describe("ImagesSection templates", () => {
     await userEvent.click(screen.getByRole("button", { name: s.templateNames.eyes }));
     expect(await screen.findByText(s.templateFailed)).toBeTruthy();
     expect(onAdd).not.toHaveBeenCalled();
-    expect(container.querySelectorAll("[data-template]")).toHaveLength(10);
+    expect(container.querySelectorAll("[data-template]")).toHaveLength(11);
     vi.unstubAllGlobals();
   });
 
   it("has no templates for a viewer who can't edit", () => {
     setup(["data:image/png;base64,x"], false);
     expect(screen.queryByRole("button", { name: s.templates })).toBeNull();
+  });
+});
+
+describe("ImagesSection on a picture card", () => {
+  it("opens a picture full size on a tap", async () => {
+    render(
+      <I18nProvider>
+        <ImagesSection images={["data:image/png;base64,AA"]} canEdit={false} busy={false} onAdd={vi.fn()} onRemove={vi.fn()} />
+      </I18nProvider>,
+    );
+    expect(screen.getByRole("button", { name: s.open })).toBeInTheDocument();
+  });
+
+  it("doesn't open the pictures of a node shown as a picture card", () => {
+    render(
+      <I18nProvider>
+        <ImagesSection images={["data:image/png;base64,AA"]} canEdit={false} busy={false} onAdd={vi.fn()} onRemove={vi.fn()} cardImage="data:image/png;base64,BB" />
+      </I18nProvider>,
+    );
+    expect(screen.queryByRole("button", { name: s.open })).toBeNull();
+    expect(screen.getByTestId("picture-no-zoom")).toBeInTheDocument();
   });
 });

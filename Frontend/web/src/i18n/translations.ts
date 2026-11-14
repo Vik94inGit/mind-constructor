@@ -117,11 +117,13 @@ export interface Translation {
       boardColor: string;
       startingPoint: string;
       templates: {
+        empty: { label: string; desc: string };
         problem: { label: string; desc: string };
         decision: { label: string; desc: string };
         goal: { label: string; desc: string };
         retro: { label: string; desc: string };
         idea: { label: string; desc: string };
+        study: { label: string; desc: string };
       };
       mode: {
         label: string;
@@ -149,6 +151,9 @@ export interface Translation {
       add: string;
       moveOn: string;
       moveOff: string;
+      /** Select mode (☑): taps only pick nodes; left only by Done or ☑ again. */
+      selectOn: string;
+      selectOff: string;
       discussionTooltip: string;
       personalTooltip: string;
       /** Battle mode while offline: paused, the toggle can't be used. */
@@ -159,6 +164,7 @@ export interface Translation {
       fitMap: string;
       zoomIn: string;
       expandToolbar: string;
+      more: string;
       displayMenu: string;
       undo: string;
       /** The display menu's entry and the bar that replays the map node by node, oldest first. */
@@ -346,11 +352,13 @@ const en: Translation = {
       boardColor: "Board color",
       startingPoint: "Starting point",
       templates: {
+        empty: { label: "Empty map", desc: "A blank canvas with no nodes. Start from nothing and add your own." },
         problem: { label: "Problem analysis", desc: "Break a problem into parts, weigh ways to solve it, plan and check the result." },
         decision: { label: "Decision", desc: "Compare options with their advantages and risks." },
         goal: { label: "Goal planning", desc: "A goal with success criteria, steps, obstacles and a review." },
         retro: { label: "Retrospective", desc: "What went well, what did not, and what to change." },
-        idea: { label: "Idea", desc: "Grow an idea: the need it meets, how it works, a first try, and what could kill it." },
+        idea: { label: "Idea", desc: "Grow an idea in three rounds: what it is and why, how to make it happen, then how it went." },
+        study: { label: "Study", desc: "A topic in titles and questions: what it is, its main parts, examples, and what an exam would ask." },
       },
       mode: {
         label: "Mode",
@@ -378,6 +386,8 @@ const en: Translation = {
       add: "Add",
       moveOn: "Move nodes: on — tap Done to go back to just selecting",
       moveOff: "Move nodes: off — turn on to drag nodes around",
+      selectOn: "Select mode: on — tap nodes to pick them; press Done to leave",
+      selectOff: "Select mode: off — turn on to pick nodes with taps",
       discussionTooltip:
         "Battle mode: on — attacks do damage, and members other than the owner are limited in what they can attack with. Click to switch to Creating mode.",
       personalTooltip:
@@ -390,6 +400,7 @@ const en: Translation = {
       fitMap: "Fit the whole map on screen",
       zoomIn: "Zoom in",
       expandToolbar: "Show toolbar",
+      more: "More tools",
       displayMenu: "Display options",
       undo: "Undo last move (Ctrl+Z)",
       timeLapse: "Time-lapse — watch the map grow",

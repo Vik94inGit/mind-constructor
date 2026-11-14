@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NodePanel } from "./NodePanel";
 import { I18nProvider } from "../i18n/I18nContext";
@@ -68,6 +68,13 @@ describe("NodePanel", () => {
     renderPanel();
     expect(screen.getByDisplayValue("The claim")).toBeInTheDocument();
     expect(screen.getByText("Claim")).toBeInTheDocument();
+  });
+
+  it("keeps a locked template question read-only and says which level to answer first", () => {
+    const node = makeNode({ nodeId: "g", text: "", prompt: "What is the plan?", ghost: true, level: 2 });
+    renderPanel({ node, nodes: [node], levelLock: en.ui.templates.locked(1, 3) });
+    expect(screen.getByTestId("level-lock")).toHaveTextContent("Answer level 1 first (3 left)");
+    expect(screen.queryByRole("textbox", { name: en.ui.node.textLabel })).not.toBeInTheDocument();
   });
 
   it("offers Split into nodes right under the text, on what's typed there", async () => {
@@ -175,19 +182,50 @@ describe("NodePanel", () => {
     expect(screen.queryAllByRole("radio")).toHaveLength(0);
   });
 
-  it("opens an attack on your node on its Attack tab", () => {
+  it("opens an attack on your node on Info, its Attack tab set to strike back", async () => {
     const attack = makeNode({ nodeId: "w", text: "Their objection", type: "Problem", userId: "u2", isWeapon: true, weaponIcon: "spear", targetNodeId: "b", parentId: "b" });
     const nodes = [makeNode({ nodeId: "b", text: "Mine" }), attack];
     renderPanel({ node: attack, nodes, edges: [] });
+    expect(document.querySelector("#attack-text")).toBeNull();
+    expect(screen.getByText("Their objection")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: en.map.panelTabs.attack }));
     expect(document.querySelector("#attack-text")).not.toBeNull();
   });
 
-  it("opens an attack reached with the arrows on Info", () => {
-    const attack = makeNode({ nodeId: "w", text: "Their objection", type: "Problem", userId: "u2", isWeapon: true, weaponIcon: "spear", targetNodeId: "b", parentId: "b" });
-    const nodes = [makeNode({ nodeId: "b", text: "Mine" }), attack];
-    renderPanel({ node: attack, nodes, edges: [], stepped: true });
-    expect(document.querySelector("#attack-text")).toBeNull();
-    expect(screen.getByText("Their objection")).toBeInTheDocument();
+  it("shows the text and its Edit / Save change before the pictures", () => {
+    renderPanel();
+    const pictures = screen.getByTestId("info-pictures");
+    const edit = document.querySelector("[data-text-edit]")!;
+    const text = document.querySelector("#node-text")!;
+    expect(text.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(edit.compareDocumentPosition(pictures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("opens a picture's dot on its dots, then the text, then the rest of the picture", async () => {
+    const pic = (dot: number) => ({ id: "p1", kind: "heart", dot });
+    const here = makeNode({ nodeId: "d0", text: "Family", x: 0, y: 0, picture: pic(0) });
+    const nodes = [
+      here,
+      makeNode({ nodeId: "d1", text: "", prompt: "Who do you love?", ghost: true, x: 50, y: 20, picture: pic(1) }),
+      makeNode({ nodeId: "d2", text: "Music", x: 80, y: 60, picture: pic(2) }),
+    ];
+    const onSelectNode = vi.fn();
+    renderPanel({ node: here, nodes, edges: [], onSelectNode });
+    const map = screen.getByTestId("picture-dots-map");
+    const text = document.querySelector("#node-text")!;
+    const list = screen.getByTestId("picture-dots-list");
+    expect(map.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(text.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(list.textContent).toContain("Who do you love?");
+    expect(list.textContent).not.toContain("Family");
+    await userEvent.click(within(list).getByRole("button", { name: /Music/ }));
+    expect(onSelectNode).toHaveBeenCalledWith("d2");
+  });
+
+  it("shows no picture dots for an ordinary node", () => {
+    renderPanel();
+    expect(screen.queryByTestId("picture-dots-map")).toBeNull();
+    expect(screen.queryByTestId("picture-dots-list")).toBeNull();
   });
 
   it("hides Protect in Personal mode", () => {
@@ -211,5 +249,16 @@ describe("NodePanel", () => {
   it("has no Swap with parent without a parent to swap with", () => {
     renderPanel();
     expect(document.querySelector("[data-swap-parent]")).toBeNull();
+  });
+
+  it("offers Extract text on a zone's parent's Info tab", async () => {
+    const props = renderPanel({ isClusterParent: true });
+    await userEvent.click(screen.getByRole("button", { name: en.ui.node.extractText }));
+    expect(props.onExtractText).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no Extract text on a node that heads no zone", () => {
+    renderPanel();
+    expect(screen.queryByRole("button", { name: en.ui.node.extractText })).not.toBeInTheDocument();
   });
 });

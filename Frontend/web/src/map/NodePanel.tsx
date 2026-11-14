@@ -1,13 +1,15 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { TemplateProgress } from "../utils/templateLevels";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { allowedAttackTypes, sentimentOf, idOf, nodeRefId, usernameOf } from "../utils/nodeType";
 import { NODE_TYPE_TEMPLATE } from "../utils/templates";
+import { PictureDotsList, PictureDotsMap, pictureGroupOf } from "./nodePanel/PictureDots";
 import type { NodeTemplateKind, TemplateKind } from "../utils/templates";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ringKindFor } from "./OutcomeBadge";
-import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
+import { ATTACK_NODE_TYPES } from "../types";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeShape, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { usePanelSheet } from "./nodePanel/usePanelSheet";
@@ -95,7 +97,7 @@ interface Props {
   onStartPack: () => void;
   /** One packed member got unpacked back to a normal, visible node. */
   onUnpacked: (node: NodeDoc) => void;
-  /** True when this node is a circle's own root/parent (2+ direct parentId-children — MapPage's circleRootSentimentByNode). Gates the "Extract text" button below: the whole-map export lives in the "+" toolbar menu only, so a plain non-parent node's panel offers no text export at all. */
+  /** True when this node is a circle's own root/parent (2+ direct parentId-children — MapPage's circleRootSentimentByNode). Gates the Info tab's "Extract text" button (the zone's own right-click menu has it too): the whole-map export lives in the "+" toolbar menu only, so a plain non-parent node's panel offers no text export at all. */
   isClusterParent: boolean;
   /** Asks MapPage to open a text export scoped to this node's own cluster — plus, recursively, any cluster rooted at one of its children (see MapPage's collectClusterSubtree). Only ever called when isClusterParent is true. */
   onExtractText: () => void;
@@ -111,6 +113,10 @@ interface Props {
   cardLook?: CardLook;
   /** Its owner locked this text block (utils/blockLock.ts): the text reads as for anyone else's node until unlocked. */
   textLocked?: boolean;
+  /** Set on a locked ghost of a leveled template (utils/templateLevels.ts): why it can't be written in yet. */
+  levelLock?: string;
+  /** Where the leveled template grown from this node stands (utils/templateLevels.ts templateProgress). */
+  levelProgress?: TemplateProgress;
   /** Locks/unlocks this node — owner only. */
   onToggleLock?: () => void;
   /** Set on a parent with nodes of yours: pulls those outside its zone back in (utils/parentMagnet.ts), resolving to how many moved. */
@@ -133,13 +139,25 @@ interface Props {
   /** Opens the previous (-1) or next (1) node in reading order (utils/nodeOrder.ts) — the text's arrow keys. */
   /** Read the previous / next node; `focusText: false` keeps focus where it is (the header's buttons). */
   onStepNode?: (dir: -1 | 1, focusText?: boolean) => void;
-  /** This node was reached with the ← / → arrows: it opens on Info, even an attack you could strike back at. */
-  stepped?: boolean;
+  // One of several panels open at once (docs/gestures/several-panels.md): it
+  // fills its tile instead of docking as the sheet, and can't be dragged or
+  // resized.
+  tiled?: boolean;
+  // The active panel (the node last tapped): an accent border when tiled.
+  active?: boolean;
+  // A press inside a tiled panel that isn't active makes it the active one.
+  onActivate?: () => void;
 }
+
+// A tile among several open panels (MapPage's grid lays them out).
+const TILE_CLASS =
+  "relative flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border bg-surface shadow-[var(--shadow-card)]";
 
 export function NodePanel({
   onStepNode,
-  stepped = false,
+  tiled = false,
+  active = true,
+  onActivate,
   node,
   nodes,
   edges,
@@ -166,6 +184,8 @@ export function NodePanel({
   feeling,
   cardLook,
   textLocked = false,
+  levelLock,
+  levelProgress,
   onToggleLock,
   onMagnet,
   onChangeParent,
@@ -233,7 +253,7 @@ export function NodePanel({
   const targetId = node.isWeapon ? nodeRefId(node.targetNodeId) : undefined;
   const target = targetId ? nodes.find((n) => n.nodeId === targetId) : undefined;
   // An attack from the other side (another member's, or the imitated
-  // opponent's) on one of your own nodes: its panel opens ready to strike back.
+  // opponent's) on one of your own nodes: its Attack tab is set to strike back.
   const strikeBack = discussionMode && !!target && idOf(target.userId) === currentUserId && (!!node.byOpponent || !isCreator);
 
   // Same idea, for a protection node's own protectsNodeId — surfaced as a
@@ -253,8 +273,9 @@ export function NodePanel({
 
   // Which node types this attack may carry: in battle mode the owner may use
   // anything, everyone else is limited by the target's side (mirrors
-  // attackAbl.ts, which enforces it); in Personal mode there is no limit.
-  const attackTypes: NodeType[] = discussionMode ? allowedAttackTypes(isMapOwner, node.type) : [...NODE_TYPES];
+  // attackAbl.ts, which enforces it); in Personal mode anyone gets the owner's
+  // set (every type an attack may be, which leaves out the study types).
+  const attackTypes: NodeType[] = allowedAttackTypes(!discussionMode || isMapOwner, node.type);
   // The type actually sent: the picked one while it is still allowed, else
   // the first allowed (a mode flip or a different target can invalidate it).
   const effectiveAttackType = attackTypes.includes(attackType) ? attackType : attackTypes[0];
@@ -269,6 +290,8 @@ export function NodePanel({
   // Growing a template branch — only offered on a node that has no branch
   // yet (Problem, Solution or Idea: a ready structure; Fail: analyze and retry).
   const hasChildren = nodes.some((n) => nodeRefId(n.parentId) === node.nodeId);
+  // A dot of a "Draw a picture": its Info tab opens on the picture's dots.
+  const pictureGroup = useMemo(() => pictureGroupOf(node, nodes), [node, nodes]);
   const templateKind: NodeTemplateKind | null =
     !isCreator || hasChildren || node.isWeapon || node.isProtection ? null : (NODE_TYPE_TEMPLATE[node.type] ?? null);
   // Only an outcome type (see OutcomeBadge.tsx) actually draws an inner
@@ -344,7 +367,9 @@ export function NodePanel({
     setExpanded(false);
     setDragOffset({ x: 0, y: 0 });
     setPanelHeight(null);
-    setTab(strikeBack && !stepped ? "attack" : "info");
+    // Every node opens on Info, an attack you could strike back at too: its
+    // Attack tab is one tap away, already set to answer it.
+    setTab("info");
     nodesApi
       .getAttackHistory(node.nodeId)
       .then(setHistory)
@@ -510,12 +535,14 @@ export function NodePanel({
   return (
     <div
       ref={panelRef}
-      className={PANEL_CLASS}
+      className={tiled ? `${TILE_CLASS} ${active ? "border-2 border-accent" : "border-line"}` : PANEL_CLASS}
       data-node-panel
+      data-active-panel={active ? "" : undefined}
+      onPointerDownCapture={tiled && !active ? onActivate : undefined}
       // A screenshot pasted anywhere in the panel (the text field included)
       // lands on the node as a picture; pasting plain text is left alone.
       onPaste={onPanelPaste}
-      style={{
+      style={tiled ? undefined : {
         ...(dragOffset.x || dragOffset.y ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` } : undefined),
         // Overrides PANEL_CLASS's own responsive max-height cap the moment
         // someone's actually resized this — see panelHeight's own doc
@@ -529,13 +556,15 @@ export function NodePanel({
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-3">
       {/* Grip: the only way to drag the sheet off its dock, kept apart so the
           tabs and ✕ stay plain tap targets. touch-none stops the page scrolling. */}
-      <div
-        className="-mx-5 mb-2 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
-        onPointerDown={onGripPointerDown}
-        title={t.ui.panelDragHandle}
-      >
-        <div className="h-[0.28rem] w-[2.5rem] rounded-full bg-line" aria-hidden />
-      </div>
+      {!tiled && (
+        <div
+          className="-mx-5 mb-2 flex touch-none cursor-grab justify-center py-[0.35rem] select-none active:cursor-grabbing"
+          onPointerDown={onGripPointerDown}
+          title={t.ui.panelDragHandle}
+        >
+          <div className="h-[0.28rem] w-[2.5rem] rounded-full bg-line" aria-hidden />
+        </div>
+      )}
       {/* Type, byline and tabs share one row (wrapping on a narrow phone), so
           the node's text shows up sooner. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line pb-[0.7rem]">
@@ -623,6 +652,8 @@ export function NodePanel({
           feeling={feeling}
           cardLook={cardLook}
           textLocked={textLocked}
+          levelLock={levelLock}
+          levelProgress={levelProgress}
           onToggleLock={onToggleLock}
           onMagnet={onMagnet}
           onChangeParent={onChangeParent}
@@ -644,9 +675,12 @@ export function NodePanel({
           onCarryText={onCarryText}
           onStepNode={onStepNode}
           onCopyText={handleCopyText}
+          onExtractText={isClusterParent ? onExtractText : undefined}
           onDelete={handleDelete}
           onTemplate={handleTemplate}
           onClose={onClose}
+          pictureMap={pictureGroup && <PictureDotsMap group={pictureGroup} nodeId={node.nodeId} onSelect={onSelectNode} />}
+          pictureList={pictureGroup && <PictureDotsList group={pictureGroup} nodeId={node.nodeId} onSelect={onSelectNode} />}
           imagesSection={
             <ImagesSection
               images={images}
@@ -659,7 +693,7 @@ export function NodePanel({
               cardImage={node.cardImage}
               onSetCard={isCreator ? (i) => setImageAs("cardImage", i) : undefined}
               extra={
-                isCreator && !textLocked ? (
+                isCreator && !textLocked && !levelLock ? (
                   <span
                     className={`text-[0.7rem] tabular-nums ${textDraft.length >= MAX_NODE_TEXT ? "font-semibold text-danger" : "text-ink-soft"}`}
                   >
@@ -707,7 +741,6 @@ export function NodePanel({
           onEdit={onEdit}
           onStartPack={onStartPack}
           onStartChoose={onStartChoose}
-          onExtractText={onExtractText}
           onClose={onClose}
         />
       )}
@@ -755,25 +788,31 @@ export function NodePanel({
           the panel's content in the markup (order-first draws it on top), so
           Tab reaches the type, the tabs, close and the open tab's content
           before these arrows. */}
+      {(!tiled || onStepNode) && (
       <div className="order-first flex flex-shrink-0 items-center gap-2 px-3 pt-2">
         {onStepNode && (
           <button className={stepBtn} title={t.ui.node.prevNode} aria-label={t.ui.node.prevNode} onClick={() => onStepNode(-1, false)}>
             ←
           </button>
         )}
-        <div
-          className="flex h-[2.75rem] flex-1 touch-none cursor-ns-resize items-center justify-center select-none"
-          onPointerDown={onResizeHandlePointerDown}
-          title={t.ui.panelResizeHandle}
-        >
-          <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
-        </div>
+        {tiled ? (
+          <div className="flex-1" />
+        ) : (
+          <div
+            className="flex h-[2.75rem] flex-1 touch-none cursor-ns-resize items-center justify-center select-none"
+            onPointerDown={onResizeHandlePointerDown}
+            title={t.ui.panelResizeHandle}
+          >
+            <div className="h-[0.28rem] w-[3rem] rounded-full bg-line" aria-hidden />
+          </div>
+        )}
         {onStepNode && (
           <button className={stepBtn} title={t.ui.node.nextNode} aria-label={t.ui.node.nextNode} onClick={() => onStepNode(1, false)}>
             →
           </button>
         )}
       </div>
+      )}
     </div>
   );
 }

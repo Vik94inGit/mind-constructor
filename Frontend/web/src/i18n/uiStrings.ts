@@ -51,12 +51,30 @@ export interface UiStrings {
     goal: { button: string; hint: string };
     retry: { title: string; hint: string; button: string };
     idea: { button: string; hint: string };
+    study: { button: string; hint: string };
+    question: { button: string; hint: string };
     created: (count: number) => string;
     failed: string;
     /** The notice's button that takes a template or picture back in one step. */
     undo: string;
     /** A map that just opened with its starter questions (a new map of a kind). */
     seeded: string;
+    /** A leveled template's ghost that can't be written in yet (utils/templateLevels.ts): the level to answer first and how many of its questions are left. */
+    locked: (level: number, left: number) => string;
+    /** A leveled template's next round just came up on the map (hooks/useLevelReveal.ts): its level and how many new questions. */
+    unlocked: (level: number, count: number) => string;
+    /** A leveled template just grown: how many questions its first round asks, and how many rounds wait behind it. */
+    createdRounds: (count: number, later: number) => string;
+    /** Where a leveled template stands, on its root's Info tab: the level being answered, of how many, and how many of its questions are left. */
+    progress: (level: number, levels: number, left: number) => string;
+    /** The same once every level is answered. */
+    progressDone: (levels: number) => string;
+    /** The level pill's tooltip on a template's root. */
+    levelBadge: (level: number, levels: number) => string;
+    /** Opens the list of what the next level will ask. */
+    peekNext: (level: number) => string;
+    /** A leveled template's last question just answered. */
+    finished: (levels: number) => string;
     nodes: Record<TemplateNodeKey, string>;
   };
   /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
@@ -82,6 +100,8 @@ export interface UiStrings {
     failed: string;
     /** The bar a tap on a picture's caption opens (hooks/usePictureEdit.ts). */
     edit: { open: string; bar: string; bigger: string; smaller: string; move: string; close: string; color: string; resizeFailed: string };
+    /** A dot's node panel (map/nodePanel/PictureDots.tsx): the picture's dots on top, its other dots in a list under the text. */
+    panel: { map: (name: string) => string; rest: string; dot: (n: number) => string; open: (label: string) => string };
   };
   contextMenu: {
     createBranch: string;
@@ -103,6 +123,7 @@ export interface UiStrings {
   selection: {
     tapToChoose: string;
     finishHint: string;
+    moveHint: string;
     chosen: (count: number) => string;
     selected: (count: number) => string;
     actions: string;
@@ -513,6 +534,11 @@ export interface UiStrings {
     showAnswer: string;
     /** Under the question while the card is still hidden. */
     hint: string;
+    /** The optional field under the card where the reader writes a guess before turning it. */
+    guessPlaceholder: string;
+    /** Headings of the two columns once a card with a written guess is turned. */
+    yourGuess: string;
+    trueAnswer: string;
     notYet: string;
     shaky: string;
     know: string;
@@ -538,6 +564,33 @@ export interface UiStrings {
     empty: string;
     /** A zone's menu: starts a presentation of only that zone, its castles included. */
     presentZone: string;
+    /** The two tabs at the top: step through slides, or see the whole map gathered up. */
+    slidesTab: string;
+    summaryTab: string;
+    /** The type chips: label of the row, and the chip that clears them. */
+    filterTypes: string;
+    allTypes: string;
+    /** No node is of the picked types. */
+    noMatch: string;
+    /** A template map's summary: each question with its answer, by level. */
+    answersTitle: string;
+    level: (n: number) => string;
+    /** The group of a template's root and questions without a level. */
+    questions: string;
+    answeredOf: (answered: number, total: number) => string;
+    notAnswered: string;
+    /** A level whose level before it isn't filled in yet. */
+    locked: (previous: number) => string;
+    /** Nodes in a template map that aren't one of its questions. */
+    otherNotes: string;
+    /** Any map's summary: its nodes grouped by type. */
+    byTypeTitle: string;
+    /** The owner's tab for rearranging the slides, its one-line explanation, the arrows on each slide, and the button that drops the chosen order. */
+    orderTab: string;
+    orderHint: string;
+    moveUp: (slide: string) => string;
+    moveDown: (slide: string) => string;
+    automaticOrder: string;
   };
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
@@ -735,6 +788,8 @@ const en: UiStrings = {
     Fail: "Fail",
     Idea: "Idea",
     unknown: "Question (unknown)",
+    Title: "Title (topic)",
+    Question: "Study question",
   },
   deleted: {
     button: (n) => `Deleted on this map: ${n}`,
@@ -748,11 +803,22 @@ const en: UiStrings = {
     problem: { button: "Analyze this problem", hint: "Adds sub-problems, the risk of doing nothing, past experience, ways to solve, a plan and its result." },
     goal: { button: "Plan this goal", hint: "Adds a success criterion, ordered steps, an obstacle with a fallback, and a review." },
     retry: { title: "This did not work out", hint: "Find out why, then choose what to change before trying again.", button: "Analyze and try again" },
-    idea: { button: "Develop this idea", hint: "Adds the need it meets, how it would work and a first try, what would prove it, what could kill it, what is unknown, and another idea." },
+    idea: { button: "Develop this idea", hint: "Asks in three rounds: the idea itself, then how to make it happen, then how it went. Each round opens once the one before is answered." },
+    study: { button: "Study this topic", hint: "Asks in three rounds: what it is and its main parts, then each part's key idea and an example, then what an exam would ask. Write each answer into its question, and Quiz me will test you on it." },
+    question: { button: "Dig into this question", hint: "Adds follow-up questions: why it is so and an example, then a common mistake and how to explain it simply." },
     created: (n) => `Added ${n} ${n === 1 ? "node" : "nodes"}`,
     failed: "Could not add the template",
     undo: "Undo",
     seeded: "Started with the template questions",
+    locked: (level, left) => `🔒 Answer level ${level} first (${left} left). Delete a question you want to skip.`,
+    progress: (level, levels, left) => `Level ${level} of ${levels} · ${left} ${left === 1 ? "question" : "questions"} left`,
+    progressDone: (levels) => `All ${levels} levels answered`,
+    levelBadge: (level, levels) => `Level ${level} of ${levels}`,
+    peekNext: (level) => `What level ${level} will ask`,
+    finished: (levels) => `✓ All ${levels} levels answered. Well thought through.`,
+    unlocked: (level, n) => `🔓 Level ${level} is open: ${n} new ${n === 1 ? "question" : "questions"}`,
+    createdRounds: (n, later) =>
+      `Added ${n} ${n === 1 ? "question" : "questions"}. ${later === 1 ? "One more level opens" : `${later} more levels open`} once these are answered (delete one to skip it).`,
     nodes: {
       subProblem1: "Which part of the problem is broken? (one cause per node)",
       subProblem2: "What else contributes to it?",
@@ -793,19 +859,42 @@ const en: UiStrings = {
       wentBad2: "What else went wrong?",
       tryNext1: "One thing we will do differently",
       tryNext2: "Another change to try",
-      rootIdea: "What is the idea, in one sentence?",
-      ideaNeed: "What need or problem does it answer, and for whom?",
-      ideaHow: "How would it work?",
-      ideaTry: "The smallest way to try it this week",
-      ideaProof: "What would show that it works?",
-      ideaRisk: "What could kill it?",
-      ideaUnknown: "What do we not know yet?",
-      ideaAlternative: "Another idea for the same need",
+      rootIdea: "Name the idea in a few words",
+      ideaWhat: "What is the idea?",
+      ideaFeel: "What do you feel about it?",
+      ideaSolves: "What problem does it solve?",
+      ideaWhyWork: "Why would it work?",
+      ideaProfit: "What is the profit?",
+      ideaPossibilities: "What are the possibilities?",
+      ideaObstacles: "What are the problems and obstacles?",
+      ideaPlan: "What is the plan?",
+      ideaFeelPlan: "What do you feel now?",
+      ideaSucceeded: "What was done successfully?",
+      ideaFailed: "What failed?",
+      ideaBrings: "What does it bring to the table?",
+      ideaFeelDone: "What do you feel about it?",
+      ideaFinished: "Is it finished as it is?",
+      rootStudy: "What are you learning? (the topic)",
+      studyWhat: "What is it, in one sentence?",
+      studyWhy: "Why does it matter?",
+      studyPart1: "The first main part of the topic",
+      studyPart1Key: "What is the key idea of this part?",
+      studyPart1Example: "What is an example of it?",
+      studyPart2: "The second main part of the topic",
+      studyPart2Key: "What is the key idea of this part?",
+      studyPart2Example: "What is an example of it?",
+      studyConnect: "How does it connect to what you already know?",
+      studyExam: "What would an exam ask about it?",
+      studyUnclear: "What is still unclear to you?",
+      questionWhy: "Why is it so?",
+      questionExample: "What is an example?",
+      questionMistake: "What is a common mistake here?",
+      questionExplain: "How would you explain it to a friend in two sentences?",
     },
   },
   canvasMenu: {
     newNode: "New node",
-    structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)", idea: "Develop an idea" },
+    structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)", idea: "Develop an idea", study: "Study" },
   },
   pictures: {
     entry: "Draw a picture…",
@@ -814,7 +903,7 @@ const en: UiStrings = {
     forTypes: "For a kind of thought",
     forTypesHint: "Each one's dots arrive as thoughts of that kind.",
     forFun: "Just for fun",
-    names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
+    names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", book: "Book", bubble: "Question bubble", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
     questions: {
       bulb: ["What idea lights up?", "What could you try that you haven't yet?", "What would make it easier?", "What would you do if you couldn't fail?", "What would a child suggest?", "What could you combine?", "What could you do differently tomorrow?", "What idea have you been putting off?", "What would make it fun?", "What is the simplest way?"],
       stop: ["What is stopping you?", "What keeps coming back?", "What worries you most about it?", "What is it costing you?", "What are you avoiding?", "What is out of your hands?", "What drains your energy?", "What would happen if you did nothing?"],
@@ -824,6 +913,8 @@ const en: UiStrings = {
       flag: ["What have you already managed?", "What are you proud of?", "What went better than you expected?", "What did you learn on the way?", "Who helped you get here?", "What got easier?", "How will you celebrate?"],
       cloud: ["What didn't work out?", "What would you do differently?", "What did it teach you?", "What still hurts about it?", "What was out of your control?", "What would you tell yourself back then?", "What can you let go of?", "What came out of it after all?", "Who could you talk to about it?", "What will you try next time?"],
       question: ["What are you not sure about yet?", "What do you still need to find out?", "What are you guessing?", "Who could you ask?", "What would help you decide?", "What are you afraid to ask?", "How could you test it?"],
+      book: ["What topic are you learning?", "What are its main parts?", "Which word do you need to know?", "What is the chapter about?", "What did the lecture cover?", "Where can you read more?"],
+      bubble: ["What would an exam ask?", "What do you want to understand?", "Why does it work that way?", "How does it work?", "What is the difference between them?", "What causes it?", "What follows from it?", "What is still unclear?"],
       heart: ["What do you love?", "Who do you love?", "What warms you up?", "What would you never give up?", "What makes you feel alive?", "Who do you miss?", "What do you love about yourself?", "What place do you love?", "What do you love to do?", "Who loves you?"],
       star: ["What do you want to reach?", "What would make you proud?", "What do you dream about?", "Where do you want to be in a year?", "What would you like to learn?", "Who do you want to become?", "What would you try if no one watched?", "What is your next big step?", "What would make this year special?", "What wish do you keep to yourself?"],
       house: ["What makes you feel at home?", "Who makes you feel safe?", "Where do you rest best?", "What would you keep forever?", "What smell reminds you of home?", "Who would you invite over?", "What makes a room cosy for you?", "What do you need to feel calm?", "What does home mean to you?"],
@@ -835,6 +926,12 @@ const en: UiStrings = {
     done: (name) => `${name} · done!`,
     minimap: (percent) => `Pictures ${percent}% drawn`,
     failed: "Couldn't draw the picture.",
+    panel: {
+      map: (name) => `${name}: its dots, this one marked`,
+      rest: "The rest of the picture",
+      dot: (n) => `Dot ${n}`,
+      open: (label) => `Open ${label}`,
+    },
     edit: {
       open: "Tap to resize it, colour it or move it",
       bar: "Picture size and place",
@@ -862,8 +959,9 @@ const en: UiStrings = {
     zones: "Zones",
   },
   selection: {
-    tapToChoose: "Tap your nodes to choose them",
-    finishHint: "A parent brings its whole branch (Shift+tap: only that node). Tap outside or press Enter when done.",
+    tapToChoose: "Tap nodes to select them",
+    finishHint: "Each tap picks or drops one node. Press Done to leave.",
+    moveHint: "Drag a picked node to move them all. A tap still picks or drops one.",
     chosen: (n) => `${n} node${n === 1 ? "" : "s"} chosen`,
     selected: (n) => `${n} node${n === 1 ? "" : "s"} selected`,
     actions: "Actions",
@@ -994,6 +1092,8 @@ const en: UiStrings = {
       "Fail": ["It failed because…", "Lesson learned:", "Don't repeat:"],
       "Idea": ["Idea:", "What if…", "Worth trying:"],
       "unknown": ["Open question:", "Need more info on…", "Idea:"],
+      "Title": ["Topic:", "Chapter:", "Key term:"],
+      "Question": ["What is…?", "Why does…?", "How does…?"],
     },
     ghostTemplatesTitle: "Start from this phrase",
     ghostChangeTo: (type) => `Make this a ${type}`,
@@ -1238,14 +1338,14 @@ const en: UiStrings = {
   gestureHint: {
     title: "How to use the map",
     touch: [
-      "Tap a node to pick it, tap it again to open it; tap a ring around it to add a thought.",
+      "Tap a node to open it; tap a ring around it to add a thought.",
       "Drag a node to move it. Hold and lift to pick it, pick more for a group, then drag the group.",
       "Hold a zone for its menu: copy its text, shape, delete, look.",
       "Double-tap empty space for a new node; hold it for a menu: templates, paste.",
       "Pinch to zoom; the eye sets how much detail you see.",
     ],
     mouse: [
-      "Click a node to pick it, click it again to open it; click a ring around it to add a thought.",
+      "Click a node to open it; click a ring around it to add a thought.",
       "Shift+click or drag on empty space to pick a group, then drag the group.",
       "Right-click a zone for its menu: copy its text, shape, delete, look.",
       "Double-click empty space for a new node; right-click it for a menu: templates, paste.",
@@ -1270,7 +1370,10 @@ const en: UiStrings = {
     exit: "Exit",
     count: (c, n) => `${c} / ${n}`,
     showAnswer: "Show answer",
-    hint: "Answer in your head, then turn the card",
+    hint: "Answer in your head or write it below, then turn the card",
+    guessPlaceholder: "Write your answer (optional)…",
+    yourGuess: "Your answer",
+    trueAnswer: "Answer",
     notYet: "Not yet",
     shaky: "Shaky",
     know: "Know it",
@@ -1280,7 +1383,7 @@ const en: UiStrings = {
     again: "Go over the shaky ones",
     restart: "Start again",
     done: "Done",
-    empty: "Nothing to quiz yet: give a node children, or a title and a text",
+    empty: "Nothing to quiz yet: put a ✅ under a ❓, a problem or a goal",
   },
   presentation: {
     exit: "Exit",
@@ -1291,6 +1394,24 @@ const en: UiStrings = {
     showOnMap: "Show on map ↗",
     empty: "Nothing to present yet — add a node first",
     presentZone: "Present this zone",
+    slidesTab: "Slides",
+    summaryTab: "Summary",
+    filterTypes: "Show types",
+    allTypes: "All",
+    noMatch: "No nodes of these types",
+    answersTitle: "Answers",
+    level: (n) => `Level ${n}`,
+    questions: "Questions",
+    answeredOf: (a, total) => `${a} of ${total} answered`,
+    notAnswered: "Not answered yet",
+    locked: (prev) => `Opens once level ${prev} is filled in`,
+    otherNotes: "Your other notes",
+    byTypeTitle: "By type",
+    orderTab: "Order",
+    orderHint: "The order the slides play in, for everyone who presents this map.",
+    moveUp: (slide) => `Move up: ${slide}`,
+    moveDown: (slide) => `Move down: ${slide}`,
+    automaticOrder: "Back to automatic order",
   },
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
   summary: {
@@ -1348,6 +1469,7 @@ const en: UiStrings = {
       puppet: "Puppet hand",
       heartMirror: "Heart and mirror",
       lightbulb: "Light bulb",
+      goalCake: "Cake with a target",
     },
   },
   emoji: {
@@ -1468,6 +1590,8 @@ const en: UiStrings = {
         node_protected: "Protected a node",
         map_finished: "Finished a discussion",
         replay_played: "Played the replay",
+        template_level_opened: "Opened a template's next level",
+        template_finished: "Answered every level of a template",
       },
       featuresTitle: "Every feature, least used first",
       featuresHint: "Features nobody used in this period are at the top: candidates to improve, explain better or remove.",

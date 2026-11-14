@@ -10,7 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working in **th
 The backend for Mind Constructor: notes you can see. The product's main path is personal — jot a
 thought (a quick note lands in an Inbox map), lay thoughts out on a canvas, find any of them again
 through search — with sharing and a discussion ("battle") layer on top. Users build a
-**map** of **nodes** (Problem / Problematic option / Solution / Option / Success / Fail / Idea / unknown)
+**map** of **nodes** (Problem / Problematic option / Solution / Option / Success / Fail / Idea / unknown,
+plus the study types Title and Question, which like unknown have no outcome and are never an attack's or a protection's type)
 connected by **edges** with a sentiment (positive/negative/neutral). Multiple invited members work
 the same map live over Socket.IO. Layered on top of the mapping itself is a "combat" system:
 members can attack *any* node on the map with one of three weapons (nitpick/counterpoint/
@@ -236,6 +237,11 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `""` = none) is the question a frontend shows as the ghost's placeholder — map templates create
   ghosts with a prompt and no text or title. Both ride along on `GET /:mapId/nodes` like `title`:
   the stored flag is what lets a frontend fade a ghost without the lazy `text` backfill.
+- **`Node.level`** — which round of a leveled template a ghost belongs to (whole number 1..9, `null` =
+  none: a template's root and every other node). Set only on `POST /api/nodes/:mapId` (`levelSchema`
+  in `nodeAbl.ts`); rides along on the node list. The backend only stores it: the frontend
+  (`utils/templateLevels.ts`) keeps a level's ghosts locked until every ghost of the earlier levels
+  under the same template root has been filled in (or deleted).
 - **`Node.picture`** — `{ id, kind, dot, color }` or null: which dot of a picture a node is, for nodes made by
   the frontend's "Draw a picture" (`Frontend/web/src/utils/pictures.ts` owns the pictures and draws
   their lines between the dots as the ghosts are filled in). `id` groups one picture's dots, `kind`
@@ -260,7 +266,7 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   an extra room `map:{id}:owner`, and `broadcastToMap` sends any event whose payload mentions a hidden
   node's `nodeId` to that room only (per-map queue keeps event order); a toggle broadcasts
   `nodes:visibility` (no node id in its payload, so everyone gets it) and clients reload what they may see.
-- **`Map.kind`** — `problem | decision | goal | retro | idea` (`MAP_KINDS`), chosen when a map is created
+- **`Map.kind`** — `problem | decision | goal | retro | idea | study` (`MAP_KINDS`), chosen when a map is created
   (`POST /api/` body `kind`, alongside `discussionMode`). Descriptive only; a frontend seeds the matching
   starter structure itself (`utils/seedMap.ts`), so the seeded text is in the user's language. The older
   server-side `template` seeds (blank / single-problem / decision-tree / pro-con / demo) still work.
@@ -274,6 +280,11 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   it replaced is deleted. `GET /api/images/:imageId` serves a node-less picture to every member of
   its map. The frontend veils it with the paper colour so it stays muted. **`Map.backgroundShade`**
   (-100..100, default 0) draws that picture darker (below 0) or lighter (above 0), set the same way.
+- **`Map.slideOrder`** — the order the owner chose for the map's presentation slides: public nodeIds,
+  first slide first (at most 5000, `MAX_SLIDE_ORDER`), set through the same owner-only `PATCH /api/:mapId`;
+  `[]` (the default) is the automatic order. The backend only stores it: the frontend applies it
+  (`utils/presentation.ts` `applySlideOrder`), skipping ids whose node is gone and leaving unnamed nodes at
+  their automatic place.
 - **Finishing a discussion** (`abl/finishAbl.ts`, `finishController.ts`; `Map.finishedAt`, `Map.finishAgreedBy`) —
   only the map's owner may finish (`POST /api/:mapId/finish`), and only fairly (`finishRule`): the newest
   node on the map is another member's or an imitated-opponent move (`Node.byOpponent`), or every other

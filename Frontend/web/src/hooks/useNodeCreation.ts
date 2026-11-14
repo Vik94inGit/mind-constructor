@@ -22,6 +22,12 @@ import * as offline from "../offline/sync";
 
 type Pt = { x: number; y: number };
 
+/** What a leveled template grew: the questions of its first round, shown now, and how many rounds wait behind it. */
+interface TemplateRounds {
+  shown: number;
+  later: number;
+}
+
 // A node not yet created — its text is still being typed into the inline
 // input hovering at (x,y), styled with `type`'s icon. Nothing is sent to the
 // backend until that input confirms with real text (see
@@ -142,7 +148,10 @@ export function useNodeCreation({
   // step by step instead of popping in as a single flash.
   // `made` collects each node's id as it lands, so a template cut short can
   // still be taken back.
-  async function growTemplate(kind: TemplateKind, root: NodeDoc, made: string[], at?: Pt) {
+  // Only the first round shows straight away (a later one stays off the map
+  // until it opens, hooks/useLevelReveal.ts), so only it is staggered in and
+  // framed; what it returns is what the notice tells about the rounds.
+  async function growTemplate(kind: TemplateKind, root: NodeDoc, made: string[], at?: Pt): Promise<TemplateRounds | undefined> {
     if (!mapId) return;
     // `at`: a root created a moment ago isn't in `positions` yet.
     const rootPos = at ?? positions.get(root.nodeId) ?? { x: CANVAS_W / 2, y: CANVAS_H / 2 };
@@ -155,6 +164,9 @@ export function useNodeCreation({
       rootPos,
       [...nodeObstacles([...obstaclePoints(), rootPos]), ...bigNodeObstacles()],
     );
+    const firstLevel = Math.min(...placed.map((p) => p.level));
+    const rounds = new Set(placed.map((p) => p.level)).size;
+    const shown: string[] = [];
     const ids = new Map<TemplateNodeKey, string>();
     for (let i = 0; i < placed.length; i++) {
       const p = placed[i];
@@ -163,6 +175,7 @@ export function useNodeCreation({
         prompt: t.ui.templates.nodes[p.key],
         type: p.type,
         order: p.order,
+        level: p.level,
         x: p.x,
         y: p.y,
         parentId: p.parentKey ? ids.get(p.parentKey) : root.nodeId,
@@ -170,18 +183,24 @@ export function useNodeCreation({
       ids.set(p.key, node.nodeId);
       made.push(node.nodeId);
       upsertNode(node);
+      if (p.level !== firstLevel) continue;
+      shown.push(node.nodeId);
       setCelebrateIds((prev) => new Set(prev).add(node.nodeId));
-      if (i < placed.length - 1) await sleep(TEMPLATE_NODE_STAGGER_MS);
+      if (placed.slice(i + 1).some((q) => q.level === firstLevel)) await sleep(TEMPLATE_NODE_STAGGER_MS);
     }
-    // Brings the whole newly-grown ring into view — spiraling out from root
+    // Brings the newly-grown first ring into view — spiraling out from root
     // can easily land later nodes past whatever's currently on-screen.
-    showNodes(Array.from(ids.values()));
+    showNodes(shown);
+    return { shown: shown.length, later: rounds - 1 };
   }
 
   // Whatever a template or picture made, offered back in one step.
-  function structureMade(made: string[]) {
+  function structureMade(made: string[], rounds?: TemplateRounds) {
     if (made.length === 0) return;
-    const message = t.ui.templates.created(made.length);
+    const message =
+      rounds && rounds.later > 0 && rounds.shown > 0
+        ? t.ui.templates.createdRounds(rounds.shown, rounds.later)
+        : t.ui.templates.created(made.length);
     if (onStructureMade) onStructureMade(made, message);
     else showNotice(message);
   }
@@ -189,10 +208,11 @@ export function useNodeCreation({
   // A template grown from a node already on the map (its panel): the node stays if it's undone.
   async function applyTemplate(kind: TemplateKind, root: NodeDoc, at?: Pt) {
     const made: string[] = [];
+    let rounds: TemplateRounds | undefined;
     try {
-      await growTemplate(kind, root, made, at);
+      rounds = await growTemplate(kind, root, made, at);
     } finally {
-      structureMade(made);
+      structureMade(made, rounds);
     }
   }
 
@@ -370,6 +390,7 @@ export function useNodeCreation({
     const root = MAP_KIND_ROOTS[kind];
     const pos = placeNode(desired, [{ nodeId: NEW_NODE_ID, parentId: null }]);
     const made: string[] = [];
+    let rounds: TemplateRounds | undefined;
     try {
       const rootNode = await nodesApi.createNode(mapId, {
         text: "",
@@ -386,11 +407,13 @@ export function useNodeCreation({
       // The kind's painting on the root, fetched while the rest grows round it.
       void addStructurePicture(rootNode.nodeId, kind).then((pictured) => pictured && upsertNode(pictured));
       await sleep(TEMPLATE_NODE_STAGGER_MS);
-      await growTemplate(root.template, rootNode, made, pos);
+      const grown = await growTemplate(root.template, rootNode, made, pos);
+      // Its root asks a question of its own too.
+      rounds = grown && { ...grown, shown: grown.shown + 1 };
     } catch (err) {
       setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.createNode);
     } finally {
-      structureMade(made);
+      structureMade(made, rounds);
     }
   }
 

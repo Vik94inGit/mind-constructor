@@ -9,6 +9,9 @@ export const NODE_TYPES = [
   "Fail",
   "Idea",
   "unknown",
+  // Study types: a topic's heading, and a question to answer about it.
+  "Title",
+  "Question",
 ] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
 
@@ -130,7 +133,7 @@ export interface SelectedCircle {
 export type MapTemplate = "blank" | "single-problem" | "decision-tree" | "pro-con";
 
 // What a map is for — see MAP_KINDS on the backend. Picked when the map is created.
-export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea"] as const;
+export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea", "study"] as const;
 export type MapKind = (typeof MAP_KINDS)[number];
 
 export interface MapDoc {
@@ -170,6 +173,8 @@ export interface MapDoc {
   backgroundImage?: string;
   /** How much darker (below 0) or lighter (above 0) the wallpaper is drawn, -100..100 (Map.backgroundShade). 0 / absent: as it is. */
   backgroundShade?: number;
+  /** The order the owner chose for the presentation's slides (Map.slideOrder): nodeIds, first slide first. Empty / absent: the automatic order (utils/presentation.ts applySlideOrder). */
+  slideOrder?: string[];
   /** When the owner finished the discussion (Map.finishedAt) — null / absent: still open. A finished map takes no new nodes, attacks or shields until reopened. */
   finishedAt?: string | null;
   /** Members other than the owner who agreed to finish (user ids) — see utils/finish.ts. */
@@ -210,6 +215,8 @@ export interface NodeDoc {
   picture?: { id: string; kind: string; dot: number; color?: ZonePaletteColor | null } | null;
   /** Optional step number (1..9999) for labeling a process's steps — see Backend's Node.order. null/absent means "not numbered". */
   order?: number | null;
+  /** Which round of a leveled template this ghost belongs to (see Backend's Node.level); null/absent for every other node. A later round stays locked until the earlier ones are filled in (utils/templateLevels.ts). */
+  level?: number | null;
   type: NodeType;
   x?: number;
   y?: number;

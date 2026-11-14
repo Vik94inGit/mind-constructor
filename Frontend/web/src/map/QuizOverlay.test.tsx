@@ -54,4 +54,31 @@ describe("QuizOverlay", () => {
     expect(screen.getByText("Photosynthesis")).toBeTruthy();
     expect(screen.getByText("1 / 1")).toBeTruthy();
   });
+
+  it("lets the reader write a guess and shows it beside the answer", () => {
+    const { onMark } = renderQuiz();
+    const box = screen.getByRole("textbox", { name: "Your answer" });
+    fireEvent.change(box, { target: { value: "Alliances, empires 3" } });
+    // Typing is not a shortcut: "3" and Space inside the field mark and turn nothing.
+    fireEvent.keyDown(box, { key: "3" });
+    fireEvent.keyDown(box, { key: " " });
+    expect(onMark).not.toHaveBeenCalled();
+    expect(screen.queryByText("Alliances")).toBeNull();
+    fireEvent.keyDown(box, { key: "Enter", ctrlKey: true });
+    expect(screen.getByText("Alliances, empires 3")).toBeTruthy();
+    expect(screen.getByText("Alliances")).toBeTruthy();
+    expect(screen.getByText("Your answer")).toBeTruthy();
+    // Back from the next card still shows what was written.
+    fireEvent.click(screen.getByRole("button", { name: "Shaky" }));
+    expect(screen.getByRole("textbox", { name: "Your answer" })).toHaveProperty("value", "");
+    fireEvent.click(screen.getByRole("button", { name: /Back/ }));
+    expect(screen.getByText("Alliances, empires 3")).toBeTruthy();
+  });
+
+  it("shows the answer alone when nothing was written", () => {
+    renderQuiz();
+    fireEvent.click(screen.getByRole("button", { name: "Show answer" }));
+    expect(screen.queryByText("Your answer")).toBeNull();
+    expect(screen.getByText("Alliances")).toBeTruthy();
+  });
 });

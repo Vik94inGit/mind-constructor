@@ -105,7 +105,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   last details go. Any parent can also be packed or opened on its own, right on the map: a selected
   parent (or one under the mouse) shows a "−" pill that packs its children in, and a packed parent
   shows a "+N" pill that opens them again (beside a round icon, above a card; also *Pack its branch*
-  in its panel's Info tab). The eye menu has *Pack all* (every parent packs, so only the top of
+  in its panel's Info tab). A double-click or double-tap on the packed node itself opens it too. The eye menu has *Pack all* (every parent packs, so only the top of
   each branch is left and each +N opens one level) and *Unpack all*. Auto-pack
   is only a way of looking, per browser and per map, and changes nothing on the map
   (`utils/autoPack.ts`), unlike packing nodes into a container. Once a map of six or more nodes
@@ -123,6 +123,25 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+- **Template levels** — a template asks its questions in rounds (`Node.level`, `utils/templates.ts`). Only
+  the first round shows when a template grows ("Added 5 questions. 2 more levels open once these are
+  answered"); a later round's ghosts are saved but kept off the canvas until every question of the
+  rounds before it under the same template root is answered or deleted, and then come up with a
+  "🔓 Level 2 is open: 3 new questions" notice (`hiddenLevelIds`/`revealedRound` in
+  `utils/templateLevels.ts`, `hooks/useLevelReveal.ts`). A locked ghost that something the user added
+  hangs from stays on the canvas, fainter, with a 🔒 before its question, and its panel says which level
+  to answer first and how many are left. The node a template grew from wears a small "1/3" pill under
+  its icon (✓ once every level is answered), and its Info tab says "Level 1 of 3 · 2 questions left"
+  with a fold-out peek at what the next level will ask (`templateProgress`, `map/nodePanel/LevelProgress.tsx`).
+  Answering the last level says so ("✓ All 3 levels answered") and, on a map with a *before* feeling,
+  asks "And now?" right then. Levels opened and templates finished are counted on the admin page
+  (`template_level_opened`, `template_finished`). *Develop an idea* asks: 1) what the idea is, how you feel about it,
+  what problem it solves, why it would work and the profit; 2) the possibilities, the problems and
+  obstacles, the plan and how you feel now; 3) what was done successfully, what failed, what it brings to
+  the table, how you feel about it and whether it is finished as it is, drawn as one ring per round.
+  The other templates are leveled too (problem: parts, then ways and a plan, then results; goal: the
+  criterion, then steps and obstacle, then review; decision: options, then their pros and risks; retro
+  and retry: what happened, then what to change).
 - **Map background** — the map's owner picks it in the display menu (the layers button): dot grid, plain,
   lined paper or soft dark (`Map.background`), plus an optional soft colour from the zones' calm palette
   (`Map.backgroundColor`), mixed into the paper so it stays muted (`softTint` in `src/utils/zoneStyle.ts`,
@@ -144,8 +163,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (both put it in the middle of the view), or the right-click menu (at the click point); then
   pick one. The first group has a picture for each node type, and its dots arrive as thoughts of
   that type: a bulb (Idea), a stop sign (Problem), a warning triangle (Problematic option), a key
-  (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail) and a question mark
-  (unknown). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
+  (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail), a question mark
+  (unknown), a book (Title) and a speech bubble (Question). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
   Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking its own
   question on the picture's theme (a stop sign: "What is stopping you?", "What keeps coming back?"…;
   a heart: "What do you love?", "Who do you love?"…). Write in two
@@ -177,15 +196,17 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   in the text; as soon as the text differs from what's saved the same button reads **Save change**,
   and pressing it saves the edit and closes the panel, like Enter on a computer. It's the way to
   confirm an edit on a phone, where Enter adds a new line (`src/map/nodePanel/InfoTab.tsx`).
-- **Pictures on nodes** — the node panel's Info tab shows the text and its pictures in one box, like
-  a post: screenshots pasted with Ctrl+V, images dropped on the box or picked with its 🖼️ button land
-  under the text; each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
+- **Pictures on nodes** — the node panel's Info tab shows the text and its buttons (*Edit* / *Save
+  change*) first and the pictures after them: screenshots pasted with Ctrl+V, images dropped on the
+  text or the pictures box or picked with its 🖼️ button land there (a node shown as a picture card
+  doesn't open its pictures full size on a tap); each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
 - **Type symbols and emoji** — on the canvas every type shows its own symbol by default: pause bars
   for a Problem, play for a Problematic option and an Option, target rings for a Solution, ✓ Success,
-  ✗ Fail, a bulb for an Idea and ? for unknown (`map/OutcomeBadge.tsx`). Symbols first is the default: the
+  ✗ Fail, a bulb for an Idea and ? for unknown (`map/OutcomeBadge.tsx`); the study types keep a plain
+  glyph, an open book for a Title and a speech bubble with a ? for a Question (`map/NodeTypeIcon.tsx`). Symbols first is the default: the
   type's symbol is face up and a node's own emoji sits on the back. With *Emoji first* turned on in
   the display menu (`Preferences.emojiUp`) a node with an emoji shows it face up, its type's symbol on the back of a two-sided card
   that turns over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the node's own
@@ -207,11 +228,29 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Emoji ghosts** — after a type ghost is picked, a ring of feeling emoji (plus a skip ghost) is
   offered the same way, and the new node gets both; in *Emoji first* the feelings come first, then the
   types (`map/QuickAddGhosts.tsx`).
-- **A tap picks, a second tap opens** — tapping or clicking a node only picks it: it's highlighted,
-  centered and its ring of ghosts comes up, with the map still in view. Tapping or clicking it again
-  (or a double-tap / double-click, or *Edit* in its right-click menu) opens its panel. The reading
-  arrows, search and creating a node still open the panel straight away (`pages/MapPage.tsx`
-  `panelHiddenFor`, [sketch](../../docs/gestures/tap-picks-node.md)).
+- **Select mode (☑)** — the toolbar's ☑ (beside ✥) turns it on: a tap on any node, of any type and
+  anyone's, picks or drops just that node, with no panel and no drag; the bottom bar counts them and
+  offers Actions (delete only takes your own). A tap on empty canvas or a zone, Enter and Esc do
+  nothing, so only *Done* or ☑ again leaves it. *Choose…* on a node opens the same mode with its
+  branch already picked (`pages/MapPage.tsx` `toggleSelectMode`, [sketch](../../docs/gestures/select-mode.md)).
+  Press ✥ as well and dragging any picked node of yours moves all of them together, while a tap
+  still picks or drops one (`hooks/useNodeDragAndDrop.ts`, [sketch](../../docs/gestures/select-move.md)).
+- **A tap opens the node** — tapping or clicking any node opens its panel on the Info tab straight
+  away: an attack, a node under attack, a card in the cards view and a node with pictures alike (the
+  pictures show in the Info tab, and an attack on your own node keeps its Attack tab ready to strike
+  back). Only the node's right-click or hold menu picks it without opening it; the menu's *Edit*
+  opens it (`pages/MapPage.tsx` `handleNodeClick`, [sketch](../../docs/gestures/tap-opens-node.md)).
+- **Several panels at once** — tapping another node opens its panel beside the ones already open
+  instead of replacing them: up to 2 on a phone, 6 on a tablet and 8 on a computer, the oldest
+  closing past that. They tile the bottom half without overlapping (a computer fits 4 in a row, a
+  tablet 3, a phone 1, then a second row). The node tapped last is the active one: centered, an accent
+  border, its arrows step inside that panel; a press in another panel makes that one active. Each ✕
+  closes just its panel; empty canvas or Esc closes them all (`utils/openPanels.ts`,
+  [sketch](../../docs/gestures/several-panels.md)).
+- **A picture's dot opens on its picture** — the Info tab of a dot of *Draw a picture* shows the
+  picture's dots first (as they sit on the map, the written ones filled, this one ringed), then the
+  text, then the picture's other dots as a list with their text or question; a tap on a dot in either
+  opens that one (`map/nodePanel/PictureDots.tsx`).
 - **Node panel under the node** — the node panel (and the pack picker and new-node panel) is a bottom
   sheet, half the screen, with the node's text first and its type's symbol in its header; the chosen node
   is centered in the half above it (`hooks/useCanvasViewport.ts`), and the quick-add ghosts ring that node itself. Creating a
@@ -228,9 +267,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
   the cards view). A card always shows the whole picture, never cropped, with its longer side twice a
   round node (96px, 72px while selected), so tall and wide paintings both sit in proportion.
-- **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens a set of ten
+- **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens a set of eleven
   ready-made paintings (eyes, clock heads, a smiling martini, fishing for time, a yin-yang yo-yo,
-  squeezed time, an orange clock, a puppet hand, a heart and mirror, a light bulb;
+  squeezed time, an orange clock, a puppet hand, a heart and mirror, a light bulb, a cake with a target;
   `utils/pictureTemplates.ts`). Their small thumbnails are built into the app; the full painting
   (WebP, at most 1024px, in `public/picture-templates/`) is fetched only when picked, then added like
   any other picture, so it can be the node's icon or card.
@@ -238,7 +277,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   picture card, whether it's grown from the canvas menu, seeded into a new map of that kind, or the
   center of a *Think it through* map: *Develop an idea* the light bulb, *Analyze a problem* the puppet
   hand, *Make a decision* the yin-yang yo-yo, a retrospective the heart and mirror or the clock heads,
-  and *Plan a goal* one of the three clock paintings, picked at random each time
+  and *Plan a goal* one of the three clock paintings or the cake with a target, picked at random each time
   (`MAP_KIND_PICTURES` in `utils/pictureTemplates.ts`, `utils/structurePicture.ts`). Offline the
   node simply comes without it.
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
@@ -263,10 +302,16 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   formulas again. The stored text stays plain, so search, export and the
   length cap are unchanged, and KaTeX is a separate download fetched only when a text has a formula.
 - **Quiz me** — the map tests its reader ([sketch](../../docs/gestures/quiz-me.md)). Started from the
-  empty-canvas menu (hold or right-click empty canvas) or the layers menu, it shows one card at a time
-  over the map: a parent asks and its children answer, a title asks and its text answers, an answered
-  ghost's question asks and what was written answers (`utils/quiz.ts`). Tap the card (Space) to turn
-  it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. A round starts
+  empty-canvas menu (hold or right-click empty canvas) or the layers menu (at its top, with Present and
+  Time-lapse, so a short window never hides it; a menu beside the computer's toolbar lifts to stay on
+  screen and scrolls what doesn't fit, `hooks/useKeepOnScreen.ts`), it shows one card at a time
+  over the map: only a ❓ (unknown), a Problem, a goal (Solution) or a study Question asks, and its ✅ (Success) children
+  answer; a study Question answered in place (a template's question written into) is a card of its own,
+  asking its question and answered by what was written; other nodes, and an asking node with no answer, make no card (`utils/quiz.ts`). Tap the card (Space) to turn
+  it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. Under the
+  card the reader can write their own answer first (Ctrl/Cmd+Enter turns the card from the field); the
+  turned card then shows *Your answer* beside the true one to compare by eye. What's written is kept
+  only for the round and never saved. A round starts
   with what isn't known yet, and its end counts the marks and offers *Go over the shaky ones*
   (`map/QuizOverlay.tsx`, `hooks/useQuiz.ts`). Marks are the viewer's own, like feelings, kept in their
   view of the map (`MapViewState.quizMarks`), and draw nothing on the map. Formulas show as maths.
@@ -320,8 +365,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (`hooks/useNodeDragAndDrop.ts`, `utils/followTrail.ts`).
 - **Zone menu** — holding or right-clicking a zone (`map/ZoneMenu.tsx`), or its name chip's menu, offers
   *Present this zone* (a presentation of only that zone, castles inside it included), *Copy as text* (every
-  node in it, in map order), one *Shape* for your nodes in it, and *Delete* for them, above its view,
-  layout and look.
+  node in it, in map order), *Extract text…* (the zone and the castles inside it as one document to read or
+  copy, the same export as the Info tab of the zone's parent), one *Shape* for your nodes in it, and
+  *Delete* for them, above its view, layout and look.
 - **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
   node or group and Ctrl/Cmd+V pastes it, on this map or another, with its text, pictures, picture
   icon and card, emoji, shape and card size (`utils/nodeClipboard.ts`, `hooks/useClipboardActions.ts`);
@@ -357,6 +403,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   opening beside it; language and theme sit at its bottom. Phones and narrow windows keep the
   floating top-left cluster.
 - **Templates in the node panel** — the button saves the text just typed and grows the template in one tap.
+- **Toolbar on a phone** — the floating cluster folds to three buttons: ← Back, + Add and ⋯ More. More
+  opens a tray with everything else (move, select, undo, deleted, line, picture, layers, search; the
+  owner's mode, opponent, history and finish; language and theme). A tool that acts at once folds the
+  tray away; a dot on ⋯ shows a mode or search filter is still on. Tablets and computers are unchanged.
 - **Toolbar while a node is open** — on a phone it folds to one ⋮ so it doesn't cover the ring of ghosts; on a tablet or wider it stays whole (`isMobileViewport`).
 - **Phones and tablets with the keyboard up** — the floating toolbar follows the part of the page
   still on screen, so the keyboard sliding the page up doesn't carry it off the top, and the page is put
@@ -401,12 +451,22 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
   breakdown, an Idea gets "Develop this idea" (the need it meets, how it would work with the smallest
   way to try it, what would prove it, what could kill it, what is still unknown, and another idea for
-  the same need), and a failed (Fail) node gets "Analyze and try again". A template's first level lands
+  the same need), a failed (Fail) node gets "Analyze and try again", a Title gets "Study this topic"
+  (in titles and questions only: what it is, why it matters and two main parts as Titles; then each
+  part's key idea and an example, and how it connects to what you know; then what an exam would ask
+  and what is still unclear) and a Question gets "Dig into this question" (why it is so and an
+  example, then a common mistake and how to explain it simply). A template's first level lands
   on a shape round the node: three (or six) make an equilateral triangle, four a square, any other
   number a circle, and each deeper level fans a step further out (`src/utils/shapeLayout.ts`,
   `src/utils/templates.ts`).
-- **Map types** — creating a map asks for one of five kinds (Problem analysis, Decision, Goal planning,
-  Retrospective, Idea), each seeded with a starter structure in your language, and for a mode (Discussion or
+- **Study types** — besides the problem-solving types there are two for learning: a **Title** (📖, the
+  heading of a topic or one of its parts) and a **Question** (🤔, something to be able to answer). Neither
+  is an outcome, so like unknown they draw no halo or horns and can't be an attack's or a protection's
+  type. A Question written into from a template (its ghost's question asking, the writing answering) is a
+  ready Quiz me card.
+- **Map types** — creating a map asks for a starting point: an **Empty map** (a blank canvas, no kind and
+  no nodes) or one of six kinds (Problem analysis, Decision, Goal planning, Retrospective, Idea, Study),
+  each seeded with a starter structure in your language, and for a mode (Discussion or
   Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
   calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, and no Attack tab or
   menu item (switch to Discussion for those).
@@ -443,6 +503,21 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   if it has one. A slide's text is sized to its length so it fits on the screen: a long thought gets
   smaller and reads left-aligned, and the *Under …* line shows two lines of the parent (`slideHeadSize`). The canvas under
   the slides stays as it was, so *Exit* lands back on exactly the view the presentation started from.
+  Type chips under the header (*All*, then one per type the map has, with its count) narrow the slides
+  and the summary to the picked types. The **Summary** tab gathers the map up instead of stepping
+  through it (`src/utils/mapSummary.ts`, `src/map/PresentationSummary.tsx`): a map without a template
+  lists its nodes grouped by type; a template map (some node still has a ghost's question) lists each
+  question with its answer (or *Not answered yet*), grouped by template level (`Node.level`; the root and
+  unleveled questions first), each level with *N of M answered* and a progress bar, and a lock line on a
+  level whose level before it isn't filled in yet. The user's own nodes in a template map follow as
+  *Your other notes*. Tapping a row opens its slide, or, for an unanswered question, the node on the map.
+  The map's owner also gets an **Order** tab: every slide in the order it plays, each with an up and a
+  down arrow (buttons, so it works the same by mouse, finger or keyboard), and *Back to automatic order*
+  once an order is chosen. The order is saved on the map (`Map.slideOrder`, `useMapControls`
+  `setSlideOrder`, saved once the clicks pause) so everyone who presents the map sees it; a node made
+  later keeps its automatic place, and rearranging a zone's or some types' slides keeps the rest of the
+  saved order (`applySlideOrder`, `mergeSlideOrder` in `src/utils/presentation.ts`,
+  `src/map/SlideOrderList.tsx`).
 - **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
   children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the
   spot that was in the middle of the screen when that spot still shows a node; a search result opens on

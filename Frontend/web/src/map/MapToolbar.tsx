@@ -1,6 +1,7 @@
 import { DeletedMenu } from "./DeletedMenu";
 import type { DeletedEntry } from "../hooks/useDeletedNodes";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useDismiss } from "../hooks/useDismiss";
 import { PictureIcon } from "./PicturePicker";
 import type { TypeEmoji } from "../utils/emojiFace";
 import { Link } from "react-router-dom";
@@ -32,6 +33,9 @@ interface Props {
   onExpand: () => void;
   moveMode: boolean;
   onToggleMove: () => void;
+  /** Select mode (docs/gestures/select-mode.md): taps only pick nodes. */
+  selectMode?: boolean;
+  onToggleSelect?: () => void;
   /** Drawing a separator line (see DrawLineBar). */
   drawMode: boolean;
   onToggleDraw: () => void;
@@ -97,6 +101,8 @@ interface Props {
   onRestoreDeleted?: (id: number) => void;
   /** Computer mode (see hooks/useDesktopLayout): a panel docked down the left edge instead of a floating top-left cluster. */
   vertical?: boolean;
+  /** A phone: the floating cluster folds to three buttons (Back, "+" and "⋯" More), the rest in a tray the More button opens. */
+  phone?: boolean;
   /** How far the visible part of the page has slid (hooks/useVisualViewportOffset): the floating cluster moves with it, so a tablet's keyboard doesn't carry it off screen. */
   viewportOffset?: { top: number; left: number };
 }
@@ -121,6 +127,8 @@ export function MapToolbar({
   expanded,
   onExpand,
   moveMode,
+  selectMode = false,
+  onToggleSelect,
   onToggleMove,
   drawMode,
   onToggleDraw,
@@ -166,6 +174,7 @@ export function MapToolbar({
   deletedEntries = [],
   onRestoreDeleted,
   vertical = false,
+  phone = false,
   viewportOffset,
 }: Props) {
   const { t } = useI18n();
@@ -173,6 +182,18 @@ export function MapToolbar({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showDisplayMenu, setShowDisplayMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  // On a phone everything but Back and "+" waits in the More tray.
+  const folded = phone && !vertical;
+  const [showMore, setShowMore] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  useDismiss(moreRef, () => setShowMore(false), { enabled: folded && showMore });
+  // A tray button that does its thing at once (a mode, undo, a panel) folds
+  // the tray away first, so the canvas is free again. Its menus stay open.
+  const fold = <A extends unknown[]>(action: (...args: A) => void) => (...args: A) => {
+    setShowMore(false);
+    action(...args);
+  };
+  const act = <A extends unknown[]>(action: (...args: A) => void) => (folded ? fold(action) : action);
   // A background picture waiting for the owner to choose the part of it to keep
   // (PictureCropDialog): a newly picked file, or the picture already set.
   const [cropFile, setCropFile] = useState<Blob | null>(null);
@@ -209,7 +230,252 @@ export function MapToolbar({
   // A menu open from the toolbar lifts it above the bottom-right corner's
   // zoom and minimap (z-[45] too, later on the page), which otherwise cover
   // the bottom of a long menu on a phone.
-  const layer = showAddMenu || showDisplayMenu || showSearch ? "z-[50]" : "z-[45]";
+  const layer = showAddMenu || showDisplayMenu || showSearch || showMore ? "z-[50]" : "z-[45]";
+  // A mode left on, or a search filter, behind the folded More button: a dot on it says so.
+  const moreBusy = moveMode || selectMode || drawMode || nodeTypeFilter.length > 0;
+
+  const tools = (
+    <>
+      {/* Off by default — arming drag from a bare pointerdown would read
+          as accidental relocation on any touch imprecision. */}
+      <button
+        type="button"
+        className={`${iconBtn} ${moveMode ? pressed : idle}`}
+        title={moveMode ? t.map.toolbar.moveOn : t.map.toolbar.moveOff}
+        aria-label={moveMode ? t.map.toolbar.moveOn : t.map.toolbar.moveOff}
+        aria-pressed={moveMode}
+        onClick={act(onToggleMove)}
+      >
+        ✥
+      </button>
+      {onToggleSelect && (
+        <button
+          type="button"
+          data-select-mode
+          className={`${iconBtn} ${selectMode ? pressed : idle}`}
+          title={selectMode ? t.map.toolbar.selectOn : t.map.toolbar.selectOff}
+          aria-label={selectMode ? t.map.toolbar.selectOn : t.map.toolbar.selectOff}
+          aria-pressed={selectMode}
+          onClick={act(onToggleSelect)}
+        >
+          ☑
+        </button>
+      )}
+      {onUndo && (
+        <button
+          type="button"
+          className={`${iconBtn} ${idle} disabled:cursor-not-allowed disabled:opacity-40`}
+          title={t.map.toolbar.undo}
+          aria-label={t.map.toolbar.undo}
+          disabled={!canUndo}
+          onClick={act(onUndo)}
+        >
+          ↶
+        </button>
+      )}
+      {onRestoreDeleted && (
+        <DeletedMenu entries={deletedEntries} onRestore={onRestoreDeleted} side={side} buttonClass={`${iconBtn} ${idle}`} />
+      )}
+      {/* Draw a separator line: click empty spots to place its points. */}
+      <button
+        type="button"
+        className={`${iconBtn} ${drawMode ? pressed : idle}`}
+        title={t.ui.lines.toolbar}
+        aria-label={t.ui.lines.toolbar}
+        aria-pressed={drawMode}
+        onClick={act(onToggleDraw)}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+        </svg>
+      </button>
+      {/* Draw a picture (map/PicturePicker.tsx): its own button, not only
+          the "+" menu, so it is one tap away on a phone, where there is
+          no right-click. */}
+      <button
+        type="button"
+        className={`${iconBtn} ${idle}`}
+        title={t.ui.pictures.title}
+        aria-label={t.ui.pictures.title}
+        onClick={act(onDrawPicture)}
+      >
+        <PictureIcon />
+      </button>
+      {/* Display options — compact view, emoji first, zone layouts and
+          presentation. Layers icon, not an eye: the eye in the bottom-right
+          corner (ViewCorner) owns how much detail the map shows, reading
+          mode included, so this menu doesn't repeat it. */}
+      <div className="relative">
+        <button
+          type="button"
+          className={`${iconBtn} ${showDisplayMenu ? pressed : idle}`}
+          title={t.map.toolbar.displayMenu}
+          aria-label={t.map.toolbar.displayMenu}
+          aria-expanded={showDisplayMenu}
+          onClick={() => setShowDisplayMenu((v) => !v)}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 1.8 L14.5 5 L8 8.2 L1.5 5 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+            <path d="M1.5 8 L8 11.2 L14.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
+            <path d="M1.5 11 L8 14.2 L14.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
+          </svg>
+        </button>
+        {showDisplayMenu && (
+          <DisplayMenu
+            side={side}
+            compact={compact}
+            onToggleCompact={onToggleCompact}
+            emojiFirst={emojiFirst}
+            nodeFade={nodeFade}
+            onNodeFade={onNodeFade}
+            onToggleEmojiFirst={onToggleEmojiFirst}
+            typeEmoji={typeEmoji}
+            onTypeEmoji={onTypeEmoji}
+            zoneLayout={zoneLayout}
+            onPickZoneLayout={onPickZoneLayout}
+            background={background}
+            onPickBackground={onPickBackground}
+            backgroundColor={backgroundColor}
+            onPickBackgroundColor={onPickBackgroundColor}
+            backgroundImage={backgroundImage}
+            onPickBackgroundImage={pickBackgroundImage}
+            onChoosePicturePart={choosePictureAgain}
+            backgroundShade={backgroundShade}
+            onPickBackgroundShade={onPickBackgroundShade}
+            onPresent={() => {
+              setShowDisplayMenu(false);
+              setShowMore(false);
+              onPresent();
+            }}
+            onQuiz={
+              onQuiz &&
+              (() => {
+                setShowDisplayMenu(false);
+                setShowMore(false);
+                onQuiz();
+              })
+            }
+            onTimeLapse={
+              onTimeLapse &&
+              (() => {
+                setShowDisplayMenu(false);
+                setShowMore(false);
+                onTimeLapse();
+              })
+            }
+            onClose={() => setShowDisplayMenu(false)}
+          />
+        )}
+      </div>
+      {/* Node search — find a node by its title/text; the matches stay lit. */}
+      <div className="relative">
+        <button
+          type="button"
+          className={`${iconBtn} relative ${showSearch || nodeTypeFilter.length > 0 ? pressed : idle}`}
+          title={nodeTypeFilter.length > 0 ? `${t.ui.search.title} · ${t.ui.search.filtered(nodeTypeFilter.length)}` : t.ui.search.title}
+          aria-label={nodeTypeFilter.length > 0 ? `${t.ui.search.title} · ${t.ui.search.filtered(nodeTypeFilter.length)}` : t.ui.search.title}
+          aria-expanded={showSearch}
+          onClick={() => setShowSearch((v) => !v)}
+        >
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="6.5" cy="6.5" r="4.2" stroke="currentColor" strokeWidth="1.8" fill="none" />
+            <path d="M9.8 9.8 L14 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          {nodeTypeFilter.length > 0 && (
+            <span className="absolute -right-[2px] -top-[2px] h-[7px] w-[7px] rounded-full bg-accent" aria-hidden="true" />
+          )}
+        </button>
+        {showSearch && (
+          <NodeSearch
+            side={side}
+            nodes={nodes}
+            onLoadTexts={onLoadTexts}
+            onMatches={onSearchMatches}
+            onPick={act(onPickSearchResult)}
+            types={nodeTypeFilter}
+            onTypes={onNodeTypeFilter}
+            onClose={() => setShowSearch(false)}
+          />
+        )}
+      </div>
+    </>
+  );
+  const settings = (
+    <>
+      {/* The global Navbar (which normally hosts these) is hidden on the
+          map route — see App.tsx's onMapPage check — so this is the only
+          place a map-page user can reach them. */}
+      {/* Docked: pinned to the bottom of the panel, like a taskbar's tray. */}
+      <div
+        className={
+          vertical
+            ? "order-last mt-auto flex flex-col items-center gap-1 border-t border-line pt-2"
+            : folded
+              ? "flex items-center gap-1 border-t border-line pt-1"
+              : "ml-1 flex items-center gap-1 border-l border-line pl-1"
+        }
+      >
+        <LanguageSwitcher />
+        <ThemeToggle />
+        {BUILD && <span className="text-[0.6rem] text-ink-soft select-all">{BUILD}</span>}
+      </div>
+    </>
+  );
+  const discussionButtons = (
+    <>
+      {/* Owner-only — updateMapDao's own ownerId filter would reject this from
+          anyone else anyway, so the button just doesn't offer what the server
+          would refuse. Discussion (the default) shows every combat control;
+          Personal hides them. Exempted from the collapse above (unlike
+          Back/+/Move): toggling combat visibility is just as likely to be
+          wanted while a node's quick-add ring is up as any other time. */}
+      {isOwner && (
+        <button
+          type="button"
+          className={`${iconBtn} ${isDiscussionMode ? idle : pressed}`}
+          title={modeTitle}
+          aria-label={modeTitle}
+          disabled={offline}
+          onClick={act(onToggleMapMode)}
+        >
+          {/* Plain text-presentation glyphs (no emoji variation selector), not
+              a colorful emoji — matches the rest of this cluster's
+              monochrome icons. */}
+          {isDiscussionMode ? "⚔" : "✎"}
+        </button>
+      )}
+      {/* The opponent's turn: an imitated opponent attacks one of your
+          castles (see SiegePanel). Owner-only for the same reason as the
+          toggle — it attacks with whatever type the strategy calls for,
+          which only the owner may do in battle mode. */}
+      {isOwner && isDiscussionMode && onOpponentTurn && (
+        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.open} aria-label={t.ui.siege.open} onClick={act(onOpponentTurn)}>
+          ♜
+        </button>
+      )}
+      {/* Finish the discussion (owner) or agree to finish (everyone else) —
+          muted while the owner may not finish yet; the press then says why. */}
+      {isDiscussionMode && onHistory && (
+        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.history.open} aria-label={t.ui.siege.history.open} onClick={act(onHistory)}>
+          ◷
+        </button>
+      )}
+      {isDiscussionMode && finish && (
+        <button
+          type="button"
+          className={`${iconBtn} ${finish.pressed ? pressed : idle} ${finish.muted ? "opacity-50" : ""}`}
+          title={finish.title}
+          aria-label={finish.title}
+          aria-pressed={finish.pressed}
+          onClick={act(finish.onClick)}
+        >
+          ⚐
+        </button>
+      )}
+    </>
+  );
+  // Whether there's any discussion button at all, for the tray's own row.
+  const discussion = isOwner || (isDiscussionMode && (onHistory || finish)) ? discussionButtons : null;
 
   return (
     <div
@@ -269,167 +535,38 @@ export function MapToolbar({
               />
             )}
           </div>
-          {/* Off by default — arming drag from a bare pointerdown would read
-              as accidental relocation on any touch imprecision. */}
-          <button
-            type="button"
-            className={`${iconBtn} ${moveMode ? pressed : idle}`}
-            title={moveMode ? t.map.toolbar.moveOn : t.map.toolbar.moveOff}
-            aria-label={moveMode ? t.map.toolbar.moveOn : t.map.toolbar.moveOff}
-            aria-pressed={moveMode}
-            onClick={onToggleMove}
-          >
-            ✥
-          </button>
-          {onUndo && (
-            <button
-              type="button"
-              className={`${iconBtn} ${idle} disabled:cursor-not-allowed disabled:opacity-40`}
-              title={t.map.toolbar.undo}
-              aria-label={t.map.toolbar.undo}
-              disabled={!canUndo}
-              onClick={onUndo}
-            >
-              ↶
-            </button>
-          )}
-          {onRestoreDeleted && (
-            <DeletedMenu entries={deletedEntries} onRestore={onRestoreDeleted} side={side} buttonClass={`${iconBtn} ${idle}`} />
-          )}
-          {/* Draw a separator line: click empty spots to place its points. */}
-          <button
-            type="button"
-            className={`${iconBtn} ${drawMode ? pressed : idle}`}
-            title={t.ui.lines.toolbar}
-            aria-label={t.ui.lines.toolbar}
-            aria-pressed={drawMode}
-            onClick={onToggleDraw}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
-            </svg>
-          </button>
-          {/* Draw a picture (map/PicturePicker.tsx): its own button, not only
-              the "+" menu, so it is one tap away on a phone, where there is
-              no right-click. */}
-          <button
-            type="button"
-            className={`${iconBtn} ${idle}`}
-            title={t.ui.pictures.title}
-            aria-label={t.ui.pictures.title}
-            onClick={onDrawPicture}
-          >
-            <PictureIcon />
-          </button>
-          {/* Display options — compact view, emoji first, zone layouts and
-              presentation. Layers icon, not an eye: the eye in the bottom-right
-              corner (ViewCorner) owns how much detail the map shows, reading
-              mode included, so this menu doesn't repeat it. */}
-          <div className="relative">
-            <button
-              type="button"
-              className={`${iconBtn} ${showDisplayMenu ? pressed : idle}`}
-              title={t.map.toolbar.displayMenu}
-              aria-label={t.map.toolbar.displayMenu}
-              aria-expanded={showDisplayMenu}
-              onClick={() => setShowDisplayMenu((v) => !v)}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M8 1.8 L14.5 5 L8 8.2 L1.5 5 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
-                <path d="M1.5 8 L8 11.2 L14.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
-                <path d="M1.5 11 L8 14.2 L14.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
-              </svg>
-            </button>
-            {showDisplayMenu && (
-              <DisplayMenu
-                side={side}
-                compact={compact}
-                onToggleCompact={onToggleCompact}
-                emojiFirst={emojiFirst}
-                nodeFade={nodeFade}
-                onNodeFade={onNodeFade}
-                onToggleEmojiFirst={onToggleEmojiFirst}
-                typeEmoji={typeEmoji}
-                onTypeEmoji={onTypeEmoji}
-                zoneLayout={zoneLayout}
-                onPickZoneLayout={onPickZoneLayout}
-                background={background}
-                onPickBackground={onPickBackground}
-                backgroundColor={backgroundColor}
-                onPickBackgroundColor={onPickBackgroundColor}
-                backgroundImage={backgroundImage}
-                onPickBackgroundImage={pickBackgroundImage}
-                onChoosePicturePart={choosePictureAgain}
-                backgroundShade={backgroundShade}
-                onPickBackgroundShade={onPickBackgroundShade}
-                onPresent={() => {
-                  setShowDisplayMenu(false);
-                  onPresent();
-                }}
-                onQuiz={
-                  onQuiz &&
-                  (() => {
-                    setShowDisplayMenu(false);
-                    onQuiz();
-                  })
-                }
-                onTimeLapse={
-                  onTimeLapse &&
-                  (() => {
-                    setShowDisplayMenu(false);
-                    onTimeLapse();
-                  })
-                }
-                onClose={() => setShowDisplayMenu(false)}
-              />
-            )}
-          </div>
-          {/* Node search — find a node by its title/text; the matches stay lit. */}
-          <div className="relative">
-            <button
-              type="button"
-              className={`${iconBtn} relative ${showSearch || nodeTypeFilter.length > 0 ? pressed : idle}`}
-              title={nodeTypeFilter.length > 0 ? `${t.ui.search.title} · ${t.ui.search.filtered(nodeTypeFilter.length)}` : t.ui.search.title}
-              aria-label={nodeTypeFilter.length > 0 ? `${t.ui.search.title} · ${t.ui.search.filtered(nodeTypeFilter.length)}` : t.ui.search.title}
-              aria-expanded={showSearch}
-              onClick={() => setShowSearch((v) => !v)}
-            >
-              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
-                <circle cx="6.5" cy="6.5" r="4.2" stroke="currentColor" strokeWidth="1.8" fill="none" />
-                <path d="M9.8 9.8 L14 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-              {nodeTypeFilter.length > 0 && (
-                <span className="absolute -right-[2px] -top-[2px] h-[7px] w-[7px] rounded-full bg-accent" aria-hidden="true" />
+          {folded ? (
+            <div className="relative" ref={moreRef}>
+              <button
+                type="button"
+                className={`${iconBtn} relative ${showMore ? pressed : idle}`}
+                title={t.map.toolbar.more}
+                aria-label={t.map.toolbar.more}
+                aria-expanded={showMore}
+                onClick={() => setShowMore((v) => !v)}
+              >
+                ⋯
+                {moreBusy && (
+                  <span className="absolute -right-[2px] -top-[2px] h-[7px] w-[7px] rounded-full bg-accent" aria-hidden="true" />
+                )}
+              </button>
+              {showMore && (
+                <div
+                  data-more-tray
+                  className="absolute left-0 top-[calc(100%+0.4rem)] z-[60] flex w-max max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-card border border-line bg-surface p-1 shadow-card"
+                >
+                  <div className="flex flex-wrap items-center gap-1">{tools}</div>
+                  {discussion && <div className="flex flex-wrap items-center gap-1 border-t border-line pt-1">{discussion}</div>}
+                  {settings}
+                </div>
               )}
-            </button>
-            {showSearch && (
-              <NodeSearch
-                side={side}
-                nodes={nodes}
-                onLoadTexts={onLoadTexts}
-                onMatches={onSearchMatches}
-                onPick={onPickSearchResult}
-                types={nodeTypeFilter}
-                onTypes={onNodeTypeFilter}
-                onClose={() => setShowSearch(false)}
-              />
-            )}
-          </div>
-          {/* The global Navbar (which normally hosts these) is hidden on the
-              map route — see App.tsx's onMapPage check — so this is the only
-              place a map-page user can reach them. */}
-          {/* Docked: pinned to the bottom of the panel, like a taskbar's tray. */}
-          <div
-            className={
-              vertical
-                ? "order-last mt-auto flex flex-col items-center gap-1 border-t border-line pt-2"
-                : "ml-1 flex items-center gap-1 border-l border-line pl-1"
-            }
-          >
-            <LanguageSwitcher />
-            <ThemeToggle />
-            {BUILD && <span className="text-[0.6rem] text-ink-soft select-all">{BUILD}</span>}
-          </div>
+            </div>
+          ) : (
+            <>
+              {tools}
+              {settings}
+            </>
+          )}
         </>
       ) : (
         // Collapsed while a node's own quick-add ring is up: expands the full
@@ -445,55 +582,7 @@ export function MapToolbar({
           ⋮
         </button>
       )}
-      {/* Owner-only — updateMapDao's own ownerId filter would reject this from
-          anyone else anyway, so the button just doesn't offer what the server
-          would refuse. Discussion (the default) shows every combat control;
-          Personal hides them. Exempted from the collapse above (unlike
-          Back/+/Move): toggling combat visibility is just as likely to be
-          wanted while a node's quick-add ring is up as any other time. */}
-      {isOwner && (
-        <button
-          type="button"
-          className={`${iconBtn} ${isDiscussionMode ? idle : pressed}`}
-          title={modeTitle}
-          aria-label={modeTitle}
-          disabled={offline}
-          onClick={onToggleMapMode}
-        >
-          {/* Plain text-presentation glyphs (no emoji variation selector), not
-              a colorful emoji — matches the rest of this cluster's
-              monochrome icons. */}
-          {isDiscussionMode ? "⚔" : "✎"}
-        </button>
-      )}
-      {/* The opponent's turn: an imitated opponent attacks one of your
-          castles (see SiegePanel). Owner-only for the same reason as the
-          toggle — it attacks with whatever type the strategy calls for,
-          which only the owner may do in battle mode. */}
-      {isOwner && isDiscussionMode && onOpponentTurn && (
-        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.open} aria-label={t.ui.siege.open} onClick={onOpponentTurn}>
-          ♜
-        </button>
-      )}
-      {/* Finish the discussion (owner) or agree to finish (everyone else) —
-          muted while the owner may not finish yet; the press then says why. */}
-      {isDiscussionMode && onHistory && (
-        <button type="button" className={`${iconBtn} ${idle}`} title={t.ui.siege.history.open} aria-label={t.ui.siege.history.open} onClick={onHistory}>
-          ◷
-        </button>
-      )}
-      {isDiscussionMode && finish && (
-        <button
-          type="button"
-          className={`${iconBtn} ${finish.pressed ? pressed : idle} ${finish.muted ? "opacity-50" : ""}`}
-          title={finish.title}
-          aria-label={finish.title}
-          aria-pressed={finish.pressed}
-          onClick={finish.onClick}
-        >
-          ⚐
-        </button>
-      )}
+      {!folded && discussion}
       {/* A demo session has no dashboard to go back to (see ProtectedRoute) and
           the global Navbar is hidden here, so this is its only way out to the
           login page. Kept outside the collapse, like the mode toggle. */}

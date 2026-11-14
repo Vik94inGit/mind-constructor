@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 Mind Constructor is "notes you can see". The main path is personal: jot a thought in a second (a
 quick note lands in the user's **Inbox** map, `Frontend/web/src/utils/inbox.ts`), lay thoughts out
 on a canvas as typed **nodes** (Problem / Problematic option / Solution / Option / Success / Fail /
-Idea / unknown) whose place, zone and links show how they relate, and find any of them again with search
+Idea / unknown, and for studying Title / Question) whose place, zone and links show how they relate, and find any of them again with search
 across all maps. A thought can also carry how it feels to the user (a private emoji badge), and *Think it through*
 asks how they feel before and, later, after, so the dashboard can show the shift. Starter structures arrive as faded **ghost** nodes that carry only a question
 (`Node.prompt`) and fill in as the user answers them.
@@ -83,8 +83,8 @@ npm run build        # tsc -b && vite build
   `canvasLayout.ts`, `siege.ts` (opponent strategies and moves), `finish.ts` (mirrors the backend's
   `finishRule` so the Finish button can say why it waits; the server still decides), `nodeType.ts`
   (mirrors `allowedAttackTypes`), `seedMap.ts`/`templates.ts` (starter structures as ghosts, in the
-  user's language), `shapeLayout.ts` (templates and the Think map laid out as a circle, square or triangle, shared with the preview), `textSplit.ts`, `pictures.ts` ("Draw a picture": a connect-the-dots of ghost nodes whose lines ink in as they are written, `Node.picture`), `cardGlue.ts` (cards glue side to side and never
-  overlap), `parentMagnet.ts` (a moved parent pulls its own far children back in), `emojiFace.ts` (emoji first, each type's emoji, a still emoji), `usage.ts` (`track()`: how the app is used, a name and short labels per event, never a thought's text; shown on the admin page by `admin/UsageSummary.tsx`), `quiz.ts` (Quiz me: cards from the map itself, a parent asking and its children answering; the viewer's own marks, `map/QuizOverlay.tsx`), `feeling.ts` (a viewer's own
+  user's language, asked in rounds: `templateLevels.ts` keeps a later round locked and off the canvas until the earlier ones are answered, `hooks/useLevelReveal.ts` says when one opens), `shapeLayout.ts` (templates and the Think map laid out as a circle, square or triangle, shared with the preview), `textSplit.ts`, `pictures.ts` ("Draw a picture": a connect-the-dots of ghost nodes whose lines ink in as they are written, `Node.picture`), `cardGlue.ts` (cards glue side to side and never
+  overlap), `parentMagnet.ts` (a moved parent pulls its own far children back in), `emojiFace.ts` (emoji first, each type's emoji, a still emoji), `usage.ts` (`track()`: how the app is used, a name and short labels per event, never a thought's text; shown on the admin page by `admin/UsageSummary.tsx`), `quiz.ts` (Quiz me: cards from the map itself, a ❓, Problem or goal asking and its ✅ children answering; the viewer's own marks, `map/QuizOverlay.tsx`), `openPanels.ts` (several node panels open at once, tiled, a limit per device), `feeling.ts` (a viewer's own
   feeling per thought and the before/after check-in, private to them like the rest of their view of a map).
 - **`offline/`** — read cache of every GET plus an outbox of changes made offline, replayed in order
   once the server is back (temporary `local_…` ids swapped for real ones); `public/sw.js` caches the

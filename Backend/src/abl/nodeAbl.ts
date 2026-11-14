@@ -68,6 +68,13 @@ const orderSchema = z
   .min(1, "order must be at least 1")
   .max(9999, "order must be at most 9999");
 
+// Node.level — which round of a template a ghost belongs to, 1..9. Creation only.
+const levelSchema = z
+  .number()
+  .int("level must be a whole number")
+  .min(1, "level must be at least 1")
+  .max(9, "level must be at most 9");
+
 // A picture already in the image store (models/Image.ts): what a node keeps
 // once updateNodeAbl has stored the data URL a frontend sent. Sending one back
 // unchanged (say, the rest of the picture list after removing one) keeps it.
@@ -168,6 +175,7 @@ const createNodeSchema = z.object({
   prompt: promptSchema.optional(),
   emoji: emojiSchema.optional(),
   order: orderSchema.nullish(),
+  level: levelSchema.nullish(),
   type: z.enum(NODE_TYPES, {
     error: () => `type is required and must be one of: ${NODE_TYPES.join(", ")}`,
   }),

@@ -110,13 +110,16 @@ export function useMapKeyboard({
           return;
         }
       }
-      // Enter (or Escape) finishes choosing / a group selection. Skipped when a
-      // button, link, select or menu has focus — there Enter has its own job.
+      // Enter (or Escape) drops a group selection. Select mode (chooseMode)
+      // is left only by its Done or ☑ button, so these keys leave it alone.
+      // Skipped when a button, link, select or menu has focus — there Enter
+      // has its own job.
       if (
         !e.ctrlKey &&
         !e.metaKey &&
         (e.key === "Enter" || e.key === "Escape") &&
-        (chooseMode || hasGroupSelection)
+        !chooseMode &&
+        hasGroupSelection
       ) {
         if (e.target instanceof HTMLElement && e.target.closest("button, a, select, [role=menu]")) return;
         e.preventDefault();

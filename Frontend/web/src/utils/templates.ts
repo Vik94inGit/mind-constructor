@@ -17,15 +17,31 @@ import type { MapKind, NodeType } from "../types";
 //    advantage and its risk.
 //  - "retro": what went well, what went badly, and what to change — the
 //    starting structure of a retrospective map (see MAP_KIND_ROOTS).
-//  - "idea": turn a loose idea into something testable — the need it meets,
-//    how it would work and the smallest way to try it, what would show it
-//    works, what could kill it, what is still unknown, and another idea for
-//    the same need.
+//  - "idea": the user's own three rounds — first the idea itself (what it is,
+//    how it feels, what problem it solves, why it would work, what it would
+//    bring), then making it happen (possibilities, obstacles, the plan, how it
+//    feels now), then looking back (what worked, what failed, what it brings
+//    to the table, how it feels, whether it is finished as it is).
+//  - "study": learning a topic, in titles and questions only. A Title node
+//    (the topic) grows the questions that make you understand it (what it is,
+//    why it matters) and two Titles for its main parts, then each part's key
+//    idea and an example and how it connects to what you know, then what an
+//    exam would ask and what is still unclear. The answer is written into each
+//    question, so a filled-in Question is a ready card for Quiz me
+//    (utils/quiz.ts).
+//  - "question": a Question node grows its follow-ups: why it is so and an
+//    example, then a common mistake and how to explain it to a friend.
+//
+// Levels: a template asks its questions in rounds. Every node carries the
+// round it belongs to (Node.level); a later round's ghosts are saved from the
+// start but stay locked, and off the canvas, until the earlier rounds are
+// filled in (utils/templateLevels.ts, hooks/useLevelReveal.ts). A template whose nodes all hang straight from
+// the root is drawn as one ring per round (layoutTemplate).
 
-export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro" | "idea";
+export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro" | "idea" | "study" | "question";
 
 /** The templates a single node offers to grow from itself (NodePanel's Info tab). */
-export type NodeTemplateKind = Extract<TemplateKind, "problem" | "goal" | "retry" | "idea">;
+export type NodeTemplateKind = Extract<TemplateKind, "problem" | "goal" | "retry" | "idea" | "study" | "question">;
 
 // Which template a node of each type offers, if any.
 export const NODE_TYPE_TEMPLATE: Partial<Record<NodeType, NodeTemplateKind>> = {
@@ -33,6 +49,8 @@ export const NODE_TYPE_TEMPLATE: Partial<Record<NodeType, NodeTemplateKind>> = {
   Solution: "goal",
   Fail: "retry",
   Idea: "idea",
+  Title: "study",
+  Question: "question",
 };
 
 export type TemplateNodeKey =
@@ -76,78 +94,152 @@ export type TemplateNodeKey =
   | "tryNext1"
   | "tryNext2"
   | "rootIdea"
-  | "ideaNeed"
-  | "ideaHow"
-  | "ideaTry"
-  | "ideaProof"
-  | "ideaRisk"
-  | "ideaUnknown"
-  | "ideaAlternative";
+  | "ideaWhat"
+  | "ideaFeel"
+  | "ideaSolves"
+  | "ideaWhyWork"
+  | "ideaProfit"
+  | "ideaPossibilities"
+  | "ideaObstacles"
+  | "ideaPlan"
+  | "ideaFeelPlan"
+  | "ideaSucceeded"
+  | "ideaFailed"
+  | "ideaBrings"
+  | "ideaFeelDone"
+  | "ideaFinished"
+  | "rootStudy"
+  | "studyWhat"
+  | "studyWhy"
+  | "studyPart1"
+  | "studyPart1Key"
+  | "studyPart1Example"
+  | "studyPart2"
+  | "studyPart2Key"
+  | "studyPart2Example"
+  | "studyConnect"
+  | "studyExam"
+  | "studyUnclear"
+  | "questionWhy"
+  | "questionExample"
+  | "questionMistake"
+  | "questionExplain";
 
 interface TemplateNode {
   key: TemplateNodeKey;
   type: NodeType;
   /** Step number, for a node that belongs to an ordered sequence. */
   order?: number;
+  /** The round of questions this node belongs to (Node.level), from 1. */
+  level: number;
   children?: TemplateNode[];
 }
 
 const TEMPLATES: Record<TemplateKind, TemplateNode[]> = {
+  // 1: take the problem apart; 2: ways to solve it and a plan; 3: how it went.
   problem: [
-    { key: "subProblem1", type: "Problem" },
-    { key: "subProblem2", type: "Problem" },
-    { key: "negativeScenario", type: "Fail" },
-    { key: "experiencePositive", type: "Success" },
-    { key: "experienceNegative", type: "Fail" },
+    { key: "subProblem1", type: "Problem", level: 1 },
+    { key: "subProblem2", type: "Problem", level: 1 },
+    { key: "negativeScenario", type: "Fail", level: 1 },
+    { key: "experiencePositive", type: "Success", level: 1 },
+    { key: "experienceNegative", type: "Fail", level: 1 },
     {
       key: "way1",
       type: "Option",
+      level: 2,
       children: [
         {
           key: "plan",
           type: "Solution",
+          level: 2,
           children: [
-            { key: "resultPositive", type: "Success" },
-            { key: "resultNegative", type: "Fail" },
+            { key: "resultPositive", type: "Success", level: 3 },
+            { key: "resultNegative", type: "Fail", level: 3 },
           ],
         },
       ],
     },
-    { key: "way2", type: "Option" },
+    { key: "way2", type: "Option", level: 2 },
   ],
+  // 1: what success looks like; 2: the steps and what could stop them; 3: the review.
   goal: [
-    { key: "criteria", type: "Success" },
-    { key: "step1", type: "Option", order: 1 },
-    { key: "step2", type: "Option", order: 2 },
-    { key: "step3", type: "Option", order: 3 },
-    { key: "obstacle", type: "Problem", children: [{ key: "fallback", type: "Option" }] },
-    { key: "review", type: "unknown" },
+    { key: "criteria", type: "Success", level: 1 },
+    { key: "step1", type: "Option", order: 1, level: 2 },
+    { key: "step2", type: "Option", order: 2, level: 2 },
+    { key: "step3", type: "Option", order: 3, level: 2 },
+    { key: "obstacle", type: "Problem", level: 2, children: [{ key: "fallback", type: "Option", level: 2 }] },
+    { key: "review", type: "unknown", level: 3 },
   ],
+  // 1: why it failed; 2: what to change.
   retry: [
-    { key: "whyFailed", type: "Problematic option" },
-    { key: "tryAgain", type: "Option" },
+    { key: "whyFailed", type: "Problematic option", level: 1 },
+    { key: "tryAgain", type: "Option", level: 2 },
   ],
+  // 1: what matters and the options; 2: each option's advantage and risk.
   decision: [
-    { key: "criteriaQuestion", type: "unknown" },
-    { key: "optionA", type: "Option", children: [{ key: "advantageA", type: "Success" }, { key: "riskA", type: "Fail" }] },
-    { key: "optionB", type: "Option", children: [{ key: "advantageB", type: "Success" }, { key: "riskB", type: "Fail" }] },
-    { key: "optionC", type: "Option", children: [{ key: "advantageC", type: "Success" }, { key: "riskC", type: "Fail" }] },
+    { key: "criteriaQuestion", type: "unknown", level: 1 },
+    { key: "optionA", type: "Option", level: 1, children: [{ key: "advantageA", type: "Success", level: 2 }, { key: "riskA", type: "Fail", level: 2 }] },
+    { key: "optionB", type: "Option", level: 1, children: [{ key: "advantageB", type: "Success", level: 2 }, { key: "riskB", type: "Fail", level: 2 }] },
+    { key: "optionC", type: "Option", level: 1, children: [{ key: "advantageC", type: "Success", level: 2 }, { key: "riskC", type: "Fail", level: 2 }] },
   ],
+  // 1: what went well and badly; 2: what to change.
   retro: [
-    { key: "wentWell1", type: "Success" },
-    { key: "wentWell2", type: "Success" },
-    { key: "wentBad1", type: "Fail" },
-    { key: "wentBad2", type: "Fail" },
-    { key: "tryNext1", type: "Option" },
-    { key: "tryNext2", type: "Option" },
+    { key: "wentWell1", type: "Success", level: 1 },
+    { key: "wentWell2", type: "Success", level: 1 },
+    { key: "wentBad1", type: "Fail", level: 1 },
+    { key: "wentBad2", type: "Fail", level: 1 },
+    { key: "tryNext1", type: "Option", level: 2 },
+    { key: "tryNext2", type: "Option", level: 2 },
   ],
   idea: [
-    { key: "ideaNeed", type: "Problem" },
-    { key: "ideaHow", type: "Solution", children: [{ key: "ideaTry", type: "Option" }] },
-    { key: "ideaProof", type: "Success" },
-    { key: "ideaRisk", type: "Fail" },
-    { key: "ideaUnknown", type: "unknown" },
-    { key: "ideaAlternative", type: "Idea" },
+    { key: "ideaWhat", type: "Idea", level: 1 },
+    { key: "ideaFeel", type: "unknown", level: 1 },
+    { key: "ideaSolves", type: "Problem", level: 1 },
+    { key: "ideaWhyWork", type: "Solution", level: 1 },
+    { key: "ideaProfit", type: "Success", level: 1 },
+    { key: "ideaPossibilities", type: "Option", level: 2 },
+    { key: "ideaObstacles", type: "Problematic option", level: 2 },
+    { key: "ideaPlan", type: "Solution", level: 2 },
+    { key: "ideaFeelPlan", type: "unknown", level: 2 },
+    { key: "ideaSucceeded", type: "Success", level: 3 },
+    { key: "ideaFailed", type: "Fail", level: 3 },
+    { key: "ideaBrings", type: "Success", level: 3 },
+    { key: "ideaFeelDone", type: "unknown", level: 3 },
+    { key: "ideaFinished", type: "unknown", level: 3 },
+  ],
+  // 1: what it is and its main parts; 2: each part's key idea and an example,
+  // and how it connects; 3: what an exam would ask and what is still unclear.
+  study: [
+    { key: "studyWhat", type: "Question", level: 1 },
+    { key: "studyWhy", type: "Question", level: 1 },
+    {
+      key: "studyPart1",
+      type: "Title",
+      level: 1,
+      children: [
+        { key: "studyPart1Key", type: "Question", level: 2 },
+        { key: "studyPart1Example", type: "Question", level: 2 },
+      ],
+    },
+    {
+      key: "studyPart2",
+      type: "Title",
+      level: 1,
+      children: [
+        { key: "studyPart2Key", type: "Question", level: 2 },
+        { key: "studyPart2Example", type: "Question", level: 2 },
+      ],
+    },
+    { key: "studyConnect", type: "Question", level: 2 },
+    { key: "studyExam", type: "Question", level: 3 },
+    { key: "studyUnclear", type: "Question", level: 3 },
+  ],
+  // 1: why and an example; 2: a common mistake and explaining it simply.
+  question: [
+    { key: "questionWhy", type: "Question", level: 1 },
+    { key: "questionExample", type: "Question", level: 1 },
+    { key: "questionMistake", type: "Question", level: 2 },
+    { key: "questionExplain", type: "Question", level: 2 },
   ],
 };
 
@@ -158,12 +250,15 @@ export const MAP_KIND_ROOTS: Record<MapKind, { key: TemplateNodeKey; type: NodeT
   goal: { key: "rootGoal", type: "Solution", template: "goal" },
   retro: { key: "rootRetro", type: "unknown", template: "retro" },
   idea: { key: "rootIdea", type: "Idea", template: "idea" },
+  study: { key: "rootStudy", type: "Title", template: "study" },
 };
 
 export interface PlacedTemplateNode {
   key: TemplateNodeKey;
   type: NodeType;
   order?: number;
+  /** The round of questions this node belongs to (Node.level). */
+  level: number;
   /** The key of the node this hangs from; null means the node the template was started on. */
   parentKey: TemplateNodeKey | null;
   x: number;
@@ -204,10 +299,12 @@ export function layoutTemplate(
   const spacing = getCirclePackSpacing();
   const step = shapeStep(spacing);
   const flat = flatten(TEMPLATES[kind]);
-  const shape = shapeTree(
-    flat.map(({ node, parentKey }) => ({ id: node.key, parentId: parentKey ?? ROOT })),
-    ROOT,
-  );
+  const shape = flat.every(({ parentKey }) => parentKey === null)
+    ? levelRings(flat.map(({ node }) => node))
+    : shapeTree(
+        flat.map(({ node, parentKey }) => ({ id: node.key, parentId: parentKey ?? ROOT })),
+        ROOT,
+      );
   const obstacles: Obstacle[] = [...existingObstacles];
   return flat.map(({ node, parentKey }) => {
     const unit = shape.get(node.key)!;
@@ -218,9 +315,37 @@ export function layoutTemplate(
       key: node.key,
       type: node.type,
       order: node.order,
+      level: node.level,
       parentKey,
       x: Math.min(CANVAS_W - EDGE, Math.max(EDGE, placed.x)),
       y: Math.min(CANVAS_H - EDGE, Math.max(EDGE, placed.y)),
     };
   });
+}
+
+// How far apart two rings of a leveled template sit, in steps. Less than a
+// whole step is enough: each ring is turned half a gap against the one inside
+// it, so a node never sits straight behind one of the ring before.
+const RING_GAP = 0.85;
+
+/**
+ * A flat leveled template (every node straight off the root) in step units:
+ * one circle per level, the first a step out, each later one a little further
+ * and turned half a gap, so the rounds read as rings growing outward.
+ */
+export function levelRings(nodes: { key: string; level: number }[]): Map<string, { x: number; y: number }> {
+  const levels = [...new Set(nodes.map((n) => n.level))].sort((a, b) => a - b);
+  const out = new Map<string, { x: number; y: number }>();
+  let radius = 0;
+  levels.forEach((level, ring) => {
+    const members = nodes.filter((n) => n.level === level);
+    // Neighbours on the ring at least a step apart.
+    radius = Math.max(ring === 0 ? 1 : radius + RING_GAP, members.length / (2 * Math.PI));
+    const turn = ring % 2 === 1 ? Math.PI / members.length : 0;
+    members.forEach((n, i) => {
+      const a = -Math.PI / 2 + turn + (i * 2 * Math.PI) / members.length;
+      out.set(n.key, { x: Math.cos(a) * radius, y: Math.sin(a) * radius });
+    });
+  });
+  return out;
 }

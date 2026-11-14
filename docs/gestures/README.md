@@ -33,10 +33,12 @@ node) must be told apart by something the user can see before they let go.
 
 | Where | Touch | Mouse | Does |
 |---|---|---|---|
-| Node | Tap | Click | Picks it: highlighted, centered, its ring of ghosts up; no panel ([sketch](tap-picks-node.md)) |
-| Picked node | Tap again, or double-tap | Click again, or double-click | Opens its panel ([sketch](tap-picks-node.md)) |
+| Node (any: an attack, a card, one with pictures) | Tap | Click, or double-click on the text to edit | Opens its panel on Info, centered, its ring of ghosts up ([sketch](tap-opens-node.md)) |
+| Another node, a panel open | Tap | Click | Opens its panel beside the open ones (phone 2, tablet 6, computer 8; the oldest closes past that), tiled without overlapping; each ✕ closes one ([sketch](several-panels.md)) |
 | Ring of ghosts | Tap a ghost | Click a ghost | Picks it out: *Make this a …* (change the node's type), *New …*, or a starter phrase; tap again adds a thought of that type ([sketch](ghost-change-type.md)) |
 | Ring of ghosts | Drag a type out | Drag a type out | Sketches a new branch where it's let go |
+| Toolbar ☑, then a node | Tap | Click | Select mode: picks or drops just that node, any kind, anyone's; no panel, no drag. Empty canvas, zones, Enter and Esc do nothing; only *Done* or ☑ leaves ([sketch](select-mode.md)) |
+| Picked node, ☑ and ✥ both on | Drag | Drag | Moves every picked node of yours together; a tap still picks or drops one; unpicked nodes never drag ([sketch](select-move.md)) |
 | Node, Move mode (✥) | Drag | Drag | Moves it; glues to a card it lands beside; joins a zone it's dropped on (a card in the cards view only moves clear of other cards) |
 | Node, Move mode | Hold still, lift | Shift+click | Adds it to a group selection (or opens a card's menu) |
 | Group member | Drag | Drag | Moves the group, the others following its path |
@@ -49,12 +51,13 @@ node) must be told apart by something the user can see before they let go.
 | Change-parent mode | Tap a node | Click a node | Hangs the child from it (own parent: swap) |
 | Strong attack, discussion | Tap the attack | Hover it or its target | Pac-Man run to the node it hit |
 | Parent's − / +N pill | Tap (− once the node is selected) | Click (− also on hover) | Packs its children in / opens them again; beside an icon, above a card ([sketch](pack-children.md)) |
+| Packed parent (+N) | Double-tap | Double-click (instead of editing) | Opens its children again, as +N does ([sketch](double-tap-unpack.md)) |
 | Picture caption | Tap | Click | Opens the picture's bar: − / + resize the whole picture, Move picks every dot for a group drag ([sketch](picture-resize.md)) |
 | Canvas | Pinch | Ctrl+wheel, − / + | Zoom |
 | Panel | Its arrows | Arrow keys | Step node to node |
 | Panel, zone chosen | Its arrows | Arrow keys | Step through the zone newest thought first, back into the past ([sketch](zone-creation-order.md)) |
 | Canvas, first open | Tap | Click or wheel | Skip the entrance |
-| Quiz me card | Tap, then Not yet / Shaky / Know it | Click or Space, then 1 / 2 / 3; ← back, Esc leaves | Turns the card to its answer, marks it and brings the next ([sketch](quiz-me.md)) |
+| Quiz me card | Tap, then Not yet / Shaky / Know it | Click or Space, then 1 / 2 / 3; ← back, Esc leaves; Ctrl/Cmd+Enter turns from the guess field | Turns the card to its answer (beside the reader's own written guess, if any), marks it and brings the next ([sketch](quiz-me.md)) |
 
 Sources: [Frontend/web/README.md](../../Frontend/web/README.md), `hooks/useNodeDragAndDrop.ts`,
 `hooks/useMarqueeSelect.ts`, `hooks/useCanvasDoubleTap.ts`, `hooks/useCanvasMode.ts`, `hooks/useTapChomp.ts`,
