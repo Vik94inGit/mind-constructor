@@ -123,11 +123,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
-- **Template levels** — a template asks its questions in rounds (`Node.level`, `utils/templates.ts`). Every
-  round's ghosts are on the canvas from the start, but a later round's are fainter, wear a 🔒 before
-  their question and can't be written in until every question of the rounds before it under the same
-  template root is answered or deleted; their panel says which level to answer first and how many are
-  left (`utils/templateLevels.ts`). *Develop an idea* asks: 1) what the idea is, how you feel about it,
+- **Template levels** — a template asks its questions in rounds (`Node.level`, `utils/templates.ts`). Only
+  the first round shows when a template grows ("Added 5 questions. 2 more levels open once these are
+  answered"); a later round's ghosts are saved but kept off the canvas until every question of the
+  rounds before it under the same template root is answered or deleted, and then come up with a
+  "🔓 Level 2 is open: 3 new questions" notice (`hiddenLevelIds`/`revealedRound` in
+  `utils/templateLevels.ts`, `hooks/useLevelReveal.ts`). A locked ghost that something the user added
+  hangs from stays on the canvas, fainter, with a 🔒 before its question, and its panel says which level
+  to answer first and how many are left. *Develop an idea* asks: 1) what the idea is, how you feel about it,
   what problem it solves, why it would work and the profit; 2) the possibilities, the problems and
   obstacles, the plan and how you feel now; 3) what was done successfully, what failed, what it brings to
   the table, how you feel about it and whether it is finished as it is, drawn as one ring per round.
@@ -259,9 +262,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
   the cards view). A card always shows the whole picture, never cropped, with its longer side twice a
   round node (96px, 72px while selected), so tall and wide paintings both sit in proportion.
-- **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens a set of ten
+- **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens a set of eleven
   ready-made paintings (eyes, clock heads, a smiling martini, fishing for time, a yin-yang yo-yo,
-  squeezed time, an orange clock, a puppet hand, a heart and mirror, a light bulb;
+  squeezed time, an orange clock, a puppet hand, a heart and mirror, a light bulb, a cake with a target;
   `utils/pictureTemplates.ts`). Their small thumbnails are built into the app; the full painting
   (WebP, at most 1024px, in `public/picture-templates/`) is fetched only when picked, then added like
   any other picture, so it can be the node's icon or card.
@@ -269,7 +272,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   picture card, whether it's grown from the canvas menu, seeded into a new map of that kind, or the
   center of a *Think it through* map: *Develop an idea* the light bulb, *Analyze a problem* the puppet
   hand, *Make a decision* the yin-yang yo-yo, a retrospective the heart and mirror or the clock heads,
-  and *Plan a goal* one of the three clock paintings, picked at random each time
+  and *Plan a goal* one of the three clock paintings or the cake with a target, picked at random each time
   (`MAP_KIND_PICTURES` in `utils/pictureTemplates.ts`, `utils/structurePicture.ts`). Offline the
   node simply comes without it.
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter
@@ -456,7 +459,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   type. A Question written into from a template (its ghost's question asking, the writing answering) is a
   ready Quiz me card.
 - **Map types** — creating a map asks for one of six kinds (Problem analysis, Decision, Goal planning,
-  Retrospective, Idea, Learn a topic), each seeded with a starter structure in your language, and for a mode (Discussion or
+  Retrospective, Idea, Study), each seeded with a starter structure in your language, and for a mode (Discussion or
   Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
   calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, and no Attack tab or
   menu item (switch to Discussion for those).

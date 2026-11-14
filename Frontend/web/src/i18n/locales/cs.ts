@@ -270,6 +270,9 @@ const ui: UiStrings = {
     undo: "Zpět",
     seeded: "Začínáte s otázkami šablony",
     locked: (level, left) => `🔒 Nejdřív odpovězte na úroveň ${level} (zbývá ${left}). Otázku, kterou chcete přeskočit, smažte.`,
+    unlocked: (level, n) => `🔓 Úroveň ${level} je otevřená: ${n} ${n === 1 ? "nová otázka" : n >= 2 && n <= 4 ? "nové otázky" : "nových otázek"}`,
+    createdRounds: (n, later) =>
+      `${n === 1 ? "Přidána 1 otázka" : n >= 2 && n <= 4 ? `Přidány ${n} otázky` : `Přidáno ${n} otázek`}. Až je zodpovíte, ${later === 1 ? "otevře se další úroveň" : `otevírají se další úrovně (${later})`} (otázku, kterou chcete přeskočit, smažte).`,
     nodes: {
       subProblem1: "Která část problému nefunguje? (jedna příčina na uzel)",
       subProblem2: "Co dalšího k němu přispívá?",
@@ -345,7 +348,7 @@ const ui: UiStrings = {
   },
   canvasMenu: {
     newNode: "Nový uzel",
-    structures: { problem: "Analyzovat problém", goal: "Naplánovat cíl", decision: "Rozhodnout se", retro: "Ohlédnutí (retrospektiva)", idea: "Rozvinout nápad", study: "Naučit se téma" },
+    structures: { problem: "Analyzovat problém", goal: "Naplánovat cíl", decision: "Rozhodnout se", retro: "Ohlédnutí (retrospektiva)", idea: "Rozvinout nápad", study: "Studovat" },
   },
   pictures: {
     entry: "Nakreslit obrázek…",
@@ -916,6 +919,7 @@ const ui: UiStrings = {
       puppet: "Ruka loutkáře",
       heartMirror: "Srdce a zrcadlo",
       lightbulb: "Žárovka",
+      goalCake: "Dort s terčem",
     },
   },
   emoji: {
@@ -1186,7 +1190,7 @@ const translation: Translation = {
         goal: { label: "Plánování cíle", desc: "Cíl s kritérii úspěchu, kroky, překážkami a kontrolou." },
         retro: { label: "Retrospektiva", desc: "Co se povedlo, co ne a co změnit." },
         idea: { label: "Nápad", desc: "Rozviňte nápad ve třech kolech: co to je a proč, jak ho uskutečnit a jak to dopadlo." },
-        study: { label: "Naučit se téma", desc: "Téma v nadpisech a otázkách: co to je, hlavní části, příklady a na co by se ptali u zkoušky." },
+        study: { label: "Studium", desc: "Téma v nadpisech a otázkách: co to je, hlavní části, příklady a na co by se ptali u zkoušky." },
       },
       mode: {
         label: "Režim",

@@ -356,7 +356,7 @@ const en: Translation = {
         goal: { label: "Goal planning", desc: "A goal with success criteria, steps, obstacles and a review." },
         retro: { label: "Retrospective", desc: "What went well, what did not, and what to change." },
         idea: { label: "Idea", desc: "Grow an idea in three rounds: what it is and why, how to make it happen, then how it went." },
-        study: { label: "Learn a topic", desc: "A topic in titles and questions: what it is, its main parts, examples, and what an exam would ask." },
+        study: { label: "Study", desc: "A topic in titles and questions: what it is, its main parts, examples, and what an exam would ask." },
       },
       mode: {
         label: "Mode",

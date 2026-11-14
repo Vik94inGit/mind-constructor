@@ -6,7 +6,7 @@ vi.mock("../api/nodes", () => ({ updateNode: vi.fn() }));
 
 describe("addStructurePicture", () => {
   it("adds the kind's painting as the root's picture and picture card", async () => {
-    const fetchFile = vi.fn(async () => new File(["x"], "fishing.webp", { type: "image/webp" }));
+    const fetchFile = vi.fn(async () => new File(["x"], "goal-cake.webp", { type: "image/webp" }));
     const update = vi.fn(async (nodeId: string) => ({ nodeId }) as NodeDoc);
     const node = await addStructurePicture("n1", "goal", {
       random: () => 0.99,
@@ -15,7 +15,7 @@ describe("addStructurePicture", () => {
       makeCard: async () => "data:image/jpeg;base64,card",
       update,
     });
-    expect(fetchFile).toHaveBeenCalledWith("fishing");
+    expect(fetchFile).toHaveBeenCalledWith("goalCake");
     expect(update).toHaveBeenCalledWith("n1", { images: ["data:image/webp;base64,big"], cardImage: "data:image/jpeg;base64,card" });
     expect(node).toEqual({ nodeId: "n1" });
   });
