@@ -107,6 +107,7 @@ export interface UiStrings {
   selection: {
     tapToChoose: string;
     finishHint: string;
+    moveHint: string;
     chosen: (count: number) => string;
     selected: (count: number) => string;
     actions: string;
@@ -910,6 +911,7 @@ const en: UiStrings = {
   selection: {
     tapToChoose: "Tap nodes to select them",
     finishHint: "Each tap picks or drops one node. Press Done to leave.",
+    moveHint: "Drag a picked node to move them all. A tap still picks or drops one.",
     chosen: (n) => `${n} node${n === 1 ? "" : "s"} chosen`,
     selected: (n) => `${n} node${n === 1 ? "" : "s"} selected`,
     actions: "Actions",

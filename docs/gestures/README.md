@@ -38,6 +38,7 @@ node) must be told apart by something the user can see before they let go.
 | Ring of ghosts | Tap a ghost | Click a ghost | Picks it out: *Make this a …* (change the node's type), *New …*, or a starter phrase; tap again adds a thought of that type ([sketch](ghost-change-type.md)) |
 | Ring of ghosts | Drag a type out | Drag a type out | Sketches a new branch where it's let go |
 | Toolbar ☑, then a node | Tap | Click | Select mode: picks or drops just that node, any kind, anyone's; no panel, no drag. Empty canvas, zones, Enter and Esc do nothing; only *Done* or ☑ leaves ([sketch](select-mode.md)) |
+| Picked node, ☑ and ✥ both on | Drag | Drag | Moves every picked node of yours together; a tap still picks or drops one; unpicked nodes never drag ([sketch](select-move.md)) |
 | Node, Move mode (✥) | Drag | Drag | Moves it; glues to a card it lands beside; joins a zone it's dropped on (a card in the cards view only moves clear of other cards) |
 | Node, Move mode | Hold still, lift | Shift+click | Adds it to a group selection (or opens a card's menu) |
 | Group member | Drag | Drag | Moves the group, the others following its path |

@@ -2154,7 +2154,9 @@ export function MapPage() {
                     isOwnNode(node) &&
                     !node.locked &&
                     !blockLocks[node.nodeId] &&
-                    (moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))
+                    (chooseMode
+                      ? moveMode && multiSelectIds.has(node.nodeId)
+                      : moveMode || (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId)))
                   }
                   groupSentiment={groupSentimentByNode.get(node.nodeId)}
                   parentCrownSentiment={circleRootSentimentByNode.get(node.nodeId)}
@@ -2506,6 +2508,7 @@ export function MapPage() {
           <SelectionBar
             count={multiSelectIds.size}
             chooseMode={chooseMode}
+            moveMode={moveMode}
             onLink={linkSelection}
             onNumber={() => numberSelection(false)}
             onDisplay={setDisplayForChosen}
