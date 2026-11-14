@@ -896,6 +896,7 @@ const ui: UiStrings = {
       puppet: "Рука кукловода",
       heartMirror: "Сердце и зеркало",
       lightbulb: "Лампочка",
+      goalCake: "Торт с мишенью",
     },
   },
   emoji: {

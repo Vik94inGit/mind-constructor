@@ -258,9 +258,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
   the cards view). A card always shows the whole picture, never cropped, with its longer side twice a
   round node (96px, 72px while selected), so tall and wide paintings both sit in proportion.
-- **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens a set of ten
+- **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens a set of eleven
   ready-made paintings (eyes, clock heads, a smiling martini, fishing for time, a yin-yang yo-yo,
-  squeezed time, an orange clock, a puppet hand, a heart and mirror, a light bulb;
+  squeezed time, an orange clock, a puppet hand, a heart and mirror, a light bulb, a cake with a target;
   `utils/pictureTemplates.ts`). Their small thumbnails are built into the app; the full painting
   (WebP, at most 1024px, in `public/picture-templates/`) is fetched only when picked, then added like
   any other picture, so it can be the node's icon or card.
@@ -268,7 +268,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   picture card, whether it's grown from the canvas menu, seeded into a new map of that kind, or the
   center of a *Think it through* map: *Develop an idea* the light bulb, *Analyze a problem* the puppet
   hand, *Make a decision* the yin-yang yo-yo, a retrospective the heart and mirror or the clock heads,
-  and *Plan a goal* one of the three clock paintings, picked at random each time
+  and *Plan a goal* one of the three clock paintings or the cake with a target, picked at random each time
   (`MAP_KIND_PICTURES` in `utils/pictureTemplates.ts`, `utils/structurePicture.ts`). Offline the
   node simply comes without it.
 - **Text length** — typed node text is capped at 1000 characters (`utils/nodeText.ts`), with a counter

@@ -8,6 +8,7 @@ import orangeClockThumb from "../assets/picture-templates/orange-clock.webp";
 import puppetThumb from "../assets/picture-templates/puppet.webp";
 import heartMirrorThumb from "../assets/picture-templates/heart-mirror.webp";
 import lightbulbThumb from "../assets/picture-templates/lightbulb.webp";
+import goalCakeThumb from "../assets/picture-templates/goal-cake.webp";
 import type { MapKind } from "../types";
 
 // Ready-made pictures for a node: a set of paintings offered under
@@ -29,6 +30,7 @@ export const PICTURE_TEMPLATES = [
   "puppet",
   "heartMirror",
   "lightbulb",
+  "goalCake",
 ] as const;
 
 export type PictureTemplate = (typeof PICTURE_TEMPLATES)[number];
@@ -44,6 +46,7 @@ const FILES: Record<PictureTemplate, { thumb: string; file: string }> = {
   puppet: { thumb: puppetThumb, file: "puppet" },
   heartMirror: { thumb: heartMirrorThumb, file: "heart-mirror" },
   lightbulb: { thumb: lightbulbThumb, file: "lightbulb" },
+  goalCake: { thumb: goalCakeThumb, file: "goal-cake" },
 };
 
 /** Template `kind`'s small thumbnail, for the picker. */
@@ -73,7 +76,7 @@ export const MAP_KIND_PICTURES: Record<MapKind, readonly PictureTemplate[]> = {
   problem: ["puppet"],
   decision: ["yoyo"],
   retro: ["heartMirror", "clockHeads"],
-  goal: ["clockJuice", "orangeClock", "fishing"],
+  goal: ["clockJuice", "orangeClock", "fishing", "goalCake"],
 };
 
 /** One of `kind`'s paintings, at random when it has more than one. */

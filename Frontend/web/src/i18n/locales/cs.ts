@@ -888,6 +888,7 @@ const ui: UiStrings = {
       puppet: "Ruka loutkáře",
       heartMirror: "Srdce a zrcadlo",
       lightbulb: "Žárovka",
+      goalCake: "Dort s terčem",
     },
   },
   emoji: {
