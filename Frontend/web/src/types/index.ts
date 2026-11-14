@@ -204,14 +204,14 @@ export interface NodeDoc {
   title?: string;
   /** A ghost's prompt (see Backend's Node.prompt): the question shown as the node's placeholder while its text is empty. Arrives with the node list like `title`. */
   prompt?: string;
-  /** Which level of a leveled template this ghost belongs to (1, 2, 3); null/absent for a template's root and every other node. */
-  level?: number | null;
   /** True while the node has never been written in (see Backend's Node.ghost) — the canvas draws it faded until someone fills it. */
   ghost?: boolean;
   /** Which dot of a picture this node is (see Backend's Node.picture and utils/pictures.ts); null/absent for every other node. */
   picture?: { id: string; kind: string; dot: number; color?: ZonePaletteColor | null } | null;
   /** Optional step number (1..9999) for labeling a process's steps — see Backend's Node.order. null/absent means "not numbered". */
   order?: number | null;
+  /** Which round of a leveled template this ghost belongs to (see Backend's Node.level); null/absent for every other node. A later round stays locked until the earlier ones are filled in (utils/templateLevels.ts). */
+  level?: number | null;
   type: NodeType;
   x?: number;
   y?: number;
