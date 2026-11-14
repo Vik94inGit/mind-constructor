@@ -21,6 +21,8 @@ export interface NewNodeInput {
   prompt?: string;
   emoji?: string;
   order?: number | null;
+  /** Node.level: the round of a leveled template this ghost belongs to. */
+  level?: number | null;
   type: NodeType;
   x?: number;
   y?: number;
@@ -44,6 +46,7 @@ export function draftNode(mapId: string, input: NewNodeInput, localId: string = 
     title: "",
     emoji: "",
     order: null,
+    level: null,
     zoneName: "",
     sizeTier: null,
     symbolOverride: null,

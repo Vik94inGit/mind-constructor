@@ -57,6 +57,8 @@ export interface UiStrings {
     undo: string;
     /** A map that just opened with its starter questions (a new map of a kind). */
     seeded: string;
+    /** A leveled template's ghost that can't be written in yet (utils/templateLevels.ts): the level to answer first and how many of its questions are left. */
+    locked: (level: number, left: number) => string;
     nodes: Record<TemplateNodeKey, string>;
   };
   /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
@@ -547,6 +549,27 @@ export interface UiStrings {
     empty: string;
     /** A zone's menu: starts a presentation of only that zone, its castles included. */
     presentZone: string;
+    /** The two tabs at the top: step through slides, or see the whole map gathered up. */
+    slidesTab: string;
+    summaryTab: string;
+    /** The type chips: label of the row, and the chip that clears them. */
+    filterTypes: string;
+    allTypes: string;
+    /** No node is of the picked types. */
+    noMatch: string;
+    /** A template map's summary: each question with its answer, by level. */
+    answersTitle: string;
+    level: (n: number) => string;
+    /** The group of a template's root and questions without a level. */
+    questions: string;
+    answeredOf: (answered: number, total: number) => string;
+    notAnswered: string;
+    /** A level whose level before it isn't filled in yet. */
+    locked: (previous: number) => string;
+    /** Nodes in a template map that aren't one of its questions. */
+    otherNotes: string;
+    /** Any map's summary: its nodes grouped by type. */
+    byTypeTitle: string;
   };
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
@@ -757,11 +780,12 @@ const en: UiStrings = {
     problem: { button: "Analyze this problem", hint: "Adds sub-problems, the risk of doing nothing, past experience, ways to solve, a plan and its result." },
     goal: { button: "Plan this goal", hint: "Adds a success criterion, ordered steps, an obstacle with a fallback, and a review." },
     retry: { title: "This did not work out", hint: "Find out why, then choose what to change before trying again.", button: "Analyze and try again" },
-    idea: { button: "Develop this idea", hint: "Adds the need it meets, how it would work and a first try, what would prove it, what could kill it, what is unknown, and another idea." },
+    idea: { button: "Develop this idea", hint: "Asks in three rounds: the idea itself, then how to make it happen, then how it went. Each round opens once the one before is answered." },
     created: (n) => `Added ${n} ${n === 1 ? "node" : "nodes"}`,
     failed: "Could not add the template",
     undo: "Undo",
     seeded: "Started with the template questions",
+    locked: (level, left) => `🔒 Answer level ${level} first (${left} left). Delete a question you want to skip.`,
     nodes: {
       subProblem1: "Which part of the problem is broken? (one cause per node)",
       subProblem2: "What else contributes to it?",
@@ -802,14 +826,21 @@ const en: UiStrings = {
       wentBad2: "What else went wrong?",
       tryNext1: "One thing we will do differently",
       tryNext2: "Another change to try",
-      rootIdea: "What is the idea, in one sentence?",
-      ideaNeed: "What need or problem does it answer, and for whom?",
-      ideaHow: "How would it work?",
-      ideaTry: "The smallest way to try it this week",
-      ideaProof: "What would show that it works?",
-      ideaRisk: "What could kill it?",
-      ideaUnknown: "What do we not know yet?",
-      ideaAlternative: "Another idea for the same need",
+      rootIdea: "Name the idea in a few words",
+      ideaWhat: "What is the idea?",
+      ideaFeel: "What do you feel about it?",
+      ideaSolves: "What problem does it solve?",
+      ideaWhyWork: "Why would it work?",
+      ideaProfit: "What is the profit?",
+      ideaPossibilities: "What are the possibilities?",
+      ideaObstacles: "What are the problems and obstacles?",
+      ideaPlan: "What is the plan?",
+      ideaFeelPlan: "What do you feel now?",
+      ideaSucceeded: "What was done successfully?",
+      ideaFailed: "What failed?",
+      ideaBrings: "What does it bring to the table?",
+      ideaFeelDone: "What do you feel about it?",
+      ideaFinished: "Is it finished as it is?",
     },
   },
   canvasMenu: {
@@ -1310,6 +1341,19 @@ const en: UiStrings = {
     showOnMap: "Show on map ↗",
     empty: "Nothing to present yet — add a node first",
     presentZone: "Present this zone",
+    slidesTab: "Slides",
+    summaryTab: "Summary",
+    filterTypes: "Show types",
+    allTypes: "All",
+    noMatch: "No nodes of these types",
+    answersTitle: "Answers",
+    level: (n) => `Level ${n}`,
+    questions: "Questions",
+    answeredOf: (a, total) => `${a} of ${total} answered`,
+    notAnswered: "Not answered yet",
+    locked: (prev) => `Opens once level ${prev} is filled in`,
+    otherNotes: "Your other notes",
+    byTypeTitle: "By type",
   },
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
   summary: {

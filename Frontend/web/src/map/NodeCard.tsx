@@ -110,6 +110,8 @@ interface Props {
   quiet?: boolean;
   /** This node's caption would lie over a parent's caption, so it's left out. */
   hideCaption?: boolean;
+  /** A ghost of a leveled template whose round hasn't come yet (utils/templateLevels.ts): drawn fainter, its question behind a 🔒. */
+  levelLocked?: boolean;
   /** The node the time-lapse has just brought back: its caption shows its title and text, up to 5 rows, whatever else would hide it. */
   replayCaption?: boolean;
   /** How many nodes are currently packed into this one (MapPage's packedCountByContainer) — undefined/0 renders no badge. See the corner-badge markup below. */
@@ -203,6 +205,7 @@ export const NodeCard = memo(function NodeCard({
   triumphant = false,
   dropHighlight,
   inlineEditing,
+  levelLocked = false,
   flightVector,
   onInlineConfirm,
   onInlineCancel,
@@ -301,7 +304,7 @@ export const NodeCard = memo(function NodeCard({
   // line-clamp cuts it), else a ghost's prompt in a quieter style.
   const ghost = !!node.ghost && !node.text?.trim();
   const ghostPrompt = ghost && !node.title?.trim() ? (node.prompt?.trim() ?? "") : "";
-  const captionLabel = node.title?.trim() || node.text || ghostPrompt;
+  const captionLabel = node.title?.trim() || node.text || (ghostPrompt && levelLocked ? `🔒 ${ghostPrompt}` : ghostPrompt);
   // An icon with no caption shows its text in a small label on hover (not
   // while selected or editing). Mounted only while hovered.
   const hoverLabel = !showCaption && !puzzle && !selected && !inlineEditing;
@@ -321,7 +324,9 @@ export const NodeCard = memo(function NodeCard({
       : muted
         ? "node-fade-muted"
         : ghost
-          ? "node-fade-ghost"
+          ? levelLocked
+            ? "node-fade-locked"
+            : "node-fade-ghost"
           : quiet
             ? "node-fade-quiet"
             : "";

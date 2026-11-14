@@ -92,3 +92,55 @@ describe("PresentationOverlay", () => {
     expect(train.querySelector("img")?.getAttribute("src")).toMatch(/\/api\/images\/card$/);
   });
 });
+
+describe("PresentationOverlay summary", () => {
+  function renderWith(nodes: ReturnType<typeof makeNode>[], onTypeFilterChange = vi.fn(), typeFilter: import("../types").NodeType[] = []) {
+    const groups = computeSlideGroups(nodes.filter((n) => n.text));
+    const onIndexChange = vi.fn();
+    const onOpenNode = vi.fn();
+    render(
+      <I18nProvider>
+        <PresentationOverlay
+          slides={groups}
+          index={0}
+          onIndexChange={onIndexChange}
+          onExit={() => {}}
+          onOpenNode={onOpenNode}
+          summaryNodes={nodes}
+          typeFilter={typeFilter}
+          onTypeFilterChange={onTypeFilterChange}
+        />
+      </I18nProvider>,
+    );
+    return { onIndexChange, onOpenNode, onTypeFilterChange };
+  }
+
+  it("lists a map's nodes by type and filters them with the type chips", () => {
+    const { onTypeFilterChange, onIndexChange } = renderWith([
+      makeNode({ nodeId: "p", text: "Too slow", type: "Problem", createdAt: "1" }),
+      makeNode({ nodeId: "s", text: "Cache it", type: "Solution", parentId: "p", createdAt: "2" }),
+    ]);
+    fireEvent.click(screen.getByRole("tab", { name: en.ui.presentation.summaryTab }));
+    expect(screen.getByRole("heading", { name: en.ui.presentation.byTypeTitle })).toBeInTheDocument();
+    const chips = within(screen.getByRole("group", { name: en.ui.presentation.filterTypes }));
+    fireEvent.click(chips.getByRole("button", { name: /Solution/ }));
+    expect(onTypeFilterChange).toHaveBeenLastCalledWith(["Solution"]);
+    fireEvent.click(screen.getByText("Cache it"));
+    expect(onIndexChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it("shows a template's questions with answers and progress per level", () => {
+    const { onOpenNode } = renderWith([
+      makeNode({ nodeId: "root", text: "Bike sharing", prompt: "What's the idea?", type: "Idea" }),
+      makeNode({ nodeId: "a1", text: "Commuters", prompt: "What problem does it solve?", level: 1, parentId: "root" }),
+      makeNode({ nodeId: "a2", text: "", ghost: true, prompt: "Why would it work?", level: 1, parentId: "root" }),
+      makeNode({ nodeId: "b1", text: "", ghost: true, prompt: "What's the plan?", level: 2, parentId: "root" }),
+    ]);
+    fireEvent.click(screen.getByRole("tab", { name: en.ui.presentation.summaryTab }));
+    expect(screen.getByRole("heading", { name: en.ui.presentation.level(1) })).toBeInTheDocument();
+    expect(screen.getByText(en.ui.presentation.answeredOf(1, 2))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(en.ui.presentation.locked(1)))).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Why would it work?"));
+    expect(onOpenNode).toHaveBeenLastCalledWith("a2");
+  });
+});
