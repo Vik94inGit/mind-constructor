@@ -1,14 +1,12 @@
 // Quiz me (docs/gestures/quiz-me.md): the map tests its reader. Nobody writes
-// questions apart from the map itself:
-//   - a parent is a question, and its children are the answer;
-//   - a node with a title and a text: the title asks, the text answers;
-//   - an answered ghost: its prompt asks, what was written answers.
-// A node with nothing to hide (only a text, no children) makes no card.
+// questions apart from the map itself: only a ❓ (unknown), a Problem or a
+// goal (Solution) asks, and its ✅ (Success) children are the answer. Any
+// other node, or an asking node with no ✅ under it, makes no card.
 // The marks a reader gives are their own, like feelings (utils/feeling.ts):
 // kept per browser and in their view of the map on the server.
 import { computeSlideOrder } from "./presentation";
 import { nodeRefId } from "./nodeType";
-import type { NodeDoc } from "../types";
+import type { NodeDoc, NodeType } from "../types";
 
 export const QUIZ_MARKS = ["notYet", "shaky", "know"] as const;
 export type QuizMark = (typeof QUIZ_MARKS)[number];
@@ -26,39 +24,35 @@ export interface QuizCard {
 
 const label = (n: NodeDoc) => (n.title?.trim() || n.text?.trim() || "").trim();
 
+/** The node types that ask a question in Quiz me: ❓, Problem and goal. */
+export const QUIZ_QUESTION_TYPES: ReadonlySet<NodeType> = new Set<NodeType>(["unknown", "Problem", "Solution"]);
+/** The node type whose nodes answer it: ✅. */
+export const QUIZ_ANSWER_TYPE: NodeType = "Success";
+
 /** The cards a map makes, in the order presentation mode shows its nodes. */
 export function quizCards(nodes: NodeDoc[]): QuizCard[] {
-  const children = new Map<string, NodeDoc[]>();
+  const answers = new Map<string, NodeDoc[]>();
   const ids = new Set(nodes.map((n) => n.nodeId));
   for (const n of nodes) {
+    if (n.type !== QUIZ_ANSWER_TYPE) continue;
     const parent = nodeRefId(n.parentId);
     if (!parent || !ids.has(parent)) continue;
-    if (!children.has(parent)) children.set(parent, []);
-    children.get(parent)!.push(n);
+    if (!answers.has(parent)) answers.set(parent, []);
+    answers.get(parent)!.push(n);
   }
   const cards: QuizCard[] = [];
   const ordered = computeSlideOrder(nodes);
   const rank = new Map(ordered.map((n, i) => [n.nodeId, i] as const));
   for (const n of ordered) {
-    const title = n.title?.trim() ?? "";
-    const text = n.text?.trim() ?? "";
-    const prompt = n.prompt?.trim() ?? "";
-    const kids = (children.get(n.nodeId) ?? [])
+    if (!QUIZ_QUESTION_TYPES.has(n.type)) continue;
+    const question = n.title?.trim() || n.text?.trim() || n.prompt?.trim() || "";
+    if (!question) continue;
+    const list = (answers.get(n.nodeId) ?? [])
       .slice()
       .sort((a, b) => rank.get(a.nodeId)! - rank.get(b.nodeId)!)
       .map(label)
       .filter(Boolean);
-    if (kids.length > 0) {
-      const question = title || text || prompt;
-      if (!question) continue;
-      // A parent whose title asks and whose text also says something keeps
-      // that text with the answer, above the children.
-      cards.push({ nodeId: n.nodeId, question, answerList: kids, ...(title && text ? { answer: text } : {}) });
-    } else if (title && text) {
-      cards.push({ nodeId: n.nodeId, question: title, answer: text });
-    } else if (prompt && text && prompt !== text) {
-      cards.push({ nodeId: n.nodeId, question: prompt, answer: text });
-    }
+    if (list.length > 0) cards.push({ nodeId: n.nodeId, question, answerList: list });
   }
   return cards;
 }

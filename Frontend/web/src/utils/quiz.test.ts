@@ -6,38 +6,50 @@ const node = (nodeId: string, fields: Partial<NodeDoc> = {}): NodeDoc =>
   ({ nodeId, mapId: "m", type: "Idea", text: "", parentId: null, ...fields }) as NodeDoc;
 
 describe("quizCards", () => {
-  it("asks a parent and answers with its children", () => {
+  it("asks a ❓, a problem or a goal and answers with its ✅ children", () => {
     const cards = quizCards([
-      node("p", { text: "Causes of WW1" }),
-      node("a", { text: "Alliances", parentId: "p" }),
-      node("b", { title: "Militarism", text: "Arms race", parentId: "p" }),
+      node("q", { type: "unknown", text: "Causes of WW1" }),
+      node("a", { type: "Success", text: "Alliances", parentId: "q" }),
+      node("b", { type: "Success", title: "Militarism", text: "Arms race", parentId: "q" }),
+      node("p", { type: "Problem", title: "Slow build" }),
+      node("c", { type: "Success", text: "Cache deps", parentId: "p" }),
+      node("g", { type: "Solution", prompt: "What is the goal?", text: "Pass the exam" }),
+      node("d", { type: "Success", text: "Study daily", parentId: "g" }),
     ]);
-    expect(cards[0]).toEqual({ nodeId: "p", question: "Causes of WW1", answerList: ["Alliances", "Militarism"] });
-  });
-
-  it("asks a title and answers with the text", () => {
-    expect(quizCards([node("n", { title: "Photosynthesis", text: "Light into sugar" })])).toEqual([
-      { nodeId: "n", question: "Photosynthesis", answer: "Light into sugar" },
-    ]);
-  });
-
-  it("keeps a parent's own text with the children", () => {
-    const [card] = quizCards([node("p", { title: "Newton", text: "Three laws" }), node("c", { text: "Inertia", parentId: "p" })]);
-    expect(card).toEqual({ nodeId: "p", question: "Newton", answer: "Three laws", answerList: ["Inertia"] });
-  });
-
-  it("asks an answered ghost's question", () => {
-    expect(quizCards([node("g", { prompt: "What is the goal?", text: "Pass the exam" })])).toEqual([
-      { nodeId: "g", question: "What is the goal?", answer: "Pass the exam" },
+    expect(cards).toEqual([
+      { nodeId: "q", question: "Causes of WW1", answerList: ["Alliances", "Militarism"] },
+      { nodeId: "p", question: "Slow build", answerList: ["Cache deps"] },
+      { nodeId: "g", question: "Pass the exam", answerList: ["Study daily"] },
     ]);
   });
 
-  it("makes no card from a node with nothing to hide", () => {
-    expect(quizCards([node("n", { text: "Just a note" }), node("e", { prompt: "Empty ghost?", ghost: true })])).toEqual([]);
+  it("leaves children that aren't ✅ out of the answer", () => {
+    const [card] = quizCards([
+      node("q", { type: "unknown", text: "Why?" }),
+      node("i", { type: "Idea", text: "Maybe this", parentId: "q" }),
+      node("s", { type: "Success", text: "Because", parentId: "q" }),
+    ]);
+    expect(card).toEqual({ nodeId: "q", question: "Why?", answerList: ["Because"] });
   });
 
-  it("drops empty children from the answer and skips a parent left with none", () => {
-    expect(quizCards([node("p", { text: "Q" }), node("c", { text: "  ", parentId: "p" })])).toEqual([]);
+  it("makes no card from other types, even with a title, text or ✅ children", () => {
+    expect(
+      quizCards([
+        node("n", { type: "Idea", title: "Photosynthesis", text: "Light into sugar" }),
+        node("o", { type: "Option", text: "Go by train" }),
+        node("s", { type: "Success", text: "Booked", parentId: "o" }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("makes no card from an asking node without a ✅ answer", () => {
+    expect(
+      quizCards([
+        node("q", { type: "unknown", title: "Title", text: "Text" }),
+        node("p", { type: "Problem", text: "Q" }),
+        node("c", { type: "Success", text: "  ", parentId: "p" }),
+      ]),
+    ).toEqual([]);
   });
 });
 
