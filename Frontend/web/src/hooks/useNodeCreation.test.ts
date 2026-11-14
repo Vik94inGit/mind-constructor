@@ -143,8 +143,18 @@ describe("useNodeCreation", () => {
     const [ids, message] = onStructureMade.mock.calls[0];
     expect(ids).toHaveLength(made);
     expect(ids).not.toContain("root");
-    expect(message).toBe(TRANSLATIONS.en.ui.templates.created(made));
+    // The problem template asks in three rounds; only the first shows now.
+    expect(message).toBe(TRANSLATIONS.en.ui.templates.createdRounds(5, 2));
     expect(params.showNotice).not.toHaveBeenCalled();
+  });
+
+  it("frames and celebrates only a template's first round, the later ones waiting off the map", async () => {
+    const { result, params } = setup();
+    const root = makeNode({ nodeId: "root", type: "Problem", x: 1200, y: 800 }) as NodeDoc;
+    await act(() => result.current.applyTemplate("problem", root));
+    const levels = vi.mocked(nodesApi.createNode).mock.calls.map(([, input]) => input.level);
+    expect(levels.filter((l) => l === 1)).toHaveLength(5);
+    expect(vi.mocked(params.showNodes).mock.calls[0][0]).toHaveLength(5);
   });
 
   it("offers a picture's dots back too, even when it was cut short", async () => {

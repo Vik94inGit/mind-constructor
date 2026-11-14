@@ -2,8 +2,9 @@ import { nodeRefId } from "./nodeType";
 import type { NodeDoc } from "../types";
 
 // A leveled template (utils/templates.ts) asks its questions in rounds: every
-// ghost carries its round in Node.level, and a later round's ghosts are on
-// the canvas from the start but can't be written in yet. A ghost of level L
+// ghost carries its round in Node.level, and a later round's ghosts are
+// saved from the start but can't be written in yet, and aren't even shown
+// (hiddenLevelIds) until their round opens. A ghost of level L
 // unlocks once no ghost of a lower level under the same template root is
 // still empty — answered or deleted, either way the earlier round is done.
 
@@ -67,4 +68,47 @@ export function levelLocks(nodes: LevelNode[]): Map<string, LevelLock> {
     out.set(n.nodeId, { waitFor: earlier[0], left: counts.get(earlier[0])! });
   }
   return out;
+}
+
+type TreeNode = Pick<NodeDoc, "nodeId" | "parentId">;
+
+/**
+ * The locked ghosts left off the canvas: a later round isn't shown at all
+ * until the round before it is done, so the map only ever asks what can be
+ * answered now. A locked ghost something else hangs from that is shown (the
+ * user's own child of it, say) stays on the canvas, still locked, so nothing
+ * is ever drawn hanging from nothing.
+ */
+export function hiddenLevelIds(nodes: TreeNode[], locks: Map<string, LevelLock>): Set<string> {
+  const hidden = new Set(locks.keys());
+  if (hidden.size === 0) return hidden;
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const n of nodes) {
+      if (hidden.has(n.nodeId)) continue;
+      const parentId = nodeRefId(n.parentId);
+      if (parentId && hidden.delete(parentId)) changed = true;
+    }
+  }
+  return hidden;
+}
+
+/**
+ * The round that has just opened: ghosts hidden before and shown now, still
+ * waiting to be written in. Its lowest level and how many questions it
+ * brings, or null when nothing new came up (a deleted ghost isn't new).
+ */
+export function revealedRound(
+  before: Set<string>,
+  after: Set<string>,
+  nodes: LevelNode[],
+): { level: number; count: number } | null {
+  let level = Infinity;
+  let count = 0;
+  for (const n of nodes) {
+    if (!before.has(n.nodeId) || after.has(n.nodeId) || !unfilled(n) || n.level == null) continue;
+    count++;
+    level = Math.min(level, n.level);
+  }
+  return count > 0 ? { level, count } : null;
 }

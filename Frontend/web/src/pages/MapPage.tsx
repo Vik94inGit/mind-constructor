@@ -155,7 +155,7 @@ import { TOP_ZONE, useCardFit } from "../hooks/useCardFit";
 import { outlineNumbers, zoneMembers } from "../utils/cardFit";
 import { findInbox, noteBranch } from "../utils/inbox";
 import { feature } from "../utils/usage";
-import { levelLocks } from "../utils/templateLevels";
+import { useLevelReveal } from "../hooks/useLevelReveal";
 
 // Stable empty fallbacks for reading a canvas-mode field that only exists in
 // one of the mode's variants (see useCanvasMode) — a plain literal instead
@@ -358,11 +358,17 @@ export function MapPage() {
   // after onUp has already handled the press; this swallows that one click.
   const suppressNextClick = useRef(false);
 
+  // A leveled template's later rounds: locked, and kept off the canvas, until
+  // the earlier ones are answered; the user is told when one opens.
+  const { locks: levelLockById, hidden: levelHidden } = useLevelReveal(nodes, ({ level, count }) =>
+    showNotice(t.ui.templates.unlocked(level, count)),
+  );
   // Packed-away members are left off the canvas (NodePanel still gets every
-  // node, for the container's Packed list).
-  const unpackedNodes = useMemo(() => nodes.filter((n) => !n.packedIntoNodeId), [nodes]);
-  // A leveled template's later rounds, locked until the earlier ones are answered.
-  const levelLockById = useMemo(() => levelLocks(nodes), [nodes]);
+  // node, for the container's Packed list), and so is a round not yet open.
+  const unpackedNodes = useMemo(
+    () => nodes.filter((n) => !n.packedIntoNodeId && !levelHidden.has(n.nodeId)),
+    [nodes, levelHidden],
+  );
   // Parents that tuck their branch in, and the overview — see hooks/useAutoPack.ts.
   const { folded, setFolded, fold, mapParents, toggleFold, overviewOn, setOverview, packAll, unpackAll } = useAutoPack(mapId, unpackedNodes);
   // Whether the minimap shows (the view corner's menu) — see utils/minimapPref.ts.

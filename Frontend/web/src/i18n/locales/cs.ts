@@ -262,6 +262,9 @@ const ui: UiStrings = {
     undo: "Zpět",
     seeded: "Začínáte s otázkami šablony",
     locked: (level, left) => `🔒 Nejdřív odpovězte na úroveň ${level} (zbývá ${left}). Otázku, kterou chcete přeskočit, smažte.`,
+    unlocked: (level, n) => `🔓 Úroveň ${level} je otevřená: ${n} ${n === 1 ? "nová otázka" : n >= 2 && n <= 4 ? "nové otázky" : "nových otázek"}`,
+    createdRounds: (n, later) =>
+      `${n === 1 ? "Přidána 1 otázka" : n >= 2 && n <= 4 ? `Přidány ${n} otázky` : `Přidáno ${n} otázek`}. Až je zodpovíte, ${later === 1 ? "otevře se další úroveň" : `otevírají se další úrovně (${later})`} (otázku, kterou chcete přeskočit, smažte).`,
     nodes: {
       subProblem1: "Která část problému nefunguje? (jedna příčina na uzel)",
       subProblem2: "Co dalšího k němu přispívá?",
