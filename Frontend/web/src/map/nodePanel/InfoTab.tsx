@@ -32,6 +32,8 @@ interface Props {
   /** The card's own look, for its owner — see NodePanel's own prop. */
   cardLook?: CardLook;
   textLocked: boolean;
+  /** Why this ghost of a leveled template can't be written in yet (utils/templateLevels.ts); absent once it can. */
+  levelLock?: string;
   onToggleLock?: () => void;
   /** Calls this parent's far nodes back in — see NodePanel's own prop. */
   onMagnet?: () => Promise<number>;
@@ -80,7 +82,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, levelLock, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   // Pasted text that didn't fit (utils/nodeText.ts), offered for a new node.
@@ -89,17 +91,24 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
   useEffect(() => setOverflow(null), [node.nodeId]);
   // What saving would change (NodePanel's saveField skips empty or unchanged text).
   const textChanged = textDraft.trim() !== "" && textDraft.trim() !== node.text;
+  // The text box is open to its owner, unless they locked it or its round of a template hasn't come yet.
+  const writable = isCreator && !textLocked && !levelLock;
   return (
     <div className="mt-2">
       {pictureMap}
       {/* The node's title, when it has one — read-only here for
           everyone; the owner edits it under Modify. */}
       {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink"><MathText text={node.title} /></div>}
+      {levelLock && (
+        <div data-testid="level-lock" role="note" className="mb-2 rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.45rem] text-[0.8rem] text-ink-soft">
+          {levelLock}
+        </div>
+      )}
       {/* The text box; a picture dropped on it joins the node's pictures,
           which are shown under the buttons below. */}
       <div
         className={`overflow-hidden rounded-lg border focus-within:outline focus-within:-outline-offset-1 focus-within:outline-2 focus-within:outline-accent ${
-          dragOver ? "border-accent bg-accent-soft" : `border-line ${isCreator && !textLocked ? "bg-surface" : "bg-surface-2"}`
+          dragOver ? "border-accent bg-accent-soft" : `border-line ${writable ? "bg-surface" : "bg-surface-2"}`
         }`}
         onDragOver={(e) => {
           if (!onDropImages || !Array.from(e.dataTransfer.types).includes("Files")) return;
@@ -116,7 +125,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
           onDropImages(files);
         }}
       >
-        {isCreator && !textLocked ? (
+        {writable ? (
           <>
           <textarea
             id="node-text"
@@ -217,7 +226,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
         >
           {expanded ? t.ui.node.collapse : t.ui.node.expand}
         </button>
-        {isCreator && !textLocked && (
+        {writable && (
           // Edit, then confirm: before any change it puts the cursor in the
           // text; once the text differs from what's saved it becomes "Save
           // change", which saves and closes the panel like Enter does — the
@@ -269,7 +278,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             // so the split cuts up what's on screen.
             onMouseDown={(e) => e.preventDefault()}
             onClick={() =>
-              void onTextSave().then((ok) => ok && onSplitText((isCreator && !textLocked && textDraft.trim()) || node.text))
+              void onTextSave().then((ok) => ok && onSplitText((writable && textDraft.trim()) || node.text))
             }
           >
             {t.ui.textNodes.splitEntry}

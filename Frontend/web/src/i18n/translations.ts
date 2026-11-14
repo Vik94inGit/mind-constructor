@@ -354,7 +354,7 @@ const en: Translation = {
         decision: { label: "Decision", desc: "Compare options with their advantages and risks." },
         goal: { label: "Goal planning", desc: "A goal with success criteria, steps, obstacles and a review." },
         retro: { label: "Retrospective", desc: "What went well, what did not, and what to change." },
-        idea: { label: "Idea", desc: "Grow an idea: the need it meets, how it works, a first try, and what could kill it." },
+        idea: { label: "Idea", desc: "Grow an idea in three rounds: what it is and why, how to make it happen, then how it went." },
       },
       mode: {
         label: "Mode",

@@ -57,6 +57,8 @@ export interface UiStrings {
     undo: string;
     /** A map that just opened with its starter questions (a new map of a kind). */
     seeded: string;
+    /** A leveled template's ghost that can't be written in yet (utils/templateLevels.ts): the level to answer first and how many of its questions are left. */
+    locked: (level: number, left: number) => string;
     nodes: Record<TemplateNodeKey, string>;
   };
   /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
@@ -757,11 +759,12 @@ const en: UiStrings = {
     problem: { button: "Analyze this problem", hint: "Adds sub-problems, the risk of doing nothing, past experience, ways to solve, a plan and its result." },
     goal: { button: "Plan this goal", hint: "Adds a success criterion, ordered steps, an obstacle with a fallback, and a review." },
     retry: { title: "This did not work out", hint: "Find out why, then choose what to change before trying again.", button: "Analyze and try again" },
-    idea: { button: "Develop this idea", hint: "Adds the need it meets, how it would work and a first try, what would prove it, what could kill it, what is unknown, and another idea." },
+    idea: { button: "Develop this idea", hint: "Asks in three rounds: the idea itself, then how to make it happen, then how it went. Each round opens once the one before is answered." },
     created: (n) => `Added ${n} ${n === 1 ? "node" : "nodes"}`,
     failed: "Could not add the template",
     undo: "Undo",
     seeded: "Started with the template questions",
+    locked: (level, left) => `🔒 Answer level ${level} first (${left} left). Delete a question you want to skip.`,
     nodes: {
       subProblem1: "Which part of the problem is broken? (one cause per node)",
       subProblem2: "What else contributes to it?",
@@ -802,14 +805,21 @@ const en: UiStrings = {
       wentBad2: "What else went wrong?",
       tryNext1: "One thing we will do differently",
       tryNext2: "Another change to try",
-      rootIdea: "What is the idea, in one sentence?",
-      ideaNeed: "What need or problem does it answer, and for whom?",
-      ideaHow: "How would it work?",
-      ideaTry: "The smallest way to try it this week",
-      ideaProof: "What would show that it works?",
-      ideaRisk: "What could kill it?",
-      ideaUnknown: "What do we not know yet?",
-      ideaAlternative: "Another idea for the same need",
+      rootIdea: "Name the idea in a few words",
+      ideaWhat: "What is the idea?",
+      ideaFeel: "What do you feel about it?",
+      ideaSolves: "What problem does it solve?",
+      ideaWhyWork: "Why would it work?",
+      ideaProfit: "What is the profit?",
+      ideaPossibilities: "What are the possibilities?",
+      ideaObstacles: "What are the problems and obstacles?",
+      ideaPlan: "What is the plan?",
+      ideaFeelPlan: "What do you feel now?",
+      ideaSucceeded: "What was done successfully?",
+      ideaFailed: "What failed?",
+      ideaBrings: "What does it bring to the table?",
+      ideaFeelDone: "What do you feel about it?",
+      ideaFinished: "Is it finished as it is?",
     },
   },
   canvasMenu: {

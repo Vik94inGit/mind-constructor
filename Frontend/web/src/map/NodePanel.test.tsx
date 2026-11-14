@@ -70,6 +70,13 @@ describe("NodePanel", () => {
     expect(screen.getByText("Claim")).toBeInTheDocument();
   });
 
+  it("keeps a locked template question read-only and says which level to answer first", () => {
+    const node = makeNode({ nodeId: "g", text: "", prompt: "What is the plan?", ghost: true, level: 2 });
+    renderPanel({ node, nodes: [node], levelLock: en.ui.templates.locked(1, 3) });
+    expect(screen.getByTestId("level-lock")).toHaveTextContent("Answer level 1 first (3 left)");
+    expect(screen.queryByRole("textbox", { name: en.ui.node.textLabel })).not.toBeInTheDocument();
+  });
+
   it("offers Split into nodes right under the text, on what's typed there", async () => {
     const user = userEvent.setup();
     vi.mocked(nodesApi.updateNode).mockResolvedValue(makeNode({ nodeId: "a", text: "The claim. A reason." }));
