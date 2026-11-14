@@ -557,6 +557,8 @@ const ui: UiStrings = {
     ghostTemplatesTitle: "Začít touto frází",
     ghostChangeTo: (type) => `Změnit na: ${type}`,
     ghostNewOne: (type) => `Nový: ${type}`,
+    ghostAllTypes: "Všechny typy",
+    ghostFewerTypes: "Méně typů",
   },
   attack: {
     intro: "Útok vytvoří skutečný uzel s vaší námitkou, propojený s tímto uzlem šípem zbraně.",

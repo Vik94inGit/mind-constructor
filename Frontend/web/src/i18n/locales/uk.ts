@@ -565,6 +565,8 @@ const ui: UiStrings = {
     ghostTemplatesTitle: "Почати з цієї фрази",
     ghostChangeTo: (type) => `Змінити на: ${type}`,
     ghostNewOne: (type) => `Новий: ${type}`,
+    ghostAllTypes: "Усі типи",
+    ghostFewerTypes: "Менше типів",
   },
   attack: {
     intro: "Атака створює справжній вузол із вашим запереченням, з’єднаний з цим вузлом стрілою зброї.",
