@@ -123,11 +123,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
-- **Template levels** — a template asks its questions in rounds (`Node.level`, `utils/templates.ts`). Every
-  round's ghosts are on the canvas from the start, but a later round's are fainter, wear a 🔒 before
-  their question and can't be written in until every question of the rounds before it under the same
-  template root is answered or deleted; their panel says which level to answer first and how many are
-  left (`utils/templateLevels.ts`). *Develop an idea* asks: 1) what the idea is, how you feel about it,
+- **Template levels** — a template asks its questions in rounds (`Node.level`, `utils/templates.ts`). Only
+  the first round shows when a template grows ("Added 5 questions. 2 more levels open once these are
+  answered"); a later round's ghosts are saved but kept off the canvas until every question of the
+  rounds before it under the same template root is answered or deleted, and then come up with a
+  "🔓 Level 2 is open: 3 new questions" notice (`hiddenLevelIds`/`revealedRound` in
+  `utils/templateLevels.ts`, `hooks/useLevelReveal.ts`). A locked ghost that something the user added
+  hangs from stays on the canvas, fainter, with a 🔒 before its question, and its panel says which level
+  to answer first and how many are left. *Develop an idea* asks: 1) what the idea is, how you feel about it,
   what problem it solves, why it would work and the profit; 2) the possibilities, the problems and
   obstacles, the plan and how you feel now; 3) what was done successfully, what failed, what it brings to
   the table, how you feel about it and whether it is finished as it is, drawn as one ring per round.

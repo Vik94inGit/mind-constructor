@@ -59,6 +59,10 @@ export interface UiStrings {
     seeded: string;
     /** A leveled template's ghost that can't be written in yet (utils/templateLevels.ts): the level to answer first and how many of its questions are left. */
     locked: (level: number, left: number) => string;
+    /** A leveled template's next round just came up on the map (hooks/useLevelReveal.ts): its level and how many new questions. */
+    unlocked: (level: number, count: number) => string;
+    /** A leveled template just grown: how many questions its first round asks, and how many rounds wait behind it. */
+    createdRounds: (count: number, later: number) => string;
     nodes: Record<TemplateNodeKey, string>;
   };
   /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
@@ -787,6 +791,9 @@ const en: UiStrings = {
     undo: "Undo",
     seeded: "Started with the template questions",
     locked: (level, left) => `🔒 Answer level ${level} first (${left} left). Delete a question you want to skip.`,
+    unlocked: (level, n) => `🔓 Level ${level} is open: ${n} new ${n === 1 ? "question" : "questions"}`,
+    createdRounds: (n, later) =>
+      `Added ${n} ${n === 1 ? "question" : "questions"}. ${later === 1 ? "One more level opens" : `${later} more levels open`} once these are answered (delete one to skip it).`,
     nodes: {
       subProblem1: "Which part of the problem is broken? (one cause per node)",
       subProblem2: "What else contributes to it?",

@@ -24,9 +24,9 @@ import type { MapKind, NodeType } from "../types";
 //    to the table, how it feels, whether it is finished as it is).
 //
 // Levels: a template asks its questions in rounds. Every node carries the
-// round it belongs to (Node.level); a later round's ghosts are on the canvas
-// from the start but stay locked until the earlier rounds are filled in
-// (utils/templateLevels.ts). A template whose nodes all hang straight from
+// round it belongs to (Node.level); a later round's ghosts are saved from the
+// start but stay locked, and off the canvas, until the earlier rounds are
+// filled in (utils/templateLevels.ts, hooks/useLevelReveal.ts). A template whose nodes all hang straight from
 // the root is drawn as one ring per round (layoutTemplate).
 
 export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro" | "idea";
