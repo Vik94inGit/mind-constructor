@@ -597,6 +597,9 @@ export function MapPage() {
     slideIndex,
     setSlideIndex,
     slideGroups,
+    summaryNodes,
+    typeFilter,
+    setTypeFilter,
     enterPresentation,
     presentZone,
     exitPresentation,
@@ -2420,6 +2423,9 @@ export function MapPage() {
           {presenting && (
             <PresentationOverlay
               slides={slideGroups}
+              summaryNodes={summaryNodes}
+              typeFilter={typeFilter}
+              onTypeFilterChange={setTypeFilter}
               index={Math.min(slideIndex, Math.max(0, slideGroups.length - 1))}
               onIndexChange={setSlideIndex}
               onExit={exitPresentation}

@@ -88,4 +88,20 @@ describe("usePresentation", () => {
     expect(result.current.slideGroups[0].node.nodeId).toBe("zone");
     expect(params.setMultiSelectIds).toHaveBeenCalledWith(new Set());
   });
+  it("keeps unanswered questions for the summary and narrows slides to the picked types", async () => {
+    const { result } = setup({
+      visibleNodes: [
+        makeNode({ nodeId: "p", text: "P", type: "Problem" }),
+        makeNode({ nodeId: "s", text: "S", type: "Solution", parentId: "p" }),
+        makeNode({ nodeId: "q", text: "", ghost: true, prompt: "Why?", parentId: "p" }),
+      ],
+    });
+    act(() => result.current.enterPresentation());
+    await waitFor(() => expect(result.current.presenting).toBe(true));
+    expect(result.current.summaryNodes.map((n) => n.nodeId)).toEqual(["p", "s", "q"]);
+    act(() => result.current.setTypeFilter(["Solution"]));
+    expect(result.current.slideNodes.map((n) => n.nodeId)).toEqual(["s"]);
+    act(() => result.current.exitPresentation());
+    expect(result.current.typeFilter).toEqual([]);
+  });
 });
