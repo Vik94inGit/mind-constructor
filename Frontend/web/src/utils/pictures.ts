@@ -16,7 +16,7 @@ type Pt = { x: number; y: number };
 // One picture for each node type (a bulb for an Idea, a stop sign for a
 // Problem…), whose dots arrive as ghosts of that type, then the pictures
 // drawn just for fun, whose dots are Ideas.
-export const TYPE_PICTURE_KINDS = ["bulb", "stop", "warning", "key", "fork", "flag", "cloud", "question"] as const;
+export const TYPE_PICTURE_KINDS = ["bulb", "stop", "warning", "key", "fork", "flag", "cloud", "question", "book", "bubble"] as const;
 export const FUN_PICTURE_KINDS = ["heart", "star", "house", "tree", "fish", "smile"] as const;
 export const PICTURE_KINDS = [...TYPE_PICTURE_KINDS, ...FUN_PICTURE_KINDS] as const;
 export type PictureKind = (typeof PICTURE_KINDS)[number];
@@ -164,6 +164,36 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
     paths: [[0, 1, 2, 3, 4, 5]],
     color: "#8a8f98",
     type: "unknown",
+  },
+  book: {
+    // An open book: both pages round, then the spine down the middle.
+    dots: [
+      { x: 0, y: -0.75 },
+      { x: -1, y: -0.95 },
+      { x: -1, y: 0.75 },
+      { x: 0, y: 0.95 },
+      { x: 1, y: 0.75 },
+      { x: 1, y: -0.95 },
+    ],
+    paths: [loop(6), [0, 3]],
+    color: "#6b4fa8",
+    type: "Title",
+  },
+  bubble: {
+    // A speech bubble with its tail down on the left.
+    dots: [
+      { x: -1, y: -0.6 },
+      { x: 0, y: -1 },
+      { x: 1, y: -0.6 },
+      { x: 1, y: 0.3 },
+      { x: 0.2, y: 0.6 },
+      { x: -0.4, y: 1 },
+      { x: -0.5, y: 0.55 },
+      { x: -1, y: 0.2 },
+    ],
+    paths: [loop(8)],
+    color: "#a8457f",
+    type: "Question",
   },
   heart: {
     dots: [

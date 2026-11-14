@@ -42,6 +42,25 @@ describe("quizCards", () => {
     ).toEqual([]);
   });
 
+  it("asks a study Question too, with its ✅ children", () => {
+    expect(
+      quizCards([
+        node("q", { type: "Question", text: "What is photosynthesis?" }),
+        node("a", { type: "Success", text: "Light into sugar", parentId: "q" }),
+      ]),
+    ).toEqual([{ nodeId: "q", question: "What is photosynthesis?", answerList: ["Light into sugar"] }]);
+  });
+
+  it("turns a study Question written in place into a card: its prompt asks, its writing answers", () => {
+    expect(
+      quizCards([
+        node("t", { type: "Title", prompt: "What are you learning?", text: "Photosynthesis" }),
+        node("q", { type: "Question", prompt: "What is it, in one sentence?", text: "Plants turn light into sugar", parentId: "t" }),
+        node("e", { type: "Question", prompt: "What is an example?", parentId: "t" }),
+      ]),
+    ).toEqual([{ nodeId: "q", question: "What is it, in one sentence?", answer: "Plants turn light into sugar" }]);
+  });
+
   it("makes no card from an asking node without a ✅ answer", () => {
     expect(
       quizCards([

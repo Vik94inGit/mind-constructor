@@ -94,6 +94,7 @@ const en: ThinkStrings = {
       goal: { label: "I want to get somewhere", placeholder: "e.g. Run a half marathon by spring" },
       retro: { label: "Something happened", placeholder: "e.g. How the product launch went" },
       idea: { label: "I have an idea", placeholder: "e.g. A weekly swap market for kids' clothes" },
+      study: { label: "I'm learning something", placeholder: "e.g. Photosynthesis" },
     },
   },
   write: {
@@ -144,6 +145,9 @@ const en: ThinkStrings = {
     ideaTryFirst: "What is the smallest way to try it?",
     ideaShows: "What would show that it works?",
     ideaKill: "What could kill it?",
+    studyParts: "What are its main parts?",
+    studyQuestions: "What questions should you be able to answer about it?",
+    studyUnclear: "What don't you understand yet?",
     anythingElse: "Anything else on your mind?",
   },
   shape: {

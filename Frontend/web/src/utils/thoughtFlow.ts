@@ -44,6 +44,9 @@ export type PromptKey =
   | "ideaTryFirst"
   | "ideaShows"
   | "ideaKill"
+  | "studyParts"
+  | "studyQuestions"
+  | "studyUnclear"
   | "anythingElse";
 
 export interface FlowPrompt {
@@ -98,6 +101,12 @@ export const FLOW_PROMPTS: Record<MapKind, FlowPrompt[]> = {
     { key: "ideaKill", type: "Fail" },
     { key: "anythingElse", type: "unknown" },
   ],
+  study: [
+    { key: "studyParts", type: "Title" },
+    { key: "studyQuestions", type: "Question" },
+    { key: "studyUnclear", type: "Question" },
+    { key: "anythingElse", type: "unknown" },
+  ],
 };
 
 /** The central thought's own type for each starting point (same roots as MAP_KIND_ROOTS). */
@@ -107,6 +116,7 @@ export const FLOW_ROOT_TYPE: Record<MapKind, NodeType> = {
   goal: "Solution",
   retro: "unknown",
   idea: "Idea",
+  study: "Title",
 };
 
 export const ROOT_ID = "root";

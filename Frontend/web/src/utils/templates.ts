@@ -22,6 +22,15 @@ import type { MapKind, NodeType } from "../types";
 //    bring), then making it happen (possibilities, obstacles, the plan, how it
 //    feels now), then looking back (what worked, what failed, what it brings
 //    to the table, how it feels, whether it is finished as it is).
+//  - "study": learning a topic, in titles and questions only. A Title node
+//    (the topic) grows the questions that make you understand it (what it is,
+//    why it matters) and two Titles for its main parts, then each part's key
+//    idea and an example and how it connects to what you know, then what an
+//    exam would ask and what is still unclear. The answer is written into each
+//    question, so a filled-in Question is a ready card for Quiz me
+//    (utils/quiz.ts).
+//  - "question": a Question node grows its follow-ups: why it is so and an
+//    example, then a common mistake and how to explain it to a friend.
 //
 // Levels: a template asks its questions in rounds. Every node carries the
 // round it belongs to (Node.level); a later round's ghosts are saved from the
@@ -29,10 +38,10 @@ import type { MapKind, NodeType } from "../types";
 // filled in (utils/templateLevels.ts, hooks/useLevelReveal.ts). A template whose nodes all hang straight from
 // the root is drawn as one ring per round (layoutTemplate).
 
-export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro" | "idea";
+export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro" | "idea" | "study" | "question";
 
 /** The templates a single node offers to grow from itself (NodePanel's Info tab). */
-export type NodeTemplateKind = Extract<TemplateKind, "problem" | "goal" | "retry" | "idea">;
+export type NodeTemplateKind = Extract<TemplateKind, "problem" | "goal" | "retry" | "idea" | "study" | "question">;
 
 // Which template a node of each type offers, if any.
 export const NODE_TYPE_TEMPLATE: Partial<Record<NodeType, NodeTemplateKind>> = {
@@ -40,6 +49,8 @@ export const NODE_TYPE_TEMPLATE: Partial<Record<NodeType, NodeTemplateKind>> = {
   Solution: "goal",
   Fail: "retry",
   Idea: "idea",
+  Title: "study",
+  Question: "question",
 };
 
 export type TemplateNodeKey =
@@ -96,7 +107,23 @@ export type TemplateNodeKey =
   | "ideaFailed"
   | "ideaBrings"
   | "ideaFeelDone"
-  | "ideaFinished";
+  | "ideaFinished"
+  | "rootStudy"
+  | "studyWhat"
+  | "studyWhy"
+  | "studyPart1"
+  | "studyPart1Key"
+  | "studyPart1Example"
+  | "studyPart2"
+  | "studyPart2Key"
+  | "studyPart2Example"
+  | "studyConnect"
+  | "studyExam"
+  | "studyUnclear"
+  | "questionWhy"
+  | "questionExample"
+  | "questionMistake"
+  | "questionExplain";
 
 interface TemplateNode {
   key: TemplateNodeKey;
@@ -180,6 +207,40 @@ const TEMPLATES: Record<TemplateKind, TemplateNode[]> = {
     { key: "ideaFeelDone", type: "unknown", level: 3 },
     { key: "ideaFinished", type: "unknown", level: 3 },
   ],
+  // 1: what it is and its main parts; 2: each part's key idea and an example,
+  // and how it connects; 3: what an exam would ask and what is still unclear.
+  study: [
+    { key: "studyWhat", type: "Question", level: 1 },
+    { key: "studyWhy", type: "Question", level: 1 },
+    {
+      key: "studyPart1",
+      type: "Title",
+      level: 1,
+      children: [
+        { key: "studyPart1Key", type: "Question", level: 2 },
+        { key: "studyPart1Example", type: "Question", level: 2 },
+      ],
+    },
+    {
+      key: "studyPart2",
+      type: "Title",
+      level: 1,
+      children: [
+        { key: "studyPart2Key", type: "Question", level: 2 },
+        { key: "studyPart2Example", type: "Question", level: 2 },
+      ],
+    },
+    { key: "studyConnect", type: "Question", level: 2 },
+    { key: "studyExam", type: "Question", level: 3 },
+    { key: "studyUnclear", type: "Question", level: 3 },
+  ],
+  // 1: why and an example; 2: a common mistake and explaining it simply.
+  question: [
+    { key: "questionWhy", type: "Question", level: 1 },
+    { key: "questionExample", type: "Question", level: 1 },
+    { key: "questionMistake", type: "Question", level: 2 },
+    { key: "questionExplain", type: "Question", level: 2 },
+  ],
 };
 
 // The node a new map of each kind starts from, and the template grown from it.
@@ -189,6 +250,7 @@ export const MAP_KIND_ROOTS: Record<MapKind, { key: TemplateNodeKey; type: NodeT
   goal: { key: "rootGoal", type: "Solution", template: "goal" },
   retro: { key: "rootRetro", type: "unknown", template: "retro" },
   idea: { key: "rootIdea", type: "Idea", template: "idea" },
+  study: { key: "rootStudy", type: "Title", template: "study" },
 };
 
 export interface PlacedTemplateNode {

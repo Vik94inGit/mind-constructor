@@ -10,6 +10,11 @@ export const NODE_TYPES = [
   "Fail",
   "Idea",
   "unknown",
+  // Study types: a topic's heading, and a question to answer about it.
+  // Neither is an outcome, so like "unknown" they draw no halo or horns and
+  // can't be an attack's or a protection's type.
+  "Title",
+  "Question",
 ] as const;
 
 export type NodeType = (typeof NODE_TYPES)[number];

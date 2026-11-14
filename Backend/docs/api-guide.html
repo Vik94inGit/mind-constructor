@@ -1097,9 +1097,12 @@ export const setMemberColorMutationDao = async (mapInternalId, userId, color) =>
         <span class="mono-text" style="color:var(--n-solution)">Solution</span>,
         <span class="mono-text" style="color:var(--n-success)">Success</span>,
         <span class="mono-text" style="color:var(--n-fail)">Fail</span>,
-        <span class="mono-text" style="color:var(--n-idea)">Idea</span>, or
+        <span class="mono-text" style="color:var(--n-idea)">Idea</span>,
         <span class="mono-text" style="color:var(--n-unknown)">unknown</span> as a conscious "not
-        categorized yet" choice), and linked to its parent node via <code>parentId</code> for the
+        categorized yet" choice, or one of the study types
+        <span class="mono-text" style="color:var(--n-title)">Title</span> (a topic's heading) and
+        <span class="mono-text" style="color:var(--n-question)">Question</span>, which can't be an
+        attack's or a protection's type), and linked to its parent node via <code>parentId</code> for the
         tree shape. Mounted at <code>/api/nodes</code>.
       </p>
       <p>

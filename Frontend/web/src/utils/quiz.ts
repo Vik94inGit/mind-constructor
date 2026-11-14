@@ -1,7 +1,9 @@
 // Quiz me (docs/gestures/quiz-me.md): the map tests its reader. Nobody writes
-// questions apart from the map itself: only a ❓ (unknown), a Problem or a
-// goal (Solution) asks, and its ✅ (Success) children are the answer. Any
-// other node, or an asking node with no ✅ under it, makes no card.
+// questions apart from the map itself: only a ❓ (unknown), a Problem, a
+// goal (Solution) or a study Question asks, and its ✅ (Success) children are
+// the answer. A study Question answered in place (a template's ghost written
+// in: its prompt the question, its text the answer) is a card of its own.
+// Any other node, or an asking node with no answer, makes no card.
 // The marks a reader gives are their own, like feelings (utils/feeling.ts):
 // kept per browser and in their view of the map on the server.
 import { computeSlideOrder } from "./presentation";
@@ -24,8 +26,8 @@ export interface QuizCard {
 
 const label = (n: NodeDoc) => (n.title?.trim() || n.text?.trim() || "").trim();
 
-/** The node types that ask a question in Quiz me: ❓, Problem and goal. */
-export const QUIZ_QUESTION_TYPES: ReadonlySet<NodeType> = new Set<NodeType>(["unknown", "Problem", "Solution"]);
+/** The node types that ask a question in Quiz me: ❓, Problem, goal and a study Question. */
+export const QUIZ_QUESTION_TYPES: ReadonlySet<NodeType> = new Set<NodeType>(["unknown", "Problem", "Solution", "Question"]);
 /** The node type whose nodes answer it: ✅. */
 export const QUIZ_ANSWER_TYPE: NodeType = "Success";
 
@@ -53,8 +55,18 @@ export function quizCards(nodes: NodeDoc[]): QuizCard[] {
       .map(label)
       .filter(Boolean);
     if (list.length > 0) cards.push({ nodeId: n.nodeId, question, answerList: list });
+    else if (n.type === "Question" && n.prompt?.trim() && answerInPlace(n)) {
+      cards.push({ nodeId: n.nodeId, question: n.prompt.trim(), answer: answerInPlace(n) });
+    }
   }
   return cards;
+}
+
+/** What a study Question's own writing answers its template question with: its title and text. */
+function answerInPlace(n: NodeDoc): string {
+  const title = n.title?.trim() ?? "";
+  const text = n.text?.trim() ?? "";
+  return [title, text].filter(Boolean).join("\n");
 }
 
 const weight: Record<QuizMark | "none", number> = { notYet: 0, shaky: 1, none: 2, know: 3 };

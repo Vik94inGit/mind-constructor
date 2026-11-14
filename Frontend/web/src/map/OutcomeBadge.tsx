@@ -23,7 +23,9 @@ import { NODE_TYPE_COLORS, ZONE_COLORS } from "../utils/nodeType";
 // tightly-cropped size no matter what — nothing about selection, health,
 // or anything else ever changes its own scale, which is the whole fix for
 // the deformation wings caused: a symbol that never resizes can't deform.
-export type OutcomeType = Exclude<NodeType, "unknown">;
+// The study types (Title, Question) have no outcome either: like "unknown"
+// they keep their plain NodeTypeIcon glyph and draw no halo or horns.
+export type OutcomeType = Exclude<NodeType, "unknown" | "Title" | "Question">;
 
 export const OUTCOME_TYPES: readonly OutcomeType[] = [
   "Problem",
@@ -40,7 +42,7 @@ export const OUTCOME_TYPES: readonly OutcomeType[] = [
 // its particle-burst color choice, MapPage's own sentiment grouping, and
 // WeaponMark's own bow color.
 export function ringKindFor(type: NodeType): "halo" | "horns" | undefined {
-  return type === "unknown" ? undefined : OUTCOME_CONFIG[type as OutcomeType]?.ring;
+  return OUTCOME_CONFIG[type as OutcomeType]?.ring;
 }
 
 // ringKindFor's own halo/horns classification, but overridden to match a

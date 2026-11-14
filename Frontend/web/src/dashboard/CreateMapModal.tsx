@@ -16,7 +16,7 @@ import { ErrorBanner } from "../components/ErrorBanner";
 // createModal.templates) instead of a hardcoded English pair, so this list
 // only has to know the *order* and which value maps to which translation
 // key.
-const MAP_KIND_KEYS: MapKind[] = ["problem", "decision", "goal", "retro", "idea"];
+const MAP_KIND_KEYS: MapKind[] = ["problem", "decision", "goal", "retro", "idea", "study"];
 
 export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated: (map: MapDoc) => void }) {
   const { t } = useI18n();

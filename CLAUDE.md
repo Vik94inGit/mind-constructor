@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 Mind Constructor is "notes you can see". The main path is personal: jot a thought in a second (a
 quick note lands in the user's **Inbox** map, `Frontend/web/src/utils/inbox.ts`), lay thoughts out
 on a canvas as typed **nodes** (Problem / Problematic option / Solution / Option / Success / Fail /
-Idea / unknown) whose place, zone and links show how they relate, and find any of them again with search
+Idea / unknown, and for studying Title / Question) whose place, zone and links show how they relate, and find any of them again with search
 across all maps. A thought can also carry how it feels to the user (a private emoji badge), and *Think it through*
 asks how they feel before and, later, after, so the dashboard can show the shift. Starter structures arrive as faded **ghost** nodes that carry only a question
 (`Node.prompt`) and fill in as the user answers them.

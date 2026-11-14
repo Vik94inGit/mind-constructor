@@ -51,6 +51,8 @@ export interface UiStrings {
     goal: { button: string; hint: string };
     retry: { title: string; hint: string; button: string };
     idea: { button: string; hint: string };
+    study: { button: string; hint: string };
+    question: { button: string; hint: string };
     created: (count: number) => string;
     failed: string;
     /** The notice's button that takes a template or picture back in one step. */
@@ -772,6 +774,8 @@ const en: UiStrings = {
     Fail: "Fail",
     Idea: "Idea",
     unknown: "Question (unknown)",
+    Title: "Title (topic)",
+    Question: "Study question",
   },
   deleted: {
     button: (n) => `Deleted on this map: ${n}`,
@@ -786,6 +790,8 @@ const en: UiStrings = {
     goal: { button: "Plan this goal", hint: "Adds a success criterion, ordered steps, an obstacle with a fallback, and a review." },
     retry: { title: "This did not work out", hint: "Find out why, then choose what to change before trying again.", button: "Analyze and try again" },
     idea: { button: "Develop this idea", hint: "Asks in three rounds: the idea itself, then how to make it happen, then how it went. Each round opens once the one before is answered." },
+    study: { button: "Study this topic", hint: "Asks in three rounds: what it is and its main parts, then each part's key idea and an example, then what an exam would ask. Write each answer into its question, and Quiz me will test you on it." },
+    question: { button: "Dig into this question", hint: "Adds follow-up questions: why it is so and an example, then a common mistake and how to explain it simply." },
     created: (n) => `Added ${n} ${n === 1 ? "node" : "nodes"}`,
     failed: "Could not add the template",
     undo: "Undo",
@@ -849,11 +855,27 @@ const en: UiStrings = {
       ideaBrings: "What does it bring to the table?",
       ideaFeelDone: "What do you feel about it?",
       ideaFinished: "Is it finished as it is?",
+      rootStudy: "What are you learning? (the topic)",
+      studyWhat: "What is it, in one sentence?",
+      studyWhy: "Why does it matter?",
+      studyPart1: "The first main part of the topic",
+      studyPart1Key: "What is the key idea of this part?",
+      studyPart1Example: "What is an example of it?",
+      studyPart2: "The second main part of the topic",
+      studyPart2Key: "What is the key idea of this part?",
+      studyPart2Example: "What is an example of it?",
+      studyConnect: "How does it connect to what you already know?",
+      studyExam: "What would an exam ask about it?",
+      studyUnclear: "What is still unclear to you?",
+      questionWhy: "Why is it so?",
+      questionExample: "What is an example?",
+      questionMistake: "What is a common mistake here?",
+      questionExplain: "How would you explain it to a friend in two sentences?",
     },
   },
   canvasMenu: {
     newNode: "New node",
-    structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)", idea: "Develop an idea" },
+    structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)", idea: "Develop an idea", study: "Study" },
   },
   pictures: {
     entry: "Draw a picture…",
@@ -862,7 +884,7 @@ const en: UiStrings = {
     forTypes: "For a kind of thought",
     forTypesHint: "Each one's dots arrive as thoughts of that kind.",
     forFun: "Just for fun",
-    names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
+    names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", book: "Book", bubble: "Question bubble", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
     questions: {
       bulb: ["What idea lights up?", "What could you try that you haven't yet?", "What would make it easier?", "What would you do if you couldn't fail?", "What would a child suggest?", "What could you combine?", "What could you do differently tomorrow?", "What idea have you been putting off?", "What would make it fun?", "What is the simplest way?"],
       stop: ["What is stopping you?", "What keeps coming back?", "What worries you most about it?", "What is it costing you?", "What are you avoiding?", "What is out of your hands?", "What drains your energy?", "What would happen if you did nothing?"],
@@ -872,6 +894,8 @@ const en: UiStrings = {
       flag: ["What have you already managed?", "What are you proud of?", "What went better than you expected?", "What did you learn on the way?", "Who helped you get here?", "What got easier?", "How will you celebrate?"],
       cloud: ["What didn't work out?", "What would you do differently?", "What did it teach you?", "What still hurts about it?", "What was out of your control?", "What would you tell yourself back then?", "What can you let go of?", "What came out of it after all?", "Who could you talk to about it?", "What will you try next time?"],
       question: ["What are you not sure about yet?", "What do you still need to find out?", "What are you guessing?", "Who could you ask?", "What would help you decide?", "What are you afraid to ask?", "How could you test it?"],
+      book: ["What topic are you learning?", "What are its main parts?", "Which word do you need to know?", "What is the chapter about?", "What did the lecture cover?", "Where can you read more?"],
+      bubble: ["What would an exam ask?", "What do you want to understand?", "Why does it work that way?", "How does it work?", "What is the difference between them?", "What causes it?", "What follows from it?", "What is still unclear?"],
       heart: ["What do you love?", "Who do you love?", "What warms you up?", "What would you never give up?", "What makes you feel alive?", "Who do you miss?", "What do you love about yourself?", "What place do you love?", "What do you love to do?", "Who loves you?"],
       star: ["What do you want to reach?", "What would make you proud?", "What do you dream about?", "Where do you want to be in a year?", "What would you like to learn?", "Who do you want to become?", "What would you try if no one watched?", "What is your next big step?", "What would make this year special?", "What wish do you keep to yourself?"],
       house: ["What makes you feel at home?", "Who makes you feel safe?", "Where do you rest best?", "What would you keep forever?", "What smell reminds you of home?", "Who would you invite over?", "What makes a room cosy for you?", "What do you need to feel calm?", "What does home mean to you?"],
@@ -1050,6 +1074,8 @@ const en: UiStrings = {
       "Fail": ["It failed because…", "Lesson learned:", "Don't repeat:"],
       "Idea": ["Idea:", "What if…", "Worth trying:"],
       "unknown": ["Open question:", "Need more info on…", "Idea:"],
+      "Title": ["Topic:", "Chapter:", "Key term:"],
+      "Question": ["What is…?", "Why does…?", "How does…?"],
     },
     ghostTemplatesTitle: "Start from this phrase",
     ghostChangeTo: (type) => `Make this a ${type}`,

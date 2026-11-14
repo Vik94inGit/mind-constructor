@@ -9,6 +9,9 @@ export const NODE_TYPES = [
   "Fail",
   "Idea",
   "unknown",
+  // Study types: a topic's heading, and a question to answer about it.
+  "Title",
+  "Question",
 ] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
 
@@ -130,7 +133,7 @@ export interface SelectedCircle {
 export type MapTemplate = "blank" | "single-problem" | "decision-tree" | "pro-con";
 
 // What a map is for — see MAP_KINDS on the backend. Picked when the map is created.
-export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea"] as const;
+export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea", "study"] as const;
 export type MapKind = (typeof MAP_KINDS)[number];
 
 export interface MapDoc {

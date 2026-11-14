@@ -90,6 +90,23 @@ export function NodeTypeIcon({ type, size = 15 }: Props) {
           <line x1="9" y1="9" x2="15" y2="15" />
         </svg>
       );
+    case "Title":
+      // Open book: the heading of a topic to learn.
+      return (
+        <svg {...common}>
+          <path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z" />
+          <path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
+        </svg>
+      );
+    case "Question":
+      // Speech bubble with a question mark: something to answer.
+      return (
+        <svg {...common}>
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+          <path d="M9.6 9.2a2.5 2.5 0 0 1 4.85.8c0 1.7-2.45 2.4-2.45 2.4" />
+          <line x1="12" y1="15.5" x2="12.01" y2="15.5" />
+        </svg>
+      );
     default:
       // unknown: just the question mark, no outer ring — the button this
       // icon sits in already draws its own circular border around it (see
