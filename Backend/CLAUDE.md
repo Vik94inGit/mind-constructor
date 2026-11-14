@@ -280,6 +280,11 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   it replaced is deleted. `GET /api/images/:imageId` serves a node-less picture to every member of
   its map. The frontend veils it with the paper colour so it stays muted. **`Map.backgroundShade`**
   (-100..100, default 0) draws that picture darker (below 0) or lighter (above 0), set the same way.
+- **`Map.slideOrder`** — the order the owner chose for the map's presentation slides: public nodeIds,
+  first slide first (at most 5000, `MAX_SLIDE_ORDER`), set through the same owner-only `PATCH /api/:mapId`;
+  `[]` (the default) is the automatic order. The backend only stores it: the frontend applies it
+  (`utils/presentation.ts` `applySlideOrder`), skipping ids whose node is gone and leaving unnamed nodes at
+  their automatic place.
 - **Finishing a discussion** (`abl/finishAbl.ts`, `finishController.ts`; `Map.finishedAt`, `Map.finishAgreedBy`) —
   only the map's owner may finish (`POST /api/:mapId/finish`), and only fairly (`finishRule`): the newest
   node on the map is another member's or an imitated-opponent move (`Node.byOpponent`), or every other

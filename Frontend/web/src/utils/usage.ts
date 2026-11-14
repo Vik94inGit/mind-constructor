@@ -62,6 +62,7 @@ export const FEATURES = [
   "folders",
   "history",
   "presentation",
+  "slide_order",
   "copy_paste",
   "undo",
   "export",

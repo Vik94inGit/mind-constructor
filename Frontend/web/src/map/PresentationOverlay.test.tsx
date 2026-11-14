@@ -144,3 +144,42 @@ describe("PresentationOverlay summary", () => {
     expect(onOpenNode).toHaveBeenLastCalledWith("a2");
   });
 });
+
+describe("PresentationOverlay's Order tab", () => {
+  const nodes = [
+    makeNode({ nodeId: "a", text: "First", createdAt: "2026-01-01T00:00:00Z" }),
+    makeNode({ nodeId: "b", text: "Second", createdAt: "2026-01-02T00:00:00Z" }),
+    makeNode({ nodeId: "c", text: "Third", createdAt: "2026-01-03T00:00:00Z" }),
+  ];
+  function renderOrder(onOrderChange?: (order: string[]) => void, savedOrder?: string[]) {
+    render(
+      <I18nProvider>
+        <PresentationOverlay
+          slides={computeSlideGroups(nodes)}
+          index={0}
+          onIndexChange={() => {}}
+          onExit={() => {}}
+          onOpenNode={() => {}}
+          savedOrder={savedOrder}
+          onOrderChange={onOrderChange}
+        />
+      </I18nProvider>,
+    );
+  }
+
+  it("is only there for the owner", () => {
+    renderOrder();
+    expect(screen.queryByRole("tab", { name: en.ui.presentation.orderTab })).toBeNull();
+  });
+
+  it("moves a slide up and keeps the rest of the saved order", () => {
+    const onOrderChange = vi.fn();
+    renderOrder(onOrderChange, ["other", "a", "b", "c"]);
+    fireEvent.click(screen.getByRole("tab", { name: en.ui.presentation.orderTab }));
+    fireEvent.click(screen.getByRole("button", { name: en.ui.presentation.moveUp("Third") }));
+    expect(onOrderChange).toHaveBeenLastCalledWith(["other", "a", "c", "b"]);
+    expect(screen.getByRole("button", { name: en.ui.presentation.moveUp("First") })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: en.ui.presentation.automaticOrder }));
+    expect(onOrderChange).toHaveBeenLastCalledWith([]);
+  });
+});

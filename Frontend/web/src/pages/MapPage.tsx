@@ -629,6 +629,7 @@ export function MapPage() {
     dispatchMode,
     setActionError,
     emptyMessage: t.ui.presentation.empty,
+    slideOrder: map?.slideOrder,
   });
   // Quiz me — the map asks, the viewer marks what they know (hooks/useQuiz.ts).
   const { quizCards, startQuiz, exitQuiz } = useQuiz({
@@ -1753,7 +1754,7 @@ export function MapPage() {
 
   // The map's mode and background, finishing the discussion, deleting the map
   // — see hooks/useMapControls.ts.
-  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, setMapBackgroundImage, setMapBackgroundShade, deleteThisMap, exitDemo, finish } = useMapControls({
+  const { isOwner, toggleMapMode, setMapBackground, setMapBackgroundColor, setMapBackgroundImage, setMapBackgroundShade, setSlideOrder, deleteThisMap, exitDemo, finish } = useMapControls({
     map,
     setMap,
     nodes,
@@ -2445,6 +2446,8 @@ export function MapPage() {
               summaryNodes={summaryNodes}
               typeFilter={typeFilter}
               onTypeFilterChange={setTypeFilter}
+              savedOrder={map?.slideOrder}
+              onOrderChange={isOwner ? setSlideOrder : undefined}
               index={Math.min(slideIndex, Math.max(0, slideGroups.length - 1))}
               onIndexChange={setSlideIndex}
               onExit={exitPresentation}

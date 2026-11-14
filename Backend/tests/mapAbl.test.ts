@@ -266,6 +266,19 @@ describe("mapAbl", () => {
       expect(result).toEqual({ mapId: "pub123", name: "Renamed" });
     });
 
+    it("saves a slide order, [] to go back to the automatic one, and refuses a bad one", async () => {
+      vi.mocked(updateMapDao).mockResolvedValue({ mapId: "pub123" } as never);
+
+      await updateMapAbl("pub123", "user1", { slideOrder: ["n2", "n1"] });
+      expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { slideOrder: ["n2", "n1"] });
+
+      await updateMapAbl("pub123", "user1", { slideOrder: [] });
+      expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { slideOrder: [] });
+
+      await expect(updateMapAbl("pub123", "user1", { slideOrder: [""] })).rejects.toThrow(ValidationError);
+      await expect(updateMapAbl("pub123", "user1", { slideOrder: "n1" })).rejects.toThrow(ValidationError);
+    });
+
     it("accepts a known background, and null to go back to the default", async () => {
       vi.mocked(updateMapDao).mockResolvedValue({ mapId: "pub123" } as never);
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { CanvasModeAction } from "./useCanvasMode";
-import { computeSlideGroups, computeSlideOrder } from "../utils/presentation";
+import { applySlideOrder, computeSlideGroups, computeSlideOrder } from "../utils/presentation";
 import { filterByTypes } from "../utils/mapSummary";
 import { collectDescendants } from "../utils/mapGraph";
 import type { NodeDoc, NodeType } from "../types";
@@ -20,6 +20,8 @@ interface Params {
   dispatchMode: Dispatch<CanvasModeAction>;
   setActionError: (message: string | null) => void;
   emptyMessage: string;
+  /** The slide order the map's owner chose (Map.slideOrder); empty / absent: the automatic one. */
+  slideOrder?: string[];
 }
 
 export function usePresentation({
@@ -33,6 +35,7 @@ export function usePresentation({
   dispatchMode,
   setActionError,
   emptyMessage,
+  slideOrder,
 }: Params) {
   // Presentation mode: steps through the map's own nodes as slides (see
   // computeSlideOrder/utils/presentation.ts) in a full-screen overlay
@@ -100,8 +103,9 @@ export function usePresentation({
 
   // What the overlay steps through: one slide per parent, with its children
   // on the same slide (utils/presentation.ts computeSlideGroups). slideIndex
-  // counts these.
-  const slideGroups = useMemo(() => computeSlideGroups(slideNodes), [slideNodes]);
+  // counts these. In the order the owner chose, when they chose one
+  // (applySlideOrder: a slide it doesn't name keeps its automatic place).
+  const slideGroups = useMemo(() => applySlideOrder(computeSlideGroups(slideNodes), slideOrder), [slideNodes, slideOrder]);
 
   // Guards an empty selection (nothing eligible to present) rather than
   // entering a blank slideshow; computes the eligible set eagerly, on the

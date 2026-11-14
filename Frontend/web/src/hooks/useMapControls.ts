@@ -10,6 +10,9 @@ import type { Translation } from "../i18n/translations";
 import type { MapBackground, MapDoc, NodeDoc, ZonePaletteColor } from "../types";
 import { track } from "../utils/usage";
 
+// How long the slide order waits after the last move before it is saved.
+const SLIDE_ORDER_SAVE_MS = 700;
+
 interface Params {
   map: MapDoc | null;
   setMap: Dispatch<SetStateAction<MapDoc | null>>;
@@ -125,6 +128,32 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
     }
   }
 
+  // The presentation's slide order (Map.slideOrder), owner only: shown at
+  // once, saved once the clicks on the up/down arrows pause, so a run of
+  // moves is one request and a slow reply can't put back an older order.
+  // [] goes back to the automatic order.
+  const slideOrderSave = useRef<{ timer: ReturnType<typeof setTimeout>; before: string[] } | null>(null);
+  function setSlideOrder(slideOrder: string[]) {
+    if (!isOwner || !mapId) return;
+    const pending = slideOrderSave.current;
+    if (pending) clearTimeout(pending.timer);
+    const before = pending ? pending.before : (map?.slideOrder ?? []);
+    setMap((prev) => (prev ? { ...prev, slideOrder } : prev));
+    slideOrderSave.current = {
+      before,
+      timer: setTimeout(async () => {
+        slideOrderSave.current = null;
+        setActionError(null);
+        try {
+          await mapsApi.updateMap(mapId, { slideOrder });
+        } catch (err) {
+          setMap((prev) => (prev ? { ...prev, slideOrder: before } : prev));
+          setActionError(err instanceof ApiRequestError ? err.message : t.ui.errors.update);
+        }
+      }, SLIDE_ORDER_SAVE_MS),
+    };
+  }
+
   // "+" menu > Delete map (owner only): the map and everything on it, then
   // back to the dashboard.
   async function deleteThisMap() {
@@ -207,6 +236,7 @@ export function useMapControls({ map, setMap, nodes, userId, online, discussionO
     setMapBackgroundColor,
     setMapBackgroundImage,
     setMapBackgroundShade,
+    setSlideOrder,
     deleteThisMap,
     exitDemo,
     finish: {
