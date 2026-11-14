@@ -117,6 +117,7 @@ export interface Translation {
       boardColor: string;
       startingPoint: string;
       templates: {
+        empty: { label: string; desc: string };
         problem: { label: string; desc: string };
         decision: { label: string; desc: string };
         goal: { label: string; desc: string };
@@ -351,6 +352,7 @@ const en: Translation = {
       boardColor: "Board color",
       startingPoint: "Starting point",
       templates: {
+        empty: { label: "Empty map", desc: "A blank canvas with no nodes. Start from nothing and add your own." },
         problem: { label: "Problem analysis", desc: "Break a problem into parts, weigh ways to solve it, plan and check the result." },
         decision: { label: "Decision", desc: "Compare options with their advantages and risks." },
         goal: { label: "Goal planning", desc: "A goal with success criteria, steps, obstacles and a review." },

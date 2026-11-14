@@ -1185,6 +1185,7 @@ const translation: Translation = {
       boardColor: "Barva nástěnky",
       startingPoint: "Výchozí bod",
       templates: {
+        empty: { label: "Prázdná mapa", desc: "Prázdné plátno bez uzlů. Začněte od nuly a přidejte si vlastní." },
         problem: { label: "Analýza problému", desc: "Rozložte problém na části, zvažte řešení, naplánujte a ověřte výsledek." },
         decision: { label: "Rozhodnutí", desc: "Porovnejte varianty s jejich výhodami a riziky." },
         goal: { label: "Plánování cíle", desc: "Cíl s kritérii úspěchu, kroky, překážkami a kontrolou." },

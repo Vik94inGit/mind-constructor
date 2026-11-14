@@ -458,8 +458,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   is an outcome, so like unknown they draw no halo or horns and can't be an attack's or a protection's
   type. A Question written into from a template (its ghost's question asking, the writing answering) is a
   ready Quiz me card.
-- **Map types** — creating a map asks for one of six kinds (Problem analysis, Decision, Goal planning,
-  Retrospective, Idea, Study), each seeded with a starter structure in your language, and for a mode (Discussion or
+- **Map types** — creating a map asks for a starting point: an **Empty map** (a blank canvas, no kind and
+  no nodes) or one of six kinds (Problem analysis, Decision, Goal planning, Retrospective, Idea, Study),
+  each seeded with a starter structure in your language, and for a mode (Discussion or
   Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
   calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, and no Attack tab or
   menu item (switch to Discussion for those).
