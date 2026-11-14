@@ -32,6 +32,7 @@ export async function seedMapKind(
       prompt: prompts[p.key],
       type: p.type,
       order: p.order,
+      level: p.level,
       x: p.x,
       y: p.y,
       parentId: p.parentKey ? ids.get(p.parentKey) : rootNode.nodeId,

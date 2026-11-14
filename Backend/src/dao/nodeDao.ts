@@ -71,6 +71,7 @@ export const createNodeMutationDao = async (
     ghost?: boolean;
     emoji?: string;
     order?: number | null;
+    level?: number | null;
     type: NodeType;
     x?: number;
     y?: number;
@@ -91,6 +92,7 @@ export const createNodeMutationDao = async (
     ghost: nodeData.ghost,
     emoji: nodeData.emoji,
     order: nodeData.order,
+    level: nodeData.level ?? null,
     type: nodeData.type,
     parentId: nodeData.parentId,
     x: nodeData.x,

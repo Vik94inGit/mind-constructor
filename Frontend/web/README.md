@@ -123,6 +123,17 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (a submenu of the node types), *Analyze a problem* / *Make a decision* / *Plan a goal* / *Look back
   (retrospective)* / *Develop an idea* (grows that map kind's starter structure right there, see `utils/templates.ts`),
   *Draw a picture…* (below), *Text → nodes here* and *Text → map*. See `src/map/CanvasContextMenu.tsx`.
+- **Template levels** — a template asks its questions in rounds (`Node.level`, `utils/templates.ts`). Every
+  round's ghosts are on the canvas from the start, but a later round's are fainter, wear a 🔒 before
+  their question and can't be written in until every question of the rounds before it under the same
+  template root is answered or deleted; their panel says which level to answer first and how many are
+  left (`utils/templateLevels.ts`). *Develop an idea* asks: 1) what the idea is, how you feel about it,
+  what problem it solves, why it would work and the profit; 2) the possibilities, the problems and
+  obstacles, the plan and how you feel now; 3) what was done successfully, what failed, what it brings to
+  the table, how you feel about it and whether it is finished as it is, drawn as one ring per round.
+  The other templates are leveled too (problem: parts, then ways and a plan, then results; goal: the
+  criterion, then steps and obstacle, then review; decision: options, then their pros and risks; retro
+  and retry: what happened, then what to change).
 - **Map background** — the map's owner picks it in the display menu (the layers button): dot grid, plain,
   lined paper or soft dark (`Map.background`), plus an optional soft colour from the zones' calm palette
   (`Map.backgroundColor`), mixed into the paper so it stays muted (`softTint` in `src/utils/zoneStyle.ts`,

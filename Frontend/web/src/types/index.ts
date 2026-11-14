@@ -210,6 +210,8 @@ export interface NodeDoc {
   picture?: { id: string; kind: string; dot: number; color?: ZonePaletteColor | null } | null;
   /** Optional step number (1..9999) for labeling a process's steps — see Backend's Node.order. null/absent means "not numbered". */
   order?: number | null;
+  /** Which round of a leveled template this ghost belongs to (see Backend's Node.level); null/absent for every other node. A later round stays locked until the earlier ones are filled in (utils/templateLevels.ts). */
+  level?: number | null;
   type: NodeType;
   x?: number;
   y?: number;

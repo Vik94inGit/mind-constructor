@@ -236,6 +236,11 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   `""` = none) is the question a frontend shows as the ghost's placeholder — map templates create
   ghosts with a prompt and no text or title. Both ride along on `GET /:mapId/nodes` like `title`:
   the stored flag is what lets a frontend fade a ghost without the lazy `text` backfill.
+- **`Node.level`** — which round of a leveled template a ghost belongs to (whole number 1..9, `null` =
+  none: a template's root and every other node). Set only on `POST /api/nodes/:mapId` (`levelSchema`
+  in `nodeAbl.ts`); rides along on the node list. The backend only stores it: the frontend
+  (`utils/templateLevels.ts`) keeps a level's ghosts locked until every ghost of the earlier levels
+  under the same template root has been filled in (or deleted).
 - **`Node.picture`** — `{ id, kind, dot, color }` or null: which dot of a picture a node is, for nodes made by
   the frontend's "Draw a picture" (`Frontend/web/src/utils/pictures.ts` owns the pictures and draws
   their lines between the dots as the ghosts are filled in). `id` groups one picture's dots, `kind`
