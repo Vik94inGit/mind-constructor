@@ -469,6 +469,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   if it has one. A slide's text is sized to its length so it fits on the screen: a long thought gets
   smaller and reads left-aligned, and the *Under …* line shows two lines of the parent (`slideHeadSize`). The canvas under
   the slides stays as it was, so *Exit* lands back on exactly the view the presentation started from.
+  Type chips under the header (*All*, then one per type the map has, with its count) narrow the slides
+  and the summary to the picked types. The **Summary** tab gathers the map up instead of stepping
+  through it (`src/utils/mapSummary.ts`, `src/map/PresentationSummary.tsx`): a map without a template
+  lists its nodes grouped by type; a template map (some node still has a ghost's question) lists each
+  question with its answer (or *Not answered yet*), grouped by template level (`Node.level`; the root and
+  unleveled questions first), each level with *N of M answered* and a progress bar, and a lock line on a
+  level whose level before it isn't filled in yet. The user's own nodes in a template map follow as
+  *Your other notes*. Tapping a row opens its slide, or, for an unanswered question, the node on the map.
 - **Opening a map** — a map opens at 100% on its first parent (its first node, else the oldest root with
   children), never on empty canvas. Coming back to a map goes to the node that was open last time, or the
   spot that was in the middle of the screen when that spot still shows a node; a search result opens on

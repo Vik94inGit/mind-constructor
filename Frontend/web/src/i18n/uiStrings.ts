@@ -547,6 +547,27 @@ export interface UiStrings {
     empty: string;
     /** A zone's menu: starts a presentation of only that zone, its castles included. */
     presentZone: string;
+    /** The two tabs at the top: step through slides, or see the whole map gathered up. */
+    slidesTab: string;
+    summaryTab: string;
+    /** The type chips: label of the row, and the chip that clears them. */
+    filterTypes: string;
+    allTypes: string;
+    /** No node is of the picked types. */
+    noMatch: string;
+    /** A template map's summary: each question with its answer, by level. */
+    answersTitle: string;
+    level: (n: number) => string;
+    /** The group of a template's root and questions without a level. */
+    questions: string;
+    answeredOf: (answered: number, total: number) => string;
+    notAnswered: string;
+    /** A level whose level before it isn't filled in yet. */
+    locked: (previous: number) => string;
+    /** Nodes in a template map that aren't one of its questions. */
+    otherNotes: string;
+    /** Any map's summary: its nodes grouped by type. */
+    byTypeTitle: string;
   };
   exportText: { title: (mapName: string) => string; download: string };
   summary: { title: (mapName: string) => string; nodes: (count: number) => string; members: (count: number) => string };
@@ -1310,6 +1331,19 @@ const en: UiStrings = {
     showOnMap: "Show on map ↗",
     empty: "Nothing to present yet — add a node first",
     presentZone: "Present this zone",
+    slidesTab: "Slides",
+    summaryTab: "Summary",
+    filterTypes: "Show types",
+    allTypes: "All",
+    noMatch: "No nodes of these types",
+    answersTitle: "Answers",
+    level: (n) => `Level ${n}`,
+    questions: "Questions",
+    answeredOf: (a, total) => `${a} of ${total} answered`,
+    notAnswered: "Not answered yet",
+    locked: (prev) => `Opens once level ${prev} is filled in`,
+    otherNotes: "Your other notes",
+    byTypeTitle: "By type",
   },
   exportText: { title: (name) => `Export text — "${name}"`, download: "Download .md" },
   summary: {
