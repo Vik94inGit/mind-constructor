@@ -61,7 +61,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   that map's and the Inbox's quick notes, each opening the map at that thought. It stays until you
   make a second template map (`src/dashboard/FirstMapCard.tsx`, `src/dashboard/firstMap.ts`).
 - **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
-  with the quick-add ghosts or the toolbar, link nodes explicitly, draw separator lines, attack
+  with the quick-add ghosts or the toolbar (the ring offers the types that fit what the map is for:
+  a problem map the problem-solving types, a study map Title, Question, ✅ answer, Idea and ❓, a map
+  made empty every type; its ⋯ ghost opens every type, `src/utils/ringTypes.ts`), link nodes explicitly, draw separator lines, attack
   other members' nodes with the three combat weapons, shield your own, pack nodes into a
   container, group nodes into a chosen circle, choose a node (and optionally its whole branch) to
   link/copy/number/delete together, and switch how nodes read (icons only, icons + text, or

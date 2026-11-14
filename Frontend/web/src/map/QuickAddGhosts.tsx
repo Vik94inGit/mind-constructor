@@ -91,6 +91,12 @@ interface Props {
   onChangeType?: (type: NodeType) => void;
   /** The types the chosen node may become (a weapon or protection node only takes ATTACK_NODE_TYPES). */
   changeTypes?: readonly NodeType[];
+  /**
+   * The types the ring offers, in ring order (utils/ringTypes.ts: by the map's
+   * kind). When it's fewer than every type, a ⋯ ghost closes the ring and opens
+   * every type on a tap (and back).
+   */
+  types?: readonly NodeType[];
 }
 
 // How far (screen px) a ghost has to travel before a press counts as a drag.
@@ -127,6 +133,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   currentType,
   onChangeType,
   changeTypes = NODE_TYPES,
+  types = NODE_TYPES,
 }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
@@ -134,7 +141,11 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
     const id = setInterval(() => setStep((s) => s + 1), STEP_MS);
     return () => clearInterval(id);
   }, []);
-  const count = NODE_TYPES.length;
+  // The ⋯ ghost: shown when the ring holds fewer than every type; a tap opens them all.
+  const [showAll, setShowAll] = useState(false);
+  const hasMore = types.length < NODE_TYPES.length;
+  const ringTypes = showAll ? NODE_TYPES : types;
+  const count = ringTypes.length + (hasMore ? 1 : 0);
   const introSteps = intro ? count * 2 : 0;
   const shownCount = step < introSteps ? Math.floor(step / 2) + 1 : count;
   // Which ghost's name is showing right now, -1 for none.
@@ -318,7 +329,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   }
   return (
     <>
-      {NODE_TYPES.map((type, i) => {
+      {ringTypes.map((type, i) => {
         if (i >= shownCount) return null;
         // Back to a full 360° ring — the node's own caption is hidden
         // outright while it's selected now (see NodeCard), which was the
@@ -330,7 +341,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
         // top (was clockwise) — the first type still lands straight up
         // (i=0 keeps angle at -90°), only the direction the rest of the
         // list sweeps around the circle flips.
-        const angle = (-i / NODE_TYPES.length) * Math.PI * 2 - Math.PI / 2;
+        const angle = (-i / count) * Math.PI * 2 - Math.PI / 2;
         const x = ringCenter.x + R * Math.cos(angle);
         const y = ringCenter.y + R * Math.sin(angle);
         return (
@@ -428,6 +439,49 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
           </button>
         );
       })}
+      {hasMore && ringTypes.length < shownCount && (() => {
+        // The ⋯ ghost, last on the ring: every type, or back to the map's own.
+        const i = ringTypes.length;
+        const angle = (-i / count) * Math.PI * 2 - Math.PI / 2;
+        const x = ringCenter.x + R * Math.cos(angle);
+        const y = ringCenter.y + R * Math.sin(angle);
+        const name = showAll ? t.ui.node.ghostFewerTypes : t.ui.node.ghostAllTypes;
+        return (
+          <button
+            key="more-types"
+            type="button"
+            data-testid="ghost-more-types"
+            className="absolute z-[33] flex -translate-x-1/2 -translate-y-1/2 cursor-pointer animate-ghost-in flex-col items-center border-0 bg-transparent p-0 opacity-75 transition-[opacity,transform] duration-[150ms] ease-[ease] hover:translate-x-[-50%] hover:translate-y-[-50%] hover:scale-[1.1] hover:opacity-100 focus-visible:translate-x-[-50%] focus-visible:translate-y-[-50%] focus-visible:scale-[1.1] focus-visible:opacity-100"
+            style={{ left: x, top: y, touchAction: "manipulation" }}
+            title={name}
+            aria-label={name}
+            aria-pressed={showAll}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (Date.now() - stageAt.current < STAGE_GUARD_MS) return;
+              setArmed(null);
+              setShowAll((v) => !v);
+            }}
+          >
+            <div
+              className="flex items-center justify-center rounded-full border-2 border-dashed bg-[var(--node-fill)] shadow-card"
+              style={{ height: EMOJI_GHOST_SIZE * k, width: EMOJI_GHOST_SIZE * k, borderColor: "var(--line)" }}
+            >
+              <span aria-hidden className="leading-none font-bold text-ink-soft" style={{ fontSize: 18 * k }}>
+                {showAll ? "−" : "⋯"}
+              </span>
+            </div>
+            <div
+              className={`pointer-events-none absolute left-1/2 top-full -translate-x-1/2 rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] text-[0.66rem] leading-[1.2] font-semibold whitespace-nowrap text-ink shadow-card transition-opacity duration-500 will-change-[opacity] ${
+                labelIndex === i ? "opacity-100" : "opacity-0"
+              }`}
+              style={{ marginTop: 4.8 * k, transform: `scale(${k})`, transformOrigin: "50% 0" }}
+            >
+              {name}
+            </div>
+          </button>
+        );
+      })()}
       {sketch && (
         // The branch being drawn: a dashed stroke from the node to the ghost
         // under the pointer, in the type's colour.

@@ -4,6 +4,7 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
+import { ringTypesFor } from "../utils/ringTypes";
 import { useBackGuard } from "../hooks/useBackGuard";
 import { useIntroMigration } from "../hooks/useIntroMigration";
 import { usePositionGlide } from "../hooks/usePositionGlide";
@@ -2299,6 +2300,7 @@ export function MapPage() {
                 onSketch={canEditNode(selectedNode) ? (type, pos) => void sketchBranch(type, pos, selectedNode) : undefined}
                 currentType={selectedNode.type}
                 changeTypes={selectedNode.isWeapon || selectedNode.isProtection ? ATTACK_NODE_TYPES : NODE_TYPES}
+                types={ringTypesFor(map?.kind, selectedNode.type)}
                 onChangeType={canEditNode(selectedNode) ? (type) => void handleChangeNodeType(selectedNode, type) : undefined}
               />
             )}
@@ -2307,6 +2309,7 @@ export function MapPage() {
               <QuickAddGhosts
                 key={`intro:${emojiFirst}`}
                 intro
+                types={ringTypesFor(map?.kind)}
                 compact={compactView || !isDiscussionMode}
                 zoom={zoom}
                 anchorPos={{ x: CANVAS_W / 2, y: CANVAS_H / 2 }}
