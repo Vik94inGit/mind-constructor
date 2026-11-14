@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+vi.mock("../utils/usage", () => ({ track: vi.fn() }));
 import { renderHook } from "@testing-library/react";
 import { useLevelReveal } from "./useLevelReveal";
 import type { NodeDoc } from "../types";
@@ -24,5 +25,24 @@ describe("useLevelReveal", () => {
     const onReveal = vi.fn();
     renderHook(() => useLevelReveal([node("root", null, null), node("a", "root", 1, true), node("b", "root", 2)], onReveal));
     expect(onReveal).not.toHaveBeenCalled();
+  });
+
+  it("tells once the last round is answered, and gives where each template stands", () => {
+    const onFinished = vi.fn();
+    const first = [node("root", null, null), node("a", "root", 1, true), node("b", "root", 2)];
+    const { result, rerender } = renderHook(({ nodes }) => useLevelReveal(nodes, vi.fn(), onFinished), {
+      initialProps: { nodes: first },
+    });
+    expect(result.current.progress.get("root")).toMatchObject({ level: 2, levels: 2, left: 1, done: false });
+    rerender({ nodes: first.map((n) => (n.nodeId === "b" ? { ...n, ghost: false, text: "done" } : n)) });
+    expect(onFinished).toHaveBeenCalledWith(2);
+  });
+
+  it("doesn't call a template finished that was already done when the map opened", () => {
+    const onFinished = vi.fn();
+    const done = [node("root", null, null), node("a", "root", 1, true), node("b", "root", 2, true)];
+    const { rerender } = renderHook(({ nodes }) => useLevelReveal(nodes, vi.fn(), onFinished), { initialProps: { nodes: done } });
+    rerender({ nodes: [...done] });
+    expect(onFinished).not.toHaveBeenCalled();
   });
 });

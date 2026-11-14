@@ -112,6 +112,8 @@ interface Props {
   hideCaption?: boolean;
   /** A ghost of a leveled template whose round hasn't come yet (utils/templateLevels.ts): drawn fainter, its question behind a 🔒. */
   levelLocked?: boolean;
+  /** The root of a leveled template: the round it's on, of how many, as a small pill under its icon (utils/templateLevels.ts templateProgress). */
+  levelBadge?: { level: number; levels: number; done: boolean };
   /** The node the time-lapse has just brought back: its caption shows its title and text, up to 5 rows, whatever else would hide it. */
   replayCaption?: boolean;
   /** How many nodes are currently packed into this one (MapPage's packedCountByContainer) — undefined/0 renders no badge. See the corner-badge markup below. */
@@ -206,6 +208,7 @@ export const NodeCard = memo(function NodeCard({
   dropHighlight,
   inlineEditing,
   levelLocked = false,
+  levelBadge,
   flightVector,
   onInlineConfirm,
   onInlineCancel,
@@ -640,6 +643,7 @@ export const NodeCard = memo(function NodeCard({
           isVariantParent={isVariantParent}
           hiddenBranch={hiddenBranch}
           calm={calm}
+          levelBadge={levelBadge}
         />
         {/* Halo/horns (NodeCrown), shared with QuickAddGhosts. */}
         {!puzzle && !showPictureCard && !calm && (!compact || triumphant) && <NodeCrown type={displayType} symbolOverride={node.symbolOverride} />}

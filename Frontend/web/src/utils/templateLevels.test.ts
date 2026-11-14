@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hiddenLevelIds, levelLocks, revealedRound } from "./templateLevels";
+import { hiddenLevelIds, levelLocks, revealedRound, templateProgress } from "./templateLevels";
 import type { NodeDoc } from "../types";
 
 type N = Pick<NodeDoc, "nodeId" | "parentId" | "level" | "ghost" | "text">;
@@ -102,5 +102,29 @@ describe("revealedRound", () => {
     expect(revealedRound(hidden, hidden, nodes)).toBeNull();
     // A hidden ghost deleted isn't a new question.
     expect(revealedRound(hidden, new Set(), [node("root", null, null), node("a", "root", 1)])).toBeNull();
+  });
+});
+
+describe("templateProgress", () => {
+  const ask = (n: N, prompt: string) => ({ ...n, prompt });
+
+  it("says which round a template is on, of how many, and what the next one asks", () => {
+    const p = templateProgress([
+      node("root", null, null),
+      node("a", "root", 1, true),
+      node("b", "root", 1),
+      ask(node("c", "root", 2), "What is the plan?"),
+      node("d", "root", 3),
+    ]).get("root");
+    expect(p).toEqual({ level: 1, levels: 3, left: 1, next: ["What is the plan?"], done: false });
+  });
+
+  it("is done once every round is answered or deleted", () => {
+    const p = templateProgress([node("root", null, null), node("a", "root", 1, true), node("c", "root", 2, true)]).get("root");
+    expect(p).toMatchObject({ level: 2, levels: 2, left: 0, next: [], done: true });
+  });
+
+  it("leaves out a template with a single round", () => {
+    expect(templateProgress([node("root", null, null), node("a", "root", 1)]).size).toBe(0);
   });
 });

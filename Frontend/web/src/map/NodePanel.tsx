@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { TemplateProgress } from "../utils/templateLevels";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
@@ -114,6 +115,8 @@ interface Props {
   textLocked?: boolean;
   /** Set on a locked ghost of a leveled template (utils/templateLevels.ts): why it can't be written in yet. */
   levelLock?: string;
+  /** Where the leveled template grown from this node stands (utils/templateLevels.ts templateProgress). */
+  levelProgress?: TemplateProgress;
   /** Locks/unlocks this node — owner only. */
   onToggleLock?: () => void;
   /** Set on a parent with nodes of yours: pulls those outside its zone back in (utils/parentMagnet.ts), resolving to how many moved. */
@@ -182,6 +185,7 @@ export function NodePanel({
   cardLook,
   textLocked = false,
   levelLock,
+  levelProgress,
   onToggleLock,
   onMagnet,
   onChangeParent,
@@ -648,6 +652,7 @@ export function NodePanel({
           cardLook={cardLook}
           textLocked={textLocked}
           levelLock={levelLock}
+          levelProgress={levelProgress}
           onToggleLock={onToggleLock}
           onMagnet={onMagnet}
           onChangeParent={onChangeParent}

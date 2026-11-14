@@ -63,6 +63,16 @@ export interface UiStrings {
     unlocked: (level: number, count: number) => string;
     /** A leveled template just grown: how many questions its first round asks, and how many rounds wait behind it. */
     createdRounds: (count: number, later: number) => string;
+    /** Where a leveled template stands, on its root's Info tab: the level being answered, of how many, and how many of its questions are left. */
+    progress: (level: number, levels: number, left: number) => string;
+    /** The same once every level is answered. */
+    progressDone: (levels: number) => string;
+    /** The level pill's tooltip on a template's root. */
+    levelBadge: (level: number, levels: number) => string;
+    /** Opens the list of what the next level will ask. */
+    peekNext: (level: number) => string;
+    /** A leveled template's last question just answered. */
+    finished: (levels: number) => string;
     nodes: Record<TemplateNodeKey, string>;
   };
   /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
@@ -791,6 +801,11 @@ const en: UiStrings = {
     undo: "Undo",
     seeded: "Started with the template questions",
     locked: (level, left) => `🔒 Answer level ${level} first (${left} left). Delete a question you want to skip.`,
+    progress: (level, levels, left) => `Level ${level} of ${levels} · ${left} ${left === 1 ? "question" : "questions"} left`,
+    progressDone: (levels) => `All ${levels} levels answered`,
+    levelBadge: (level, levels) => `Level ${level} of ${levels}`,
+    peekNext: (level) => `What level ${level} will ask`,
+    finished: (levels) => `✓ All ${levels} levels answered. Well thought through.`,
     unlocked: (level, n) => `🔓 Level ${level} is open: ${n} new ${n === 1 ? "question" : "questions"}`,
     createdRounds: (n, later) =>
       `Added ${n} ${n === 1 ? "question" : "questions"}. ${later === 1 ? "One more level opens" : `${later} more levels open`} once these are answered (delete one to skip it).`,
@@ -1540,6 +1555,8 @@ const en: UiStrings = {
         node_protected: "Protected a node",
         map_finished: "Finished a discussion",
         replay_played: "Played the replay",
+        template_level_opened: "Opened a template's next level",
+        template_finished: "Answered every level of a template",
       },
       featuresTitle: "Every feature, least used first",
       featuresHint: "Features nobody used in this period are at the top: candidates to improve, explain better or remove.",

@@ -17,6 +17,8 @@ interface Props {
   hiddenBranch: boolean;
   /** A Personal map: no crown. */
   calm: boolean;
+  /** A leveled template's root: "1/3" while it's being answered, ✓ once every level is. */
+  levelBadge?: { level: number; levels: number; done: boolean };
 }
 
 /**
@@ -24,12 +26,23 @@ interface Props {
  * several can show at once: under fire top-right, crown top-left, packed
  * count bottom-right, shield bottom-left, step number (or the hidden-branch
  * eye) left middle, the viewer's feeling right middle, and the imitated
- * opponent's flag on the top edge.
+ * opponent's flag on the top edge, a template's level bottom middle.
  */
-export function NodeBadges({ node, indicator, feeling, packedCount, parentCrownSentiment, isVariantParent, hiddenBranch, calm }: Props) {
+export function NodeBadges({ node, indicator, feeling, packedCount, parentCrownSentiment, isVariantParent, hiddenBranch, calm, levelBadge }: Props) {
   const { t } = useI18n();
   return (
     <>
+    {levelBadge && (
+      <div
+        className={`absolute -bottom-2 left-1/2 z-[6] flex h-[1.1rem] -translate-x-1/2 items-center justify-center rounded-full border-2 border-surface px-1.5 text-[0.6rem] leading-none font-bold whitespace-nowrap ${
+          levelBadge.done ? "bg-success text-white" : "bg-surface-2 text-ink"
+        }`}
+        title={levelBadge.done ? t.ui.templates.progressDone(levelBadge.levels) : t.ui.templates.levelBadge(levelBadge.level, levelBadge.levels)}
+        data-testid="level-badge"
+      >
+        {levelBadge.done ? "✓" : `${levelBadge.level}/${levelBadge.levels}`}
+      </div>
+    )}
     {indicator && (
       <div className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface bg-danger text-[0.65rem] font-bold text-white">
         {indicator.incomingNegativeEdges}

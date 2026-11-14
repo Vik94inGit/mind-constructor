@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { LevelProgress } from "./LevelProgress";
+import type { TemplateProgress } from "../../utils/templateLevels";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import { imageFilesFrom } from "../../utils/images";
 import { MAX_NODE_TEXT, pasteKeepingOverflow } from "../../utils/nodeText";
@@ -34,6 +36,8 @@ interface Props {
   textLocked: boolean;
   /** Why this ghost of a leveled template can't be written in yet (utils/templateLevels.ts); absent once it can. */
   levelLock?: string;
+  /** Where the leveled template grown from this node stands, if one was. */
+  levelProgress?: TemplateProgress;
   onToggleLock?: () => void;
   /** Calls this parent's far nodes back in — see NodePanel's own prop. */
   onMagnet?: () => Promise<number>;
@@ -82,7 +86,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, levelLock, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, levelLock, levelProgress, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   // Pasted text that didn't fit (utils/nodeText.ts), offered for a new node.
@@ -99,6 +103,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
       {/* The node's title, when it has one — read-only here for
           everyone; the owner edits it under Modify. */}
       {node.title && <div className="mb-2 text-[0.95rem] font-semibold text-ink"><MathText text={node.title} /></div>}
+      {levelProgress && <LevelProgress progress={levelProgress} />}
       {levelLock && (
         <div data-testid="level-lock" role="note" className="mb-2 rounded-lg border border-line bg-surface-2 px-[0.7rem] py-[0.45rem] text-[0.8rem] text-ink-soft">
           {levelLock}

@@ -360,8 +360,17 @@ export function MapPage() {
 
   // A leveled template's later rounds: locked, and kept off the canvas, until
   // the earlier ones are answered; the user is told when one opens.
-  const { locks: levelLockById, hidden: levelHidden } = useLevelReveal(nodes, ({ level, count }) =>
-    showNotice(t.ui.templates.unlocked(level, count)),
+  // Answering a template's last level is a small moment of its own, and the
+  // right time to ask "And now?" (CheckInPrompt), not on the next open.
+  const [templateDone, setTemplateDone] = useState(false);
+  useEffect(() => setTemplateDone(false), [mapId]);
+  const { locks: levelLockById, hidden: levelHidden, progress: levelProgressById } = useLevelReveal(
+    nodes,
+    ({ level, count }) => showNotice(t.ui.templates.unlocked(level, count)),
+    (levels) => {
+      showNotice(t.ui.templates.finished(levels));
+      setTemplateDone(true);
+    },
   );
   // Packed-away members are left off the canvas (NodePanel still gets every
   // node, for the container's Packed list), and so is a round not yet open.
@@ -1202,6 +1211,7 @@ export function MapPage() {
       }}
       textLocked={!!blockLocks[panelFor.nodeId]}
       levelLock={levelLockFor(panelFor.nodeId)}
+      levelProgress={levelProgressById.get(panelFor.nodeId)}
       autoFocusText={focusTextNodeId === panelFor.nodeId}
       onAutoFocused={() => setFocusTextNodeId(null)}
       onToggleLock={isOwnNode(panelFor) ? () => toggleBlockLock(panelFor.nodeId) : undefined}
@@ -2003,7 +2013,7 @@ export function MapPage() {
       {finish.isFinished && !timeLapse && (
         <FinishedBanner {...battleTally(nodes)} onReplay={startTimeLapse} onReopen={finish.reopen} busy={finish.busy} />
       )}
-      {mapId && !timeLapse && <CheckInPrompt key={mapId} mapId={mapId} checkIn={checkIn} finished={finish.isFinished} onSave={setCheckIn} />}
+      {mapId && !timeLapse && <CheckInPrompt key={mapId} mapId={mapId} checkIn={checkIn} finished={finish.isFinished || templateDone} onSave={setCheckIn} />}
 
       <div className="flex min-h-0 flex-1">
         {desktopLayout && !presenting && renderToolbar(true)}
@@ -2212,6 +2222,7 @@ export function MapPage() {
                   }
                   inlineEditing={editingThis && !levelLockById.has(node.nodeId)}
                   levelLocked={levelLockById.has(node.nodeId)}
+                  levelBadge={levelProgressById.get(node.nodeId)}
                   actions={nodeActions}
                   canResize={canEditNode(node)}
                   cardFill={cardFills[node.nodeId]}
