@@ -440,7 +440,6 @@ const ui: UiStrings = {
     byUser: (name) => `od ${name}`,
     prevNode: "Předchozí uzel (←)",
     textLabel: "Text uzlu",
-    formulaPreview: "Náhled vzorců",
     tabsLabel: "Části uzlu",
     nextNode: "Další uzel (→)",
     root: "kořen",

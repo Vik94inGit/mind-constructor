@@ -258,8 +258,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (`map/MathText.tsx`, KaTeX). It reads the LaTeX that copied text already carries: `$…$` and
   `\(…\)` inside a sentence, `$$…$$` and `\[…\]` on a line of their own (as ChatGPT, Overleaf and
   lecture notes copy it), and Wikipedia's `{\displaystyle …}`. A `$` that looks like money (`$5 and
-  $10`) stays text (`utils/mathText.ts`). While the panel's text box holds a formula, a *Formulas
-  preview* under it shows how it will read. The stored text stays plain, so search, export and the
+  $10`) stays text (`utils/mathText.ts`). In the panel a text with formulas shows only rendered;
+  tapping it (or *Edit*) opens the raw text to change, and leaving the field saves it and shows the
+  formulas again. The stored text stays plain, so search, export and the
   length cap are unchanged, and KaTeX is a separate download fetched only when a text has a formula.
 - **Quiz me** — the map tests its reader ([sketch](../../docs/gestures/quiz-me.md)). Started from the
   empty-canvas menu (hold or right-click empty canvas) or the layers menu, it shows one card at a time
