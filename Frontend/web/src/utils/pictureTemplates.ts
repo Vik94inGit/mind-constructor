@@ -67,13 +67,14 @@ export async function pictureTemplateFile(kind: PictureTemplate, fetcher: typeof
 // The paintings a starter structure's first node is given (utils/structurePicture.ts):
 // "Develop an idea" a bulb, "Analyze a problem" the puppeteer's hand, "Make a
 // decision" the yin-yang yo-yo; a retrospective and a plan each pick one of
-// theirs at random every time one is grown.
+// theirs at random every time one is grown; "Learn a topic" the eyes.
 export const MAP_KIND_PICTURES: Record<MapKind, readonly PictureTemplate[]> = {
   idea: ["lightbulb"],
   problem: ["puppet"],
   decision: ["yoyo"],
   retro: ["heartMirror", "clockHeads"],
   goal: ["clockJuice", "orangeClock", "fishing"],
+  study: ["eyes"],
 };
 
 /** One of `kind`'s paintings, at random when it has more than one. */

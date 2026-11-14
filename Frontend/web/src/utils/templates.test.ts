@@ -63,7 +63,7 @@ describe("layoutTemplate", () => {
   });
 
   it("places one entry per node across every template kind, in parent-before-child order", () => {
-    for (const kind of ["problem", "goal", "retry", "decision", "retro", "idea"] as const) {
+    for (const kind of ["problem", "goal", "retry", "decision", "retro", "idea", "study", "question"] as const) {
       const placed = layoutTemplate(kind, { x: CANVAS_W / 2, y: CANVAS_H / 2 });
       const seen = new Set<string>();
       for (const p of placed) {
@@ -93,8 +93,37 @@ describe("layoutTemplate", () => {
     ]);
   });
 
+  it("studies a topic in titles and questions only, three rounds deep", () => {
+    const placed = layoutTemplate("study", { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+    expect(new Set(placed.map((p) => p.type))).toEqual(new Set(["Title", "Question"]));
+    expect(placed.map((p) => [p.key, p.type, p.level, p.parentKey])).toEqual([
+      ["studyWhat", "Question", 1, null],
+      ["studyWhy", "Question", 1, null],
+      ["studyPart1", "Title", 1, null],
+      ["studyPart1Key", "Question", 2, "studyPart1"],
+      ["studyPart1Example", "Question", 2, "studyPart1"],
+      ["studyPart2", "Title", 1, null],
+      ["studyPart2Key", "Question", 2, "studyPart2"],
+      ["studyPart2Example", "Question", 2, "studyPart2"],
+      ["studyConnect", "Question", 2, null],
+      ["studyExam", "Question", 3, null],
+      ["studyUnclear", "Question", 3, null],
+    ]);
+  });
+
+  it("follows a question up with more questions", () => {
+    const placed = layoutTemplate("question", { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+    expect(placed.every((p) => p.type === "Question" && p.parentKey === null)).toBe(true);
+    expect(placed.map((p) => p.level)).toEqual([1, 1, 2, 2]);
+  });
+
+  it("offers the study templates on a Title and a Question", () => {
+    expect(NODE_TYPE_TEMPLATE.Title).toBe("study");
+    expect(NODE_TYPE_TEMPLATE.Question).toBe("question");
+  });
+
   it("gives every node of every template a level, starting at 1", () => {
-    for (const kind of ["problem", "goal", "retry", "decision", "retro", "idea"] as const) {
+    for (const kind of ["problem", "goal", "retry", "decision", "retro", "idea", "study", "question"] as const) {
       const levels = layoutTemplate(kind, { x: CANVAS_W / 2, y: CANVAS_H / 2 }).map((p) => p.level);
       expect(Math.min(...levels)).toBe(1);
       for (const l of levels) expect(Number.isInteger(l)).toBe(true);
@@ -102,7 +131,7 @@ describe("layoutTemplate", () => {
   });
 
   it("never asks a child before its parent", () => {
-    for (const kind of ["problem", "goal", "retry", "decision", "retro", "idea"] as const) {
+    for (const kind of ["problem", "goal", "retry", "decision", "retro", "idea", "study", "question"] as const) {
       const placed = layoutTemplate(kind, { x: CANVAS_W / 2, y: CANVAS_H / 2 });
       const byKey = new Map(placed.map((p) => [p.key, p]));
       for (const p of placed) if (p.parentKey) expect(p.level).toBeGreaterThanOrEqual(byKey.get(p.parentKey)!.level);

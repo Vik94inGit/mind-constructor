@@ -10,7 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working in **th
 The backend for Mind Constructor: notes you can see. The product's main path is personal — jot a
 thought (a quick note lands in an Inbox map), lay thoughts out on a canvas, find any of them again
 through search — with sharing and a discussion ("battle") layer on top. Users build a
-**map** of **nodes** (Problem / Problematic option / Solution / Option / Success / Fail / Idea / unknown)
+**map** of **nodes** (Problem / Problematic option / Solution / Option / Success / Fail / Idea / unknown,
+plus the study types Title and Question, which like unknown have no outcome and are never an attack's or a protection's type)
 connected by **edges** with a sentiment (positive/negative/neutral). Multiple invited members work
 the same map live over Socket.IO. Layered on top of the mapping itself is a "combat" system:
 members can attack *any* node on the map with one of three weapons (nitpick/counterpoint/
@@ -265,7 +266,7 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   an extra room `map:{id}:owner`, and `broadcastToMap` sends any event whose payload mentions a hidden
   node's `nodeId` to that room only (per-map queue keeps event order); a toggle broadcasts
   `nodes:visibility` (no node id in its payload, so everyone gets it) and clients reload what they may see.
-- **`Map.kind`** — `problem | decision | goal | retro | idea` (`MAP_KINDS`), chosen when a map is created
+- **`Map.kind`** — `problem | decision | goal | retro | idea | study` (`MAP_KINDS`), chosen when a map is created
   (`POST /api/` body `kind`, alongside `discussionMode`). Descriptive only; a frontend seeds the matching
   starter structure itself (`utils/seedMap.ts`), so the seeded text is in the user's language. The older
   server-side `template` seeds (blank / single-problem / decision-tree / pro-con / demo) still work.

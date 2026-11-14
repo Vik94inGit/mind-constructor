@@ -10,6 +10,8 @@ export const NODE_TYPE_COLORS: Record<NodeType, string> = {
   Fail: "var(--n-fail)",
   Idea: "var(--n-idea)",
   unknown: "var(--n-unknown)",
+  Title: "var(--n-title)",
+  Question: "var(--n-question)",
 };
 
 // No more per-weapon icon (sword/axe/spear as different glyphs) — every
@@ -125,11 +127,12 @@ export function cycleAttackNodeType(current: NodeType): NodeType {
 
 // Which node types an attack may carry in Discussion (battle) mode — mirrors
 // Backend attackAbl.ts's allowedAttackTypes, which is what actually enforces
-// it. The map's owner may use anything; any other member answers a negative
+// it. The map's owner may use any outcome type or a question (never a study
+// Title or Question, which aren't attack types); any other member answers a negative
 // node with positive ones, and a positive (or unknown) node with a question
 // or a negative problem/option. Personal mode has no such limit.
 export function allowedAttackTypes(isMapOwner: boolean, targetType: NodeType): NodeType[] {
-  if (isMapOwner) return [...NODE_TYPES];
+  if (isMapOwner) return [...ATTACK_NODE_TYPES, "unknown"];
   if (sentimentOf(targetType) === "negative") return ["Solution", "Option", "Success", "Idea"];
   return ["unknown", "Problem", "Problematic option"];
 }

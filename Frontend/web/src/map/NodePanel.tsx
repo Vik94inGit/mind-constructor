@@ -8,7 +8,7 @@ import { PictureDotsList, PictureDotsMap, pictureGroupOf } from "./nodePanel/Pic
 import type { NodeTemplateKind, TemplateKind } from "../utils/templates";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
 import { ringKindFor } from "./OutcomeBadge";
-import { ATTACK_NODE_TYPES, NODE_TYPES } from "../types";
+import { ATTACK_NODE_TYPES } from "../types";
 import type { Attack, AttackNodeType, EdgeDoc, ManualZoneColor, NodeDoc, NodeShape, NodeType, SizeTier, SymbolOverride, Weapon } from "../types";
 import { useI18n } from "../i18n/I18nContext";
 import { usePanelSheet } from "./nodePanel/usePanelSheet";
@@ -269,8 +269,9 @@ export function NodePanel({
 
   // Which node types this attack may carry: in battle mode the owner may use
   // anything, everyone else is limited by the target's side (mirrors
-  // attackAbl.ts, which enforces it); in Personal mode there is no limit.
-  const attackTypes: NodeType[] = discussionMode ? allowedAttackTypes(isMapOwner, node.type) : [...NODE_TYPES];
+  // attackAbl.ts, which enforces it); in Personal mode anyone gets the owner's
+  // set (every type an attack may be, which leaves out the study types).
+  const attackTypes: NodeType[] = allowedAttackTypes(!discussionMode || isMapOwner, node.type);
   // The type actually sent: the picked one while it is still allowed, else
   // the first allowed (a mode flip or a different target can invalidate it).
   const effectiveAttackType = attackTypes.includes(attackType) ? attackType : attackTypes[0];

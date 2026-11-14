@@ -3,7 +3,7 @@ import { ZONE_PALETTE } from "./palette.js";
 
 // What a map is for — picked when it is created, and the frontend seeds a
 // matching starter structure. Purely descriptive: nothing here is enforced.
-export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea"] as const;
+export const MAP_KINDS = ["problem", "decision", "goal", "retro", "idea", "study"] as const;
 
 // The canvas behind a map's nodes, picked by the map's owner and seen by every
 // member. null (every map that never picked one) draws the dot grid.

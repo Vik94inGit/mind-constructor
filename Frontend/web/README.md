@@ -155,8 +155,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (both put it in the middle of the view), or the right-click menu (at the click point); then
   pick one. The first group has a picture for each node type, and its dots arrive as thoughts of
   that type: a bulb (Idea), a stop sign (Problem), a warning triangle (Problematic option), a key
-  (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail) and a question mark
-  (unknown). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
+  (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail), a question mark
+  (unknown), a book (Title) and a speech bubble (Question). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
   Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking its own
   question on the picture's theme (a stop sign: "What is stopping you?", "What keeps coming back?"…;
   a heart: "What do you love?", "Who do you love?"…). Write in two
@@ -197,7 +197,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
 - **Type symbols and emoji** — on the canvas every type shows its own symbol by default: pause bars
   for a Problem, play for a Problematic option and an Option, target rings for a Solution, ✓ Success,
-  ✗ Fail, a bulb for an Idea and ? for unknown (`map/OutcomeBadge.tsx`). Symbols first is the default: the
+  ✗ Fail, a bulb for an Idea and ? for unknown (`map/OutcomeBadge.tsx`); the study types keep a plain
+  glyph, an open book for a Title and a speech bubble with a ? for a Question (`map/NodeTypeIcon.tsx`). Symbols first is the default: the
   type's symbol is face up and a node's own emoji sits on the back. With *Emoji first* turned on in
   the display menu (`Preferences.emojiUp`) a node with an emoji shows it face up, its type's symbol on the back of a two-sided card
   that turns over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the node's own
@@ -295,8 +296,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   empty-canvas menu (hold or right-click empty canvas) or the layers menu (at its top, with Present and
   Time-lapse, so a short window never hides it; a menu beside the computer's toolbar lifts to stay on
   screen and scrolls what doesn't fit, `hooks/useKeepOnScreen.ts`), it shows one card at a time
-  over the map: only a ❓ (unknown), a Problem or a goal (Solution) asks, and its ✅ (Success) children
-  answer; other nodes, and an asking node with no ✅ under it, make no card (`utils/quiz.ts`). Tap the card (Space) to turn
+  over the map: only a ❓ (unknown), a Problem, a goal (Solution) or a study Question asks, and its ✅ (Success) children
+  answer; a study Question answered in place (a template's question written into) is a card of its own,
+  asking its question and answered by what was written; other nodes, and an asking node with no answer, make no card (`utils/quiz.ts`). Tap the card (Space) to turn
   it, then mark it *Not yet*, *Shaky* or *Know it* (1 / 2 / 3); ← steps back, Esc leaves. Under the
   card the reader can write their own answer first (Ctrl/Cmd+Enter turns the card from the field); the
   turned card then shows *Your answer* beside the true one to compare by eye. What's written is kept
@@ -440,12 +442,21 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   a Problem gets an issue-tree / plan-do-check structure, a Solution (goal) gets a SMART-style
   breakdown, an Idea gets "Develop this idea" (the need it meets, how it would work with the smallest
   way to try it, what would prove it, what could kill it, what is still unknown, and another idea for
-  the same need), and a failed (Fail) node gets "Analyze and try again". A template's first level lands
+  the same need), a failed (Fail) node gets "Analyze and try again", a Title gets "Study this topic"
+  (in titles and questions only: what it is, why it matters and two main parts as Titles; then each
+  part's key idea and an example, and how it connects to what you know; then what an exam would ask
+  and what is still unclear) and a Question gets "Dig into this question" (why it is so and an
+  example, then a common mistake and how to explain it simply). A template's first level lands
   on a shape round the node: three (or six) make an equilateral triangle, four a square, any other
   number a circle, and each deeper level fans a step further out (`src/utils/shapeLayout.ts`,
   `src/utils/templates.ts`).
-- **Map types** — creating a map asks for one of five kinds (Problem analysis, Decision, Goal planning,
-  Retrospective, Idea), each seeded with a starter structure in your language, and for a mode (Discussion or
+- **Study types** — besides the problem-solving types there are two for learning: a **Title** (📖, the
+  heading of a topic or one of its parts) and a **Question** (🤔, something to be able to answer). Neither
+  is an outcome, so like unknown they draw no halo or horns and can't be an attack's or a protection's
+  type. A Question written into from a template (its ghost's question asking, the writing answering) is a
+  ready Quiz me card.
+- **Map types** — creating a map asks for one of six kinds (Problem analysis, Decision, Goal planning,
+  Retrospective, Idea, Learn a topic), each seeded with a starter structure in your language, and for a mode (Discussion or
   Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
   calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, and no Attack tab or
   menu item (switch to Discussion for those).

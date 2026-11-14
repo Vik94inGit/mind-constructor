@@ -10,9 +10,10 @@ Date: 2026-11-09 · PR: <link once it exists>
 
 - **How it starts:** a **Quiz me** row in the empty-canvas menu (hold or right-click empty canvas), next to *Text → nodes*, and in the Display (layers) menu next to *Presentation*. It opens a full-screen card over the map, like presentation mode does.
 - **Which nodes become cards (changed 2026-11-14):**
-  - Only a ❓ (unknown), a Problem or a goal (Solution) node asks. Its title (or text, or a ghost's question) is the question.
+  - Only a ❓ (unknown), a Problem, a goal (Solution) or a study Question node asks. Its title (or text, or a ghost's question) is the question.
   - The answer is its ✅ (Success) children, as a list. Children of other types are left out of the answer.
-  - Any other node, or an asking node with no ✅ under it, makes no card.
+  - A study Question (added 2026-11-14) asks the same way. One written into from a template is a card of its own: its ghost's question asks and what was written answers.
+  - Any other node, or an asking node with no answer, makes no card.
   - Cards come in map order, the same order presentation mode uses.
 - **Touch:** tap the card, or **Show answer**, to turn it over. Then tap one of three buttons under it: **Not yet** (red), **Shaky** (amber) or **Know it** (green). The next card comes up.
 - **Mouse / keyboard:** click works the same way. Space turns the card over, 1 / 2 / 3 pick the mark, and ← steps back one card.
