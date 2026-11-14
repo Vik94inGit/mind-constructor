@@ -196,8 +196,6 @@ export interface UiStrings {
     prevNode: string;
     /** Screen-reader names: the panel's text field, and its row of tabs. */
     textLabel: string;
-    /** Over the live preview of the formulas typed or pasted into a node's text ($…$, \\(…\\), $$…$$). */
-    formulaPreview: string;
     tabsLabel: string;
     nextNode: string;
     root: string;
@@ -1032,7 +1030,6 @@ const en: UiStrings = {
     byUser: (name) => `by ${name}`,
     prevNode: "Previous node (←)",
     textLabel: "Node text",
-    formulaPreview: "Formulas preview",
     tabsLabel: "Node sections",
     nextNode: "Next node (→)",
     root: "root",

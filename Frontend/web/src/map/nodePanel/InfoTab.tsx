@@ -93,10 +93,25 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
   const [overflow, setOverflow] = useState<string | null>(null);
   const [carrying, setCarrying] = useState(false);
   useEffect(() => setOverflow(null), [node.nodeId]);
+  // A text with formulas reads rendered (utils/mathText.ts), and only turns
+  // back into its raw text for editing once tapped; leaving the field (which
+  // saves) shows it rendered again.
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setEditing(false), [node.nodeId]);
+  const startEditing = () => setEditing(true);
+  useEffect(() => {
+    if (!editing) return;
+    const ta = textareaRef.current;
+    if (!ta || document.activeElement === ta) return;
+    ta.focus();
+    const end = ta.value.length;
+    ta.setSelectionRange(end, end);
+  }, [editing, textareaRef]);
   // What saving would change (NodePanel's saveField skips empty or unchanged text).
   const textChanged = textDraft.trim() !== "" && textDraft.trim() !== node.text;
   // The text box is open to its owner, unless they locked it or its round of a template hasn't come yet.
   const writable = isCreator && !textLocked && !levelLock;
+  const showRendered = writable && !editing && hasMath(textDraft);
   return (
     <div className="mt-2">
       {pictureMap}
@@ -130,8 +145,27 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
           onDropImages(files);
         }}
       >
-        {writable ? (
-          <>
+        {showRendered ? (
+          <div
+            ref={readonlyTextRef}
+            data-testid="formula-rendered"
+            tabIndex={0}
+            role="button"
+            aria-label={t.ui.node.textLabel}
+            title={t.ui.common.edit}
+            onClick={startEditing}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                startEditing();
+              }
+            }}
+            className={`min-h-[8rem] w-full cursor-text overflow-y-auto bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap break-words text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
+            style={!expanded && textHeight != null ? { height: textHeight } : undefined}
+          >
+            <MathText text={textDraft} />
+          </div>
+        ) : writable ? (
           <textarea
             id="node-text"
             ref={textareaRef}
@@ -180,18 +214,15 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
               // preventDefault — the textarea's own default behavior
               // (insert a newline) is exactly what's wanted here.
             }}
-            onBlur={() => void onTextSave()}
+            onFocus={startEditing}
+            onBlur={() => {
+              setEditing(false);
+              void onTextSave();
+            }}
             className={`block min-h-[8rem] w-full resize-y border-0 bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline-none ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
+            // Remounted after the rendered view: keep the size the panel resize gave it.
+            style={!expanded && textHeight != null ? { height: textHeight } : undefined}
           />
-          {hasMath(textDraft) && (
-            // How the formulas in the text will read, as the user types or
-            // pastes them (utils/mathText.ts says what counts as one).
-            <div data-testid="formula-preview" className="border-t border-line px-[0.7rem] py-[0.45rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap break-words text-ink">
-              <div className="mb-[0.2rem] text-[0.68rem] font-bold tracking-[0.03em] text-ink-soft uppercase">{t.ui.node.formulaPreview}</div>
-              <MathText text={textDraft} />
-            </div>
-          )}
-          </>
         ) : (
           // Focusable so the keyboard can scroll a long text.
           <div
@@ -247,7 +278,9 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               if (textChanged) void onTextSave().then((ok) => ok && onClose());
-              else textareaRef.current?.focus();
+              else if (textareaRef.current) textareaRef.current.focus();
+              // Text with formulas shows rendered: open its raw text to edit.
+              else startEditing();
             }}
             disabled={busy && textChanged}
             title={textChanged ? t.ui.node.saveTextTitle : undefined}
