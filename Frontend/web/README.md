@@ -130,7 +130,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   "🔓 Level 2 is open: 3 new questions" notice (`hiddenLevelIds`/`revealedRound` in
   `utils/templateLevels.ts`, `hooks/useLevelReveal.ts`). A locked ghost that something the user added
   hangs from stays on the canvas, fainter, with a 🔒 before its question, and its panel says which level
-  to answer first and how many are left. *Develop an idea* asks: 1) what the idea is, how you feel about it,
+  to answer first and how many are left. The node a template grew from wears a small "1/3" pill under
+  its icon (✓ once every level is answered), and its Info tab says "Level 1 of 3 · 2 questions left"
+  with a fold-out peek at what the next level will ask (`templateProgress`, `map/nodePanel/LevelProgress.tsx`).
+  Answering the last level says so ("✓ All 3 levels answered") and, on a map with a *before* feeling,
+  asks "And now?" right then. Levels opened and templates finished are counted on the admin page
+  (`template_level_opened`, `template_finished`). *Develop an idea* asks: 1) what the idea is, how you feel about it,
   what problem it solves, why it would work and the profit; 2) the possibilities, the problems and
   obstacles, the plan and how you feel now; 3) what was done successfully, what failed, what it brings to
   the table, how you feel about it and whether it is finished as it is, drawn as one ring per round.
