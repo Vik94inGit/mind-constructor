@@ -348,7 +348,12 @@ export function useNodeDragAndDrop({
   }
 
   function onNodePointerDown(node: NodeDoc, e: ReactPointerEvent) {
-    if (chooseMode || packMode || drawMode) return;
+    if (packMode || drawMode) return;
+    // Select mode never drags, except with ✥ pressed too: then a picked node
+    // drags every picked node with it (docs/gestures/select-move.md). A node
+    // that isn't picked still only takes the tap that picks it.
+    const selectMove = chooseMode && moveMode && multiSelectIds.has(node.nodeId);
+    if (chooseMode && !selectMove) return;
     if (!isOwnNode(node)) return;
 
     // Group drag: the pointer-downed node is itself a member of a 2+-node
@@ -360,7 +365,7 @@ export function useNodeDragAndDrop({
     // (Node.locked — its circle is the currently-chosen one, see
     // handleCircleBackdropClick): a chosen cluster holds its position for
     // good, so falls through to the ordinary long-press/tap paths below.
-    if (multiSelectIds.size > 1 && multiSelectIds.has(node.nodeId) && !held(node)) {
+    if ((selectMove || multiSelectIds.size > 1) && multiSelectIds.has(node.nodeId) && !held(node)) {
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       dragMoved.current = false;
@@ -404,7 +409,18 @@ export function useNodeDragAndDrop({
         window.removeEventListener("pointercancel", onGroupCancel);
       }
 
+      // A finger's own jitter (below TOUCH_DRAG_SLOP) moves nothing, so a
+      // tap on a member stays a tap: in Select mode that tap drops it.
+      const groupTouch = e.pointerType === "touch";
+      const groupPressX = e.clientX;
+      const groupPressY = e.clientY;
       function onGroupMove(ev: PointerEvent) {
+        if (
+          !dragMoved.current &&
+          groupTouch &&
+          Math.hypot(ev.clientX - groupPressX, ev.clientY - groupPressY) <= TOUCH_DRAG_SLOP
+        )
+          return;
         const p = screenToCanvas(ev.clientX, ev.clientY);
         dragMoved.current = true;
         trail.lead({ x: p.x - startPt.x, y: p.y - startPt.y });
@@ -494,6 +510,8 @@ export function useNodeDragAndDrop({
     // any node, since picking it into a selection doesn't move anything.
     // Puzzle pieces clicked together drag as one (see clusterFor below), so a
     // puzzle with any piece held in place is held as a whole.
+    // Select mode only ever drags the picked nodes, as a group (above).
+    if (chooseMode) return;
     const touch = e.pointerType === "touch";
     const canDrag = moveMode;
     const clusterIds = canDrag && !held(node) ? (clusterFor?.(node) ?? [node.nodeId]) : [node.nodeId];

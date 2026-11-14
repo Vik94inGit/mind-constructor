@@ -378,6 +378,7 @@ const ui: UiStrings = {
   selection: {
     tapToChoose: "Klepnutím vyberete uzly",
     finishHint: "Každé klepnutí přidá nebo odebere jeden uzel. Odejdete tlačítkem Hotovo.",
+    moveHint: "Přetažením vybraného uzlu posunete všechny vybrané. Klepnutí dál přidá nebo odebere jeden.",
     chosen: (n) => `Vybráno: ${csNodes(n)}`,
     selected: (n) => `Označeno: ${csNodes(n)}`,
     actions: "Akce",

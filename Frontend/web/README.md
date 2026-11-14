@@ -213,6 +213,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   offers Actions (delete only takes your own). A tap on empty canvas or a zone, Enter and Esc do
   nothing, so only *Done* or ☑ again leaves it. *Choose…* on a node opens the same mode with its
   branch already picked (`pages/MapPage.tsx` `toggleSelectMode`, [sketch](../../docs/gestures/select-mode.md)).
+  Press ✥ as well and dragging any picked node of yours moves all of them together, while a tap
+  still picks or drops one (`hooks/useNodeDragAndDrop.ts`, [sketch](../../docs/gestures/select-move.md)).
 - **A tap opens the node** — tapping or clicking any node opens its panel on the Info tab straight
   away: an attack, a node under attack, a card in the cards view and a node with pictures alike (the
   pictures show in the Info tab, and an attack on your own node keeps its Attack tab ready to strike
