@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nContext";
 import { useDismiss } from "../hooks/useDismiss";
 import { CANVAS_H, CANVAS_W } from "../utils/canvasLayout";
@@ -13,7 +13,7 @@ export const AREA_STRIP_H = 26;
 
 // A tiny drawing of one area: a dot per node, coloured by side like the
 // minimap's own dots.
-function AreaThumb({ nodes, positions, area, w, h }: { nodes: NodeDoc[]; positions: Map<string, Pt>; area: number; w: number; h: number }) {
+function AreaThumb({ nodes, positions, w, h }: { nodes: NodeDoc[]; positions: Map<string, Pt>; w: number; h: number }) {
   const sx = w / CANVAS_W;
   const sy = h / CANVAS_H;
   const r = Math.max(0.7, w / 70);
@@ -21,7 +21,6 @@ function AreaThumb({ nodes, positions, area, w, h }: { nodes: NodeDoc[]; positio
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="block">
       <rect width={w} height={h} fill="var(--surface-2)" />
       {nodes.map((n) => {
-        if (areaOf(n) !== area || n.packedIntoNodeId) return null;
         const p = positions.get(n.nodeId) ?? (n.x !== undefined && n.y !== undefined ? { x: n.x, y: n.y } : null);
         if (!p) return null;
         const s = sentimentOf(n.type);
@@ -46,8 +45,14 @@ interface StripProps {
 // The mini-views over the minimap (docs/gestures/map-areas.md): "All", then
 // one per area, six at most. A tap on an area shows it; "All" opens every
 // area side by side to pick from.
-export function AreaStrip({ nodes, positions, count, area, perArea, onSwitch, onRemoveLast }: StripProps) {
+export const AreaStrip = memo(function AreaStrip({ nodes, positions, count, area, perArea, onSwitch, onRemoveLast }: StripProps) {
   const { t } = useI18n();
+  // Each area's nodes, sorted once for every thumbnail.
+  const byArea = useMemo(() => {
+    const out: NodeDoc[][] = Array.from({ length: count }, () => []);
+    for (const n of nodes) if (!n.packedIntoNodeId) out[areaOf(n)]?.push(n);
+    return out;
+  }, [nodes, count]);
   const a = t.ui.mapAreas;
   const [allOpen, setAllOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -85,7 +90,7 @@ export function AreaStrip({ nodes, positions, count, area, perArea, onSwitch, on
                 onSwitch(v);
               }}
             >
-              <AreaThumb nodes={nodes} positions={positions} area={v} w={26} h={18} />
+              <AreaThumb nodes={byArea[v]} positions={positions} w={26} h={18} />
               <span className="pointer-events-none absolute right-0 bottom-0 rounded-tl-[4px] bg-surface/90 px-[3px] text-[0.6rem] font-bold leading-[1.1] text-ink">{v + 1}</span>
             </button>
           ),
@@ -112,7 +117,7 @@ export function AreaStrip({ nodes, positions, count, area, perArea, onSwitch, on
                 }}
               >
                 <span className="overflow-hidden rounded-[4px]">
-                  <AreaThumb nodes={nodes} positions={positions} area={i} w={96} h={64} />
+                  <AreaThumb nodes={byArea[i]} positions={positions} w={96} h={64} />
                 </span>
                 <span className="text-[0.66rem] font-semibold text-ink">{a.areaThoughts(i + 1, perArea[i] ?? 0)}</span>
               </button>
@@ -135,7 +140,7 @@ export function AreaStrip({ nodes, positions, count, area, perArea, onSwitch, on
       )}
     </div>
   );
-}
+});
 
 // The minimap's own + (docs/gestures/map-areas.md): one more area, shown at once.
 export function AreaAddButton({ onAdd, busy }: { onAdd: () => void; busy?: boolean }) {

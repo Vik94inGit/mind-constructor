@@ -423,13 +423,55 @@ export function avoidOverlap(
 
 /**
  * Whether one more node fits anywhere in `bounds` without landing on any of
- * `obstacles` — false once the canvas is full (utils/mapAreas.ts).
+ * `obstacles` — false once the canvas is full (utils/mapAreas.ts). Asked
+ * before every new node, so it's kept cheap: a map with few obstacles can't
+ * be full at all, and otherwise the obstacles are sorted into a grid so
+ * each spot tried only looks at the ones near it. Spots are tried on the
+ * same SEARCH_STEP grid, and kept the same margin from the edge, as
+ * avoidOverlap's own search, so "full" means avoidOverlap would find nothing.
  */
 export function hasClearSpot(obstacles: Obstacle[], bounds: ViewportBounds = FULL_CANVAS_BOUNDS): boolean {
-  const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
-  return nearestClearSpot(center, obstacles, bounds, 40).clear;
+  const lo = clampIntoBounds({ x: -Infinity, y: -Infinity }, bounds, CLEAR_SPOT_MARGIN);
+  const hi = clampIntoBounds({ x: Infinity, y: Infinity }, bounds, CLEAR_SPOT_MARGIN);
+  if (obstacles.length === 0) return true;
+  // How far an obstacle reaches from its center on either axis.
+  const reach = (o: Obstacle) => (o.footprint ? Math.max(o.footprint.w, o.footprint.h) : o.minDist);
+  // Room is certain while everything blocked adds up to less than the space.
+  let blocked = 0;
+  for (const o of obstacles) blocked += o.footprint ? 4 * o.footprint.w * o.footprint.h : Math.PI * o.minDist * o.minDist;
+  if (blocked < (hi.x - lo.x) * (hi.y - lo.y)) return true;
+
+  const cell = Math.max(SEARCH_STEP, ...obstacles.map(reach));
+  const grid = new Map<string, Obstacle[]>();
+  for (const o of obstacles) {
+    const key = `${Math.floor(o.x / cell)},${Math.floor(o.y / cell)}`;
+    const list = grid.get(key);
+    if (list) list.push(o);
+    else grid.set(key, [o]);
+  }
+  const clear = (p: Pt) => {
+    const cx = Math.floor(p.x / cell);
+    const cy = Math.floor(p.y / cell);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const near = grid.get(`${cx + dx},${cy + dy}`);
+        if (near && !isClearOf(p, near)) return false;
+      }
+    }
+    return true;
+  };
+  for (let x = lo.x; x <= hi.x + 1e-9; x += SEARCH_STEP) {
+    for (let y = lo.y; y <= hi.y + 1e-9; y += SEARCH_STEP) {
+      if (clear({ x, y })) return true;
+    }
+    if (clear({ x, y: hi.y })) return true;
+  }
+  for (let y = lo.y; y <= hi.y + 1e-9; y += SEARCH_STEP) if (clear({ x: hi.x, y })) return true;
+  return clear({ x: hi.x, y: hi.y });
 }
 
+/** avoidOverlap's own margin from the canvas edge. */
+const CLEAR_SPOT_MARGIN = 40;
 
 // sentimentOf (imported from utils/nodeType.ts) — matches ringKindFor's own
 // halo/horns split exactly (see OutcomeBadge.tsx's OUTCOME_CONFIG), so

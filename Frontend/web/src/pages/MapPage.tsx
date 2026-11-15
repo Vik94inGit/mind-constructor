@@ -1886,6 +1886,38 @@ export function MapPage() {
     fold: (nodeId) => toggleFold(nodeId),
   });
 
+  // What the minimap draws, kept the same object while it doesn't change so
+  // the memoized MiniMap (and its strip of areas) skips the map's other renders.
+  const areaActions = useStableActions({
+    switchArea: (a: number) => areas.switchArea(a),
+    removeLast: () => void areas.removeLast(),
+    extend: () => void areas.extend(),
+  });
+  const minimapGroups = useMemo(() => {
+    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+    return nodeGroups.map((g) => ({ ...g, variant: !!byId.get(g.rootId)?.parentId }));
+  }, [nodeGroups, nodes]);
+  const canRemoveArea = isOwner && areas.canRemoveLast;
+  const minimapHeader = useMemo(
+    () => (
+      <AreaStrip
+        nodes={nodes}
+        positions={positions}
+        count={areas.count}
+        area={areas.area}
+        perArea={areas.perArea}
+        onSwitch={areaActions.switchArea}
+        onRemoveLast={canRemoveArea ? areaActions.removeLast : undefined}
+      />
+    ),
+    [nodes, positions, areas.count, areas.area, areas.perArea, areaActions, canRemoveArea],
+  );
+  const canAddArea = isOwner && areas.canExtend && !timeLapse;
+  const minimapCorner = useMemo(
+    () => (canAddArea ? <AreaAddButton onAdd={areaActions.extend} busy={areas.busy} /> : undefined),
+    [canAddArea, areaActions, areas.busy],
+  );
+
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
   if (error || !map) {
     return (
@@ -2424,7 +2456,7 @@ export function MapPage() {
                 onPackAll={mapParents.size > 0 ? (folded.size > 0 ? unpackAll : packAll) : undefined}
                 somePacked={folded.size > 0}
                 minimapLift={areas.count > 1 ? AREA_STRIP_H : 0}
-                onExtend={isOwner && areas.canExtend && !timeLapse ? () => void areas.extend() : undefined}
+                onExtend={canAddArea ? areaActions.extend : undefined}
               />
               {viewPromptOpen && (
                 <ViewPrompt
@@ -2441,25 +2473,15 @@ export function MapPage() {
                 lines={lines}
                 pictures={pictures}
                 positions={positions}
-                groups={nodeGroups.map((g) => ({ ...g, variant: !!nodes.find((n) => n.nodeId === g.rootId)?.parentId }))}
+                groups={minimapGroups}
                 canvasW={CANVAS_W}
                 canvasH={CANVAS_H}
                 zoom={zoom}
                 hScrollMargin={hScrollMargin}
                 vScrollMargin={vScrollMargin}
                 onPanTo={panTo}
-                header={
-                  <AreaStrip
-                    nodes={nodes}
-                    positions={positions}
-                    count={areas.count}
-                    area={areas.area}
-                    perArea={areas.perArea}
-                    onSwitch={(a) => areas.switchArea(a)}
-                    onRemoveLast={isOwner && areas.canRemoveLast ? () => void areas.removeLast() : undefined}
-                  />
-                }
-                corner={isOwner && areas.canExtend && !timeLapse ? <AreaAddButton onAdd={() => void areas.extend()} busy={areas.busy} /> : undefined}
+                header={minimapHeader}
+                corner={minimapCorner}
               />
               )}
 

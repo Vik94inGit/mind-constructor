@@ -87,4 +87,5 @@ mini-views (*All* and 1 to 5) sits on top of the minimap once there are two area
 area side by side with its count of thoughts, and the owner's *Remove the empty last area* (instead
 of a hold menu on a thumbnail). Viktor then asked that the map can be extended any time, not only
 when full: besides the minimap's +, the eye menu has *Extend map* (owner, under five areas), which
-also works with the minimap hidden. Search covers every area and switches to the one a result is on.
+also works with the minimap hidden. Asked whether areas should scroll into each other instead, he answered
+"switched from minimap": one area at a time stays. Search covers every area and switches to the one a result is on.

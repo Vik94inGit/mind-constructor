@@ -95,6 +95,11 @@ describe("hasClearSpot", () => {
       for (let y = 0; y <= CANVAS_H; y += NODE_FOOTPRINT.h) full.push({ x, y });
     }
     expect(hasClearSpot(footprintObstacles(full, 4))).toBe(false);
+    // A few nodes taken out of the middle leave one gap, and it's found.
+    const gx = NODE_FOOTPRINT.w * 7;
+    const gy = NODE_FOOTPRINT.h * 8;
+    const gap = full.filter((p) => !(p.x >= gx && p.x <= gx + NODE_FOOTPRINT.w && p.y >= gy && p.y <= gy + NODE_FOOTPRINT.h));
+    expect(hasClearSpot(footprintObstacles(gap, 4))).toBe(true);
   });
 });
 
