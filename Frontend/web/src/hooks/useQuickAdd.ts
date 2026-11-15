@@ -30,7 +30,8 @@ interface Params {
    * Whether the area on screen has room for one more node; when it doesn't,
    * nothing is started and the caller says the map is full (utils/mapAreas.ts).
    */
-  roomForOne?: () => boolean;
+  /** False when the area is full; `parentId` is the thought the new one would hang from. */
+  roomForOne?: (parentId?: string | null) => boolean;
   t: Translation;
 }
 
@@ -60,7 +61,7 @@ export function useQuickAdd({
   // stay reserved for the explicit "Link nodes" flow). Nothing is created
   // until confirmPendingCreate actually fires.
   function startQuickAdd(type: NodeType, pos: Pt, parent: NodeDoc, text?: string, emoji?: string) {
-    if (!roomForOne()) return;
+    if (!roomForOne(parent.nodeId)) return;
     setActionError(null);
     // The ghost's slot is a fixed angle around the anchor — it doesn't know
     // about anything else on the canvas, so a crowded area can still land
@@ -79,7 +80,7 @@ export function useQuickAdd({
   // new node starts just under the card, and its type and feeling are picked
   // as it's written, like the right-click menu's Create branch.
   function addBranchFromCard(parent: NodeDoc) {
-    if (!roomForOne()) return;
+    if (!roomForOne(parent.nodeId)) return;
     setActionError(null);
     const pos = cardBranchSpot(parent) ?? placeNode(posFor(parent), [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }]);
     setInlineEditId(null);
@@ -92,7 +93,7 @@ export function useQuickAdd({
   // stays up for the next branch; the new node's text is written whenever
   // it's opened.
   async function sketchBranch(type: NodeType, pos: Pt, parent: NodeDoc) {
-    if (!mapId || !roomForOne()) return;
+    if (!mapId || !roomForOne(parent.nodeId)) return;
     setActionError(null);
     const placed = placeNode(pos, [{ nodeId: NEW_NODE_ID, parentId: parent.nodeId }], [], { free: true });
     try {
@@ -111,7 +112,7 @@ export function useQuickAdd({
   // if needed) and handed back, so the caller can open it with its panel and
   // ring of ghosts. No text field, so no keyboard pops up on a phone.
   async function createBlankNodeAt(at: Pt, parentId: string | null = null): Promise<NodeDoc | null> {
-    if (!mapId || !roomForOne()) return null;
+    if (!mapId || !roomForOne(parentId)) return null;
     setActionError(null);
     const pos = placeNode(at, [{ nodeId: NEW_NODE_ID, parentId }]);
     setInlineEditId(null);
@@ -131,7 +132,7 @@ export function useQuickAdd({
   // placeNode moves it just clear of it (and of anything else the zone rules
   // keep it from), so the new child appears right beside its parent.
   function startBranchOf(anchor: NodeDoc) {
-    if (!roomForOne()) return;
+    if (!roomForOne(anchor.nodeId)) return;
     const pos = placeNode(posFor(anchor), [{ nodeId: NEW_NODE_ID, parentId: anchor.nodeId }]);
     setInlineEditId(null);
     setPendingCreate({ x: pos.x, y: pos.y, type: "unknown", parentId: anchor.nodeId });
@@ -142,7 +143,7 @@ export function useQuickAdd({
   // `parentId` hangs it from a zone's parent, so it joins that zone
   // (a double-tap inside a zone, docs/gestures/double-tap-new-node.md).
   function startNodeAt(at: Pt, type: NodeType, parentId: string | null = null) {
-    if (!roomForOne()) return;
+    if (!roomForOne(parentId)) return;
     const pos = placeNode(at, [{ nodeId: NEW_NODE_ID, parentId }]);
     setInlineEditId(null);
     setPendingCreate({ x: pos.x, y: pos.y, type, parentId });

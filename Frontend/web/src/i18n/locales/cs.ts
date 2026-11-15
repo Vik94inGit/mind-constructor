@@ -387,6 +387,10 @@ const ui: UiStrings = {
     area: (n) => `Oblast ${n}`,
     areaThoughts: (n, count) => `Oblast ${n} · myšlenek: ${count}`,
     removeLast: "Odebrat prázdnou poslední oblast",
+    inboxFull: "Doručené jsou plné, všech 5 oblastí. Nejdřív pár poznámek roztřiď nebo smaž.",
+    targetFull: "Ta mapa je plná. Vyber jinou, nebo na ní nejdřív udělej místo.",
+    fromArea: (n) => `Z oblasti ${n}`,
+    toArea: (n) => `Pokračuje v oblasti ${n}`,
   },
   pictures: {
     entry: "Nakreslit obrázek…",

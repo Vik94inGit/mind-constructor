@@ -5,7 +5,8 @@ import { Modal } from "../components/Modal";
 import { MapTargetList } from "../dashboard/MapTargetList";
 import { primaryBtn } from "../dashboard/FolderModal";
 import { useI18n } from "../i18n/I18nContext";
-import { moveNoteToMap, moveTargets } from "../utils/inbox";
+import { MapFullError, moveNoteToMap, moveTargets } from "../utils/inbox";
+import { useAuthUser } from "../context/AuthContext";
 import type { MapDoc } from "../types";
 import { ErrorBanner } from "../components/ErrorBanner";
 
@@ -25,6 +26,7 @@ export function MoveCardsModal({
   onMoved: (movedRootIds: string[], target: MapDoc) => void;
 }) {
   const { t } = useI18n();
+  const user = useAuthUser();
   const s = t.ui.inbox;
   const c = t.ui.cardFit;
   const [list, setList] = useState<MapDoc[] | null>(null);
@@ -47,13 +49,13 @@ export function MoveCardsModal({
     try {
       target = await pick();
       for (const id of rootIds) {
-        await moveNoteToMap(map.mapId, id, target);
+        await moveNoteToMap(map.mapId, id, target, user?._id);
         moved.push(id);
       }
       onMoved(moved, target);
     } catch (err) {
       if (target && moved.length > 0) onMoved(moved, target);
-      setError(err instanceof ApiRequestError ? err.message : s.moveError);
+      setError(err instanceof MapFullError ? t.ui.mapAreas.targetFull : err instanceof ApiRequestError ? err.message : s.moveError);
       setBusy(false);
     }
   }

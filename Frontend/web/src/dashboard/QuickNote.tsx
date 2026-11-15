@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/I18nContext";
 import { ApiRequestError } from "../api/client";
-import { addQuickNote } from "../utils/inbox";
+import { addQuickNote, MapFullError } from "../utils/inbox";
 import { MAX_NODE_TEXT, pasteKeepingOverflow, splitNodeText } from "../utils/nodeText";
 import { TextOverflowOffer } from "../components/TextOverflowOffer";
 import type { MapDoc } from "../types";
@@ -45,7 +45,7 @@ export function QuickNote({ maps, autoFocus, onSaved }: { maps: MapDoc[]; autoFo
       setSaved(map);
       onSaved(map, created);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : s.error);
+      setError(err instanceof MapFullError ? t.ui.mapAreas.inboxFull : err instanceof ApiRequestError ? err.message : s.error);
     } finally {
       setBusy(false);
     }

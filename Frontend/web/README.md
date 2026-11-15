@@ -39,8 +39,13 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   **All** (every area side by side with its count of thoughts, and *Remove the empty last area*) and
   one thumbnail per area; a tap shows that area. One area is on screen at a time, with its own zones
   and links; search finds thoughts on every area and goes to the right one. The area shown is
-  remembered per map in this browser. See `utils/mapAreas.ts`, `hooks/useMapAreas.ts`,
-  `map/AreaStrip.tsx` and the sketch [docs/gestures/map-areas.md](../../docs/gestures/map-areas.md).
+  remembered per map in this browser. A branch stopped by a full area goes on in the new one after
+  **Extend map**: the new thought hangs from its parent across areas, drawn on its own there with a
+  *From area N* chip, and its parent shows *Continues in area N*; a tap on either goes to the other.
+  The Inbox works the same way: a quick note never lands on another one, and a full Inbox grows an
+  area; moving a note to a map checks that map for room first and uses (or, for its owner, adds) an
+  area with space, or says the map is full. See `utils/mapAreas.ts`, `hooks/useMapAreas.ts`,
+  `map/AreaStrip.tsx`, `map/AreaLinks.tsx`, `utils/inbox.ts` and the sketch [docs/gestures/map-areas.md](../../docs/gestures/map-areas.md).
 - **Feelings and the before/after check-in** — a thought can carry how it feels to you (16 feelings,
   heavy to light: 😟 worried, 😰 anxious, 😨 scared, 😢 sad, 😠 angry, 😤 frustrated, 😕 confused,
   😩 tired, 🤔 curious, 🙂 hopeful, 🤩 excited, 😄 happy, 😎 proud, 🥰 grateful, 😌 calm, 😮‍💨 relieved): one tap in the node

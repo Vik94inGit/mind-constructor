@@ -1,4 +1,5 @@
 import type { MapDoc, NodeDoc } from "../types";
+import { nodeRefId } from "./nodeType";
 
 // A map's areas (Map.areaCount, Node.area): once the canvas fills up, the
 // owner can extend the map by up to four more areas, each a whole canvas of
@@ -77,4 +78,55 @@ export function setShownArea(mapId: string, area: number | null): void {
 /** The area a new node on `mapId` goes to when the caller doesn't say: the one on screen, else the main one. */
 export function shownAreaOf(mapId: string): number {
   return shownArea.get(mapId) ?? 0;
+}
+
+/** A thought on the area shown whose parent, or one of whose children, lives on another area. */
+export interface AreaLink {
+  /** The thought on the area shown, where the chip sits. */
+  nodeId: string;
+  /** "from": its parent is elsewhere; "to": a child of it is. */
+  kind: "from" | "to";
+  /** The thought on the other area, to go to. */
+  otherId: string;
+  otherArea: number;
+}
+
+/**
+ * The links that cross areas, seen from `area`: each thought there whose
+ * parent is on another area (a branch that went on after its area filled
+ * up), and each one with a child on another area — one link per other area.
+ */
+export function areaLinks(nodes: NodeDoc[], area: number): AreaLink[] {
+  const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+  const out: AreaLink[] = [];
+  const seenTo = new Set<string>();
+  for (const n of nodes) {
+    if (n.isWeapon || n.isProtection) continue;
+    const parentId = nodeRefId(n.parentId);
+    const parent = parentId ? byId.get(parentId) : undefined;
+    if (!parent || areaOf(parent) === areaOf(n)) continue;
+    if (areaOf(n) === area) out.push({ nodeId: n.nodeId, kind: "from", otherId: parent.nodeId, otherArea: areaOf(parent) });
+    if (areaOf(parent) === area) {
+      const key = `${parent.nodeId}:${areaOf(n)}`;
+      if (seenTo.has(key)) continue;
+      seenTo.add(key);
+      out.push({ nodeId: parent.nodeId, kind: "to", otherId: n.nodeId, otherArea: areaOf(n) });
+    }
+  }
+  return out;
+}
+
+/**
+ * The nodes as the area shown draws them: a thought whose parent is on
+ * another area stands on its own here (its parentId stays saved; the link
+ * back is drawn as a chip, map/AreaLinks.tsx).
+ */
+export function cutAtAreaEdge(nodes: NodeDoc[], all: NodeDoc[]): NodeDoc[] {
+  const areaById = new Map(all.map((n) => [n.nodeId, areaOf(n)]));
+  return nodes.map((n) => {
+    const parentId = nodeRefId(n.parentId);
+    if (!parentId) return n;
+    const parentArea = areaById.get(parentId);
+    return parentArea !== undefined && parentArea !== areaOf(n) ? { ...n, parentId: null } : n;
+  });
 }

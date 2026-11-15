@@ -5,7 +5,9 @@ import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
 import { useMapAreas } from "../hooks/useMapAreas";
-import { areaOf } from "../utils/mapAreas";
+import { areaLinks, areaOf, cutAtAreaEdge } from "../utils/mapAreas";
+import type { AreaLink } from "../utils/mapAreas";
+import { AreaLinks } from "../map/AreaLinks";
 import { ringAllTypesFor, ringTypesFor } from "../utils/ringTypes";
 import { useBackGuard } from "../hooks/useBackGuard";
 import { useIntroMigration } from "../hooks/useIntroMigration";
@@ -400,8 +402,14 @@ export function MapPage() {
   // Packed-away members are left off the canvas (NodePanel still gets every
   // node, for the container's Packed list), and so is a round not yet open,
   // and every node on another of the map's areas (utils/mapAreas.ts).
+  // A thought whose parent is on another area stands on its own here; a chip
+  // links the two (map/AreaLinks.tsx).
   const unpackedNodes = useMemo(
-    () => nodes.filter((n) => !n.packedIntoNodeId && !levelHidden.has(n.nodeId) && areaOf(n) === areas.area),
+    () =>
+      cutAtAreaEdge(
+        nodes.filter((n) => !n.packedIntoNodeId && !levelHidden.has(n.nodeId) && areaOf(n) === areas.area),
+        nodes,
+      ),
     [nodes, levelHidden, areas.area],
   );
   // What search finds: the same, on every area (picking one on another area goes there).
@@ -773,11 +781,17 @@ export function MapPage() {
   });
   // A full area takes no more nodes (they'd land on top of others): the map
   // says so instead, offering its owner another area (utils/mapAreas.ts).
-  function roomForOne(): boolean {
+  // A thought stopped on its way to a parent goes on in the new area, hanging
+  // from that parent there, with a chip linking back (map/AreaLinks.tsx).
+  function roomForOne(parentId?: string | null): boolean {
     if (hasRoom()) return true;
     const a = t.ui.mapAreas;
+    const extendThen = async () => {
+      if (!(await areas.extend()) || !parentId) return;
+      setTimeout(() => setPendingCreate({ x: CANVAS_W / 2, y: CANVAS_H / 2, type: "unknown", parentId }), 120);
+    };
     if (!areas.canExtend) showNotice(a.mapFull);
-    else if (isOwner) showNotice(a.areaFull, { label: a.extend, run: () => void areas.extend() });
+    else if (isOwner) showNotice(a.areaFull, { label: a.extend, run: () => void extendThen() });
     else showNotice(a.areaFullAskOwner);
     return false;
   }
@@ -1898,6 +1912,19 @@ export function MapPage() {
     return nodeGroups.map((g) => ({ ...g, variant: !!byId.get(g.rootId)?.parentId }));
   }, [nodeGroups, nodes]);
   const canRemoveArea = isOwner && areas.canRemoveLast;
+  // The chips linking a thought here to its parent or child on another area.
+  const visibleById = useMemo(() => new Map(visibleNodes.map((n) => [n.nodeId, n])), [visibleNodes]);
+  const crossAreaLinks = useMemo(
+    () => (areas.count > 1 ? areaLinks(nodes, areas.area).filter((l) => visibleById.has(l.nodeId)) : []),
+    [nodes, areas.count, areas.area, visibleById],
+  );
+  const goToAreaLink = useStableActions({
+    go: (l: AreaLink) => {
+      areas.switchArea(l.otherArea, { frame: false });
+      setSelectedId(l.otherId);
+      setTimeout(() => centerOnNode(l.otherId), 60);
+    },
+  }).go;
   const minimapHeader = useMemo(
     () => (
       <AreaStrip
@@ -2328,6 +2355,9 @@ export function MapPage() {
               );
             })}
 
+            {view !== "cards" && !timeLapse && (
+              <AreaLinks links={selectedId ? crossAreaLinks.filter((l) => l.nodeId !== selectedId) : crossAreaLinks} nodeById={visibleById} posFor={posFor} zoom={zoom} onGo={goToAreaLink} />
+            )}
             {view !== "cards" && (
               <PictureCaptions
                 pictures={pictures}

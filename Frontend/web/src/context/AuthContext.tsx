@@ -124,3 +124,8 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+
+/** The signed-in user, or null — for a component that may also render outside AuthProvider (a modal in a test). */
+export function useAuthUser() {
+  return useContext(AuthContext)?.user ?? null;
+}

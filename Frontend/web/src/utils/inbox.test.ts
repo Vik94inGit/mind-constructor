@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { addQuickNote, findInbox, moveNoteToMap, moveTargets, noteBranch, notePosition, unsortedNotes } from "./inbox";
+import { addQuickNote, findInbox, MapFullError, NOTES_PER_AREA, moveNoteToMap, moveTargets, noteBranch, notePosition, unsortedNotes } from "./inbox";
 import * as mapsApi from "../api/maps";
 import * as nodesApi from "../api/nodes";
 import * as edgesApi from "../api/edges";
@@ -7,6 +7,8 @@ import type { MapDoc, NodeDoc } from "../types";
 
 vi.mock("../api/maps", () => ({
   createMap: vi.fn(async () => ({ mapId: "inbox", name: "Inbox", ownerId: "u1" })),
+  updateMap: vi.fn(async (mapId: string, patch: object) => ({ mapId, name: "Inbox", ownerId: "u1", ...patch })),
+  getMap: vi.fn(async (mapId: string) => ({ mapId, name: "Target", ownerId: "u1" })),
   getNodesText: vi.fn(async (_mapId: string, ids: string[]) => Object.fromEntries(ids.map((id) => [id, `text ${id}`]))),
 }));
 vi.mock("../api/nodes", () => ({
@@ -49,6 +51,49 @@ describe("inbox", () => {
     const second = await addQuickNote("Call mum", [map("inbox", "Renamed")], "u1", "Inbox");
     expect(second.created).toBe(false);
     expect(nodesApi.createNode).toHaveBeenLastCalledWith("inbox", expect.objectContaining({ text: "Call mum", ...notePosition(2) }));
+  });
+
+  it("never puts a note on top of another: a full Inbox area spills into a new one", async () => {
+    localStorage.clear();
+    const full = Array.from({ length: NOTES_PER_AREA }, (_, i) => node(`f${i}`, null, notePosition(i)));
+    vi.mocked(nodesApi.listNodes).mockResolvedValueOnce(full);
+    const res = await addQuickNote("One more", [map("inbox", "Inbox")], "u1", "Inbox");
+    expect(mapsApi.updateMap).toHaveBeenCalledWith("inbox", { areaCount: 2 });
+    expect(nodesApi.createNode).toHaveBeenLastCalledWith("inbox", expect.objectContaining({ area: 1, ...notePosition(0) }));
+    expect(res.map.areaCount).toBe(2);
+  });
+
+  it("takes a free spot a moved note left, before a new area", async () => {
+    localStorage.clear();
+    vi.mocked(mapsApi.updateMap).mockClear();
+    const full = Array.from({ length: NOTES_PER_AREA }, (_, i) => node(`f${i}`, null, i === 3 ? { x: 5000, y: 5000 } : notePosition(i)));
+    vi.mocked(nodesApi.listNodes).mockResolvedValueOnce(full);
+    await addQuickNote("Fits", [map("inbox", "Inbox")], "u1", "Inbox");
+    expect(mapsApi.updateMap).not.toHaveBeenCalled();
+    expect(nodesApi.createNode).toHaveBeenLastCalledWith("inbox", expect.objectContaining({ area: 0, ...notePosition(3) }));
+  });
+
+  it("says the Inbox is full once all five areas are", async () => {
+    localStorage.clear();
+    const all = Array.from({ length: 5 }, (_, a) =>
+      Array.from({ length: NOTES_PER_AREA }, (_, i) => node(`a${a}n${i}`, null, { ...notePosition(i), area: a })),
+    ).flat();
+    vi.mocked(nodesApi.listNodes).mockResolvedValueOnce(all);
+    await expect(addQuickNote("No room", [{ ...map("inbox", "Inbox"), areaCount: 5 }], "u1", "Inbox")).rejects.toBeInstanceOf(MapFullError);
+  });
+
+  it("moves a note only where there's room: a new area on your own full map, else it stays", async () => {
+    const fullTarget: NodeDoc[] = [];
+    for (let x = 0; x <= 2400; x += 140) for (let y = 0; y <= 1600; y += 90) fullTarget.push(node(`t${x}-${y}`, null, { x, y }));
+    vi.mocked(nodesApi.listNodes).mockImplementation(async (mapId: string) => (mapId === "work" ? fullTarget : [node("a")]));
+    vi.mocked(mapsApi.updateMap).mockClear();
+    await expect(moveNoteToMap("inbox", "a", map("work", "Work", "u2"), "u1")).rejects.toBeInstanceOf(MapFullError);
+    expect(nodesApi.deleteManyNodes).not.toHaveBeenCalledWith(["a"]);
+    await moveNoteToMap("inbox", "a", map("work", "Work"), "u1");
+    expect(mapsApi.updateMap).toHaveBeenCalledWith("work", { areaCount: 2 });
+    expect(nodesApi.createNode).toHaveBeenLastCalledWith("work", expect.objectContaining({ area: 1 }));
+    vi.mocked(nodesApi.listNodes).mockReset();
+    vi.mocked(nodesApi.listNodes).mockImplementation(async () => [{ nodeId: "a" }, { nodeId: "b" }] as NodeDoc[]);
   });
 
   it("lists the top-level notes to sort, oldest first, and moves a note with its branch", () => {

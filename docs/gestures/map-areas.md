@@ -80,8 +80,7 @@ One area at a time (Viktor's pick). A map has 1 to 5 areas (`Map.areaCount`), ea
 (`Node.area`). When the area on screen has no clear spot left for one more node, every way of adding
 one (ghost ring, double-tap, + menu, branch, template, picture) stops and the notice says the area is
 full, with **Extend map** for the owner; members are asked to ask the owner, and at five areas the
-notice suggests packing or deleting. Extend opens the new, empty area (it doesn't carry the stopped
-node over: a branch can't hang across areas) and turns the minimap on, since that's where areas are
+notice suggests packing or deleting. Extend opens the new area and turns the minimap on, since that's where areas are
 switched. The minimap's **+** sits in its bottom-right corner (owner only, gone at five); the strip of
 mini-views (*All* and 1 to 5) sits on top of the minimap once there are two areas. *All* opens every
 area side by side with its count of thoughts, and the owner's *Remove the empty last area* (instead
@@ -89,3 +88,10 @@ of a hold menu on a thumbnail). Viktor then asked that the map can be extended a
 when full: besides the minimap's +, the eye menu has *Extend map* (owner, under five areas), which
 also works with the minimap hidden. Asked whether areas should scroll into each other instead, he answered
 "switched from minimap": one area at a time stays. Search covers every area and switches to the one a result is on.
+
+Later Viktor asked that a new node added after extending keeps a link to the previous area: when a
+branch was stopped by the full area, Extend opens the new area with that thought waiting to be
+written, hanging from its parent on the old area. The canvas draws it on its own there with a
+*From area N* chip, and the parent carries *Continues in area N*; a tap goes across (a tap target,
+not a new gesture: same as a button). Quick notes in the Inbox and notes moved to a map follow the
+same room check.

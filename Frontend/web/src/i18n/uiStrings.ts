@@ -98,6 +98,13 @@ export interface UiStrings {
     area: (n: number) => string;
     areaThoughts: (n: number, count: number) => string;
     removeLast: string;
+    /** A quick note when every area of the Inbox is full. */
+    inboxFull: string;
+    /** Moving a note onto a map with no room left. */
+    targetFull: string;
+    /** On a thought whose parent is on another area, and on the parent. */
+    fromArea: (n: number) => string;
+    toArea: (n: number) => string;
   };
   pictures: {
     /** The menu item that opens the picker. */
@@ -952,6 +959,10 @@ const en: UiStrings = {
     area: (n) => `Area ${n}`,
     areaThoughts: (n, count) => `Area ${n} · ${count} thoughts`,
     removeLast: "Remove the empty last area",
+    inboxFull: "Your Inbox is full, all 5 areas. Sort or delete some notes first.",
+    targetFull: "That map is full. Pick another one, or make room on it first.",
+    fromArea: (n) => `From area ${n}`,
+    toArea: (n) => `Continues in area ${n}`,
   },
   pictures: {
     entry: "Draw a picture…",

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   areaCountOf,
+  areaLinks,
+  cutAtAreaEdge,
   areaOf,
   canExtend,
   canRemoveLastArea,
@@ -12,6 +14,7 @@ import {
   setShownArea,
   shownAreaOf,
 } from "./mapAreas";
+import type { NodeDoc } from "../types";
 
 describe("mapAreas", () => {
   afterEach(() => setShownArea("m1", null));
@@ -63,5 +66,23 @@ describe("mapAreas", () => {
     expect(shownAreaOf("m2")).toBe(0);
     setShownArea("m1", null);
     expect(shownAreaOf("m1")).toBe(0);
+  });
+});
+
+describe("areaLinks / cutAtAreaEdge", () => {
+  const n = (nodeId: string, parentId: string | null, area?: number) => ({ nodeId, parentId, area, text: "" }) as unknown as NodeDoc;
+  const nodes = [n("root", null), n("a", "root"), n("b", "root", 1), n("c", "root", 1), n("d", "b", 1)];
+
+  it("links a child on another area back to its parent, and the parent on to it once per area", () => {
+    expect(areaLinks(nodes, 1)).toEqual([
+      { nodeId: "b", kind: "from", otherId: "root", otherArea: 0 },
+      { nodeId: "c", kind: "from", otherId: "root", otherArea: 0 },
+    ]);
+    expect(areaLinks(nodes, 0)).toEqual([{ nodeId: "root", kind: "to", otherId: "b", otherArea: 1 }]);
+  });
+
+  it("draws a thought whose parent is elsewhere as standing on its own", () => {
+    const cut = cutAtAreaEdge(nodes.filter((x) => areaOf(x) === 1), nodes);
+    expect(cut.map((x) => [x.nodeId, x.parentId])).toEqual([["b", null], ["c", null], ["d", "b"]]);
   });
 });

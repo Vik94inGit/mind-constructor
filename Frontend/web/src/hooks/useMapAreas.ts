@@ -89,16 +89,17 @@ export function useMapAreas({ mapId, map, setMap, nodes, setActionError, errorMe
     }
   }
 
-  /** Adds an empty area and shows it. */
-  async function extend() {
-    if (!canExtend(count)) return;
+  /** Adds an empty area and shows it; true once it's there. */
+  async function extend(): Promise<boolean> {
+    if (!canExtend(count)) return false;
     const added = count;
-    if (!(await saveCount(count + 1)) || !mapId) return;
+    if (!(await saveCount(count + 1)) || !mapId) return false;
     setShownArea(mapId, added);
     saveArea(mapId, added);
     setStored(added);
     onExtended?.();
     onSwitched?.(added);
+    return true;
   }
 
   /** Gives back the last area, when it is an empty extra one. */
