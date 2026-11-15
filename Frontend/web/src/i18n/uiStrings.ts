@@ -92,6 +92,8 @@ export interface UiStrings {
     forTypes: string;
     forTypesHint: string;
     forFun: string;
+    /** The picker's group of pictures for studying, whose dots are study types. */
+    forStudy: string;
     names: Record<PictureKind, string>;
     /** One question per dot of the picture, in dot order, each its ghost's prompt (the first is also the picker's hint). */
     questions: Record<PictureKind, string[]>;
@@ -929,7 +931,8 @@ const en: UiStrings = {
     forTypes: "For a kind of thought",
     forTypesHint: "Each one's dots arrive as thoughts of that kind.",
     forFun: "Just for fun",
-    names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", book: "Book", bubble: "Question bubble", bookmark: "Bookmark", flask: "Flask", list: "List", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
+    forStudy: "For studying",
+    names: { bulb: "Bulb", stop: "Stop sign", warning: "Warning", key: "Key", fork: "Crossroads", flag: "Flag", cloud: "Rain cloud", question: "Question mark", book: "Book", bubble: "Question bubble", bookmark: "Bookmark", flask: "Flask", list: "List", cap: "Graduation cap", pencil: "Pencil", globe: "Globe", heart: "Heart", star: "Star", house: "House", tree: "Tree", fish: "Fish", smile: "Smile" },
     questions: {
       bulb: ["What idea lights up?", "What could you try that you haven't yet?", "What would make it easier?", "What would you do if you couldn't fail?", "What would a child suggest?", "What could you combine?", "What could you do differently tomorrow?", "What idea have you been putting off?", "What would make it fun?", "What is the simplest way?"],
       stop: ["What is stopping you?", "What keeps coming back?", "What worries you most about it?", "What is it costing you?", "What are you avoiding?", "What is out of your hands?", "What drains your energy?", "What would happen if you did nothing?"],
@@ -944,6 +947,9 @@ const en: UiStrings = {
       bookmark: ["Which word does it define?", "What does it mean?", "Say it in your own words", "What is it not?", "Is there a formula for it?"],
       flask: ["What is a simple example?", "Where do you meet it in real life?", "What would you calculate?", "What is an example that fails?", "How would you show it to a friend?", "What does the example prove?"],
       list: ["What is it about in one line?", "What are the key points?", "What should you remember?", "What follows from it?", "What links it to the rest?", "What is still to learn?"],
+      cap: ["What would the exam ask first?", "What is the hardest question?", "What do you always forget?", "Which formula must you know?", "What would a teacher ask?", "Why is it true?", "How do the parts connect?", "What would you ask a classmate?"],
+      pencil: ["What did you learn today?", "What is the main idea?", "Which word was new?", "What surprised you?", "What will you review tomorrow?"],
+      globe: ["Which word do you need to know?", "What does it mean?", "Which term goes with it?", "Which term is often confused?", "Where is it used?", "What is its opposite?", "Which rule names it?", "Which term sums the topic up?"],
       heart: ["What do you love?", "Who do you love?", "What warms you up?", "What would you never give up?", "What makes you feel alive?", "Who do you miss?", "What do you love about yourself?", "What place do you love?", "What do you love to do?", "Who loves you?"],
       star: ["What do you want to reach?", "What would make you proud?", "What do you dream about?", "Where do you want to be in a year?", "What would you like to learn?", "Who do you want to become?", "What would you try if no one watched?", "What is your next big step?", "What would make this year special?", "What wish do you keep to yourself?"],
       house: ["What makes you feel at home?", "Who makes you feel safe?", "Where do you rest best?", "What would you keep forever?", "What smell reminds you of home?", "Who would you invite over?", "What makes a room cosy for you?", "What do you need to feel calm?", "What does home mean to you?"],

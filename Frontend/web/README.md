@@ -167,7 +167,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   pick one. The first group has a picture for each node type, and its dots arrive as thoughts of
   that type: a bulb (Idea), a stop sign (Problem), a warning triangle (Problematic option), a key
   (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail), a question mark
-  (unknown), a book (Title), a speech bubble (Question), a bookmark (Definition), a flask (Example) and a list (Summary). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
+  (unknown), a book (Title), a speech bubble (Question), a bookmark (Definition), a flask (Example) and a list (Summary). The second group is for studying: a graduation cap (exam Questions), a pencil (Summary notes on what you learned) and a globe (Definitions of the words to know). The third group, a heart, star, house, tree, fish or smile, is just for fun and made of
   Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking its own
   question on the picture's theme (a stop sign: "What is stopping you?", "What keeps coming back?"…;
   a heart: "What do you love?", "Who do you love?"…). Write in two
