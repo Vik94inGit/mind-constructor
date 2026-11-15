@@ -823,14 +823,18 @@ export const NodeCard = memo(function NodeCard({
             // center so it doesn't drift sideways or up into the icon.
             transform: `translateX(-50%) scale(${1 / sizeMultiplier})`,
             transformOrigin: "50% 0",
+            // Never taller than its rows, even when a formula is taller than a
+            // line, so it can't run down over the nodes below (1.3 = leading).
+            maxHeight: `${(replayCaption ? 5 : iconText ? 4 : mixed ? 1 : 2) * 1.3 + 0.25}em`,
+            overflow: "hidden",
           }}
         >
           {(iconText || replayCaption) && trimmedTitle && node.text ? (
             <>
-              <span className="font-semibold"><MathText text={trimmedTitle} /></span> <MathText text={node.text} />
+              <span className="font-semibold"><MathText text={trimmedTitle} compact /></span> <MathText text={node.text} compact />
             </>
           ) : (
-            <MathText text={captionLabel} />
+            <MathText text={captionLabel} compact />
           )}
         </div>
       )}

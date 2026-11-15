@@ -315,6 +315,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   it's a banner at the top of the map; in the new-node panel and the dashboard's Quick note, saying
   yes sends the rest along when the node (or note) is made. It works with a tablet's paste bubble
   too, since it reads the paste event rather than keys.
+- **Captions stay short and apart** — the caption under a node's icon keeps to its rows (2, 4 in icons
+  + text): runs of spaces and blank lines read as one space, a formula on a line of its own is drawn
+  inside the line, and the chip is never taller than its rows, so it can't run down over the nodes
+  below (`MathText` `compact`). A caption that would lie over another node's icon, or over a caption
+  already shown, is left out (first in map order wins, parents' captions always stay); its text still
+  shows on hover and in the panel (`captionsCoveringOthers` in `utils/nodePriority.ts`).
 - **Formulas** — maths typed or pasted into a node's title or text shows as real formulas on its
   card, under its icon, in the panel, on presentation slides and in the time-lapse replay
   (`map/MathText.tsx`, KaTeX). It reads the LaTeX that copied text already carries: `$…$` and
