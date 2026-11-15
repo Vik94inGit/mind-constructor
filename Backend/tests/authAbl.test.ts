@@ -17,6 +17,9 @@ import {
   AccountBlockedError,
 } from "../src/abl/authAbl.js";
 import { ValidationError } from "../src/abl/errors.js";
+import { updatePreferencesDao } from "../src/dao/userStateDao.js";
+
+vi.mock("../src/dao/userStateDao.js", () => ({ updatePreferencesDao: vi.fn() }));
 
 vi.mock("../src/dao/userDao.js", () => ({
   createUserDao: vi.fn(),
@@ -97,6 +100,15 @@ describe("authAbl", () => {
         username: "alice", email: "alice@test.com", password: "secret123",
       });
       expect(result.user._id).toBe("u1");
+    });
+
+    it("starts the new account with only the basics on screen", async () => {
+      vi.mocked(findUserByEmailDao).mockResolvedValue(null as never);
+      vi.mocked(createUserDao).mockResolvedValue({ _id: "u1", username: "alice", email: "alice@test.com" } as never);
+
+      await registerAbl({ username: "alice", email: "alice@test.com", password: "secret123" });
+
+      expect(updatePreferencesDao).toHaveBeenCalledWith("u1", { moreTools: false });
     });
   });
 

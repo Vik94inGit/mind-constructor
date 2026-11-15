@@ -18,7 +18,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 
 - **Auth** (`/login`, `/register`) — email/password or "Sign in with Google" (one endpoint for
   both registering and logging in); the session is an httpOnly cookie kept in Redis on the backend. "Try it without an account"
-  spins up a throwaway demo account with its own seeded map — nothing to configure to try it.
+  spins up a throwaway demo account with its own seeded map (*Should I change jobs?*, a personal
+  decision in Personal mode) — nothing to configure to try it.
 - **Think it through** (`/think`) — a guided, writing-first way to start a map, opened from the
   dashboard's "What's on your mind?" box. Four steps: pick what kind of thinking it is and write the
   central thought; answer one guiding question at a time (Enter adds a thought, Enter on an empty
@@ -78,8 +79,10 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   that map's and the Inbox's quick notes, each opening the map at that thought. It stays until you
   make a second template map (`src/dashboard/FirstMapCard.tsx`, `src/dashboard/firstMap.ts`).
 - **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
-  with the quick-add ghosts or the toolbar (the ring offers the types that fit what the map is for:
-  a problem map the problem-solving types, a study map six study choices: Title, Question, ✅ answer,
+  with the quick-add ghosts or the toolbar (each ghost always shows its type's name under it, and the
+  ring offers the types that fit what the map is for: five up front on a map that isn't for studying,
+  Problem, Option, Success, Fail and Idea on a problem or decision map or one made empty, with the rest
+  behind ⋯, a study map six study choices: Title, Question, ✅ answer,
   Definition, Example and Summary; a map that isn't for studying, one made empty included, never shows a
   study type on the ring, not even behind its ⋯ ghost, which opens the rest, `src/utils/ringTypes.ts`), link nodes explicitly, draw separator lines, attack
   other members' nodes with the three combat weapons, shield your own, pack nodes into a
@@ -492,8 +495,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   the writing answering) is a ready Quiz me card.
 - **Map types** — creating a map asks for a starting point: an **Empty map** (a blank canvas, no kind and
   no nodes) or one of six kinds (Problem analysis, Decision, Goal planning, Retrospective, Idea, Study),
-  each seeded with a starter structure in your language, and for a mode (Discussion or
-  Personal). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
+  each seeded with a starter structure in your language, and for a mode (Personal, picked unless
+  you choose Discussion). The owner can switch the mode later from the map's toolbar. A Personal map is drawn
   calm: no halo/horns, wings or crown badge on its nodes or quick-add ghosts, and no Attack tab or
   menu item (switch to Discussion for those).
 - **Entrance** — the first time a map opens in this browser, Personal or Discussion, it builds
@@ -556,13 +559,26 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (`src/utils/nodeFilter.ts`, `src/map/NodeSearch.tsx`).
 - **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden
   nodes carry a crossed-eye badge for the owner. Enforced by the backend, not just the UI.
+- **More tools** — a newcomer sees only the basics of untangling a thought; every other tool waits
+  behind one switch, *More tools* / *Fewer tools*, at the bottom of the dashboard (with a line on what
+  it holds while it's off) and beside language and theme in the map's toolbar. Off: no Select, line,
+  Draw a picture or display (layers) button, so no looks, presentation, Quiz me or time-lapse; no
+  Personal/Discussion switch on a Personal map (a Discussion map keeps its own controls, and its owner
+  can still take it back to Personal); no group or picture in the "+" menu; no picture, Text → nodes,
+  Text → map or Quiz me on the right-click menu; no split, change or swap parent, lock (unless locked)
+  or extract in a node's Info tab, and no History tab on a Personal map; no New folder or Text → map on
+  the dashboard; and *New map* and *Think it through* ask for no colours or mode (always Personal).
+  Nothing is removed. A new account starts with it off (`preferences.moreTools = false`, saved by the
+  backend when the account is made), an older account has nothing saved and keeps every tool, and a
+  demo starts with it off (this browser's copy carries the switch, `mc_more_tools`). See
+  `utils/moreTools.ts`, `hooks/useMoreTools.ts`, `components/MoreToolsSwitch.tsx`.
 - **Simplified view** — the toolbar's `Aa` menu has a switch that shrinks icons and drops halo/horns,
   wings and circle-parent rings to cut visual noise. It defaults to on for a phone-sized screen and
   is remembered per browser.
 
 ## Known API limitations reflected in the UI
 
-- Combat has no cooldowns. In Battle mode (the map's default) attacks do damage; the map's owner may
+- Combat has no cooldowns. In Battle (Discussion) mode attacks do damage (a map made from *New map* or *Think it through* starts Personal; one made through the API without `discussionMode` is still a Discussion map); the map's owner may
   attack with any node type, other members answer a negative node with a positive one and a positive
   node with a question or a Problem / Problematic option (enforced by the backend's `attackAbl.ts`).
   In Creating mode attacks only add their node and do no damage. The one way to stop a battle-mode

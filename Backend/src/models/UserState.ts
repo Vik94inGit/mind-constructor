@@ -56,6 +56,10 @@ const UserStateSchema = new mongoose.Schema(
       emojiFirst: { type: Boolean },
       // The user's own emoji for each node type (type -> emoji), over the app's defaults.
       typeEmoji: { type: mongoose.Schema.Types.Mixed },
+      // Every tool on screen (the frontend's utils/moreTools.ts). A new
+      // account starts with false (authAbl.ts startSimple), so it sees only
+      // the basics; unset (accounts from before the switch) keeps every tool.
+      moreTools: { type: Boolean },
     },
     lastMapId: { type: String, default: null }, // public mapId
   },

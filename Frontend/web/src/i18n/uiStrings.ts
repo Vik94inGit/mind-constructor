@@ -420,6 +420,8 @@ export interface UiStrings {
     unknown: string;
   };
   /** Leaving a demo session (its account and map are throwaway) to log in or register. */
+  /** The "More tools" switch (utils/moreTools.ts): every tool, or only the basics. */
+  moreTools: { show: string; hide: string; showTitle: string; hideTitle: string; hint: string };
   demo: { exit: string; exitTitle: string; exitConfirm: string };
   /** Tooltips on the zone/branch shapes that stabilize a circle, and the text of nodes the app creates itself. */
   canvas: {
@@ -1336,6 +1338,13 @@ const en: UiStrings = {
     noMembers: "No members yet.",
     unknown: "Unknown user",
   },
+  moreTools: {
+    show: "More tools",
+    hide: "Fewer tools",
+    showTitle: "Show every tool: discussions, pictures, presentations, Quiz me, folders and more",
+    hideTitle: "Keep only the basics on screen",
+    hint: "Only the basics are on screen. Discussions, pictures, presentations, Quiz me and folders wait under More tools.",
+  },
   demo: {
     exit: "Exit demo",
     exitTitle: "Leave the demo to log in or register",
@@ -1708,6 +1717,7 @@ const en: UiStrings = {
         opponent_turn: "Played the imitated opponent",
         quick_add: "Added a node from the ring",
         quiz: "Quizzed themselves (Quiz me)",
+        more_tools: "Turned more tools on or off",
       },
     },
   },

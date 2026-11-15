@@ -1,4 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import { saveLocalMoreTools } from "../utils/moreTools";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CreateMapModal } from "./CreateMapModal";
@@ -49,5 +50,34 @@ describe("CreateMapModal", () => {
 
     expect(mapsApi.createMap).toHaveBeenCalledWith(expect.objectContaining({ kind: "study" }));
     expect(seedMapKind).toHaveBeenCalledWith("m1", "study", t.ui.templates.nodes);
+  });
+
+  it("makes a Personal map unless Discussion is picked", async () => {
+    renderModal();
+    await userEvent.type(screen.getByLabelText(t.dashboard.createModal.name), "Mine");
+    await userEvent.click(screen.getByRole("button", { name: t.dashboard.createModal.submit }));
+    expect(mapsApi.createMap).toHaveBeenLastCalledWith(expect.objectContaining({ discussionMode: false }));
+  });
+
+  it("makes a Discussion map when it is picked", async () => {
+    renderModal();
+    await userEvent.type(screen.getByLabelText(t.dashboard.createModal.name), "Debate");
+    await userEvent.click(screen.getByText(t.dashboard.createModal.mode.discussion.label));
+    await userEvent.click(screen.getByRole("button", { name: t.dashboard.createModal.submit }));
+    expect(mapsApi.createMap).toHaveBeenLastCalledWith(expect.objectContaining({ discussionMode: true }));
+  });
+
+  describe("with only the basics (More tools off)", () => {
+    afterEach(() => localStorage.clear());
+
+    it("asks for no colours and no mode, and makes a Personal map", async () => {
+      saveLocalMoreTools(false);
+      renderModal();
+      expect(screen.queryByText(t.dashboard.createModal.ownerColor)).toBeNull();
+      expect(screen.queryByText(t.dashboard.createModal.mode.discussion.label)).toBeNull();
+      await userEvent.type(screen.getByLabelText(t.dashboard.createModal.name), "Mine");
+      await userEvent.click(screen.getByRole("button", { name: t.dashboard.createModal.submit }));
+      expect(mapsApi.createMap).toHaveBeenLastCalledWith(expect.objectContaining({ discussionMode: false }));
+    });
   });
 });

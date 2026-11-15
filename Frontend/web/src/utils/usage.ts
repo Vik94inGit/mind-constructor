@@ -71,6 +71,7 @@ export const FEATURES = [
   "opponent_turn",
   "quick_add",
   "quiz",
+  "more_tools",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

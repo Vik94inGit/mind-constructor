@@ -87,31 +87,29 @@ const MAP_TEMPLATES = {
     },
   ],
   // Seeded onto every fresh demo account (see authAbl.ts's
-  // createDemoSessionAbl) — deliberately the richest built-in template, not
-  // just a nudge to start from: a Problem with two Option children forms an
-  // actual auto-detected circle (circleAbl.ts's 2+-children rule) right out
-  // of the gate, and each Option's own outcome child gives a halo/horns
-  // framing to look at too, so a first-time visitor lands on something that
-  // already demonstrates the app rather than a blank canvas.
+  // createDemoSessionAbl). It shows what the app is for, untangling
+  // something personal, so it is a decision of one's own, not a team's
+  // meeting: a Problem with two Option children forms an auto-detected
+  // circle (circleAbl.ts's 2+-children rule) right away, and each Option's
+  // good and bad outcome shows how the pieces relate.
   demo: [
     {
-      text: "Should we launch the new feature?",
-      title: "Launch the feature?",
+      text: "Should I change jobs?",
       type: "Problem",
       children: [
         {
-          text: "Ship it now",
+          text: "Take the new offer",
           type: "Option",
-          children: [{ text: "Faster user feedback", type: "Success" }],
+          children: [{ text: "More money and something new to learn", type: "Success" }],
         },
         {
           // Longer text than fits on the canvas, with a title standing in
           // for it — the other nodes here show the fallback (the text's own
           // first words) instead, so the demo shows both.
-          text: "Wait for more testing before we release anything to users",
-          title: "Wait and test first",
+          text: "Stay where I am and ask my manager for a raise first",
+          title: "Stay and ask for a raise",
           type: "Option",
-          children: [{ text: "Risk of missing the window", type: "Fail" }],
+          children: [{ text: "I might still feel stuck in a year", type: "Fail" }],
         },
       ],
     },

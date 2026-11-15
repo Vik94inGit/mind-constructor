@@ -94,6 +94,10 @@ npm run build        # tsc -b && vite build
   (each holds the shape and the English) and `locales/<cs|uk|ru>.ts` (that language's copy of all
   five, loaded only when picked: `loadTranslation`); add a new string in all four. Stored values
   (node types etc.) stay English.
+- **More tools** (`utils/moreTools.ts`, `hooks/useMoreTools.ts`): a new account sees only the basics
+  of untangling a thought, and discussion, pictures, looks, presentation, Quiz me, folders and power
+  editing wait behind one switch. When adding a tool that a first-time user doesn't need, gate it on
+  `useMoreTools().moreTools` rather than putting it in front of everyone.
 - Per-browser view preferences (card fills, locked blocks, minimap) live in
   `localStorage`; anything that should follow the user across devices goes through `/api/state`
   (`context/UserStateContext.tsx`).

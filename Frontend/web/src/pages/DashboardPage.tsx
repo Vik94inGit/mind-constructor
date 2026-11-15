@@ -37,6 +37,8 @@ import { useDesktopLayout } from "../hooks/useDesktopLayout";
 import { checkInShift } from "../utils/feeling";
 import type { CheckIns } from "../utils/feeling";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { useMoreTools } from "../hooks/useMoreTools";
+import { MoreToolsSwitch } from "../components/MoreToolsSwitch";
 
 type Filter = mapsApi.MapFilter;
 
@@ -44,6 +46,7 @@ export function DashboardPage() {
   const confirm = useConfirm();
   const { user } = useAuth();
   const { t } = useI18n();
+  const { moreTools } = useMoreTools();
   const navigate = useNavigate();
   // A computer (wide screen, mouse) keeps the original dashboard; a phone or tablet gets the main menu node.
   const desktop = useDesktopLayout();
@@ -248,8 +251,13 @@ export function DashboardPage() {
       ? [{ id: "inbox", label: ring.unsorted(unsortedCount), icon: "📥", color: NODE_TYPE_COLORS["Problematic option"], onClick: () => toggleMenu("inbox") }]
       : []),
     { id: "map", label: ring.newMap, icon: "＋", color: NODE_TYPE_COLORS.Solution, onClick: () => setShowCreate(true) },
-    { id: "folder", label: ring.newFolder, icon: "🗂", color: NODE_TYPE_COLORS.Option, onClick: () => setFolderModal({}) },
-    { id: "split", label: ring.split, icon: "✂", color: NODE_TYPE_COLORS.unknown, onClick: () => navigate("/split") },
+    // Folders and Text → map wait behind More tools (utils/moreTools.ts).
+    ...(moreTools
+      ? [
+          { id: "folder", label: ring.newFolder, icon: "🗂", color: NODE_TYPE_COLORS.Option, onClick: () => setFolderModal({}) },
+          { id: "split", label: ring.split, icon: "✂", color: NODE_TYPE_COLORS.unknown, onClick: () => navigate("/split") },
+        ]
+      : []),
   ];
 
   const quickNote = (autoFocus: boolean) => (
@@ -301,12 +309,16 @@ export function DashboardPage() {
         </div>
         {desktop && (
           <div className="flex flex-wrap gap-2">
-            <button className={secondaryBtn} onClick={() => navigate("/split")}>
-              {t.split.entry}
-            </button>
-            <button className={secondaryBtn} onClick={() => setFolderModal({})}>
-              {t.dashboard.library.newFolder}
-            </button>
+            {moreTools && (
+              <button className={secondaryBtn} onClick={() => navigate("/split")}>
+                {t.split.entry}
+              </button>
+            )}
+            {moreTools && (
+              <button className={secondaryBtn} onClick={() => setFolderModal({})}>
+                {t.dashboard.library.newFolder}
+              </button>
+            )}
             <button className={primaryBtn} onClick={() => setShowCreate(true)}>
               {t.dashboard.newMap}
             </button>
@@ -464,6 +476,11 @@ export function DashboardPage() {
               )}
             </>
           )}
+          {/* The More tools switch, with a word on what waits behind it while it's off. */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-2 text-center text-[0.8rem] text-ink-soft">
+            {!moreTools && <span>{t.ui.moreTools.hint}</span>}
+            <MoreToolsSwitch />
+          </div>
         </section>
       </div>
 

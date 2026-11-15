@@ -61,6 +61,11 @@ vi.mock("../src/dao/userDao.js", () => ({
   deleteAllDao: vi.fn(),
 }));
 
+vi.mock("../src/dao/userStateDao.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/dao/userStateDao.js")>()),
+  updatePreferencesDao: vi.fn(),
+}));
+
 let app: typeof import("../server.js").app;
 
 describe("Auth", () => {

@@ -13,6 +13,13 @@ import {
 } from "../dao/userDao.js";
 import { parseOrThrow } from "./errors.js";
 import { createMapAbl } from "./mapAbl.js";
+import { updatePreferencesDao } from "../dao/userStateDao.js";
+
+// A new account starts with only the basics on screen; the user turns on
+// "More tools" when they want the rest (UserState.preferences.moreTools).
+const startSimple = async (userId: string) => {
+  await updatePreferencesDao(userId, { moreTools: false });
+};
 
 export class EmailAlreadyInUseError extends Error {}
 export class InvalidCredentialsError extends Error {}
@@ -128,6 +135,7 @@ export const registerAbl = async (input: unknown) => {
   }
 
   const user = await createUserDao({ username: finalUsername, email, password });
+  await startSimple(user._id.toString());
 
   return { user };
 };
@@ -196,6 +204,7 @@ export const googleAuthAbl = async (input: unknown) => {
       // User.usernameConfirmed).
       const username = await defaultUsername({ name: payload.name, email });
       user = await createGoogleUserDao({ username, email, googleId, usernameConfirmed: false });
+      await startSimple(user._id.toString());
     }
   }
   if (!user) throw new GoogleTokenInvalidError();
@@ -219,11 +228,13 @@ const DEMO_OWNER_COLOR = "#b5651d";
 // the exact same createMapAbl a real user's "new map" flow goes through, so
 // this gets the exact same node-creation/circle-detection behavior a real
 // map would. Isolated per visitor — everyone who tries the demo gets their
-// own copy, not a shared one others could disrupt.
+// own copy, not a shared one others could disrupt. Personal (not Discussion)
+// and a decision, because untangling a problem or decision of your own is
+// what the app leads with.
 export const createDemoSessionAbl = async () => {
   const user = await createDemoUserDao();
   const map = await createMapAbl(
-    { name: "Demo map", ownerColor: DEMO_OWNER_COLOR, template: "demo" },
+    { name: "Should I change jobs?", ownerColor: DEMO_OWNER_COLOR, template: "demo", kind: "decision", discussionMode: false },
     user._id.toString(),
   );
 

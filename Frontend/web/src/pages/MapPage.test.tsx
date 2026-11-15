@@ -16,6 +16,7 @@ import type { MapDoc } from "../types";
 
 vi.mock("../context/AuthContext", () => ({
   useAuth: () => ({ user: { _id: "u1", username: "me", email: "me@x" }, logout: vi.fn() }),
+  useAuthUser: () => ({ _id: "u1", username: "me", email: "me@x" }),
 }));
 vi.mock("../api/socket", () => {
   const socket = { on: vi.fn(), off: vi.fn(), connected: false, io: { on: vi.fn(), off: vi.fn() } };

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMoreTools } from "../hooks/useMoreTools";
 import type { FormEvent } from "react";
 import * as mapsApi from "../api/maps";
 import { Modal } from "../components/Modal";
@@ -22,12 +23,15 @@ const MAP_KIND_KEYS: StartingPoint[] = ["empty", "problem", "decision", "goal", 
 
 export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; onCreated: (map: MapDoc) => void }) {
   const { t } = useI18n();
+  const { moreTools } = useMoreTools();
   const [name, setName] = useState("");
   const [ownerColor, setOwnerColor] = useState("#22c55e");
   const [color, setColor] = useState("#e08a3e");
   const [kind, setKind] = useState<StartingPoint>("problem");
   // Discussion (battle) or Personal (creating) — the owner can switch it later on the map itself.
-  const [discussionMode, setDiscussionMode] = useState(true);
+  // Personal first: untangling something of your own is what the app leads with;
+  // Discussion (the battle) is picked on purpose.
+  const [discussionMode, setDiscussionMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -65,14 +69,19 @@ export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; on
             className="rounded-lg border border-line bg-surface px-[0.7rem] py-[0.55rem] text-[0.92rem] font-[inherit] text-ink focus:outline focus:-outline-offset-1 focus:outline-2 focus:outline-accent"
           />
         </div>
-        <div className="mb-4 flex flex-col gap-[0.35rem]">
-          <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.ownerColor}</label>
-          <ColorPicker value={ownerColor} onChange={setOwnerColor} />
-        </div>
-        <div className="mb-4 flex flex-col gap-[0.35rem]">
-          <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.boardColor}</label>
-          <ColorPicker value={color} onChange={setColor} />
-        </div>
+        {/* Colours and Personal/Discussion only with More tools on (utils/moreTools.ts): a map otherwise starts Personal in the default colours. */}
+        {moreTools && (
+          <>
+            <div className="mb-4 flex flex-col gap-[0.35rem]">
+              <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.ownerColor}</label>
+              <ColorPicker value={ownerColor} onChange={setOwnerColor} />
+            </div>
+            <div className="mb-4 flex flex-col gap-[0.35rem]">
+              <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.boardColor}</label>
+              <ColorPicker value={color} onChange={setColor} />
+            </div>
+          </>
+        )}
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.startingPoint}</label>
           <div className="grid grid-cols-2 gap-[0.5rem]">
@@ -96,31 +105,33 @@ export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; on
             })}
           </div>
         </div>
-        <div className="mb-4 flex flex-col gap-[0.35rem]">
-          <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.mode.label}</label>
-          <div className="grid grid-cols-2 gap-[0.5rem]">
-            {([true, false] as const).map((isDiscussion) => {
-              const label = isDiscussion ? t.dashboard.createModal.mode.discussion : t.dashboard.createModal.mode.personal;
-              return (
-                <button
-                  key={String(isDiscussion)}
-                  type="button"
-                  onClick={() => setDiscussionMode(isDiscussion)}
-                  className={`cursor-pointer rounded-lg border px-[0.7rem] py-[0.55rem] text-left transition-[background-color,border-color] duration-[120ms] ${
-                    discussionMode === isDiscussion ? "border-accent bg-accent-soft" : "border-line bg-surface hover:bg-surface-2"
-                  }`}
-                >
-                  <div
-                    className={`text-[0.82rem] font-semibold ${discussionMode === isDiscussion ? "text-accent-ink" : "text-ink"}`}
+        {moreTools && (
+          <div className="mb-4 flex flex-col gap-[0.35rem]">
+            <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.mode.label}</label>
+            <div className="grid grid-cols-2 gap-[0.5rem]">
+              {([false, true] as const).map((isDiscussion) => {
+                const label = isDiscussion ? t.dashboard.createModal.mode.discussion : t.dashboard.createModal.mode.personal;
+                return (
+                  <button
+                    key={String(isDiscussion)}
+                    type="button"
+                    onClick={() => setDiscussionMode(isDiscussion)}
+                    className={`cursor-pointer rounded-lg border px-[0.7rem] py-[0.55rem] text-left transition-[background-color,border-color] duration-[120ms] ${
+                      discussionMode === isDiscussion ? "border-accent bg-accent-soft" : "border-line bg-surface hover:bg-surface-2"
+                    }`}
                   >
-                    {label.label}
-                  </div>
-                  <div className="mt-[0.1rem] text-[0.72rem] text-ink-soft">{label.desc}</div>
-                </button>
-              );
-            })}
+                    <div
+                      className={`text-[0.82rem] font-semibold ${discussionMode === isDiscussion ? "text-accent-ink" : "text-ink"}`}
+                    >
+                      {label.label}
+                    </div>
+                    <div className="mt-[0.1rem] text-[0.72rem] text-ink-soft">{label.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
         <div className="mt-[1.2rem] flex justify-end gap-[0.6rem]">
           <button
             type="button"

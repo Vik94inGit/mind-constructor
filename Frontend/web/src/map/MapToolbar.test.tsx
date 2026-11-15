@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { saveLocalMoreTools } from "../utils/moreTools";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -235,5 +236,35 @@ describe("MapToolbar", () => {
       expect(screen.queryByTitle(t.map.toolbar.more)).not.toBeInTheDocument();
       expect(screen.getByTitle(t.map.toolbar.moveOff)).toBeInTheDocument();
     });
+  });
+});
+
+describe("MapToolbar with only the basics (More tools off)", () => {
+  afterEach(() => localStorage.clear());
+
+  it("keeps lines, pictures, the display menu and the mode switch out of a Personal map's toolbar", () => {
+    saveLocalMoreTools(false);
+    renderToolbar({ isOwner: true, isDiscussionMode: false });
+    expect(screen.queryByLabelText(t.ui.lines.toolbar)).toBeNull();
+    expect(screen.queryByLabelText(t.ui.pictures.title)).toBeNull();
+    expect(screen.queryByLabelText(t.map.toolbar.displayMenu)).toBeNull();
+    expect(screen.queryByLabelText(t.map.toolbar.personalTooltip)).toBeNull();
+    expect(screen.getByTestId("more-tools").textContent).toBe(t.ui.moreTools.show);
+  });
+
+  it("still lets the owner take a Discussion map back to Personal", () => {
+    saveLocalMoreTools(false);
+    renderToolbar({ isOwner: true, isDiscussionMode: true });
+    expect(screen.getByLabelText(t.map.toolbar.discussionTooltip)).toBeTruthy();
+  });
+
+  it("brings every tool back with the switch", async () => {
+    saveLocalMoreTools(false);
+    renderToolbar({ isOwner: true, isDiscussionMode: false });
+    await userEvent.click(screen.getByTestId("more-tools"));
+    expect(screen.getByLabelText(t.ui.lines.toolbar)).toBeTruthy();
+    expect(screen.getByLabelText(t.map.toolbar.displayMenu)).toBeTruthy();
+    expect(screen.getByLabelText(t.map.toolbar.personalTooltip)).toBeTruthy();
+    expect(screen.getByTestId("more-tools").textContent).toBe(t.ui.moreTools.hide);
   });
 });

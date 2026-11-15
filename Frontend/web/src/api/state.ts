@@ -23,6 +23,8 @@ export interface Preferences {
   nodeFade?: number;
   /** The user's own emoji per node type. */
   typeEmoji?: TypeEmoji;
+  /** Every tool on screen (utils/moreTools.ts); false for a new account, unset (on) for older ones. */
+  moreTools?: boolean;
 }
 
 export interface MapViewState {

@@ -1,4 +1,5 @@
 import { useI18n } from "../i18n/I18nContext";
+import { useMoreTools } from "../hooks/useMoreTools";
 import { btnPrimary, btnGhost, inputCls } from "./thinkStyles";
 import { StepHeader, StepNav } from "./StepChrome";
 import { ErrorBanner } from "../components/ErrorBanner";
@@ -25,6 +26,7 @@ export function BuildStep({
   onBuild: () => void;
 }) {
   const { t } = useI18n();
+  const { moreTools } = useMoreTools();
   const tt = t.ui.think;
   const modes = [
     { value: true, ...tt.build.personal },
@@ -47,27 +49,30 @@ export function BuildStep({
         disabled={!!building}
       />
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup">
-        {modes.map((m) => {
-          const on = personal === m.value;
-          return (
-            <button
-              key={String(m.value)}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              disabled={!!building}
-              onClick={() => setPersonal(m.value)}
-              className={`cursor-pointer rounded-lg border px-4 py-3 text-left transition-[border-color,background-color] duration-[120ms] ${
-                on ? "border-accent bg-accent-soft" : "border-line bg-surface hover:border-accent"
-              }`}
-            >
-              <div className={`text-[0.92rem] font-semibold ${on ? "text-accent-ink" : "text-ink"}`}>{m.label}</div>
-              <div className="mt-1 text-[0.8rem] text-ink-soft">{m.hint}</div>
-            </button>
-          );
-        })}
-      </div>
+      {/* Personal or Discussion: only with More tools on (utils/moreTools.ts); otherwise Personal. */}
+      {moreTools && (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup">
+          {modes.map((m) => {
+            const on = personal === m.value;
+            return (
+              <button
+                key={String(m.value)}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={!!building}
+                onClick={() => setPersonal(m.value)}
+                className={`cursor-pointer rounded-lg border px-4 py-3 text-left transition-[border-color,background-color] duration-[120ms] ${
+                  on ? "border-accent bg-accent-soft" : "border-line bg-surface hover:border-accent"
+                }`}
+              >
+                <div className={`text-[0.92rem] font-semibold ${on ? "text-accent-ink" : "text-ink"}`}>{m.label}</div>
+                <div className="mt-1 text-[0.8rem] text-ink-soft">{m.hint}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <p className="mt-6 mb-0 text-[0.9rem] text-ink-soft">{tt.build.summary(count)}</p>
 

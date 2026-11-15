@@ -764,6 +764,13 @@ const ui: UiStrings = {
     noMembers: "Zatím žádní členové.",
     unknown: "Neznámý uživatel",
   },
+  moreTools: {
+    show: "Více nástrojů",
+    hide: "Méně nástrojů",
+    showTitle: "Ukázat všechny nástroje: diskuse, obrázky, prezentace, Vyzkoušej mě, složky a další",
+    hideTitle: "Nechat na obrazovce jen základ",
+    hint: "Na obrazovce je jen základ. Diskuse, obrázky, prezentace, Vyzkoušej mě a složky čekají pod Více nástrojů.",
+  },
   demo: {
     exit: "Ukončit demo",
     exitTitle: "Opustit demo a přihlásit se nebo zaregistrovat",
@@ -1135,6 +1142,7 @@ const ui: UiStrings = {
         opponent_turn: "Hráli za napodobeného soupeře",
         quick_add: "Přidali uzel z kruhu",
         quiz: "Zkoušeli se (Vyzkoušej mě)",
+        more_tools: "Zapnuli nebo vypnuli více nástrojů",
       },
     },
   },

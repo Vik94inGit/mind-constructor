@@ -417,7 +417,9 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
                 cross-fade instead of popping, and absolutely placed under the
                 icon so showing one never shifts the icon itself. Shows for
                 the ghost a click has picked out (with the "click again"
-                hint), otherwise for whichever ghost the sequence has reached — a hover tooltip never shows at all on
+                hint), for whichever ghost the intro has reached, and for every
+                ghost once the intro is over, so each icon always has its word
+                (newcomers read words, not symbols) — a hover tooltip never shows at all on
                 a touch device, which is exactly where a bare icon is hardest
                 to identify. Same small-chip-over-clutter styling NodeCard's
                 own caption uses, so it reads clearly against the canvas
@@ -432,7 +434,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
                 and went). Same on the emoji ring. */}
             <div
               className={`pointer-events-none absolute left-1/2 top-full flex -translate-x-1/2 flex-col items-center rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] leading-[1.2] whitespace-nowrap text-ink shadow-card transition-opacity duration-500 will-change-[opacity] ease-in-out ${
-                armedType === type || labelIndex === i ? "opacity-100" : "opacity-0"
+                armedType === type || labelIndex === i || step >= introSteps ? "opacity-100" : "opacity-0"
               }`}
               style={{ marginTop: 4.8 * k, transform: `scale(${k})`, transformOrigin: "50% 0" }}
             >
@@ -476,7 +478,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
             </div>
             <div
               className={`pointer-events-none absolute left-1/2 top-full -translate-x-1/2 rounded-[3px] bg-surface px-[0.3rem] py-[0.1rem] text-[0.66rem] leading-[1.2] font-semibold whitespace-nowrap text-ink shadow-card transition-opacity duration-500 will-change-[opacity] ${
-                labelIndex === i ? "opacity-100" : "opacity-0"
+                labelIndex === i || step >= introSteps ? "opacity-100" : "opacity-0"
               }`}
               style={{ marginTop: 4.8 * k, transform: `scale(${k})`, transformOrigin: "50% 0" }}
             >
