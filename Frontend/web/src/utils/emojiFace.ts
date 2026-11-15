@@ -49,6 +49,9 @@ export const DEFAULT_TYPE_EMOJI: Record<NodeType, string> = {
   unknown: "❓",
   Title: "📖",
   Question: "🤔",
+  Definition: "📘",
+  Example: "🧪",
+  Summary: "📝",
 };
 
 /** A type's choice that keeps the type's own symbol face up instead of an emoji (also what no choice means). */

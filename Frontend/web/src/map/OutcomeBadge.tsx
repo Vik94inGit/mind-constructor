@@ -25,7 +25,7 @@ import { NODE_TYPE_COLORS, ZONE_COLORS } from "../utils/nodeType";
 // the deformation wings caused: a symbol that never resizes can't deform.
 // The study types (Title, Question) have no outcome either: like "unknown"
 // they keep their plain NodeTypeIcon glyph and draw no halo or horns.
-export type OutcomeType = Exclude<NodeType, "unknown" | "Title" | "Question">;
+export type OutcomeType = Exclude<NodeType, "unknown" | "Title" | "Question" | "Definition" | "Example" | "Summary">;
 
 export const OUTCOME_TYPES: readonly OutcomeType[] = [
   "Problem",

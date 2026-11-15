@@ -12,6 +12,10 @@ export const NODE_TYPES = [
   // Study types: a topic's heading, and a question to answer about it.
   "Title",
   "Question",
+  // More study types: what a term means, a worked example, and the gist of a topic.
+  "Definition",
+  "Example",
+  "Summary",
 ] as const;
 export type NodeType = (typeof NODE_TYPES)[number];
 

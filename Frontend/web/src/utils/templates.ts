@@ -22,15 +22,21 @@ import type { MapKind, NodeType } from "../types";
 //    bring), then making it happen (possibilities, obstacles, the plan, how it
 //    feels now), then looking back (what worked, what failed, what it brings
 //    to the table, how it feels, whether it is finished as it is).
-//  - "study": learning a topic, in titles and questions only. A Title node
+//  - "study": learning a topic, in study types only. A Title node
 //    (the topic) grows the questions that make you understand it (what it is,
 //    why it matters) and two Titles for its main parts, then each part's key
 //    idea and an example and how it connects to what you know, then what an
-//    exam would ask and what is still unclear. The answer is written into each
+//    exam would ask, what is still unclear and a Summary. The answer is written into each
 //    question, so a filled-in Question is a ready card for Quiz me
 //    (utils/quiz.ts).
 //  - "question": a Question node grows its follow-ups: why it is so and an
 //    example, then a common mistake and how to explain it to a friend.
+//  - "definition": a Definition grows its meaning in your own words and an
+//    Example, then what it is not and its rule or formula.
+//  - "example": an Example grows what it shows and its steps, then another
+//    example and one where it doesn't work.
+//  - "summary": a Summary grows its three key points, then what to remember
+//    and what to study next.
 //
 // Levels: a template asks its questions in rounds. Every node carries the
 // round it belongs to (Node.level); a later round's ghosts are saved from the
@@ -38,10 +44,10 @@ import type { MapKind, NodeType } from "../types";
 // filled in (utils/templateLevels.ts, hooks/useLevelReveal.ts). A template whose nodes all hang straight from
 // the root is drawn as one ring per round (layoutTemplate).
 
-export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro" | "idea" | "study" | "question";
+export type TemplateKind = "problem" | "goal" | "retry" | "decision" | "retro" | "idea" | "study" | "question" | "definition" | "example" | "summary";
 
 /** The templates a single node offers to grow from itself (NodePanel's Info tab). */
-export type NodeTemplateKind = Extract<TemplateKind, "problem" | "goal" | "retry" | "idea" | "study" | "question">;
+export type NodeTemplateKind = Extract<TemplateKind, "problem" | "goal" | "retry" | "idea" | "study" | "question" | "definition" | "example" | "summary">;
 
 // Which template a node of each type offers, if any.
 export const NODE_TYPE_TEMPLATE: Partial<Record<NodeType, NodeTemplateKind>> = {
@@ -51,6 +57,9 @@ export const NODE_TYPE_TEMPLATE: Partial<Record<NodeType, NodeTemplateKind>> = {
   Idea: "idea",
   Title: "study",
   Question: "question",
+  Definition: "definition",
+  Example: "example",
+  Summary: "summary",
 };
 
 export type TemplateNodeKey =
@@ -123,7 +132,21 @@ export type TemplateNodeKey =
   | "questionWhy"
   | "questionExample"
   | "questionMistake"
-  | "questionExplain";
+  | "questionExplain"
+  | "studySum"
+  | "defOwnWords"
+  | "defExample"
+  | "defNotThis"
+  | "defRule"
+  | "exampleShows"
+  | "exampleSteps"
+  | "exampleAnother"
+  | "exampleFails"
+  | "summaryPoint1"
+  | "summaryPoint2"
+  | "summaryPoint3"
+  | "summaryRemember"
+  | "summaryNext";
 
 interface TemplateNode {
   key: TemplateNodeKey;
@@ -218,7 +241,7 @@ const TEMPLATES: Record<TemplateKind, TemplateNode[]> = {
       level: 1,
       children: [
         { key: "studyPart1Key", type: "Question", level: 2 },
-        { key: "studyPart1Example", type: "Question", level: 2 },
+        { key: "studyPart1Example", type: "Example", level: 2 },
       ],
     },
     {
@@ -227,12 +250,13 @@ const TEMPLATES: Record<TemplateKind, TemplateNode[]> = {
       level: 1,
       children: [
         { key: "studyPart2Key", type: "Question", level: 2 },
-        { key: "studyPart2Example", type: "Question", level: 2 },
+        { key: "studyPart2Example", type: "Example", level: 2 },
       ],
     },
     { key: "studyConnect", type: "Question", level: 2 },
     { key: "studyExam", type: "Question", level: 3 },
     { key: "studyUnclear", type: "Question", level: 3 },
+    { key: "studySum", type: "Summary", level: 3 },
   ],
   // 1: why and an example; 2: a common mistake and explaining it simply.
   question: [
@@ -240,6 +264,28 @@ const TEMPLATES: Record<TemplateKind, TemplateNode[]> = {
     { key: "questionExample", type: "Question", level: 1 },
     { key: "questionMistake", type: "Question", level: 2 },
     { key: "questionExplain", type: "Question", level: 2 },
+  ],
+  // 1: in your own words and an example; 2: what it is not and its rule.
+  definition: [
+    { key: "defOwnWords", type: "Question", level: 1 },
+    { key: "defExample", type: "Example", level: 1 },
+    { key: "defNotThis", type: "Question", level: 2 },
+    { key: "defRule", type: "Definition", level: 2 },
+  ],
+  // 1: what it shows and its steps; 2: another example and one that fails.
+  example: [
+    { key: "exampleShows", type: "Question", level: 1 },
+    { key: "exampleSteps", type: "Summary", level: 1 },
+    { key: "exampleAnother", type: "Example", level: 2 },
+    { key: "exampleFails", type: "Example", level: 2 },
+  ],
+  // 1: the three key points; 2: what to remember and what to study next.
+  summary: [
+    { key: "summaryPoint1", type: "Summary", level: 1 },
+    { key: "summaryPoint2", type: "Summary", level: 1 },
+    { key: "summaryPoint3", type: "Summary", level: 1 },
+    { key: "summaryRemember", type: "Question", level: 2 },
+    { key: "summaryNext", type: "Title", level: 2 },
   ],
 };
 

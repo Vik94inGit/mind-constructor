@@ -18,16 +18,19 @@ offer *Problematic option*; a problem map shouldn't offer *Title* and *Question*
   name in the ring's rolling name chip.
 - **How to leave or undo it:** tap ⋯ / − again, or close the node. The ring opens on the map's set
   again for the next node.
-- A map made empty has no kind, so its ring is every type and has no ⋯.
+- A map made empty has no kind: its ring is every type but the study ones, and has no ⋯.
+- 2026-11-15, Viktor: study types (Title, Question, Definition, Example, Summary) never show on the
+  ring of a map that isn't for studying, ⋯ included; a study map offers six study choices (Title,
+  Question, ✅ answer, Definition, Example, Summary), its ⋯ opening every type.
 
 ## Sketch
 
 ```
 study map                       after tapping ⋯
       (Title)                          (Problem) …
- (⋯)          (Question)        all 10 types round the node, (−) last
- (❓)  [node]  (✅)
-      (Idea)
+ (⋯)          (Question)        every type round the node, (−) last
+ (Summary)  [node]  (✅)
+  (Example)   (Definition)
 ```
 
 ## Could be confused with

@@ -1,25 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { MAP_KINDS, NODE_TYPES } from "../types";
-import { RING_TYPES_BY_KIND, ringTypesFor } from "./ringTypes";
+import { NON_STUDY_TYPES, RING_TYPES_BY_KIND, STUDY_TYPES, ringAllTypesFor, ringTypesFor } from "./ringTypes";
 
 describe("ringTypesFor", () => {
-  it("offers every type on a map made empty", () => {
-    expect(ringTypesFor(undefined)).toEqual(NODE_TYPES);
-    expect(ringTypesFor(null)).toEqual(NODE_TYPES);
+  it("offers every type but the study ones on a map made empty", () => {
+    expect(ringTypesFor(undefined)).toEqual(NON_STUDY_TYPES);
+    expect(ringTypesFor(null)).toEqual(NON_STUDY_TYPES);
+    expect(ringAllTypesFor(undefined)).toEqual(NON_STUDY_TYPES);
   });
 
-  it("keeps a study map to the study types and a problem map to the problem-solving ones", () => {
-    expect(ringTypesFor("study")[0]).toBe("Title");
-    expect(ringTypesFor("study")).toContain("Question");
-    expect(ringTypesFor("study")).not.toContain("Problematic option");
-    expect(ringTypesFor("problem")[0]).toBe("Problem");
-    expect(ringTypesFor("problem")).not.toContain("Title");
-    expect(ringTypesFor("problem")).not.toContain("Question");
+  it("gives a study map six study choices, with the topic on top", () => {
+    const ring = ringTypesFor("study");
+    expect(ring).toHaveLength(6);
+    expect(ring[0]).toBe("Title");
+    for (const type of STUDY_TYPES) expect(ring).toContain(type);
+    expect(ringAllTypesFor("study")).toEqual(NODE_TYPES);
+  });
+
+  it("never shows a study type on a map that isn't for studying, ⋯ included", () => {
+    for (const kind of MAP_KINDS.filter((k) => k !== "study")) {
+      for (const type of STUDY_TYPES) {
+        expect(ringTypesFor(kind)).not.toContain(type);
+        expect(ringAllTypesFor(kind)).not.toContain(type);
+      }
+    }
   });
 
   it("adds the chosen node's own type when the map's set lacks it", () => {
     expect(ringTypesFor("study", "Problem")).toEqual([...RING_TYPES_BY_KIND.study, "Problem"]);
     expect(ringTypesFor("study", "Title")).toEqual(RING_TYPES_BY_KIND.study);
+    expect(ringAllTypesFor("problem", "Question")).toEqual([...NON_STUDY_TYPES, "Question"]);
   });
 
   it("has a set for every kind, each a real subset with the kind's root type", () => {

@@ -15,6 +15,10 @@ export const NODE_TYPES = [
   // can't be an attack's or a protection's type.
   "Title",
   "Question",
+  // More study types: what a term means, a worked example, and the gist of a topic.
+  "Definition",
+  "Example",
+  "Summary",
 ] as const;
 
 export type NodeType = (typeof NODE_TYPES)[number];
