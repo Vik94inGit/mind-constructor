@@ -72,6 +72,7 @@ export const createNodeMutationDao = async (
     emoji?: string;
     order?: number | null;
     level?: number | null;
+    area?: number;
     type: NodeType;
     x?: number;
     y?: number;
@@ -93,6 +94,7 @@ export const createNodeMutationDao = async (
     emoji: nodeData.emoji,
     order: nodeData.order,
     level: nodeData.level ?? null,
+    area: nodeData.area ?? 0,
     type: nodeData.type,
     parentId: nodeData.parentId,
     x: nodeData.x,
@@ -437,6 +439,12 @@ export const setLockedNodesDao = async (
 // so it stops at the first node: 0 or 1, however big the map is.
 export const countNodesByMapInternalIdDao = async (mapInternalId: MapInternalId) => {
   return await Node.countDocuments({ mapId: mapInternalId }, { limit: 1 });
+};
+
+// Whether any node sits on area `from` or a later one (Node.area) — a map
+// can only give up areas that are empty.
+export const hasNodesFromAreaDao = async (mapInternalId: MapInternalId, from: number) => {
+  return (await Node.countDocuments({ mapId: mapInternalId, area: { $gte: from } }, { limit: 1 })) > 0;
 };
 
 // Minimal projection for translating internal _ids back to public nodeIds —

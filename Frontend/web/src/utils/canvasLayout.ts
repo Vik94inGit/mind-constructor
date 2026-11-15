@@ -421,6 +421,15 @@ export function avoidOverlap(
   return anywhere.clear ? anywhere.point : inView.point;
 }
 
+/**
+ * Whether one more node fits anywhere in `bounds` without landing on any of
+ * `obstacles` — false once the canvas is full (utils/mapAreas.ts).
+ */
+export function hasClearSpot(obstacles: Obstacle[], bounds: ViewportBounds = FULL_CANVAS_BOUNDS): boolean {
+  const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+  return nearestClearSpot(center, obstacles, bounds, 40).clear;
+}
+
 
 // sentimentOf (imported from utils/nodeType.ts) — matches ringKindFor's own
 // halo/horns split exactly (see OutcomeBadge.tsx's OUTCOME_CONFIG), so

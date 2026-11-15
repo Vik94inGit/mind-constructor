@@ -8,8 +8,9 @@ import type { Translation } from "../i18n/translations";
 vi.mock("../api/nodes");
 vi.mock("../utils/usage");
 
-function setup() {
+function setup(extra: { roomForOne?: () => boolean } = {}) {
   const params = {
+    ...extra,
     mapId: "m1",
     emojiFirst: false,
     placeNode: vi.fn((p: { x: number; y: number }) => ({ x: p.x + 10, y: p.y })),
@@ -44,5 +45,22 @@ describe("createBlankNodeAt (double-tap on empty canvas)", () => {
     const { params, result } = setup();
     expect(await result.current.createBlankNodeAt({ x: 0, y: 0 })).toBeNull();
     expect(params.setActionError).toHaveBeenLastCalledWith("could not create");
+  });
+});
+
+describe("a full area", () => {
+  it("starts nothing and makes nothing once there's no room for one more node", async () => {
+    vi.mocked(nodesApi.createNode).mockClear();
+    const roomForOne = vi.fn(() => false);
+    const { params, result } = setup({ roomForOne });
+    const parent = { nodeId: "p1" } as NodeDoc;
+    result.current.startQuickAdd("Idea", { x: 1, y: 1 }, parent);
+    result.current.startNodeAt({ x: 1, y: 1 }, "Idea");
+    result.current.startBranchOf(parent);
+    expect(await result.current.createBlankNodeAt({ x: 1, y: 1 })).toBeNull();
+    await result.current.sketchBranch("Idea", { x: 1, y: 1 }, parent);
+    expect(params.setPendingCreate).not.toHaveBeenCalled();
+    expect(nodesApi.createNode).not.toHaveBeenCalled();
+    expect(roomForOne).toHaveBeenCalledTimes(5);
   });
 });

@@ -97,11 +97,12 @@ export async function createMap(input: {
 
 export async function updateMap(
   mapId: string,
-  updates: Partial<Pick<MapDoc, "name" | "color" | "discussionMode" | "background" | "backgroundColor" | "backgroundImage" | "backgroundShade" | "slideOrder">>,
+  updates: Partial<Pick<MapDoc, "name" | "color" | "discussionMode" | "background" | "backgroundColor" | "backgroundImage" | "backgroundShade" | "slideOrder" | "areaCount">>,
 ) {
   if ("name" in updates || "color" in updates) feature("rename_map");
   if ("discussionMode" in updates) feature("discussion_mode");
   if ("slideOrder" in updates) feature("slide_order");
+  if ("areaCount" in updates) feature("map_area");
   if ("background" in updates || "backgroundColor" in updates || "backgroundImage" in updates || "backgroundShade" in updates) {
     feature("map_background");
   }

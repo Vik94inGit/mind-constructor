@@ -1,4 +1,4 @@
-import { CANVAS_W, CANVAS_H, footprintObstacles } from "../utils/canvasLayout";
+import { CANVAS_W, CANVAS_H, footprintObstacles, hasClearSpot } from "../utils/canvasLayout";
 import type { NodeGroup, Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import { MIN_NODE_GAP, makeZoneRule, othersTerritory, placeByZoneRules } from "../utils/zoneRules";
 import type { ExtraNode, MovingNode } from "../utils/zoneRules";
@@ -80,5 +80,12 @@ export function usePlacement({ visibleNodes, positions, nodeGroups, viewportBoun
       .map((g) => ({ x: g.cx, y: g.cy, minDist: g.r + 20 }));
   }
 
-  return { obstaclePoints, placeNode, bigNodeObstacles };
+  // Whether one more node fits anywhere on the area on screen without
+  // covering another — false once it's full (utils/mapAreas.ts): new nodes
+  // are then stopped instead of landing on top of others.
+  function hasRoom() {
+    return hasClearSpot(footprintObstacles(obstaclePoints(), MIN_NODE_GAP));
+  }
+
+  return { obstaclePoints, placeNode, bigNodeObstacles, hasRoom };
 }

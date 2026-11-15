@@ -63,6 +63,7 @@ export const FEATURES = [
   "history",
   "presentation",
   "slide_order",
+  "map_area",
   "copy_paste",
   "undo",
   "export",

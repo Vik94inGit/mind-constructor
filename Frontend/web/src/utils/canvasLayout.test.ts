@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   avoidOverlap,
+  hasClearSpot,
+  CANVAS_W,
+  CANVAS_H,
   dropTargetDistance,
   footprintObstacles,
   nodeZoomScale,
@@ -81,6 +84,17 @@ describe("avoidOverlap", () => {
     const desired = { x: 500, y: 500 };
     const farObstacle = { x: 2000, y: 1400, minDist: 150 };
     expect(avoidOverlap(desired, [farObstacle])).toEqual(desired);
+  });
+});
+
+describe("hasClearSpot", () => {
+  it("finds room on a canvas with a few nodes, and none once nodes cover all of it", () => {
+    expect(hasClearSpot(footprintObstacles([{ x: 1200, y: 800 }], 4))).toBe(true);
+    const full: { x: number; y: number }[] = [];
+    for (let x = 0; x <= CANVAS_W; x += NODE_FOOTPRINT.w) {
+      for (let y = 0; y <= CANVAS_H; y += NODE_FOOTPRINT.h) full.push({ x, y });
+    }
+    expect(hasClearSpot(footprintObstacles(full, 4))).toBe(false);
   });
 });
 

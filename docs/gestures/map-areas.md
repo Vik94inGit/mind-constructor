@@ -1,6 +1,6 @@
 # Extra areas on a full map
 
-Date: 2026-11-15 · PR: not yet
+Date: 2026-11-15 · PR: see the PR that links this file
 
 ## What the user wants to do
 
@@ -69,11 +69,20 @@ Thumbnail strip on top of the minimap, at most six:
 
 | Person | Tried first | Stuck on | Changed |
 |---|---|---|---|
-| Viktor | to fill in | | |
+| Viktor | read the sketch | picked between areas side by side and one at a time | one area at a time, as sketched |
 
 Questions for the test: does *one area at a time* match "switching between big parts", or should
 areas sit side by side on one long canvas? Is *All* the right sixth mini-view?
 
 ## Decision
 
-To fill in after the test.
+One area at a time (Viktor's pick). A map has 1 to 5 areas (`Map.areaCount`), each node one area
+(`Node.area`). When the area on screen has no clear spot left for one more node, every way of adding
+one (ghost ring, double-tap, + menu, branch, template, picture) stops and the notice says the area is
+full, with **Extend map** for the owner; members are asked to ask the owner, and at five areas the
+notice suggests packing or deleting. Extend opens the new, empty area (it doesn't carry the stopped
+node over: a branch can't hang across areas) and turns the minimap on, since that's where areas are
+switched. The minimap's **+** sits in its bottom-right corner (owner only, gone at five); the strip of
+mini-views (*All* and 1 to 5) sits on top of the minimap once there are two areas. *All* opens every
+area side by side with its count of thoughts, and the owner's *Remove the empty last area* (instead
+of a hold menu on a thumbnail). Search covers every area and switches to the one a result is on.

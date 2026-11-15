@@ -15,6 +15,8 @@ interface Props {
   /** Packs every parent's branch in, or (somePacked) opens them all again — utils/autoPack.ts. Undefined on a map with no parents. */
   onPackAll?: () => void;
   somePacked?: boolean;
+  /** How much taller the minimap is than usual (its strip of areas, map/AreaStrip.tsx), in px. */
+  minimapLift?: number;
 }
 
 // The three views side by side, the chosen one filled. Also the view prompt's
@@ -50,7 +52,7 @@ export function ViewSwitch({ view, onChange }: { view: MapView; onChange: (view:
 // open, the whole corner lifts to z-[49] — the menu's own z-index only counts
 // inside this wrapper, so without the lift the minimap (a later z-45 sibling)
 // painted over it. Still below a real modal (z-50).
-export function ViewCorner({ minimapShown, onToggleMinimap, view, onViewChange, onLayCardsClose, onPackAll, somePacked = false }: Props) {
+export function ViewCorner({ minimapShown, onToggleMinimap, view, onViewChange, onLayCardsClose, onPackAll, somePacked = false, minimapLift = 0 }: Props) {
   const { t } = useI18n();
   const s = t.ui.abstraction;
   const [open, setOpen] = useState(false);
@@ -61,7 +63,11 @@ export function ViewCorner({ minimapShown, onToggleMinimap, view, onViewChange, 
   return (
     // With the minimap shown it takes the corner itself (~122px tall with its
     // border): the zoom controls sit on it and the eye on top of them.
-    <div ref={ref} className={`absolute ${minimapShown ? "bottom-[186px]" : "bottom-3"} right-3 ${open ? "z-[49]" : "z-[45]"}`}>
+    <div
+      ref={ref}
+      className={`absolute ${minimapShown ? "bottom-[186px]" : "bottom-3"} right-3 ${open ? "z-[49]" : "z-[45]"}`}
+      style={minimapShown && minimapLift ? { bottom: 186 + minimapLift } : undefined}
+    >
       {open && (
         <div className="absolute right-0 bottom-[calc(100%+0.4rem)] z-[60] flex w-[230px] flex-col gap-3 rounded-card border border-line bg-surface p-2 shadow-card">
           <div className="flex flex-col gap-1">

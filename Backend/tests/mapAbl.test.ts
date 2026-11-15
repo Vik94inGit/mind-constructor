@@ -23,6 +23,7 @@ import {
 } from "../src/abl/mapAbl.js";
 import { createNodeAbl } from "../src/abl/nodeAbl.js";
 import { findUserByIdDao } from "../src/dao/userDao.js";
+import { hasNodesFromAreaDao } from "../src/dao/nodeDao.js";
 import { ValidationError } from "../src/abl/errors.js";
 import { createImageDao, deleteMapBackgroundImagesExceptDao } from "../src/dao/imageDao.js";
 
@@ -46,6 +47,10 @@ vi.mock("../src/dao/userDao.js", () => ({
 
 vi.mock("../src/abl/nodeAbl.js", () => ({
   createNodeAbl: vi.fn(),
+}));
+
+vi.mock("../src/dao/nodeDao.js", () => ({
+  hasNodesFromAreaDao: vi.fn(),
 }));
 
 vi.mock("../src/dao/imageDao.js", () => ({
@@ -264,6 +269,23 @@ describe("mapAbl", () => {
 
       expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { name: "Renamed" });
       expect(result).toEqual({ mapId: "pub123", name: "Renamed" });
+    });
+
+    it("extends a map up to five areas and gives an area back only when it is empty", async () => {
+      vi.mocked(updateMapDao).mockResolvedValue({ mapId: "pub123" } as never);
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1", areaCount: 3 } as never);
+
+      await updateMapAbl("pub123", "user1", { areaCount: 4 });
+      expect(updateMapDao).toHaveBeenCalledWith("pub123", "user1", { areaCount: 4 });
+      await expect(updateMapAbl("pub123", "user1", { areaCount: 6 })).rejects.toThrow(ValidationError);
+      await expect(updateMapAbl("pub123", "user1", { areaCount: 0 })).rejects.toThrow(ValidationError);
+
+      vi.mocked(hasNodesFromAreaDao).mockResolvedValue(true);
+      await expect(updateMapAbl("pub123", "user1", { areaCount: 2 })).rejects.toThrow("only an empty area");
+      expect(hasNodesFromAreaDao).toHaveBeenCalledWith("m1", 2);
+      vi.mocked(hasNodesFromAreaDao).mockResolvedValue(false);
+      await updateMapAbl("pub123", "user1", { areaCount: 2 });
+      expect(updateMapDao).toHaveBeenLastCalledWith("pub123", "user1", { areaCount: 2 });
     });
 
     it("saves a slide order, [] to go back to the automatic one, and refuses a bad one", async () => {

@@ -175,6 +175,8 @@ export interface MapDoc {
   backgroundShade?: number;
   /** The order the owner chose for the presentation's slides (Map.slideOrder): nodeIds, first slide first. Empty / absent: the automatic order (utils/presentation.ts applySlideOrder). */
   slideOrder?: string[];
+  /** How many areas the map has (Map.areaCount, 1..5): each a whole canvas, shown one at a time (utils/mapAreas.ts). Absent: 1. */
+  areaCount?: number;
   /** When the owner finished the discussion (Map.finishedAt) — null / absent: still open. A finished map takes no new nodes, attacks or shields until reopened. */
   finishedAt?: string | null;
   /** Members other than the owner who agreed to finish (user ids) — see utils/finish.ts. */
@@ -217,6 +219,8 @@ export interface NodeDoc {
   order?: number | null;
   /** Which round of a leveled template this ghost belongs to (see Backend's Node.level); null/absent for every other node. A later round stays locked until the earlier ones are filled in (utils/templateLevels.ts). */
   level?: number | null;
+  /** Which area of the map this node lives on (Node.area): 0 (or absent) is the main one. */
+  area?: number;
   type: NodeType;
   x?: number;
   y?: number;

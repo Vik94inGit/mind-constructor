@@ -4,6 +4,8 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
+import { useMapAreas } from "../hooks/useMapAreas";
+import { areaOf } from "../utils/mapAreas";
 import { ringTypesFor } from "../utils/ringTypes";
 import { useBackGuard } from "../hooks/useBackGuard";
 import { useIntroMigration } from "../hooks/useIntroMigration";
@@ -64,6 +66,7 @@ import { PictureCaptions } from "../map/PictureCaptions";
 import { usePictureEdit } from "../hooks/usePictureEdit";
 import { pictureGroups } from "../utils/pictures";
 import { MiniMap } from "../map/MiniMap";
+import { AreaAddButton, AreaStrip, AREA_STRIP_H } from "../map/AreaStrip";
 import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
@@ -336,6 +339,27 @@ export function MapPage() {
     refreshInsights,
   } = useMapData({ mapId, setSelectedId, setCelebrateIds, loadErrorMessage: t.ui.errors.loadMap });
 
+  // The map's areas, one on screen at a time — see hooks/useMapAreas.ts.
+  const areas = useMapAreas({
+    mapId,
+    map,
+    setMap,
+    nodes,
+    setActionError,
+    errorMessage: t.ui.errors.update,
+    onSwitched: () => {
+      setSelectedId(null);
+      setMultiSelectIds(new Set());
+      closeMenu();
+      setTimeout(() => fitAllLatest.current(), 60);
+    },
+    // The minimap is where areas are switched, so a new one brings it up.
+    onExtended: () => {
+      setMinimapShown(true);
+      saveMinimapShown(true);
+    },
+  });
+
   // Battle mode needs the server and the other members, so it is off while
   // offline: the map reads as Creating mode until the connection is back.
   const online = useSyncExternalStore(subscribeSyncStatus, () => getSyncStatus().online);
@@ -374,8 +398,14 @@ export function MapPage() {
     },
   );
   // Packed-away members are left off the canvas (NodePanel still gets every
-  // node, for the container's Packed list), and so is a round not yet open.
+  // node, for the container's Packed list), and so is a round not yet open,
+  // and every node on another of the map's areas (utils/mapAreas.ts).
   const unpackedNodes = useMemo(
+    () => nodes.filter((n) => !n.packedIntoNodeId && !levelHidden.has(n.nodeId) && areaOf(n) === areas.area),
+    [nodes, levelHidden, areas.area],
+  );
+  // What search finds: the same, on every area (picking one on another area goes there).
+  const searchableNodes = useMemo(
     () => nodes.filter((n) => !n.packedIntoNodeId && !levelHidden.has(n.nodeId)),
     [nodes, levelHidden],
   );
@@ -732,7 +762,7 @@ export function MapPage() {
   });
 
   // Where a new or moved node may go — see hooks/usePlacement.ts.
-  const { obstaclePoints, placeNode, bigNodeObstacles } = usePlacement({
+  const { obstaclePoints, placeNode, bigNodeObstacles, hasRoom } = usePlacement({
     visibleNodes,
     positions,
     nodeGroups,
@@ -741,6 +771,16 @@ export function MapPage() {
     discussionOn,
     userId: user?._id,
   });
+  // A full area takes no more nodes (they'd land on top of others): the map
+  // says so instead, offering its owner another area (utils/mapAreas.ts).
+  function roomForOne(): boolean {
+    if (hasRoom()) return true;
+    const a = t.ui.mapAreas;
+    if (!areas.canExtend) showNotice(a.mapFull);
+    else if (isOwner) showNotice(a.areaFull, { label: a.extend, run: () => void areas.extend() });
+    else showNotice(a.areaFullAskOwner);
+    return false;
+  }
 
   // Any closed loop in the Link graph reads as a "figure" and gets colored
   // in — see canvasLayout.ts's own computeLinkCycles doc comment for the
@@ -1274,7 +1314,9 @@ export function MapPage() {
       currentUserId={user._id}
       discussionMode={isDiscussionMode}
       isMapOwner={isOwner}
-      onApplyTemplate={(kind) => applyTemplate(kind, panelFor)}
+      onApplyTemplate={async (kind) => {
+        if (roomForOne()) await applyTemplate(kind, panelFor);
+      }}
       onClose={() => closePanel(panelFor.nodeId)}
       onStepNode={active ? stepReading : undefined}
       onSelectNode={(id) => {
@@ -1587,6 +1629,7 @@ export function MapPage() {
     upsertNode,
     setCelebrateIds,
     setActionError,
+    roomForOne,
     t,
   });
 
@@ -1937,14 +1980,16 @@ export function MapPage() {
       onPickBackgroundImage={isOwner ? (file) => void setMapBackgroundImage(file) : undefined}
       backgroundShade={map.backgroundShade}
       onPickBackgroundShade={isOwner ? (shade, save) => void setMapBackgroundShade(shade, save) : undefined}
-      nodes={visibleNodes}
+      nodes={areas.count > 1 ? searchableNodes : visibleNodes}
       onLoadTexts={async () => {
-        await ensureNodeText(visibleNodes.map((n) => n.nodeId));
+        await ensureNodeText((areas.count > 1 ? searchableNodes : visibleNodes).map((n) => n.nodeId));
       }}
       onSearchMatches={setSearchMatches}
       nodeTypeFilter={nodeTypeFilter}
       onNodeTypeFilter={setNodeTypeFilter}
       onPickSearchResult={(id) => {
+        const found = nodes.find((n) => n.nodeId === id);
+        if (found) areas.switchArea(areaOf(found), { frame: false });
         setSelectedId(id);
         centerOnNode(id);
       }}
@@ -1965,7 +2010,9 @@ export function MapPage() {
       onExitDemo={exitDemo}
       onInvite={() => setShowInvite(true)}
       onCreateNode={startCreateNodeInView}
-      onCreateCircle={createCircle}
+      onCreateCircle={() => {
+        if (roomForOne()) void createCircle();
+      }}
       onDrawPicture={() => setPicturePickerAt("view")}
       onCopyMap={copyWholeMap}
       onPaste={() => pasteClipboard()}
@@ -2305,7 +2352,7 @@ export function MapPage() {
               />
             )}
 
-            {!loading && nodes.length === 0 && !pendingCreate && !drawMode && (
+            {!loading && (areas.area === 0 ? nodes.length === 0 : unpackedNodes.length === 0) && !pendingCreate && !drawMode && (
               <QuickAddGhosts
                 key={`intro:${emojiFirst}`}
                 intro
@@ -2376,6 +2423,7 @@ export function MapPage() {
                 onLayCardsClose={layCardsClose}
                 onPackAll={mapParents.size > 0 ? (folded.size > 0 ? unpackAll : packAll) : undefined}
                 somePacked={folded.size > 0}
+                minimapLift={areas.count > 1 ? AREA_STRIP_H : 0}
               />
               {viewPromptOpen && (
                 <ViewPrompt
@@ -2399,6 +2447,18 @@ export function MapPage() {
                 hScrollMargin={hScrollMargin}
                 vScrollMargin={vScrollMargin}
                 onPanTo={panTo}
+                header={
+                  <AreaStrip
+                    nodes={nodes}
+                    positions={positions}
+                    count={areas.count}
+                    area={areas.area}
+                    perArea={areas.perArea}
+                    onSwitch={(a) => areas.switchArea(a)}
+                    onRemoveLast={isOwner && areas.canRemoveLast ? () => void areas.removeLast() : undefined}
+                  />
+                }
+                corner={isOwner && areas.canExtend && !timeLapse ? <AreaAddButton onAdd={() => void areas.extend()} busy={areas.busy} /> : undefined}
               />
               )}
 
@@ -2436,6 +2496,7 @@ export function MapPage() {
                 onReset={() => zoomFromCenter(0, 1)}
                 onFit={fitAll}
                 minimapShown={minimapShown}
+                minimapLift={areas.count > 1 ? AREA_STRIP_H : 0}
               />
             </>
           )}
@@ -2737,7 +2798,7 @@ export function MapPage() {
             const at = { x: canvasMenu.canvasX, y: canvasMenu.canvasY };
             closeMenu();
             setInlineEditId(null);
-            void growStructure(kind, at);
+            if (roomForOne()) void growStructure(kind, at);
           }}
           onQuiz={() => {
             closeMenu();
@@ -2771,7 +2832,7 @@ export function MapPage() {
                 ? { x: (view.minX + view.maxX) / 2, y: (view.minY + view.maxY) / 2 }
                 : picturePickerAt;
             setPicturePickerAt(null);
-            void drawPicture(kind, at);
+            if (roomForOne()) void drawPicture(kind, at);
           }}
         />
       )}

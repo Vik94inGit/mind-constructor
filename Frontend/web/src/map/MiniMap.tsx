@@ -94,6 +94,10 @@ interface Props {
   vScrollMargin: number;
   /** Moves the view (see useCanvasViewport's panTo): a click glides there, a drag follows the pointer. */
   onPanTo: (left: number, top: number, animate: boolean) => void;
+  /** Above the drawing: the strip of the map's areas (map/AreaStrip.tsx). */
+  header?: React.ReactNode;
+  /** Over the drawing's corner: the + that adds an area. */
+  corner?: React.ReactNode;
 }
 
 export const MiniMap = memo(function MiniMap({
@@ -110,6 +114,8 @@ export const MiniMap = memo(function MiniMap({
   hScrollMargin,
   vScrollMargin,
   onPanTo,
+  header,
+  corner,
 }: Props) {
   const { t } = useI18n();
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -219,9 +225,13 @@ export const MiniMap = memo(function MiniMap({
       // it's open. (An earlier z-[70] here overshot past z-50 too, leaving
       // the minimap floating on top of an open modal instead of properly
       // covered by it.)
-      className="absolute bottom-3 right-3 z-45 overflow-hidden rounded-card border border-line bg-surface shadow-card"
-      title={t.ui.minimapTitle}
+      // The drawing is clipped to the rounded corners on its own, so a
+      // header's popover (every area, map/AreaStrip.tsx) can reach outside.
+      // Lifted over the zoom buttons while every area is open above it.
+      className="absolute bottom-3 right-3 z-45 rounded-card border border-line bg-surface shadow-card [&:has([data-area-all-open])]:z-[49]"
     >
+      {header}
+      <div className={`relative overflow-hidden ${header ? "rounded-b-card" : "rounded-card"}`} title={t.ui.minimapTitle}>
       <svg
         ref={svgRef}
         width={MINIMAP_W}
@@ -490,6 +500,8 @@ export const MiniMap = memo(function MiniMap({
           </span>
         </div>
       )}
+      {corner}
+      </div>
     </div>
   );
 });

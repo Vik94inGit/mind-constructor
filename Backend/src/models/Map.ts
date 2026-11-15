@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { ZONE_PALETTE } from "./palette.js";
+import { MAX_MAP_AREAS, ZONE_PALETTE } from "./palette.js";
 
 // What a map is for — picked when it is created, and the frontend seeds a
 // matching starter structure. Purely descriptive: nothing here is enforced.
@@ -92,6 +92,10 @@ export const MapSchema = new mongoose.Schema(
     // and an id whose node is gone is simply skipped (frontend
     // utils/presentation.ts applySlideOrder).
     slideOrder: { type: [String], default: [] },
+    // How many areas the map has (Node.area): 1 (the default) is just the
+    // main canvas; the owner extends a full map up to MAX_MAP_AREAS, each
+    // area a whole canvas of its own that the frontend switches between.
+    areaCount: { type: Number, min: 1, max: MAX_MAP_AREAS, default: 1 },
     // When the discussion on this map was finished (see abl/finishAbl.ts) —
     // null while it's still going. A finished map takes no new nodes,
     // attacks or shields until its owner reopens it.

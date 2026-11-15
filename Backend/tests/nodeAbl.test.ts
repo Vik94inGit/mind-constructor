@@ -96,6 +96,19 @@ describe("nodeAbl", () => {
       await expect(createNodeAbl({ text: "", type: "Option", level: 1.5 }, "pub123", "user1")).rejects.toThrow(ValidationError);
     });
 
+    it("puts a node on an area the map has, and refuses one it doesn't", async () => {
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1", areaCount: 2 } as never);
+      vi.mocked(countNodesByMapInternalIdDao).mockResolvedValue(1 as never);
+      vi.mocked(createNodeMutationDao).mockResolvedValue({ nodeId: "n1" } as never);
+
+      await createNodeAbl({ text: "a", type: "Idea", area: 1 }, "pub123", "user1");
+      expect(vi.mocked(createNodeMutationDao).mock.calls[0][1].area).toBe(1);
+
+      await expect(createNodeAbl({ text: "a", type: "Idea", area: 2 }, "pub123", "user1")).rejects.toThrow(ValidationError);
+      vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1" } as never);
+      await expect(createNodeAbl({ text: "a", type: "Idea", area: 1 }, "pub123", "user1")).rejects.toThrow(ValidationError);
+    });
+
     it("keeps which dot of a picture a node is", async () => {
       vi.mocked(getMapByIdDao).mockResolvedValue({ _id: "m1" } as never);
       vi.mocked(countNodesByMapInternalIdDao).mockResolvedValue(1 as never);
