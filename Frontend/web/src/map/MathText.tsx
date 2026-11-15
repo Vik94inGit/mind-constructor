@@ -34,7 +34,13 @@ function toHtml(k: Katex, tex: string, display: boolean): string {
   return html;
 }
 
-function MathTextImpl({ text }: { text: string }) {
+/**
+ * `compact` is for a short caption under a node: runs of spaces and line
+ * breaks become one space, and a formula on its own line is drawn inside the
+ * line, so a caption with maths stays as short as its text.
+ */
+function MathTextImpl({ text, compact = false }: { text: string; compact?: boolean }) {
+  if (compact) text = text.replace(/\s+/g, " ").trim();
   const withMath = hasMath(text);
   const [lib, setLib] = useState<Katex | null>(katex);
   useEffect(() => {
@@ -54,8 +60,9 @@ function MathTextImpl({ text }: { text: string }) {
   if (!withMath) return <>{text}</>;
   return (
     <>
-      {splitMath(text).map((p, i) =>
-        p.kind === "text" ? (
+      {splitMath(text).map((piece, i) => {
+        const p = compact && piece.kind === "math" ? { ...piece, display: false } : piece;
+        return p.kind === "text" ? (
           <Fragment key={i}>{p.value}</Fragment>
         ) : lib ? (
           <span
@@ -68,8 +75,8 @@ function MathTextImpl({ text }: { text: string }) {
           <code key={i} data-math="source">
             {p.tex}
           </code>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }

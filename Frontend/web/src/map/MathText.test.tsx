@@ -21,4 +21,11 @@ describe("MathText", () => {
     await waitFor(() => expect(container.querySelector('[data-math="display"]')).not.toBeNull());
     expect(screen.getByText(/frac/)).toBeTruthy();
   });
+
+  it("keeps a caption short: spaces and line breaks become one space, a formula stays in the line", async () => {
+    const { container } = render(<MathText text={"  Speed\n\n\n   is   $$v = \\frac{s}{t}$$  "} compact />);
+    await waitFor(() => expect(container.querySelector('[data-math="inline"] .katex')).not.toBeNull());
+    expect(container.querySelector('[data-math="display"]')).toBeNull();
+    expect(container.textContent?.startsWith("Speed is ")).toBe(true);
+  });
 });

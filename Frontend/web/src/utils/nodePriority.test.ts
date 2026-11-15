@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captionBox, childCaptionsCoveringParents, computeParentIds, hiddenChildCaptions, nodeSizeMultiplier } from "./nodePriority";
+import { captionBox, captionsCoveringOthers, childCaptionsCoveringParents, computeParentIds, hiddenChildCaptions, nodeSizeMultiplier } from "./nodePriority";
 import type { CaptionSpec } from "./nodePriority";
 import { makeNode } from "../test/fixtures";
 
@@ -90,5 +90,52 @@ describe("hiddenChildCaptions", () => {
   it("hides nothing while the parent's own caption is down", () => {
     expect(hiddenChildCaptions(nodes, parents, { ...view, selectedId: "p" }).size).toBe(0);
     expect(hiddenChildCaptions(nodes, parents, { ...view, modeOf: () => "puzzle" as const }).size).toBe(0);
+  });
+});
+
+describe("captionsCoveringOthers", () => {
+  const spec = (x: number, y: number): CaptionSpec => ({ pos: { x, y }, sizeMultiplier: 1, lines: 2 });
+
+  it("leaves out a caption that lies over another node's icon", () => {
+    const captions = new Map([["a", spec(500, 500)]]);
+    // b's icon sits right where a's caption hangs, under a's icon.
+    const icons = new Map([["a", spec(500, 500)], ["b", spec(500, 545)]]);
+    expect([...captionsCoveringOthers(captions, icons, [], 1)]).toEqual(["a"]);
+  });
+
+  it("keeps the first of two captions that would lie on each other", () => {
+    const captions = new Map([["a", spec(500, 500)], ["b", spec(560, 505)]]);
+    const icons = new Map([["a", spec(500, 500)], ["b", spec(560, 505)]]);
+    expect([...captionsCoveringOthers(captions, icons, [], 1)]).toEqual(["b"]);
+  });
+
+  it("keeps captions that are clear of everything", () => {
+    const captions = new Map([["a", spec(500, 500)], ["b", spec(800, 500)]]);
+    const icons = new Map([["a", spec(500, 500)], ["b", spec(800, 500)]]);
+    expect(captionsCoveringOthers(captions, icons, [], 1).size).toBe(0);
+  });
+});
+
+describe("hiddenChildCaptions with every caption weighed", () => {
+  it("also leaves out a leaf's caption that lies over a sibling's", () => {
+    const nodes = [
+      makeNode({ nodeId: "p", x: 100, y: 100 }),
+      makeNode({ nodeId: "a", parentId: "p", x: 500, y: 500 }),
+      makeNode({ nodeId: "b", parentId: "p", x: 560, y: 505 }),
+    ];
+    const view = {
+      posFor: (n: { x?: number; y?: number }) => ({ x: n.x ?? 0, y: n.y ?? 0 }),
+      isCircleParent: () => false,
+      modeOf: () => "actual" as const,
+      dottedByZone: () => false,
+      compact: false,
+      zoom: 1,
+      selectedId: null,
+      inlineEditId: null,
+    };
+    const parents = computeParentIds(nodes);
+    expect(hiddenChildCaptions(nodes, parents, view).size).toBe(0);
+    expect([...hiddenChildCaptions(nodes, parents, { ...view, hasCaption: () => true })]).toEqual(["b"]);
+    expect(hiddenChildCaptions(nodes, parents, { ...view, hasCaption: () => false }).size).toBe(0);
   });
 });

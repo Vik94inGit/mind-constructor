@@ -96,6 +96,38 @@ export function childCaptionsCoveringParents(
   return hidden;
 }
 
+/** Where a node's icon sits, in canvas units (same zoom rule as captionBox). */
+export function iconBox({ pos, sizeMultiplier }: Pick<CaptionSpec, "pos" | "sizeMultiplier">, zoom: number): Box {
+  const half = (ICON_HALF_PX * sizeMultiplier) / (1 / nodeZoomScale(zoom));
+  return { left: pos.x - half, top: pos.y - half, right: pos.x + half, bottom: pos.y + half };
+}
+
+/**
+ * Captions that would lie over another node's icon or over a caption already
+ * kept, taken in order, so the first one kept wins and nothing reads on top
+ * of anything else. `blocked` are the boxes already taken (parents' captions).
+ */
+export function captionsCoveringOthers(
+  captions: Map<string, CaptionSpec>,
+  icons: Map<string, CaptionSpec>,
+  blocked: Box[],
+  zoom: number,
+): Set<string> {
+  const pad = 2 / (zoom || 1);
+  const iconBoxes = [...icons].map(([id, spec]) => [id, iconBox(spec, zoom)] as const);
+  const kept: Box[] = [...blocked];
+  const hidden = new Set<string>();
+  for (const [id, spec] of captions) {
+    const box = captionBox(spec, zoom);
+    if (iconBoxes.some(([other, icon]) => other !== id && overlaps(box, icon, pad)) || kept.some((k) => overlaps(box, k, pad))) {
+      hidden.add(id);
+    } else {
+      kept.push(box);
+    }
+  }
+  return hidden;
+}
+
 /** How the canvas draws each node right now — what hiddenChildCaptions reads. */
 export interface CaptionView {
   posFor: (node: NodeDoc) => Pt;
@@ -106,6 +138,8 @@ export interface CaptionView {
   zoom: number;
   selectedId: string | null;
   inlineEditId: string | null;
+  /** Whether a node that isn't a parent shows a caption at all (NodeCard's showCaption); absent: only parents' captions are weighed. */
+  hasCaption?: (node: NodeDoc) => boolean;
 }
 
 /**
@@ -132,10 +166,26 @@ export function hiddenChildCaptions(visibleNodes: NodeDoc[], parentIds: Set<stri
       view.selectedId !== n.nodeId &&
       view.inlineEditId !== n.nodeId,
   );
-  if (shownParents.length === 0) return new Set<string>();
   const children = new Map<string, CaptionSpec>();
   for (const n of visibleNodes) {
     if (!parentIds.has(n.nodeId)) children.set(n.nodeId, captionSpec(n));
   }
-  return childCaptionsCoveringParents(children, shownParents.map(captionSpec), view.zoom);
+  const parentSpecs = shownParents.map(captionSpec);
+  const hidden = shownParents.length > 0 ? childCaptionsCoveringParents(children, parentSpecs, view.zoom) : new Set<string>();
+  if (!view.hasCaption) return hidden;
+  // Then the other captions, in map order: one that would lie over another
+  // node's icon or a caption already kept is left out too (its text still
+  // shows on hover), so a crowded spot reads as icons, not stacked text.
+  const byId = new Map(visibleNodes.map((n) => [n.nodeId, n]));
+  const others = new Map<string, CaptionSpec>();
+  for (const [id, spec] of children) {
+    const n = byId.get(id)!;
+    if (hidden.has(id) || !view.hasCaption(n) || view.selectedId === id || view.inlineEditId === id) continue;
+    if (["puzzle", "mixed"].includes(view.modeOf(id)) || view.dottedByZone(id)) continue;
+    others.set(id, spec);
+  }
+  const icons = new Map(visibleNodes.map((n) => [n.nodeId, captionSpec(n)]));
+  const blocked = parentSpecs.map((p) => captionBox(p, view.zoom));
+  for (const id of captionsCoveringOthers(others, icons, blocked, view.zoom)) hidden.add(id);
+  return hidden;
 }

@@ -1995,6 +1995,13 @@ export function MapPage() {
     zoom,
     selectedId,
     inlineEditId,
+    // NodeCard's own showCaption: a node in a circle lets its zone speak,
+    // unless it's the circle's parent, in the chosen circle, or every caption shows.
+    hasCaption: (n) =>
+      ["iconText", "mixed"].includes(modeOf(n.nodeId)) ||
+      !groupSentimentByNode.get(n.nodeId) ||
+      circleRootSentimentByNode.has(n.nodeId) ||
+      !!spotlightedSet?.has(n.nodeId),
   });
 
   // The map's toolbar: a floating top-left cluster, or in computer mode a
