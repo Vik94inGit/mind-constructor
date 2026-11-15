@@ -2424,6 +2424,7 @@ export function MapPage() {
                 onPackAll={mapParents.size > 0 ? (folded.size > 0 ? unpackAll : packAll) : undefined}
                 somePacked={folded.size > 0}
                 minimapLift={areas.count > 1 ? AREA_STRIP_H : 0}
+                onExtend={isOwner && areas.canExtend && !timeLapse ? () => void areas.extend() : undefined}
               />
               {viewPromptOpen && (
                 <ViewPrompt

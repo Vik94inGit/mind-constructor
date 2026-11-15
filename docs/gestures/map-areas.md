@@ -85,4 +85,6 @@ node over: a branch can't hang across areas) and turns the minimap on, since tha
 switched. The minimap's **+** sits in its bottom-right corner (owner only, gone at five); the strip of
 mini-views (*All* and 1 to 5) sits on top of the minimap once there are two areas. *All* opens every
 area side by side with its count of thoughts, and the owner's *Remove the empty last area* (instead
-of a hold menu on a thumbnail). Search covers every area and switches to the one a result is on.
+of a hold menu on a thumbnail). Viktor then asked that the map can be extended any time, not only
+when full: besides the minimap's +, the eye menu has *Extend map* (owner, under five areas), which
+also works with the minimap hidden. Search covers every area and switches to the one a result is on.
