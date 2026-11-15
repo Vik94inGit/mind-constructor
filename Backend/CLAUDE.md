@@ -242,6 +242,12 @@ null`, e.g. a frontend's drag-node-out-of-the-backdrop gesture) — once a root 
   in `nodeAbl.ts`); rides along on the node list. The backend only stores it: the frontend
   (`utils/templateLevels.ts`) keeps a level's ghosts locked until every ghost of the earlier levels
   under the same template root has been filled in (or deleted).
+- **`Node.area`** and **`Map.areaCount`** — a map whose canvas fills up can grow extra areas, each a
+  whole canvas of its own; the frontend shows one at a time (`Frontend/web/src/utils/mapAreas.ts`).
+  `Map.areaCount` is 1..5 (`MAX_MAP_AREAS` in `models/palette.ts`, default 1), set through the owner-only
+  `PATCH /api/:mapId`; lowering it is refused while any node sits on an area it would drop
+  (`hasNodesFromAreaDao`). `Node.area` (0 = main, default) is set only on `POST /api/nodes/:mapId` and
+  must be below the map's `areaCount`.
 - **`Node.picture`** — `{ id, kind, dot, color }` or null: which dot of a picture a node is, for nodes made by
   the frontend's "Draw a picture" (`Frontend/web/src/utils/pictures.ts` owns the pictures and draws
   their lines between the dots as the ghosts are filled in). `id` groups one picture's dots, `kind`

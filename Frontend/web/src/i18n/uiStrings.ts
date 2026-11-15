@@ -83,6 +83,29 @@ export interface UiStrings {
   /** Right-click on empty canvas — see map/CanvasContextMenu.tsx. */
   canvasMenu: { newNode: string; structures: Record<MapKind, string> };
   /** "Draw a picture" — see utils/pictures.ts, map/PicturePicker.tsx and map/PictureLayer.tsx. */
+  /** A map's extra areas (utils/mapAreas.ts, map/AreaStrip.tsx). */
+  mapAreas: {
+    areaFull: string;
+    extend: string;
+    areaFullAskOwner: string;
+    mapFull: string;
+    /** The minimap's + button. */
+    add: string;
+    /** The strip of mini-views over the minimap. */
+    stripLabel: string;
+    all: string;
+    allTitle: string;
+    area: (n: number) => string;
+    areaThoughts: (n: number, count: number) => string;
+    removeLast: string;
+    /** A quick note when every area of the Inbox is full. */
+    inboxFull: string;
+    /** Moving a note onto a map with no room left. */
+    targetFull: string;
+    /** On a thought whose parent is on another area, and on the parent. */
+    fromArea: (n: number) => string;
+    toArea: (n: number) => string;
+  };
   pictures: {
     /** The menu item that opens the picker. */
     entry: string;
@@ -923,6 +946,23 @@ const en: UiStrings = {
   canvasMenu: {
     newNode: "New node",
     structures: { problem: "Analyze a problem", goal: "Plan a goal", decision: "Make a decision", retro: "Look back (retrospective)", idea: "Develop an idea", study: "Study" },
+  },
+  mapAreas: {
+    areaFull: "This area is full: a new thought would land on top of another.",
+    extend: "Extend map",
+    areaFullAskOwner: "This area is full. Ask the map's owner to extend the map.",
+    mapFull: "The map is full, all 5 areas. Pack some children in or delete a few thoughts to make room.",
+    add: "Add an area to the map",
+    stripLabel: "Map areas",
+    all: "All",
+    allTitle: "Every area",
+    area: (n) => `Area ${n}`,
+    areaThoughts: (n, count) => `Area ${n} · ${count} thoughts`,
+    removeLast: "Remove the empty last area",
+    inboxFull: "Your Inbox is full, all 5 areas. Sort or delete some notes first.",
+    targetFull: "That map is full. Pick another one, or make room on it first.",
+    fromArea: (n) => `From area ${n}`,
+    toArea: (n) => `Continues in area ${n}`,
   },
   pictures: {
     entry: "Draw a picture…",

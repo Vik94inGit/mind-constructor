@@ -53,7 +53,7 @@ describe("InboxTray", () => {
     fireEvent.click(screen.getByText("Move to a map"));
     fireEvent.click(screen.getByText("Work"));
     await waitFor(() => expect(onMoved).toHaveBeenCalledWith(work, 1));
-    expect(inbox.moveNoteToMap).toHaveBeenCalledWith("inbox", "a", work);
+    expect(inbox.moveNoteToMap).toHaveBeenCalledWith("inbox", "a", work, undefined);
     expect(screen.queryByText("Buy milk")).toBeNull();
     expect(screen.getByText("Moved to Work.")).toBeTruthy();
   });

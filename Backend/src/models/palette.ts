@@ -4,3 +4,7 @@
 // use it without loading the Node model.
 export const ZONE_PALETTE = ["sand", "sage", "sky", "lavender", "rose", "slate"] as const;
 export type ZonePaletteColor = (typeof ZONE_PALETTE)[number];
+
+// How many areas one map can have at most (Map.areaCount, Node.area): the
+// main canvas and up to four more the owner adds once it fills up.
+export const MAX_MAP_AREAS = 5;

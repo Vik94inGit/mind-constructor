@@ -3,6 +3,7 @@ import * as offline from "../offline/sync";
 import { upsertBy } from "../utils/mapGraph";
 import type { Attack, AttackNodeType, NodeDoc, NodeType, Weapon, ZonePaletteColor } from "../types";
 import { feature, type Feature } from "../utils/usage";
+import { shownAreaOf } from "../utils/mapAreas";
 
 export async function listNodes(mapId: string): Promise<NodeDoc[]> {
   const nodes = await apiRequest<NodeDoc[]>(`/api/${mapId}/nodes`);
@@ -23,6 +24,8 @@ export interface NewNodeInput {
   order?: number | null;
   /** Node.level: the round of a leveled template this ghost belongs to. */
   level?: number | null;
+  /** Node.area: left out, the area the map is showing (utils/mapAreas.ts activeArea). */
+  area?: number;
   type: NodeType;
   x?: number;
   y?: number;
@@ -69,7 +72,11 @@ export function draftNode(mapId: string, input: NewNodeInput, localId: string = 
   };
 }
 
-export async function createNode(mapId: string, input: NewNodeInput): Promise<NodeDoc> {
+export async function createNode(mapId: string, given: NewNodeInput): Promise<NodeDoc> {
+  // Left unsaid, a node goes to the area the map is showing (only sent past
+  // the main one, so a map with one area sends what it always did).
+  const area = given.area ?? shownAreaOf(mapId);
+  const input: NewNodeInput = area > 0 ? { ...given, area } : given;
   const localId = offline.newLocalId();
   const node = await apiRequest<NodeDoc>(`/api/nodes/${mapId}`, {
     method: "POST",

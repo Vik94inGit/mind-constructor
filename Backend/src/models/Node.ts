@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { ZONE_PALETTE } from "./palette.js";
+import { MAX_MAP_AREAS, ZONE_PALETTE } from "./palette.js";
 
 export const NODE_TYPES = [
   "Problem",
@@ -137,6 +137,18 @@ export const NodeSchema = new mongoose.Schema(
       min: 1,
       max: 9,
       validate: { validator: (v: number | null) => v === null || Number.isInteger(v), message: "level must be a whole number" },
+    },
+    // Which area of the map this node lives on (Map.areaCount): a map that
+    // has filled its canvas can grow up to MAX_MAP_AREAS - 1 more, each a
+    // full canvas of its own, and the frontend shows one area at a time.
+    // 0 (the default) is the main area, so every older node stays there.
+    // Set at creation only.
+    area: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: MAX_MAP_AREAS - 1,
+      validate: { validator: (v: number) => Number.isInteger(v), message: "area must be a whole number" },
     },
     // Which dot of a picture this node is, for a node made by "Draw a
     // picture": the frontend lays a picture out as ghost nodes, one per dot,

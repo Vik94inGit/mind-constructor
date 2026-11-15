@@ -176,6 +176,8 @@ const createNodeSchema = z.object({
   emoji: emojiSchema.optional(),
   order: orderSchema.nullish(),
   level: levelSchema.nullish(),
+  // Node.area — which area of the map; must be one the map already has.
+  area: z.number().int("area must be a whole number").min(0, "area must be at least 0").optional(),
   type: z.enum(NODE_TYPES, {
     error: () => `type is required and must be one of: ${NODE_TYPES.join(", ")}`,
   }),
@@ -209,6 +211,9 @@ export const createNodeAbl = async (
   const map = await getMapByIdDao(publicMapId, userId);
   if (!map) throw new MapNotFoundError();
   if (map.finishedAt) throw new MapFinishedError();
+  if (parsed.area !== undefined && parsed.area >= (map.areaCount ?? 1)) {
+    throw new ValidationError("area must be one the map has");
+  }
 
   // parentId arrives as a public nodeId (nanoid) — the schema stores an
   // internal ObjectId ref, so it has to be resolved the same way edgeAbl

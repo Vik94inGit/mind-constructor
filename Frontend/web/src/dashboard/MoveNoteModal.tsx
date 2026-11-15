@@ -3,7 +3,8 @@ import * as mapsApi from "../api/maps";
 import { Modal } from "../components/Modal";
 import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
-import { moveNoteToMap, moveTargets } from "../utils/inbox";
+import { MapFullError, moveNoteToMap, moveTargets } from "../utils/inbox";
+import { useAuthUser } from "../context/AuthContext";
 import type { MapDoc, NodeDoc } from "../types";
 import { MapTargetList } from "./MapTargetList";
 import { ErrorBanner } from "../components/ErrorBanner";
@@ -27,6 +28,7 @@ export function MoveNoteModal({
   onMoved: (target: MapDoc, created: NodeDoc[]) => void;
 }) {
   const { t } = useI18n();
+  const user = useAuthUser();
   const s = t.ui.inbox;
   const [list, setList] = useState<MapDoc[] | null>(maps ?? null);
   const [busy, setBusy] = useState(false);
@@ -45,10 +47,10 @@ export function MoveNoteModal({
     setError(null);
     setBusy(true);
     try {
-      const created = await moveNoteToMap(inboxId, noteId, target);
+      const created = await moveNoteToMap(inboxId, noteId, target, user?._id);
       onMoved(target, created);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : s.moveError);
+      setError(err instanceof MapFullError ? t.ui.mapAreas.targetFull : err instanceof ApiRequestError ? err.message : s.moveError);
       setBusy(false);
     }
   }

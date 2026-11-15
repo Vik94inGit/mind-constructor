@@ -9,11 +9,12 @@ import {
   searchNodesDao,
 } from "../dao/mapsDao.js";
 import { findUserByIdDao } from "../dao/userDao.js";
+import { hasNodesFromAreaDao } from "../dao/nodeDao.js";
 import { parseOrThrow, ValidationError } from "./errors.js";
 import { createImageDao, deleteMapBackgroundImagesExceptDao } from "../dao/imageDao.js";
 import { IMAGE_URL_PREFIX } from "../models/Image.js";
 import { createNodeAbl } from "./nodeAbl.js";
-import { ZONE_PALETTE } from "../models/palette.js";
+import { MAX_MAP_AREAS, ZONE_PALETTE } from "../models/palette.js";
 import type { NodeType } from "../models/Node.js";
 import { MAP_BACKGROUNDS, MAP_KINDS } from "../models/Map.js";
 import { escapeRegExp } from "../utils/escapeRegExp.js";
@@ -198,6 +199,8 @@ const updateMapSchema = z
     backgroundShade: z.number().int().min(-100).max(100).optional(),
     // See Map.slideOrder — [] goes back to the automatic order.
     slideOrder: z.array(z.string().min(1).max(64)).max(MAX_SLIDE_ORDER).optional(),
+    // See Map.areaCount — the owner extends a full map one area at a time.
+    areaCount: z.number().int().min(1).max(MAX_MAP_AREAS).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No fields to update",
@@ -209,6 +212,14 @@ export const updateMapAbl = async (
   input: unknown,
 ) => {
   const updates = parseOrThrow(updateMapSchema, input);
+  if (updates.areaCount !== undefined) {
+    // Areas only go away empty: a node is never left on an area its map no
+    // longer has.
+    const map = await getMapByIdDao(publicMapId, userId);
+    if (map && updates.areaCount < (map.areaCount ?? 1) && (await hasNodesFromAreaDao(map._id, updates.areaCount))) {
+      throw new ValidationError("only an empty area can be removed");
+    }
+  }
   if (updates.backgroundImage === undefined) return await updateMapDao(publicMapId, userId, updates);
 
   // A new background picture goes to the image store and the map keeps its

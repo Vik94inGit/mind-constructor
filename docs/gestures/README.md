@@ -54,6 +54,8 @@ node) must be told apart by something the user can see before they let go.
 | Parent's − / +N pill | Tap (− once the node is selected) | Click (− also on hover) | Packs its children in / opens them again; beside an icon, above a card ([sketch](pack-children.md)) |
 | Packed parent (+N) | Double-tap | Double-click (instead of editing) | Opens its children again, as +N does ([sketch](double-tap-unpack.md)) |
 | Picture caption | Tap | Click | Opens the picture's bar: − / + resize the whole picture, Move picks every dot for a group drag ([sketch](picture-resize.md)) |
+| Minimap + | Tap | Click | Adds an area to the map and shows it (owner, up to five) ([sketch](map-areas.md)) |
+| Minimap strip: All / 1–5 | Tap | Click | A thumbnail shows that area; *All* opens every area side by side to pick one ([sketch](map-areas.md)) |
 | Canvas | Pinch | Ctrl+wheel, − / + | Zoom |
 | Panel | Its arrows | Arrow keys | Step node to node |
 | Panel, zone chosen | Its arrows | Arrow keys | Step through the zone newest thought first, back into the past ([sketch](zone-creation-order.md)) |

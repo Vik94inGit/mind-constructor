@@ -4,6 +4,10 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent }
 import * as nodesApi from "../api/nodes";
 import { ApiRequestError } from "../api/client";
 import { useMapData } from "../hooks/useMapData";
+import { useMapAreas } from "../hooks/useMapAreas";
+import { areaLinks, areaOf, cutAtAreaEdge } from "../utils/mapAreas";
+import type { AreaLink } from "../utils/mapAreas";
+import { AreaLinks } from "../map/AreaLinks";
 import { ringAllTypesFor, ringTypesFor } from "../utils/ringTypes";
 import { useBackGuard } from "../hooks/useBackGuard";
 import { useIntroMigration } from "../hooks/useIntroMigration";
@@ -64,6 +68,7 @@ import { PictureCaptions } from "../map/PictureCaptions";
 import { usePictureEdit } from "../hooks/usePictureEdit";
 import { pictureGroups } from "../utils/pictures";
 import { MiniMap } from "../map/MiniMap";
+import { AreaAddButton, AreaStrip, AREA_STRIP_H } from "../map/AreaStrip";
 import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
@@ -336,6 +341,27 @@ export function MapPage() {
     refreshInsights,
   } = useMapData({ mapId, setSelectedId, setCelebrateIds, loadErrorMessage: t.ui.errors.loadMap });
 
+  // The map's areas, one on screen at a time — see hooks/useMapAreas.ts.
+  const areas = useMapAreas({
+    mapId,
+    map,
+    setMap,
+    nodes,
+    setActionError,
+    errorMessage: t.ui.errors.update,
+    onSwitched: () => {
+      setSelectedId(null);
+      setMultiSelectIds(new Set());
+      closeMenu();
+      setTimeout(() => fitAllLatest.current(), 60);
+    },
+    // The minimap is where areas are switched, so a new one brings it up.
+    onExtended: () => {
+      setMinimapShown(true);
+      saveMinimapShown(true);
+    },
+  });
+
   // Battle mode needs the server and the other members, so it is off while
   // offline: the map reads as Creating mode until the connection is back.
   const online = useSyncExternalStore(subscribeSyncStatus, () => getSyncStatus().online);
@@ -374,8 +400,20 @@ export function MapPage() {
     },
   );
   // Packed-away members are left off the canvas (NodePanel still gets every
-  // node, for the container's Packed list), and so is a round not yet open.
+  // node, for the container's Packed list), and so is a round not yet open,
+  // and every node on another of the map's areas (utils/mapAreas.ts).
+  // A thought whose parent is on another area stands on its own here; a chip
+  // links the two (map/AreaLinks.tsx).
   const unpackedNodes = useMemo(
+    () =>
+      cutAtAreaEdge(
+        nodes.filter((n) => !n.packedIntoNodeId && !levelHidden.has(n.nodeId) && areaOf(n) === areas.area),
+        nodes,
+      ),
+    [nodes, levelHidden, areas.area],
+  );
+  // What search finds: the same, on every area (picking one on another area goes there).
+  const searchableNodes = useMemo(
     () => nodes.filter((n) => !n.packedIntoNodeId && !levelHidden.has(n.nodeId)),
     [nodes, levelHidden],
   );
@@ -732,7 +770,7 @@ export function MapPage() {
   });
 
   // Where a new or moved node may go — see hooks/usePlacement.ts.
-  const { obstaclePoints, placeNode, bigNodeObstacles } = usePlacement({
+  const { obstaclePoints, placeNode, bigNodeObstacles, hasRoom } = usePlacement({
     visibleNodes,
     positions,
     nodeGroups,
@@ -741,6 +779,22 @@ export function MapPage() {
     discussionOn,
     userId: user?._id,
   });
+  // A full area takes no more nodes (they'd land on top of others): the map
+  // says so instead, offering its owner another area (utils/mapAreas.ts).
+  // A thought stopped on its way to a parent goes on in the new area, hanging
+  // from that parent there, with a chip linking back (map/AreaLinks.tsx).
+  function roomForOne(parentId?: string | null): boolean {
+    if (hasRoom()) return true;
+    const a = t.ui.mapAreas;
+    const extendThen = async () => {
+      if (!(await areas.extend()) || !parentId) return;
+      setTimeout(() => setPendingCreate({ x: CANVAS_W / 2, y: CANVAS_H / 2, type: "unknown", parentId }), 120);
+    };
+    if (!areas.canExtend) showNotice(a.mapFull);
+    else if (isOwner) showNotice(a.areaFull, { label: a.extend, run: () => void extendThen() });
+    else showNotice(a.areaFullAskOwner);
+    return false;
+  }
 
   // Any closed loop in the Link graph reads as a "figure" and gets colored
   // in — see canvasLayout.ts's own computeLinkCycles doc comment for the
@@ -1274,7 +1328,9 @@ export function MapPage() {
       currentUserId={user._id}
       discussionMode={isDiscussionMode}
       isMapOwner={isOwner}
-      onApplyTemplate={(kind) => applyTemplate(kind, panelFor)}
+      onApplyTemplate={async (kind) => {
+        if (roomForOne()) await applyTemplate(kind, panelFor);
+      }}
       onClose={() => closePanel(panelFor.nodeId)}
       onStepNode={active ? stepReading : undefined}
       onSelectNode={(id) => {
@@ -1587,6 +1643,7 @@ export function MapPage() {
     upsertNode,
     setCelebrateIds,
     setActionError,
+    roomForOne,
     t,
   });
 
@@ -1843,6 +1900,51 @@ export function MapPage() {
     fold: (nodeId) => toggleFold(nodeId),
   });
 
+  // What the minimap draws, kept the same object while it doesn't change so
+  // the memoized MiniMap (and its strip of areas) skips the map's other renders.
+  const areaActions = useStableActions({
+    switchArea: (a: number) => areas.switchArea(a),
+    removeLast: () => void areas.removeLast(),
+    extend: () => void areas.extend(),
+  });
+  const minimapGroups = useMemo(() => {
+    const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+    return nodeGroups.map((g) => ({ ...g, variant: !!byId.get(g.rootId)?.parentId }));
+  }, [nodeGroups, nodes]);
+  const canRemoveArea = isOwner && areas.canRemoveLast;
+  // The chips linking a thought here to its parent or child on another area.
+  const visibleById = useMemo(() => new Map(visibleNodes.map((n) => [n.nodeId, n])), [visibleNodes]);
+  const crossAreaLinks = useMemo(
+    () => (areas.count > 1 ? areaLinks(nodes, areas.area).filter((l) => visibleById.has(l.nodeId)) : []),
+    [nodes, areas.count, areas.area, visibleById],
+  );
+  const goToAreaLink = useStableActions({
+    go: (l: AreaLink) => {
+      areas.switchArea(l.otherArea, { frame: false });
+      setSelectedId(l.otherId);
+      setTimeout(() => centerOnNode(l.otherId), 60);
+    },
+  }).go;
+  const minimapHeader = useMemo(
+    () => (
+      <AreaStrip
+        nodes={nodes}
+        positions={positions}
+        count={areas.count}
+        area={areas.area}
+        perArea={areas.perArea}
+        onSwitch={areaActions.switchArea}
+        onRemoveLast={canRemoveArea ? areaActions.removeLast : undefined}
+      />
+    ),
+    [nodes, positions, areas.count, areas.area, areas.perArea, areaActions, canRemoveArea],
+  );
+  const canAddArea = isOwner && areas.canExtend && !timeLapse;
+  const minimapCorner = useMemo(
+    () => (canAddArea ? <AreaAddButton onAdd={areaActions.extend} busy={areas.busy} /> : undefined),
+    [canAddArea, areaActions, areas.busy],
+  );
+
   if (loading) return <div className="p-12 text-center text-ink-soft">{t.ui.loadingMap}</div>;
   if (error || !map) {
     return (
@@ -1937,14 +2039,16 @@ export function MapPage() {
       onPickBackgroundImage={isOwner ? (file) => void setMapBackgroundImage(file) : undefined}
       backgroundShade={map.backgroundShade}
       onPickBackgroundShade={isOwner ? (shade, save) => void setMapBackgroundShade(shade, save) : undefined}
-      nodes={visibleNodes}
+      nodes={areas.count > 1 ? searchableNodes : visibleNodes}
       onLoadTexts={async () => {
-        await ensureNodeText(visibleNodes.map((n) => n.nodeId));
+        await ensureNodeText((areas.count > 1 ? searchableNodes : visibleNodes).map((n) => n.nodeId));
       }}
       onSearchMatches={setSearchMatches}
       nodeTypeFilter={nodeTypeFilter}
       onNodeTypeFilter={setNodeTypeFilter}
       onPickSearchResult={(id) => {
+        const found = nodes.find((n) => n.nodeId === id);
+        if (found) areas.switchArea(areaOf(found), { frame: false });
         setSelectedId(id);
         centerOnNode(id);
       }}
@@ -1965,7 +2069,9 @@ export function MapPage() {
       onExitDemo={exitDemo}
       onInvite={() => setShowInvite(true)}
       onCreateNode={startCreateNodeInView}
-      onCreateCircle={createCircle}
+      onCreateCircle={() => {
+        if (roomForOne()) void createCircle();
+      }}
       onDrawPicture={() => setPicturePickerAt("view")}
       onCopyMap={copyWholeMap}
       onPaste={() => pasteClipboard()}
@@ -2249,6 +2355,9 @@ export function MapPage() {
               );
             })}
 
+            {view !== "cards" && !timeLapse && (
+              <AreaLinks links={selectedId ? crossAreaLinks.filter((l) => l.nodeId !== selectedId) : crossAreaLinks} nodeById={visibleById} posFor={posFor} zoom={zoom} onGo={goToAreaLink} />
+            )}
             {view !== "cards" && (
               <PictureCaptions
                 pictures={pictures}
@@ -2306,7 +2415,7 @@ export function MapPage() {
               />
             )}
 
-            {!loading && nodes.length === 0 && !pendingCreate && !drawMode && (
+            {!loading && (areas.area === 0 ? nodes.length === 0 : unpackedNodes.length === 0) && !pendingCreate && !drawMode && (
               <QuickAddGhosts
                 key={`intro:${emojiFirst}`}
                 intro
@@ -2378,6 +2487,8 @@ export function MapPage() {
                 onLayCardsClose={layCardsClose}
                 onPackAll={mapParents.size > 0 ? (folded.size > 0 ? unpackAll : packAll) : undefined}
                 somePacked={folded.size > 0}
+                minimapLift={areas.count > 1 ? AREA_STRIP_H : 0}
+                onExtend={canAddArea ? areaActions.extend : undefined}
               />
               {viewPromptOpen && (
                 <ViewPrompt
@@ -2394,13 +2505,15 @@ export function MapPage() {
                 lines={lines}
                 pictures={pictures}
                 positions={positions}
-                groups={nodeGroups.map((g) => ({ ...g, variant: !!nodes.find((n) => n.nodeId === g.rootId)?.parentId }))}
+                groups={minimapGroups}
                 canvasW={CANVAS_W}
                 canvasH={CANVAS_H}
                 zoom={zoom}
                 hScrollMargin={hScrollMargin}
                 vScrollMargin={vScrollMargin}
                 onPanTo={panTo}
+                header={minimapHeader}
+                corner={minimapCorner}
               />
               )}
 
@@ -2438,6 +2551,7 @@ export function MapPage() {
                 onReset={() => zoomFromCenter(0, 1)}
                 onFit={fitAll}
                 minimapShown={minimapShown}
+                minimapLift={areas.count > 1 ? AREA_STRIP_H : 0}
               />
             </>
           )}
@@ -2739,7 +2853,7 @@ export function MapPage() {
             const at = { x: canvasMenu.canvasX, y: canvasMenu.canvasY };
             closeMenu();
             setInlineEditId(null);
-            void growStructure(kind, at);
+            if (roomForOne()) void growStructure(kind, at);
           }}
           onQuiz={() => {
             closeMenu();
@@ -2773,7 +2887,7 @@ export function MapPage() {
                 ? { x: (view.minX + view.maxX) / 2, y: (view.minY + view.maxY) / 2 }
                 : picturePickerAt;
             setPicturePickerAt(null);
-            void drawPicture(kind, at);
+            if (roomForOne()) void drawPicture(kind, at);
           }}
         />
       )}

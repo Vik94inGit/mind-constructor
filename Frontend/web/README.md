@@ -29,6 +29,23 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   equilateral triangle, each deeper one a step out from the one it hangs from, and the zone rules
   only nudge what would cover another node or cross a castle wall. The draft is kept in the browser until then. See
   `src/pages/ThinkPage.tsx` and `src/utils/thoughtFlow.ts`.
+- **Extra areas on a full map** — a map's canvas has room for a few hundred nodes; once no new one
+  fits without landing on top of another, nothing is dropped on top: adding (a ghost, double-tap, the
+  + menu, a template, a picture) stops and a notice says *This area is full*, with **Extend map** for
+  the owner. That adds an area, a whole new canvas of the same map, and shows it (up to five areas: the
+  main one and four more; past that the notice suggests packing or deleting). The owner can extend the map any
+  time too, not only when it's full: the minimap's **+** or *Extend map* in the eye menu adds
+  an area, and once a map has more than one, a strip of mini-views sits on top of the minimap:
+  **All** (every area side by side with its count of thoughts, and *Remove the empty last area*) and
+  one thumbnail per area; a tap shows that area. One area is on screen at a time, with its own zones
+  and links; search finds thoughts on every area and goes to the right one. The area shown is
+  remembered per map in this browser. A branch stopped by a full area goes on in the new one after
+  **Extend map**: the new thought hangs from its parent across areas, drawn on its own there with a
+  *From area N* chip, and its parent shows *Continues in area N*; a tap on either goes to the other.
+  The Inbox works the same way: a quick note never lands on another one, and a full Inbox grows an
+  area; moving a note to a map checks that map for room first and uses (or, for its owner, adds) an
+  area with space, or says the map is full. See `utils/mapAreas.ts`, `hooks/useMapAreas.ts`,
+  `map/AreaStrip.tsx`, `map/AreaLinks.tsx`, `utils/inbox.ts` and the sketch [docs/gestures/map-areas.md](../../docs/gestures/map-areas.md).
 - **Feelings and the before/after check-in** — a thought can carry how it feels to you (16 feelings,
   heavy to light: 😟 worried, 😰 anxious, 😨 scared, 😢 sad, 😠 angry, 😤 frustrated, 😕 confused,
   😩 tired, 🤔 curious, 🙂 hopeful, 🤩 excited, 😄 happy, 😎 proud, 🥰 grateful, 😌 calm, 😮‍💨 relieved): one tap in the node
