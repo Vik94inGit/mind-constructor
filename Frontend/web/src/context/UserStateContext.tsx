@@ -80,6 +80,8 @@ export function UserStateProvider({ children }: { children: ReactNode }) {
           compactView: saved.compactView ?? loadCompactView(),
           emojiUp: saved.emojiUp ?? loadEmojiFirst(),
           typeEmoji: saved.typeEmoji ?? loadTypeEmoji(),
+          // Only ever the server's: an account with nothing saved keeps every tool.
+          moreTools: saved.moreTools,
         };
         setPreferences(local);
         setLastMapId(state.lastMapId);

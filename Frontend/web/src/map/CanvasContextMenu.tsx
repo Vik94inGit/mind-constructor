@@ -9,6 +9,7 @@ import { PictureIcon } from "./PicturePicker";
 import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
 import { useDismiss } from "../hooks/useDismiss";
+import { useMoreTools } from "../hooks/useMoreTools";
 
 interface Props {
   x: number;
@@ -60,6 +61,7 @@ function TypeSymbol({ type }: { type: NodeType }) {
 // beside the menu.
 export function CanvasContextMenu({ x, y, onPick, onGrow, onDrawPicture, onTextToNodes, onTextToMap, onQuiz, pasteCount, onPasteHere, onClose }: Props) {
   const { t } = useI18n();
+  const { moreTools } = useMoreTools();
   const ref = useRef<HTMLDivElement | null>(null);
   const [typesOpen, setTypesOpen] = useState(false);
   const inline = isMobileViewport();
@@ -146,21 +148,28 @@ export function CanvasContextMenu({ x, y, onPick, onGrow, onDrawPicture, onTextT
           {t.ui.canvasMenu.structures[kind]}
         </button>
       ))}
-      <button role="menuitem" className={item} onClick={onDrawPicture}>
-        <span className="inline-flex w-4 justify-center">
-          <PictureIcon />
-        </span>
-        {t.ui.pictures.entry}
-      </button>
+      {/* Pictures, text splitting and Quiz me wait behind More tools (utils/moreTools.ts). */}
+      {moreTools && (
+        <button role="menuitem" className={item} onClick={onDrawPicture}>
+          <span className="inline-flex w-4 justify-center">
+            <PictureIcon />
+          </span>
+          {t.ui.pictures.entry}
+        </button>
+      )}
 
-      {divider}
-      <button role="menuitem" className={`${item} font-semibold`} onClick={onTextToNodes}>
-        {t.ui.textNodes.entry}
-      </button>
-      <button role="menuitem" className={item} onClick={onTextToMap}>
-        {t.split.entry}
-      </button>
-      {onQuiz && (
+      {moreTools && divider}
+      {moreTools && (
+        <button role="menuitem" className={`${item} font-semibold`} onClick={onTextToNodes}>
+          {t.ui.textNodes.entry}
+        </button>
+      )}
+      {moreTools && (
+        <button role="menuitem" className={item} onClick={onTextToMap}>
+          {t.split.entry}
+        </button>
+      )}
+      {moreTools && onQuiz && (
         <button role="menuitem" className={item} onClick={onQuiz}>
           {t.ui.quiz.entry}
         </button>

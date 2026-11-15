@@ -27,6 +27,7 @@ import { MAX_NODE_TEXT } from "../utils/nodeText";
 import { moveRovingFocus } from "../utils/roving";
 import { track } from "../utils/usage";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { useMoreTools } from "../hooks/useMoreTools";
 
 // A bottom sheet over the canvas at every screen size; tapping empty canvas
 // closes it too (MapPage's onClick). Docked at half the screen so it opens
@@ -199,6 +200,9 @@ export function NodePanel({
   onAutoFocused,
 }: Props) {
   const { t } = useI18n();
+  // Power editing (split, change or swap a parent, lock, extract) and a
+  // Personal map's History tab wait behind More tools (utils/moreTools.ts).
+  const { moreTools } = useMoreTools();
   const isCreator = idOf(node.userId) === currentUserId;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -311,7 +315,7 @@ export function NodePanel({
     // Personal maps have no attacks to make: Attack and Protect only in Discussion.
     ...(discussionMode ? (["attack", "protect"] as const) : []),
     ...(packedMembers.length > 0 ? (["pack"] as const) : []),
-    "history",
+    ...(moreTools || discussionMode ? (["history"] as const) : []),
   ];
   const [tab, setTab] = useState<Tab>("info");
   const tabIdBase = useId();
@@ -341,16 +345,16 @@ export function NodePanel({
     // `tab`: the textarea remounts whenever the Info tab is reopened.
   }, [expanded, textDraft, textHeight, tab]);
 
-  // Someone (the owner) flipped Discussion/Personal mode while this panel
-  // was already open on the Attack or Protect tab — that tab's own button
+  // Someone (the owner) flipped Discussion/Personal mode, or the viewer
+  // turned More tools off, while this panel was open on a tab whose button
   // just vanished from the row above (see `tabs`), so fall back to Info
   // rather than leaving `tab` pointed at a pane with no button and no
   // content (both content blocks below are gated by the same discussionMode
   // check, so it would otherwise render as a silently blank sheet).
   useEffect(() => {
-    if (!discussionMode && (tab === "attack" || tab === "protect")) setTab("info");
+    if (!tabs.includes(tab)) setTab("info");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [discussionMode]);
+  }, [discussionMode, moreTools]);
 
   useEffect(() => {
     setError(null);
@@ -654,12 +658,12 @@ export function NodePanel({
           textLocked={textLocked}
           levelLock={levelLock}
           levelProgress={levelProgress}
-          onToggleLock={onToggleLock}
+          onToggleLock={moreTools || textLocked ? onToggleLock : undefined}
           onMagnet={onMagnet}
-          onChangeParent={onChangeParent}
+          onChangeParent={moreTools ? onChangeParent : undefined}
           onAutoPack={onAutoPack}
           autoPacked={autoPacked}
-          onSwapWithParent={onSwapWithParent}
+          onSwapWithParent={moreTools ? onSwapWithParent : undefined}
           onMoveToMap={onMoveToMap}
           textareaRef={textareaRef}
           readonlyTextRef={readonlyTextRef}
@@ -671,11 +675,11 @@ export function NodePanel({
           copied={copied}
           templateKind={templateKind}
           onTextSave={handleTextSave}
-          onSplitText={onSplitText}
+          onSplitText={moreTools ? onSplitText : undefined}
           onCarryText={onCarryText}
           onStepNode={onStepNode}
           onCopyText={handleCopyText}
-          onExtractText={isClusterParent ? onExtractText : undefined}
+          onExtractText={moreTools && isClusterParent ? onExtractText : undefined}
           onDelete={handleDelete}
           onTemplate={handleTemplate}
           onClose={onClose}

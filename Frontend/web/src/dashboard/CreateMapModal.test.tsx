@@ -1,4 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import { saveLocalMoreTools } from "../utils/moreTools";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CreateMapModal } from "./CreateMapModal";
@@ -64,5 +65,19 @@ describe("CreateMapModal", () => {
     await userEvent.click(screen.getByText(t.dashboard.createModal.mode.discussion.label));
     await userEvent.click(screen.getByRole("button", { name: t.dashboard.createModal.submit }));
     expect(mapsApi.createMap).toHaveBeenLastCalledWith(expect.objectContaining({ discussionMode: true }));
+  });
+
+  describe("with only the basics (More tools off)", () => {
+    afterEach(() => localStorage.clear());
+
+    it("asks for no colours and no mode, and makes a Personal map", async () => {
+      saveLocalMoreTools(false);
+      renderModal();
+      expect(screen.queryByText(t.dashboard.createModal.ownerColor)).toBeNull();
+      expect(screen.queryByText(t.dashboard.createModal.mode.discussion.label)).toBeNull();
+      await userEvent.type(screen.getByLabelText(t.dashboard.createModal.name), "Mine");
+      await userEvent.click(screen.getByRole("button", { name: t.dashboard.createModal.submit }));
+      expect(mapsApi.createMap).toHaveBeenLastCalledWith(expect.objectContaining({ discussionMode: false }));
+    });
   });
 });

@@ -13,6 +13,8 @@ import { DisplayMenu } from "./DisplayMenu";
 import { PictureCropDialog } from "./PictureCropDialog";
 import { cropImage, pictureBlob } from "../utils/images";
 import { NodeSearch } from "./NodeSearch";
+import { useMoreTools } from "../hooks/useMoreTools";
+import { MoreToolsSwitch } from "../components/MoreToolsSwitch";
 import type { MapBackground, NodeDoc, NodeType, ZonePaletteColor } from "../types";
 import type { ZoneLayout } from "../utils/zoneLayout";
 
@@ -178,6 +180,10 @@ export function MapToolbar({
   viewportOffset,
 }: Props) {
   const { t } = useI18n();
+  // Only the basics until the user turns on More tools (utils/moreTools.ts):
+  // select, lines, pictures and the display menu (looks, presentation, Quiz
+  // me, time-lapse) wait behind it, and so does switching a map to Discussion.
+  const { moreTools } = useMoreTools();
   // Each dropdown's own open/closed state.
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showDisplayMenu, setShowDisplayMenu] = useState(false);
@@ -248,7 +254,7 @@ export function MapToolbar({
       >
         ✥
       </button>
-      {onToggleSelect && (
+      {moreTools && onToggleSelect && (
         <button
           type="button"
           data-select-mode
@@ -277,96 +283,102 @@ export function MapToolbar({
         <DeletedMenu entries={deletedEntries} onRestore={onRestoreDeleted} side={side} buttonClass={`${iconBtn} ${idle}`} />
       )}
       {/* Draw a separator line: click empty spots to place its points. */}
-      <button
-        type="button"
-        className={`${iconBtn} ${drawMode ? pressed : idle}`}
-        title={t.ui.lines.toolbar}
-        aria-label={t.ui.lines.toolbar}
-        aria-pressed={drawMode}
-        onClick={act(onToggleDraw)}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
-        </svg>
-      </button>
+      {moreTools && (
+        <button
+          type="button"
+          className={`${iconBtn} ${drawMode ? pressed : idle}`}
+          title={t.ui.lines.toolbar}
+          aria-label={t.ui.lines.toolbar}
+          aria-pressed={drawMode}
+          onClick={act(onToggleDraw)}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M2.5 13 L13.5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+          </svg>
+        </button>
+      )}
       {/* Draw a picture (map/PicturePicker.tsx): its own button, not only
           the "+" menu, so it is one tap away on a phone, where there is
           no right-click. */}
-      <button
-        type="button"
-        className={`${iconBtn} ${idle}`}
-        title={t.ui.pictures.title}
-        aria-label={t.ui.pictures.title}
-        onClick={act(onDrawPicture)}
-      >
-        <PictureIcon />
-      </button>
+      {moreTools && (
+        <button
+          type="button"
+          className={`${iconBtn} ${idle}`}
+          title={t.ui.pictures.title}
+          aria-label={t.ui.pictures.title}
+          onClick={act(onDrawPicture)}
+        >
+          <PictureIcon />
+        </button>
+      )}
       {/* Display options — compact view, emoji first, zone layouts and
           presentation. Layers icon, not an eye: the eye in the bottom-right
           corner (ViewCorner) owns how much detail the map shows, reading
           mode included, so this menu doesn't repeat it. */}
-      <div className="relative">
-        <button
-          type="button"
-          className={`${iconBtn} ${showDisplayMenu ? pressed : idle}`}
-          title={t.map.toolbar.displayMenu}
-          aria-label={t.map.toolbar.displayMenu}
-          aria-expanded={showDisplayMenu}
-          onClick={() => setShowDisplayMenu((v) => !v)}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M8 1.8 L14.5 5 L8 8.2 L1.5 5 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
-            <path d="M1.5 8 L8 11.2 L14.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
-            <path d="M1.5 11 L8 14.2 L14.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
-          </svg>
-        </button>
-        {showDisplayMenu && (
-          <DisplayMenu
-            side={side}
-            compact={compact}
-            onToggleCompact={onToggleCompact}
-            emojiFirst={emojiFirst}
-            nodeFade={nodeFade}
-            onNodeFade={onNodeFade}
-            onToggleEmojiFirst={onToggleEmojiFirst}
-            typeEmoji={typeEmoji}
-            onTypeEmoji={onTypeEmoji}
-            zoneLayout={zoneLayout}
-            onPickZoneLayout={onPickZoneLayout}
-            background={background}
-            onPickBackground={onPickBackground}
-            backgroundColor={backgroundColor}
-            onPickBackgroundColor={onPickBackgroundColor}
-            backgroundImage={backgroundImage}
-            onPickBackgroundImage={pickBackgroundImage}
-            onChoosePicturePart={choosePictureAgain}
-            backgroundShade={backgroundShade}
-            onPickBackgroundShade={onPickBackgroundShade}
-            onPresent={() => {
-              setShowDisplayMenu(false);
-              setShowMore(false);
-              onPresent();
-            }}
-            onQuiz={
-              onQuiz &&
-              (() => {
+      {moreTools && (
+        <div className="relative">
+          <button
+            type="button"
+            className={`${iconBtn} ${showDisplayMenu ? pressed : idle}`}
+            title={t.map.toolbar.displayMenu}
+            aria-label={t.map.toolbar.displayMenu}
+            aria-expanded={showDisplayMenu}
+            onClick={() => setShowDisplayMenu((v) => !v)}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 1.8 L14.5 5 L8 8.2 L1.5 5 Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill="none" />
+              <path d="M1.5 8 L8 11.2 L14.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
+              <path d="M1.5 11 L8 14.2 L14.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none" />
+            </svg>
+          </button>
+          {showDisplayMenu && (
+            <DisplayMenu
+              side={side}
+              compact={compact}
+              onToggleCompact={onToggleCompact}
+              emojiFirst={emojiFirst}
+              nodeFade={nodeFade}
+              onNodeFade={onNodeFade}
+              onToggleEmojiFirst={onToggleEmojiFirst}
+              typeEmoji={typeEmoji}
+              onTypeEmoji={onTypeEmoji}
+              zoneLayout={zoneLayout}
+              onPickZoneLayout={onPickZoneLayout}
+              background={background}
+              onPickBackground={onPickBackground}
+              backgroundColor={backgroundColor}
+              onPickBackgroundColor={onPickBackgroundColor}
+              backgroundImage={backgroundImage}
+              onPickBackgroundImage={pickBackgroundImage}
+              onChoosePicturePart={choosePictureAgain}
+              backgroundShade={backgroundShade}
+              onPickBackgroundShade={onPickBackgroundShade}
+              onPresent={() => {
                 setShowDisplayMenu(false);
                 setShowMore(false);
-                onQuiz();
-              })
-            }
-            onTimeLapse={
-              onTimeLapse &&
-              (() => {
-                setShowDisplayMenu(false);
-                setShowMore(false);
-                onTimeLapse();
-              })
-            }
-            onClose={() => setShowDisplayMenu(false)}
-          />
-        )}
-      </div>
+                onPresent();
+              }}
+              onQuiz={
+                onQuiz &&
+                (() => {
+                  setShowDisplayMenu(false);
+                  setShowMore(false);
+                  onQuiz();
+                })
+              }
+              onTimeLapse={
+                onTimeLapse &&
+                (() => {
+                  setShowDisplayMenu(false);
+                  setShowMore(false);
+                  onTimeLapse();
+                })
+              }
+              onClose={() => setShowDisplayMenu(false)}
+            />
+          )}
+        </div>
+      )}
       {/* Node search — find a node by its title/text; the matches stay lit. */}
       <div className="relative">
         <button
@@ -415,6 +427,7 @@ export function MapToolbar({
               : "ml-1 flex items-center gap-1 border-l border-line pl-1"
         }
       >
+        <MoreToolsSwitch className={vertical ? "w-full whitespace-normal" : "whitespace-nowrap"} />
         <LanguageSwitcher />
         <ThemeToggle />
         {BUILD && <span className="text-[0.6rem] text-ink-soft select-all">{BUILD}</span>}
@@ -429,7 +442,7 @@ export function MapToolbar({
           Personal hides them. Exempted from the collapse above (unlike
           Back/+/Move): toggling combat visibility is just as likely to be
           wanted while a node's quick-add ring is up as any other time. */}
-      {isOwner && (
+      {isOwner && (moreTools || isDiscussionMode) && (
         <button
           type="button"
           className={`${iconBtn} ${isDiscussionMode ? idle : pressed}`}
@@ -475,7 +488,8 @@ export function MapToolbar({
     </>
   );
   // Whether there's any discussion button at all, for the tray's own row.
-  const discussion = isOwner || (isDiscussionMode && (onHistory || finish)) ? discussionButtons : null;
+  const discussion =
+    (isOwner && (moreTools || isDiscussionMode)) || (isDiscussionMode && (onHistory || finish)) ? discussionButtons : null;
 
   return (
     <div

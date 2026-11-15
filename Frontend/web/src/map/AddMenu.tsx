@@ -3,6 +3,7 @@ import { useI18n } from "../i18n/I18nContext";
 import { useKeepOnScreen } from "../hooks/useKeepOnScreen";
 import { nodeClipboardSize } from "../utils/nodeClipboard";
 import { useDismiss } from "../hooks/useDismiss";
+import { useMoreTools } from "../hooks/useMoreTools";
 
 interface Props {
   isOwner: boolean;
@@ -43,6 +44,7 @@ export function AddMenu({
   side = "below",
 }: Props) {
   const { t } = useI18n();
+  const { moreTools } = useMoreTools();
   const ref = useRef<HTMLDivElement | null>(null);
   const onScreen = useKeepOnScreen(ref);
   // Read once as the menu opens — it mounts fresh each time, so this is what is on the clipboard right now.
@@ -67,12 +69,17 @@ export function AddMenu({
       <button className={item} onClick={onCreateNode}>
         {t.map.addMenu.createNode}
       </button>
-      <button className={item} onClick={onCreateCircle}>
-        {t.map.addMenu.createCircle}
-      </button>
-      <button className={item} onClick={onDrawPicture}>
-        {t.ui.pictures.entry}
-      </button>
+      {/* Groups and pictures wait behind More tools (utils/moreTools.ts). */}
+      {moreTools && (
+        <button className={item} onClick={onCreateCircle}>
+          {t.map.addMenu.createCircle}
+        </button>
+      )}
+      {moreTools && (
+        <button className={item} onClick={onDrawPicture}>
+          {t.ui.pictures.entry}
+        </button>
+      )}
       <button className={item} onClick={onCopyMap}>
         {t.ui.clipboard.copyWholeMap}
       </button>

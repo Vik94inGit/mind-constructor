@@ -559,6 +559,19 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   (`src/utils/nodeFilter.ts`, `src/map/NodeSearch.tsx`).
 - **Hide a branch** — the map's owner can hide a branch from invited members in a node's Modify tab; hidden
   nodes carry a crossed-eye badge for the owner. Enforced by the backend, not just the UI.
+- **More tools** — a newcomer sees only the basics of untangling a thought; every other tool waits
+  behind one switch, *More tools* / *Fewer tools*, at the bottom of the dashboard (with a line on what
+  it holds while it's off) and beside language and theme in the map's toolbar. Off: no Select, line,
+  Draw a picture or display (layers) button, so no looks, presentation, Quiz me or time-lapse; no
+  Personal/Discussion switch on a Personal map (a Discussion map keeps its own controls, and its owner
+  can still take it back to Personal); no group or picture in the "+" menu; no picture, Text → nodes,
+  Text → map or Quiz me on the right-click menu; no split, change or swap parent, lock (unless locked)
+  or extract in a node's Info tab, and no History tab on a Personal map; no New folder or Text → map on
+  the dashboard; and *New map* and *Think it through* ask for no colours or mode (always Personal).
+  Nothing is removed. A new account starts with it off (`preferences.moreTools = false`, saved by the
+  backend when the account is made), an older account has nothing saved and keeps every tool, and a
+  demo starts with it off (this browser's copy carries the switch, `mc_more_tools`). See
+  `utils/moreTools.ts`, `hooks/useMoreTools.ts`, `components/MoreToolsSwitch.tsx`.
 - **Simplified view** — the toolbar's `Aa` menu has a switch that shrinks icons and drops halo/horns,
   wings and circle-parent rings to cut visual noise. It defaults to on for a phone-sized screen and
   is remembered per browser.
