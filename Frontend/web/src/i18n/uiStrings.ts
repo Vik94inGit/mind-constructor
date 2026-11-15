@@ -53,6 +53,9 @@ export interface UiStrings {
     idea: { button: string; hint: string };
     study: { button: string; hint: string };
     question: { button: string; hint: string };
+    definition: { button: string; hint: string };
+    example: { button: string; hint: string };
+    summary: { button: string; hint: string };
     created: (count: number) => string;
     failed: string;
     /** The notice's button that takes a template or picture back in one step. */
@@ -812,6 +815,9 @@ const en: UiStrings = {
     idea: { button: "Develop this idea", hint: "Asks in three rounds: the idea itself, then how to make it happen, then how it went. Each round opens once the one before is answered." },
     study: { button: "Study this topic", hint: "Asks in three rounds: what it is and its main parts, then each part's key idea and an example, then what an exam would ask. Write each answer into its question, and Quiz me will test you on it." },
     question: { button: "Dig into this question", hint: "Adds follow-up questions: why it is so and an example, then a common mistake and how to explain it simply." },
+    definition: { button: "Pin down this definition", hint: "Asks it in your own words and for an example, then what it is not and its rule or formula." },
+    example: { button: "Work through this example", hint: "Asks what it shows and its steps, then another example and one where it doesn't work." },
+    summary: { button: "Sum this up", hint: "Asks for the three key points, then what to remember and what to study next." },
     created: (n) => `Added ${n} ${n === 1 ? "node" : "nodes"}`,
     failed: "Could not add the template",
     undo: "Undo",
@@ -896,6 +902,20 @@ const en: UiStrings = {
       questionExample: "What is an example?",
       questionMistake: "What is a common mistake here?",
       questionExplain: "How would you explain it to a friend in two sentences?",
+      studySum: "Sum the topic up in three lines",
+      defOwnWords: "What does it mean, in your own words?",
+      defExample: "What is an example of it?",
+      defNotThis: "What is it not, or mixed up with?",
+      defRule: "Is there a rule or formula for it?",
+      exampleShows: "What does this example show?",
+      exampleSteps: "What are its steps?",
+      exampleAnother: "What is another example?",
+      exampleFails: "What is an example where it doesn't work?",
+      summaryPoint1: "The first key point",
+      summaryPoint2: "The second key point",
+      summaryPoint3: "The third key point",
+      summaryRemember: "What must you remember for the exam?",
+      summaryNext: "What do you study next?",
     },
   },
   canvasMenu: {

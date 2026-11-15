@@ -30,6 +30,8 @@ const label = (n: NodeDoc) => (n.title?.trim() || n.text?.trim() || "").trim();
 export const QUIZ_QUESTION_TYPES: ReadonlySet<NodeType> = new Set<NodeType>(["unknown", "Problem", "Solution", "Question"]);
 /** The node type whose nodes answer it: ✅. */
 export const QUIZ_ANSWER_TYPE: NodeType = "Success";
+/** The study types whose own writing answers their template question (a ghost's prompt asks): each such node is a card of its own. */
+export const QUIZ_IN_PLACE_TYPES: ReadonlySet<NodeType> = new Set<NodeType>(["Question", "Definition", "Example", "Summary"]);
 
 /** The cards a map makes, in the order presentation mode shows its nodes. */
 export function quizCards(nodes: NodeDoc[]): QuizCard[] {
@@ -46,7 +48,7 @@ export function quizCards(nodes: NodeDoc[]): QuizCard[] {
   const ordered = computeSlideOrder(nodes);
   const rank = new Map(ordered.map((n, i) => [n.nodeId, i] as const));
   for (const n of ordered) {
-    if (!QUIZ_QUESTION_TYPES.has(n.type)) continue;
+    if (!QUIZ_QUESTION_TYPES.has(n.type) && !QUIZ_IN_PLACE_TYPES.has(n.type)) continue;
     const question = n.title?.trim() || n.text?.trim() || n.prompt?.trim() || "";
     if (!question) continue;
     const list = (answers.get(n.nodeId) ?? [])
@@ -55,7 +57,7 @@ export function quizCards(nodes: NodeDoc[]): QuizCard[] {
       .map(label)
       .filter(Boolean);
     if (list.length > 0) cards.push({ nodeId: n.nodeId, question, answerList: list });
-    else if (n.type === "Question" && n.prompt?.trim() && answerInPlace(n)) {
+    else if (QUIZ_IN_PLACE_TYPES.has(n.type) && n.prompt?.trim() && answerInPlace(n)) {
       cards.push({ nodeId: n.nodeId, question: n.prompt.trim(), answer: answerInPlace(n) });
     }
   }

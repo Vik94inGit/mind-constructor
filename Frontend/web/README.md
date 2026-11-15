@@ -455,10 +455,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   breakdown, an Idea gets "Develop this idea" (the need it meets, how it would work with the smallest
   way to try it, what would prove it, what could kill it, what is still unknown, and another idea for
   the same need), a failed (Fail) node gets "Analyze and try again", a Title gets "Study this topic"
-  (in titles and questions only: what it is, why it matters and two main parts as Titles; then each
-  part's key idea and an example, and how it connects to what you know; then what an exam would ask
-  and what is still unclear) and a Question gets "Dig into this question" (why it is so and an
-  example, then a common mistake and how to explain it simply). A template's first level lands
+  (in study types only: what it is, why it matters and two main parts as Titles; then each
+  part's key idea and an Example, and how it connects to what you know; then what an exam would ask,
+  what is still unclear and a Summary), a Question gets "Dig into this question" (why it is so and an
+  example, then a common mistake and how to explain it simply), a Definition gets "Pin down this
+  definition" (in your own words and an Example, then what it is not and its rule or formula), an
+  Example gets "Work through this example" (what it shows and its steps, then another example and one
+  where it doesn't work) and a Summary gets "Sum this up" (three key points, then what to remember and
+  what to study next). A template's first level lands
   on a shape round the node: three (or six) make an equilateral triangle, four a square, any other
   number a circle, and each deeper level fans a step further out (`src/utils/shapeLayout.ts`,
   `src/utils/templates.ts`).
@@ -467,8 +471,8 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   **Definition** (📘, what a term means), an **Example** (🧪, a worked or real-life case) and a **Summary**
   (📝, the gist). None
   is an outcome, so like unknown they draw no halo or horns and can't be an attack's or a protection's
-  type. A Question written into from a template (its ghost's question asking, the writing answering) is a
-  ready Quiz me card.
+  type. A Question, Definition, Example or Summary written into from a template (its ghost's question asking,
+  the writing answering) is a ready Quiz me card.
 - **Map types** — creating a map asks for a starting point: an **Empty map** (a blank canvas, no kind and
   no nodes) or one of six kinds (Problem analysis, Decision, Goal planning, Retrospective, Idea, Study),
   each seeded with a starter structure in your language, and for a mode (Discussion or

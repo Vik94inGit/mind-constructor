@@ -93,21 +93,22 @@ describe("layoutTemplate", () => {
     ]);
   });
 
-  it("studies a topic in titles and questions only, three rounds deep", () => {
+  it("studies a topic in study types only, three rounds deep", () => {
     const placed = layoutTemplate("study", { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-    expect(new Set(placed.map((p) => p.type))).toEqual(new Set(["Title", "Question"]));
+    expect(new Set(placed.map((p) => p.type))).toEqual(new Set(["Title", "Question", "Example", "Summary"]));
     expect(placed.map((p) => [p.key, p.type, p.level, p.parentKey])).toEqual([
       ["studyWhat", "Question", 1, null],
       ["studyWhy", "Question", 1, null],
       ["studyPart1", "Title", 1, null],
       ["studyPart1Key", "Question", 2, "studyPart1"],
-      ["studyPart1Example", "Question", 2, "studyPart1"],
+      ["studyPart1Example", "Example", 2, "studyPart1"],
       ["studyPart2", "Title", 1, null],
       ["studyPart2Key", "Question", 2, "studyPart2"],
-      ["studyPart2Example", "Question", 2, "studyPart2"],
+      ["studyPart2Example", "Example", 2, "studyPart2"],
       ["studyConnect", "Question", 2, null],
       ["studyExam", "Question", 3, null],
       ["studyUnclear", "Question", 3, null],
+      ["studySum", "Summary", 3, null],
     ]);
   });
 
@@ -120,6 +121,18 @@ describe("layoutTemplate", () => {
   it("offers the study templates on a Title and a Question", () => {
     expect(NODE_TYPE_TEMPLATE.Title).toBe("study");
     expect(NODE_TYPE_TEMPLATE.Question).toBe("question");
+    expect(NODE_TYPE_TEMPLATE.Definition).toBe("definition");
+    expect(NODE_TYPE_TEMPLATE.Example).toBe("example");
+    expect(NODE_TYPE_TEMPLATE.Summary).toBe("summary");
+  });
+
+  it("grows a Definition, an Example and a Summary in two rounds of study types", () => {
+    const study = new Set(["Title", "Question", "Definition", "Example", "Summary"]);
+    for (const kind of ["definition", "example", "summary"] as const) {
+      const placed = layoutTemplate(kind, { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+      expect(placed.every((p) => study.has(p.type))).toBe(true);
+      expect(new Set(placed.map((p) => p.level))).toEqual(new Set([1, 2]));
+    }
   });
 
   it("gives every node of every template a level, starting at 1", () => {
