@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { MAP_KINDS, NODE_TYPES } from "../types";
-import { NON_STUDY_TYPES, RING_TYPES_BY_KIND, STUDY_TYPES, ringAllTypesFor, ringTypesFor } from "./ringTypes";
+import { CORE_TYPES, NON_STUDY_TYPES, RING_TYPES_BY_KIND, STUDY_TYPES, ringAllTypesFor, ringTypesFor } from "./ringTypes";
 
 describe("ringTypesFor", () => {
-  it("offers every type but the study ones on a map made empty", () => {
-    expect(ringTypesFor(undefined)).toEqual(NON_STUDY_TYPES);
-    expect(ringTypesFor(null)).toEqual(NON_STUDY_TYPES);
+  it("offers the five core types on a map made empty, the rest but study behind ⋯", () => {
+    expect(ringTypesFor(undefined)).toEqual(CORE_TYPES);
+    expect(ringTypesFor(null)).toEqual(CORE_TYPES);
     expect(ringAllTypesFor(undefined)).toEqual(NON_STUDY_TYPES);
   });
 
@@ -24,6 +24,10 @@ describe("ringTypesFor", () => {
         expect(ringAllTypesFor(kind)).not.toContain(type);
       }
     }
+  });
+
+  it("keeps every map that isn't for studying to five types up front", () => {
+    for (const kind of MAP_KINDS.filter((k) => k !== "study")) expect(ringTypesFor(kind)).toHaveLength(5);
   });
 
   it("adds the chosen node's own type when the map's set lacks it", () => {

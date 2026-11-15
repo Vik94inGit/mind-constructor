@@ -219,11 +219,13 @@ const DEMO_OWNER_COLOR = "#b5651d";
 // the exact same createMapAbl a real user's "new map" flow goes through, so
 // this gets the exact same node-creation/circle-detection behavior a real
 // map would. Isolated per visitor — everyone who tries the demo gets their
-// own copy, not a shared one others could disrupt.
+// own copy, not a shared one others could disrupt. Personal (not Discussion)
+// and a decision, because untangling a problem or decision of your own is
+// what the app leads with.
 export const createDemoSessionAbl = async () => {
   const user = await createDemoUserDao();
   const map = await createMapAbl(
-    { name: "Demo map", ownerColor: DEMO_OWNER_COLOR, template: "demo" },
+    { name: "Should I change jobs?", ownerColor: DEMO_OWNER_COLOR, template: "demo", kind: "decision", discussionMode: false },
     user._id.toString(),
   );
 

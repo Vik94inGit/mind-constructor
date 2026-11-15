@@ -27,7 +27,9 @@ export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; on
   const [color, setColor] = useState("#e08a3e");
   const [kind, setKind] = useState<StartingPoint>("problem");
   // Discussion (battle) or Personal (creating) — the owner can switch it later on the map itself.
-  const [discussionMode, setDiscussionMode] = useState(true);
+  // Personal first: untangling something of your own is what the app leads with;
+  // Discussion (the battle) is picked on purpose.
+  const [discussionMode, setDiscussionMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -99,7 +101,7 @@ export function CreateMapModal({ onClose, onCreated }: { onClose: () => void; on
         <div className="mb-4 flex flex-col gap-[0.35rem]">
           <label className="text-[0.8rem] font-semibold text-ink-soft">{t.dashboard.createModal.mode.label}</label>
           <div className="grid grid-cols-2 gap-[0.5rem]">
-            {([true, false] as const).map((isDiscussion) => {
+            {([false, true] as const).map((isDiscussion) => {
               const label = isDiscussion ? t.dashboard.createModal.mode.discussion : t.dashboard.createModal.mode.personal;
               return (
                 <button

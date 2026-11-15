@@ -161,8 +161,10 @@ payload)` is the one function controllers call after a mutation commits; it's a 
 - **`src/abl/authAbl.ts`** `createDemoSessionAbl` (`POST /api/auth/demo`, no request body) — "try it
   without registering": mints a throwaway `User` (`isDemo: true`, no password/googleId,
   `createDemoUserDao`) and a real, already-seeded `Map` for it via `mapAbl.ts`'s own `createMapAbl`
-  (the `"demo"` `MAP_TEMPLATES` entry — a Problem with two Option children, each with its own
-  Success/Fail child, so it's already an auto-detected circle). Isolated per visitor, not a shared
+  (the `"demo"` `MAP_TEMPLATES` entry, *Should I change jobs?* — a Problem with two Option children,
+  each with its own Success/Fail child, so it's already an auto-detected circle), made as a Personal
+  (`discussionMode: false`) decision map, since untangling a decision of your own is what the app
+  leads with. Isolated per visitor, not a shared
   map — every call creates a brand-new account+map pair. Returns the same `{ user }` shape every
   other auth endpoint does (plus `{ map: { mapId } }` so the frontend can navigate straight there)
   and signs the caller in via the same session cookie. No cleanup job for these accounts exists yet.

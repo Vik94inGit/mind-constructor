@@ -213,3 +213,13 @@ describe("QuickAddGhosts types by map kind", () => {
     expect(screen.queryByTestId("ghost-more-types")).toBeNull();
   });
 });
+
+describe("QuickAddGhosts names", () => {
+  it("shows every type's name under its ghost, not only one at a time", () => {
+    renderGhosts({ types: ringTypesFor("problem"), allTypes: ringAllTypesFor("problem") });
+    for (const type of ringTypesFor("problem")) {
+      const name = screen.getAllByText(en.types[type]).find((el) => el.closest(".pointer-events-none"))!;
+      expect(name.closest(".pointer-events-none")!.className).toContain("opacity-100");
+    }
+  });
+});
