@@ -257,6 +257,9 @@ export interface UiStrings {
     ghostChangeTo: (type: string) => string;
     /** On a picked ghost: add a new node of this type. */
     ghostNewOne: (type: string) => string;
+    /** The ring's ⋯ ghost: open every type, and back to the map's own. */
+    ghostAllTypes: string;
+    ghostFewerTypes: string;
   };
   attack: {
     intro: string;
@@ -1098,6 +1101,8 @@ const en: UiStrings = {
     ghostTemplatesTitle: "Start from this phrase",
     ghostChangeTo: (type) => `Make this a ${type}`,
     ghostNewOne: (type) => `New ${type}`,
+    ghostAllTypes: "All types",
+    ghostFewerTypes: "Fewer types",
   },
   attack: {
     intro: "Landing an attack creates a real node with your objection, linked to this one by a weapon arrow.",
