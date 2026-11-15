@@ -16,7 +16,7 @@ type Pt = { x: number; y: number };
 // One picture for each node type (a bulb for an Idea, a stop sign for a
 // Problem…), whose dots arrive as ghosts of that type, then the pictures
 // drawn just for fun, whose dots are Ideas.
-export const TYPE_PICTURE_KINDS = ["bulb", "stop", "warning", "key", "fork", "flag", "cloud", "question", "book", "bubble"] as const;
+export const TYPE_PICTURE_KINDS = ["bulb", "stop", "warning", "key", "fork", "flag", "cloud", "question", "book", "bubble", "bookmark", "flask", "list"] as const;
 export const FUN_PICTURE_KINDS = ["heart", "star", "house", "tree", "fish", "smile"] as const;
 export const PICTURE_KINDS = [...TYPE_PICTURE_KINDS, ...FUN_PICTURE_KINDS] as const;
 export type PictureKind = (typeof PICTURE_KINDS)[number];
@@ -194,6 +194,47 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
     paths: [loop(8)],
     color: "#a8457f",
     type: "Question",
+  },
+  bookmark: {
+    // A bookmark: down one side, the notch, up the other.
+    dots: [
+      { x: -0.6, y: -1 },
+      { x: 0.6, y: -1 },
+      { x: 0.6, y: 1 },
+      { x: 0, y: 0.45 },
+      { x: -0.6, y: 1 },
+    ],
+    paths: [loop(5)],
+    color: "#2b6f9e",
+    type: "Definition",
+  },
+  flask: {
+    // A flask: the neck, then the wide bottom.
+    dots: [
+      { x: -0.25, y: -1 },
+      { x: 0.25, y: -1 },
+      { x: 0.25, y: -0.2 },
+      { x: 0.9, y: 1 },
+      { x: -0.9, y: 1 },
+      { x: -0.25, y: -0.2 },
+    ],
+    paths: [loop(6)],
+    color: "#b0612a",
+    type: "Example",
+  },
+  list: {
+    // Three lines of a list.
+    dots: [
+      { x: -1, y: -0.7 },
+      { x: 1, y: -0.7 },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+      { x: -1, y: 0.7 },
+      { x: 0.5, y: 0.7 },
+    ],
+    paths: [[0, 1], [2, 3], [4, 5]],
+    color: "#4a5a8c",
+    type: "Summary",
   },
   heart: {
     dots: [

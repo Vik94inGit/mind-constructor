@@ -98,6 +98,35 @@ export function NodeTypeIcon({ type, size = 15 }: Props) {
           <path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
         </svg>
       );
+    case "Definition":
+      // A bookmark with a line across: what a term means.
+      return (
+        <svg {...common}>
+          <path d="M6 3h12v18l-6-4-6 4z" />
+          <line x1="9" y1="8" x2="15" y2="8" />
+        </svg>
+      );
+    case "Example":
+      // A flask: an example to try the idea out on.
+      return (
+        <svg {...common}>
+          <path d="M9 3h6" />
+          <path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3" />
+          <line x1="7.5" y1="15" x2="16.5" y2="15" />
+        </svg>
+      );
+    case "Summary":
+      // Three lines of a list: the gist of a topic.
+      return (
+        <svg {...common}>
+          <line x1="9" y1="6" x2="20" y2="6" />
+          <line x1="9" y1="12" x2="20" y2="12" />
+          <line x1="9" y1="18" x2="20" y2="18" />
+          <line x1="4" y1="6" x2="4.01" y2="6" />
+          <line x1="4" y1="12" x2="4.01" y2="12" />
+          <line x1="4" y1="18" x2="4.01" y2="18" />
+        </svg>
+      );
     case "Question":
       // Speech bubble with a question mark: something to answer.
       return (

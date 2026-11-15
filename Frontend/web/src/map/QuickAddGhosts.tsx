@@ -93,10 +93,12 @@ interface Props {
   changeTypes?: readonly NodeType[];
   /**
    * The types the ring offers, in ring order (utils/ringTypes.ts: by the map's
-   * kind). When it's fewer than every type, a ⋯ ghost closes the ring and opens
-   * every type on a tap (and back).
+   * kind). When it's fewer than allTypes, a ⋯ ghost closes the ring and opens
+   * allTypes on a tap (and back).
    */
   types?: readonly NodeType[];
+  /** What the ⋯ ghost opens (utils/ringTypes.ts: no study types on a map that isn't for studying). */
+  allTypes?: readonly NodeType[];
 }
 
 // How far (screen px) a ghost has to travel before a press counts as a drag.
@@ -134,6 +136,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   onChangeType,
   changeTypes = NODE_TYPES,
   types = NODE_TYPES,
+  allTypes = NODE_TYPES,
 }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
@@ -143,8 +146,8 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   }, []);
   // The ⋯ ghost: shown when the ring holds fewer than every type; a tap opens them all.
   const [showAll, setShowAll] = useState(false);
-  const hasMore = types.length < NODE_TYPES.length;
-  const ringTypes = showAll ? NODE_TYPES : types;
+  const hasMore = allTypes.some((type) => !types.includes(type));
+  const ringTypes = showAll ? allTypes : types;
   const count = ringTypes.length + (hasMore ? 1 : 0);
   const introSteps = intro ? count * 2 : 0;
   const shownCount = step < introSteps ? Math.floor(step / 2) + 1 : count;

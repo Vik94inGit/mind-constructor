@@ -12,6 +12,9 @@ export const NODE_TYPE_COLORS: Record<NodeType, string> = {
   unknown: "var(--n-unknown)",
   Title: "var(--n-title)",
   Question: "var(--n-question)",
+  Definition: "var(--n-definition)",
+  Example: "var(--n-example)",
+  Summary: "var(--n-summary)",
 };
 
 // No more per-weapon icon (sword/axe/spear as different glyphs) — every

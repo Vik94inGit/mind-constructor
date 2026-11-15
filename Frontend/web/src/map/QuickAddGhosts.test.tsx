@@ -5,7 +5,7 @@ import { QuickAddGhosts } from "./QuickAddGhosts";
 import { PendingNodeCard } from "./PendingNodeCard";
 import { I18nProvider } from "../i18n/I18nContext";
 import { TRANSLATIONS } from "../i18n/translations";
-import { ringTypesFor } from "../utils/ringTypes";
+import { ringAllTypesFor, ringTypesFor } from "../utils/ringTypes";
 
 const en = TRANSLATIONS.en.ui;
 const problemPhrases = en.node.ghostTemplates.Problem;
@@ -188,7 +188,7 @@ describe("QuickAddGhosts types by map kind", () => {
 
   it("shows only the map's own types, and every type behind the ⋯ ghost", async () => {
     const user = userEvent.setup();
-    renderGhosts({ types: ringTypesFor("study") });
+    renderGhosts({ types: ringTypesFor("study"), allTypes: ringAllTypesFor("study") });
     expect(typeNames()).toContain(en.types.Title);
     expect(typeNames()).toContain(en.types.Question);
     expect(typeNames()).not.toContain(en.types["Problematic option"]);
@@ -197,6 +197,15 @@ describe("QuickAddGhosts types by map kind", () => {
     expect(screen.getByTestId("ghost-more-types").getAttribute("aria-label")).toBe(en.node.ghostFewerTypes);
     await user.click(screen.getByTestId("ghost-more-types"));
     expect(typeNames()).not.toContain(en.types["Problematic option"]);
+  });
+
+  it("opens no study type behind the ⋯ ghost on a problem map", async () => {
+    const user = userEvent.setup();
+    renderGhosts({ types: ringTypesFor("decision"), allTypes: ringAllTypesFor("decision") });
+    await user.click(screen.getByTestId("ghost-more-types"));
+    expect(typeNames()).toContain(en.types.Idea);
+    expect(typeNames()).not.toContain(en.types.Title);
+    expect(typeNames()).not.toContain(en.types.Question);
   });
 
   it("has no ⋯ ghost when the ring already holds every type", () => {
