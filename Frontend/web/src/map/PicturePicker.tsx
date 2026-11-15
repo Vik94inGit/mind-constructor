@@ -1,6 +1,6 @@
 import { Modal } from "../components/Modal";
 import { useI18n } from "../i18n/I18nContext";
-import { FUN_PICTURE_KINDS, PICTURES, TYPE_PICTURE_KINDS, pictureDots } from "../utils/pictures";
+import { FUN_PICTURE_KINDS, PICTURES, STUDY_PICTURE_KINDS, TYPE_PICTURE_KINDS, pictureDots } from "../utils/pictures";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import type { PictureKind } from "../utils/pictures";
 
@@ -118,6 +118,8 @@ export function PicturePicker({ onPick, onClose }: Props) {
       <h3 className="mb-0.5 text-[0.85rem] font-semibold text-ink">{p.forTypes}</h3>
       <p className="mb-2 text-[0.75rem] text-ink-soft">{p.forTypesHint}</p>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{TYPE_PICTURE_KINDS.map(tile)}</div>
+      <h3 className="mb-2 mt-4 text-[0.85rem] font-semibold text-ink">{p.forStudy}</h3>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{STUDY_PICTURE_KINDS.map(tile)}</div>
       <h3 className="mb-2 mt-4 text-[0.85rem] font-semibold text-ink">{p.forFun}</h3>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{FUN_PICTURE_KINDS.map(tile)}</div>
       <div className="mt-4 flex justify-end">

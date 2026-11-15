@@ -61,6 +61,15 @@ describe("quizCards", () => {
     ).toEqual([{ nodeId: "q", question: "What is it, in one sentence?", answer: "Plants turn light into sugar" }]);
   });
 
+  it("turns a Definition, Example or Summary written in place into a card too", () => {
+    expect(
+      quizCards([
+        node("d", { type: "Definition", prompt: "Is there a rule or formula for it?", text: "E = mc²" }),
+        node("x", { type: "Example", prompt: "What is another example?" }),
+      ]),
+    ).toEqual([{ nodeId: "d", question: "Is there a rule or formula for it?", answer: "E = mc²" }]);
+  });
+
   it("makes no card from an asking node without a ✅ answer", () => {
     expect(
       quizCards([

@@ -32,6 +32,9 @@
   --n-unknown: #8a8f98;
   --n-title: #6b4fa8;
   --n-question: #a8457f;
+  --n-definition: #2b6f9e;
+  --n-example: #b0612a;
+  --n-summary: #4a5a8c;
 
   /* The one green/red pair every "which side is this on" signal shares —
      zone backdrops, a grouped branch-arrow's color, a manually-overridden
@@ -113,6 +116,9 @@
     --n-unknown: #7d828c;
     --n-title: #7d68a8;
     --n-question: #9a5c82;
+    --n-definition: #4f7f9f;
+    --n-example: #a3714d;
+    --n-summary: #66709a;
 
     --zone-positive: #4b9f63;
     --zone-negative: #c1555a;
@@ -203,6 +209,9 @@
   --n-unknown: #bcc2cc;
   --n-title: #c3a8f5;
   --n-question: #f08cc8;
+  --n-definition: #8cc8f0;
+  --n-example: #f5b07a;
+  --n-summary: #aab6ef;
   --zone-positive: #73d48e;
   --zone-negative: #f37c82;
   --zone-neutral: #b4bac6;
@@ -233,6 +242,9 @@
   --color-n-unknown: var(--n-unknown);
   --color-n-title: var(--n-title);
   --color-n-question: var(--n-question);
+  --color-n-definition: var(--n-definition);
+  --color-n-example: var(--n-example);
+  --color-n-summary: var(--n-summary);
 
   --color-zone-positive: var(--zone-positive);
   --color-zone-negative: var(--zone-negative);

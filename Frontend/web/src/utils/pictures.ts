@@ -15,10 +15,12 @@ type Pt = { x: number; y: number };
 
 // One picture for each node type (a bulb for an Idea, a stop sign for a
 // Problem…), whose dots arrive as ghosts of that type, then the pictures
-// drawn just for fun, whose dots are Ideas.
-export const TYPE_PICTURE_KINDS = ["bulb", "stop", "warning", "key", "fork", "flag", "cloud", "question", "book", "bubble"] as const;
+// drawn for studying, whose dots are study types asking about what you learn,
+// then the pictures drawn just for fun, whose dots are Ideas.
+export const TYPE_PICTURE_KINDS = ["bulb", "stop", "warning", "key", "fork", "flag", "cloud", "question", "book", "bubble", "bookmark", "flask", "list"] as const;
+export const STUDY_PICTURE_KINDS = ["cap", "pencil", "globe"] as const;
 export const FUN_PICTURE_KINDS = ["heart", "star", "house", "tree", "fish", "smile"] as const;
-export const PICTURE_KINDS = [...TYPE_PICTURE_KINDS, ...FUN_PICTURE_KINDS] as const;
+export const PICTURE_KINDS = [...TYPE_PICTURE_KINDS, ...STUDY_PICTURE_KINDS, ...FUN_PICTURE_KINDS] as const;
 export type PictureKind = (typeof PICTURE_KINDS)[number];
 
 export interface PictureDef {
@@ -194,6 +196,83 @@ export const PICTURES: Record<PictureKind, PictureDef> = {
     paths: [loop(8)],
     color: "#a8457f",
     type: "Question",
+  },
+  bookmark: {
+    // A bookmark: down one side, the notch, up the other.
+    dots: [
+      { x: -0.6, y: -1 },
+      { x: 0.6, y: -1 },
+      { x: 0.6, y: 1 },
+      { x: 0, y: 0.45 },
+      { x: -0.6, y: 1 },
+    ],
+    paths: [loop(5)],
+    color: "#2b6f9e",
+    type: "Definition",
+  },
+  flask: {
+    // A flask: the neck, then the wide bottom.
+    dots: [
+      { x: -0.25, y: -1 },
+      { x: 0.25, y: -1 },
+      { x: 0.25, y: -0.2 },
+      { x: 0.9, y: 1 },
+      { x: -0.9, y: 1 },
+      { x: -0.25, y: -0.2 },
+    ],
+    paths: [loop(6)],
+    color: "#b0612a",
+    type: "Example",
+  },
+  list: {
+    // Three lines of a list.
+    dots: [
+      { x: -1, y: -0.7 },
+      { x: 1, y: -0.7 },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+      { x: -1, y: 0.7 },
+      { x: 0.5, y: 0.7 },
+    ],
+    paths: [[0, 1], [2, 3], [4, 5]],
+    color: "#4a5a8c",
+    type: "Summary",
+  },
+  cap: {
+    // A graduation cap: the board, then the cap under it. Exam questions.
+    dots: [
+      { x: -1, y: -0.35 },
+      { x: 0, y: -0.85 },
+      { x: 1, y: -0.35 },
+      { x: 0, y: 0.15 },
+      { x: -0.6, y: 0.1 },
+      { x: -0.6, y: 0.8 },
+      { x: 0.6, y: 0.8 },
+      { x: 0.6, y: 0.1 },
+    ],
+    paths: [loop(4), [4, 5, 6, 7]],
+    color: "#a8457f",
+    type: "Question",
+  },
+  pencil: {
+    // A pencil lying down, its tip to the right. Notes on what you learned.
+    dots: [
+      { x: -1, y: -0.3 },
+      { x: 0.4, y: -0.3 },
+      { x: 1, y: 0 },
+      { x: 0.4, y: 0.3 },
+      { x: -1, y: 0.3 },
+    ],
+    paths: [loop(5), [1, 3]],
+    color: "#4a5a8c",
+    type: "Summary",
+  },
+  globe: {
+    // A globe: round, with its equator and a meridian. Words to know.
+    dots: ring(8, 1, -90),
+    paths: [loop(8), [6, 2], [0, 4]],
+    color: "#2b6f9e",
+    type: "Definition",
   },
   heart: {
     dots: [

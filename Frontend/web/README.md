@@ -62,8 +62,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   make a second template map (`src/dashboard/FirstMapCard.tsx`, `src/dashboard/firstMap.ts`).
 - **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
   with the quick-add ghosts or the toolbar (the ring offers the types that fit what the map is for:
-  a problem map the problem-solving types, a study map Title, Question, ✅ answer, Idea and ❓, a map
-  made empty every type; its ⋯ ghost opens every type, `src/utils/ringTypes.ts`), link nodes explicitly, draw separator lines, attack
+  a problem map the problem-solving types, a study map six study choices: Title, Question, ✅ answer,
+  Definition, Example and Summary; a map that isn't for studying, one made empty included, never shows a
+  study type on the ring, not even behind its ⋯ ghost, which opens the rest, `src/utils/ringTypes.ts`), link nodes explicitly, draw separator lines, attack
   other members' nodes with the three combat weapons, shield your own, pack nodes into a
   container, group nodes into a chosen circle, choose a node (and optionally its whole branch) to
   link/copy/number/delete together, and switch how nodes read (icons only, icons + text, or
@@ -166,7 +167,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   pick one. The first group has a picture for each node type, and its dots arrive as thoughts of
   that type: a bulb (Idea), a stop sign (Problem), a warning triangle (Problematic option), a key
   (Solution), a crossroads (Option), a flag (Success), a rain cloud (Fail), a question mark
-  (unknown), a book (Title) and a speech bubble (Question). The second group, a heart, star, house, tree, fish or smile, is just for fun and made of
+  (unknown), a book (Title), a speech bubble (Question), a bookmark (Definition), a flask (Example) and a list (Summary). The second group is for studying: a graduation cap (exam Questions), a pencil (Summary notes on what you learned) and a globe (Definitions of the words to know). The third group, a heart, star, house, tree, fish or smile, is just for fun and made of
   Ideas. Its dots arrive as numbered ghosts, like a connect-the-dots page, each asking its own
   question on the picture's theme (a stop sign: "What is stopping you?", "What keeps coming back?"…;
   a heart: "What do you love?", "Who do you love?"…). Write in two
@@ -208,7 +209,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Type symbols and emoji** — on the canvas every type shows its own symbol by default: pause bars
   for a Problem, play for a Problematic option and an Option, target rings for a Solution, ✓ Success,
   ✗ Fail, a bulb for an Idea and ? for unknown (`map/OutcomeBadge.tsx`); the study types keep a plain
-  glyph, an open book for a Title and a speech bubble with a ? for a Question (`map/NodeTypeIcon.tsx`). Symbols first is the default: the
+  glyph, an open book for a Title, a speech bubble with a ? for a Question, a bookmark for a Definition, a flask for an Example and list lines for a Summary (`map/NodeTypeIcon.tsx`). Symbols first is the default: the
   type's symbol is face up and a node's own emoji sits on the back. With *Emoji first* turned on in
   the display menu (`Preferences.emojiUp`) a node with an emoji shows it face up, its type's symbol on the back of a two-sided card
   that turns over once when the node is chosen (`map/NodeFlipIcon.tsx`). The emoji is the node's own
@@ -454,18 +455,24 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   breakdown, an Idea gets "Develop this idea" (the need it meets, how it would work with the smallest
   way to try it, what would prove it, what could kill it, what is still unknown, and another idea for
   the same need), a failed (Fail) node gets "Analyze and try again", a Title gets "Study this topic"
-  (in titles and questions only: what it is, why it matters and two main parts as Titles; then each
-  part's key idea and an example, and how it connects to what you know; then what an exam would ask
-  and what is still unclear) and a Question gets "Dig into this question" (why it is so and an
-  example, then a common mistake and how to explain it simply). A template's first level lands
+  (in study types only: what it is, why it matters and two main parts as Titles; then each
+  part's key idea and an Example, and how it connects to what you know; then what an exam would ask,
+  what is still unclear and a Summary), a Question gets "Dig into this question" (why it is so and an
+  example, then a common mistake and how to explain it simply), a Definition gets "Pin down this
+  definition" (in your own words and an Example, then what it is not and its rule or formula), an
+  Example gets "Work through this example" (what it shows and its steps, then another example and one
+  where it doesn't work) and a Summary gets "Sum this up" (three key points, then what to remember and
+  what to study next). A template's first level lands
   on a shape round the node: three (or six) make an equilateral triangle, four a square, any other
   number a circle, and each deeper level fans a step further out (`src/utils/shapeLayout.ts`,
   `src/utils/templates.ts`).
-- **Study types** — besides the problem-solving types there are two for learning: a **Title** (📖, the
-  heading of a topic or one of its parts) and a **Question** (🤔, something to be able to answer). Neither
+- **Study types** — besides the problem-solving types there are five for learning: a **Title** (📖, the
+  heading of a topic or one of its parts), a **Question** (🤔, something to be able to answer), a
+  **Definition** (📘, what a term means), an **Example** (🧪, a worked or real-life case) and a **Summary**
+  (📝, the gist). None
   is an outcome, so like unknown they draw no halo or horns and can't be an attack's or a protection's
-  type. A Question written into from a template (its ghost's question asking, the writing answering) is a
-  ready Quiz me card.
+  type. A Question, Definition, Example or Summary written into from a template (its ghost's question asking,
+  the writing answering) is a ready Quiz me card.
 - **Map types** — creating a map asks for a starting point: an **Empty map** (a blank canvas, no kind and
   no nodes) or one of six kinds (Problem analysis, Decision, Goal planning, Retrospective, Idea, Study),
   each seeded with a starter structure in your language, and for a mode (Discussion or

@@ -11,7 +11,7 @@ The backend for Mind Constructor: notes you can see. The product's main path is 
 thought (a quick note lands in an Inbox map), lay thoughts out on a canvas, find any of them again
 through search — with sharing and a discussion ("battle") layer on top. Users build a
 **map** of **nodes** (Problem / Problematic option / Solution / Option / Success / Fail / Idea / unknown,
-plus the study types Title and Question, which like unknown have no outcome and are never an attack's or a protection's type)
+plus the study types Title, Question, Definition, Example and Summary, which like unknown have no outcome and are never an attack's or a protection's type)
 connected by **edges** with a sentiment (positive/negative/neutral). Multiple invited members work
 the same map live over Socket.IO. Layered on top of the mapping itself is a "combat" system:
 members can attack *any* node on the map with one of three weapons (nitpick/counterpoint/

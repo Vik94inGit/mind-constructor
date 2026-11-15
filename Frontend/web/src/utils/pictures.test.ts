@@ -3,6 +3,7 @@ import { NODE_FOOTPRINT } from "./canvasLayout";
 import {
   PICTURES,
   FUN_PICTURE_KINDS,
+  STUDY_PICTURE_KINDS,
   PICTURE_KINDS,
   TYPE_PICTURE_KINDS,
   isPictureKind,
@@ -69,6 +70,11 @@ describe("PICTURES", () => {
     for (const type of NODE_TYPES) expect(pictureNodeType(pictureForType(type))).toBe(type);
     expect(pictureForType("Idea")).toBe("bulb");
     expect(pictureForType("Problem")).toBe("stop");
+  });
+
+  it("makes the pictures for studying of study types", () => {
+    const study = new Set(["Title", "Question", "Definition", "Example", "Summary"]);
+    for (const kind of STUDY_PICTURE_KINDS) expect(study.has(pictureNodeType(kind))).toBe(true);
   });
 
   it("makes a picture for fun of Ideas", () => {
