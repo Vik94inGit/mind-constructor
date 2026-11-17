@@ -79,7 +79,9 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   that map's and the Inbox's quick notes, each opening the map at that thought. It stays until you
   make a second template map (`src/dashboard/FirstMapCard.tsx`, `src/dashboard/firstMap.ts`).
 - **Map canvas** (`/maps/:mapId`) — the core of the app. Drag your own nodes, branch off a node
-  with the quick-add ghosts or the toolbar (each ghost always shows its type's name under it, and the
+  with the quick-add ghosts or the toolbar (each ghost always shows its type's name under it; around a
+  node drawn as a picture card or a card the ring steps out so no ghost or name lies on it,
+  `src/utils/ghostRing.ts`; and the
   ring offers the types that fit what the map is for: five up front on a map that isn't for studying,
   Problem, Option, Success, Fail and Idea on a problem or decision map or one made empty, with the rest
   behind ⋯, a study map six study choices: Title, Question, ✅ answer,

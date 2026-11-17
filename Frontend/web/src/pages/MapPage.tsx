@@ -2408,6 +2408,7 @@ export function MapPage() {
                 // A fresh round of ghosts for each node, and when the emoji-first order changes.
                 key={`${selectedNode.nodeId}:${emojiFirst}`}
                 anchorPos={posFor(selectedNode)}
+                nodeId={selectedNode.nodeId}
                 bounds={settledViewportBounds()}
                 compact={compactView || !isDiscussionMode}
                 zoom={zoom}
