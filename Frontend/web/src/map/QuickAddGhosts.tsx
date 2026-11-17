@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { NODE_TYPES } from "../types";
 import type { NodeType } from "../types";
@@ -9,6 +9,8 @@ import { OutcomeBadge, ringKindFor } from "./OutcomeBadge";
 import type { OutcomeType } from "./OutcomeBadge";
 import { NodeCrown } from "./NodeCrown";
 import { useI18n } from "../i18n/I18nContext";
+import { ghostDistance } from "../utils/ghostRing";
+import type { RingBox } from "../utils/ghostRing";
 
 // Same 60px reference circle NodeCard's own icon uses (NodeCrown assumes
 // it) — a ghost is a preview of what the real node is about to look like,
@@ -97,6 +99,12 @@ interface Props {
    * allTypes on a tap (and back).
    */
   types?: readonly NodeType[];
+  /**
+   * The chosen node, when there is one: the ring measures how big it is drawn
+   * (a picture card or a card is far bigger than a round icon) and moves the
+   * ghosts out along their own rays wherever they would lie on it.
+   */
+  nodeId?: string;
   /** What the ⋯ ghost opens (utils/ringTypes.ts: no study types on a map that isn't for studying). */
   allTypes?: readonly NodeType[];
 }
@@ -137,6 +145,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   changeTypes = NODE_TYPES,
   types = NODE_TYPES,
   allTypes = NODE_TYPES,
+  nodeId,
 }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
@@ -278,11 +287,59 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   const availDown = bounds.maxY - ringCenter.y;
   const tightest = Math.min(availLeft, availRight, availUp, availDown);
   const R = Math.min(RADIUS, Math.max(MIN_RADIUS, tightest - EDGE_MARGIN));
+  // The chosen node's drawn box around the ring's center, in canvas units
+  // (see nodeId). Measured against a marker at the ring's center, so it is
+  // right whatever the zoom, the node's size tier or how its card is drawn.
+  const centerRef = useRef<HTMLDivElement>(null);
+  const [nodeBox, setNodeBox] = useState<RingBox | null>(null);
+  useLayoutEffect(() => {
+    if (!nodeId) return;
+    const body = document.querySelector(`[data-reveal-node="${CSS.escape(nodeId)}"] [data-node-body]`);
+    const center = centerRef.current;
+    if (!body || !center) return;
+    function measure() {
+      const c = center!.getBoundingClientRect();
+      const r = body!.getBoundingClientRect();
+      const box = {
+        left: (r.left - c.left) / zoom,
+        top: (r.top - c.top) / zoom,
+        right: (r.right - c.left) / zoom,
+        bottom: (r.bottom - c.top) / zoom,
+      };
+      setNodeBox((prev) =>
+        prev && Math.abs(prev.left - box.left) < 0.5 && Math.abs(prev.top - box.top) < 0.5 && Math.abs(prev.right - box.right) < 0.5 && Math.abs(prev.bottom - box.bottom) < 0.5
+          ? prev
+          : box,
+      );
+    }
+    measure();
+    // A card that grows or shrinks once chosen (its picture loading, its text
+    // clamped) moves the ghosts with it.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(body);
+    return () => observer?.disconnect();
+  }, [nodeId, zoom, anchorPos.x, anchorPos.y]);
+  // A ghost's size for keeping clear of the node: its circle plus a gap, and
+  // the name chip under it (about 76px wide at most, one line).
+  const ghostShape = {
+    half: ((ICON_SIZE * GHOST_SCALE) / 2 + 6) * k,
+    labelBelow: ((ICON_SIZE * GHOST_SCALE) / 2 + 4.8 + 18) * k,
+    labelHalfWidth: 38 * k,
+  };
+  /** Where the ghost at `angle` sits: on the ring, or further out where the ring would cover the node. */
+  function ringPoint(angle: number) {
+    const d = ghostDistance(angle, R, nodeBox, ghostShape);
+    return { x: ringCenter.x + d * Math.cos(angle), y: ringCenter.y + d * Math.sin(angle) };
+  }
+  const centerMarker = nodeId ? (
+    <div ref={centerRef} aria-hidden className="pointer-events-none absolute h-0 w-0" style={{ left: ringCenter.x, top: ringCenter.y }} />
+  ) : null;
   if (stage === "emoji") {
     const n = FEELING_EMOJIS.length + 1;
     const borderColor = "var(--line)";
     return (
       <>
+        {centerMarker}
         <div
           className="pointer-events-none absolute z-[33] -translate-x-1/2 -translate-y-full rounded-[3px] bg-surface px-[0.4rem] py-[0.1rem] text-[0.68rem] font-semibold whitespace-nowrap text-ink shadow-card"
           style={{ left: ringCenter.x, top: ringCenter.y - R - 34 * k, transform: `scale(${k})`, transformOrigin: "50% 100%" }}
@@ -291,8 +348,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
         </div>
         {[...FEELING_EMOJIS, ""].map((emoji, i) => {
           const angle = (-i / n) * Math.PI * 2 - Math.PI / 2;
-          const x = ringCenter.x + R * Math.cos(angle);
-          const y = ringCenter.y + R * Math.sin(angle);
+          const { x, y } = ringPoint(angle);
           const name = emoji ? t.ui.emoji.feelings[i] : t.ui.emoji.skip;
           return (
             <button
@@ -332,6 +388,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
   }
   return (
     <>
+      {centerMarker}
       {ringTypes.map((type, i) => {
         if (i >= shownCount) return null;
         // Back to a full 360° ring — the node's own caption is hidden
@@ -345,8 +402,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
         // (i=0 keeps angle at -90°), only the direction the rest of the
         // list sweeps around the circle flips.
         const angle = (-i / count) * Math.PI * 2 - Math.PI / 2;
-        const x = ringCenter.x + R * Math.cos(angle);
-        const y = ringCenter.y + R * Math.sin(angle);
+        const { x, y } = ringPoint(angle);
         return (
           <button
             key={type}
@@ -448,8 +504,7 @@ export const QuickAddGhosts = memo(function QuickAddGhosts({
         // The ⋯ ghost, last on the ring: every type, or back to the map's own.
         const i = ringTypes.length;
         const angle = (-i / count) * Math.PI * 2 - Math.PI / 2;
-        const x = ringCenter.x + R * Math.cos(angle);
-        const y = ringCenter.y + R * Math.sin(angle);
+        const { x, y } = ringPoint(angle);
         const name = showAll ? t.ui.node.ghostFewerTypes : t.ui.node.ghostAllTypes;
         return (
           <button

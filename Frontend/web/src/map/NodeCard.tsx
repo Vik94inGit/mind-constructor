@@ -576,6 +576,8 @@ export const NodeCard = memo(function NodeCard({
       {/* The one part of the node that takes the pointer; handlers are on the outer div. */}
       <div
         className={`pointer-events-auto relative ${puzzle || showPictureCard ? "" : "h-[48px] w-[48px]"}`}
+        // What the quick-add ghosts measure to keep clear of (QuickAddGhosts' nodeId).
+        data-node-body
         onPointerEnter={(e) => {
           if (e.pointerType === "touch") return;
           onIconHover?.(true);
