@@ -12,6 +12,7 @@ import type { TypeEmoji } from "../utils/emojiFace";
 import { shapeRoundClass } from "./nodeShape";
 import { StickerCard } from "./StickerCard";
 import { NodeBadges } from "./nodeCard/NodeBadges";
+import { PictureZoomButton } from "./nodeCard/PictureZoomButton";
 import { NodeFace } from "./nodeCard/NodeFace";
 import { MAX_NODE_TEXT, pasteKeepingOverflow } from "../utils/nodeText";
 import { CAPTION_WIDTH, nodeZoomScale } from "../utils/canvasLayout";
@@ -628,6 +629,10 @@ export const NodeCard = memo(function NodeCard({
           >
             −
           </button>
+        )}
+        {(showPictureCard || (!!node.iconImage && !node.cardImage && !puzzle)) && !inlineEditing && (
+          // A 🔍 on the picture, to look at it full screen and zoom in.
+          <PictureZoomButton node={node} shown={selected} />
         )}
         {hoverLabel && hovered && captionLabel && (
           <div className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-[6] max-w-[220px] -translate-x-1/2 truncate rounded-md border border-line bg-surface px-2 py-[0.15rem] text-[0.75rem] font-semibold whitespace-nowrap text-ink shadow-card">

@@ -4,6 +4,8 @@ import { useI18n } from "../../i18n/I18nContext";
 import { MAX_NODE_IMAGES, imageSrc } from "../../utils/images";
 import { PICTURE_TEMPLATES, pictureTemplateFile, pictureTemplateThumb } from "../../utils/pictureTemplates";
 import type { PictureTemplate } from "../../utils/pictureTemplates";
+import { PictureViewer } from "../PictureViewer";
+import { ZoomGlass } from "../ZoomGlass";
 
 interface Props {
   /** null while they're still being fetched. */
@@ -83,6 +85,17 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
                     className={`mx-auto block max-w-full object-contain ${list.length === 1 ? "h-auto max-h-[30vh] w-full" : "h-[110px] w-full"}`}
                   />
                 </ZoomWrap>
+                {/* Every picture can be looked at closer, a picture card's too. */}
+                <button
+                  type="button"
+                  data-testid="picture-zoom"
+                  className="absolute top-[0.3rem] left-[0.3rem] flex h-[1.5rem] w-[1.5rem] cursor-zoom-in items-center justify-center rounded-full border border-line bg-surface p-0 text-ink shadow-card hover:bg-surface-2"
+                  aria-label={s.zoom}
+                  title={s.zoom}
+                  onClick={() => setOpen(i)}
+                >
+                  <ZoomGlass size={13} />
+                </button>
                 {(onSetIcon || onSetCard) && (
                   // Shows this picture on the map: as the node's round icon
                   // (instead of its type's symbol) or as a card — one or the
@@ -226,24 +239,8 @@ export function ImagesSection({ images, canEdit, busy, onAdd, onRemove, extra, i
         </div>
       )}
       {open !== null && list[open] && (
-        // Full-size view — click anywhere (or press Escape on the button) to close.
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4"
-          role="dialog"
-          aria-label={s.title}
-          onClick={() => setOpen(null)}
-        >
-          <img src={imageSrc(list[open])} alt="" className="max-h-full max-w-full rounded-md object-contain shadow-card" />
-          <button
-            type="button"
-            autoFocus
-            className="absolute top-3 right-3 cursor-pointer rounded-full border-0 bg-surface px-3 py-1 text-[0.85rem] font-semibold text-ink"
-            onKeyDown={(e) => e.key === "Escape" && setOpen(null)}
-            onClick={() => setOpen(null)}
-          >
-            {s.close}
-          </button>
-        </div>
+        // Full screen, to zoom in (map/PictureViewer.tsx).
+        <PictureViewer sources={list} start={open} onClose={() => setOpen(null)} />
       )}
     </div>
   );

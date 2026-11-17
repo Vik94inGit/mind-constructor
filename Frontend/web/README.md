@@ -222,7 +222,7 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
 - **Pictures on nodes** — the node panel's Info tab shows the text and its buttons (*Edit* / *Save
   change*) first and the pictures after them: screenshots pasted with Ctrl+V, images dropped on the
   text or the pictures box or picked with its 🖼️ button land there (a node shown as a picture card
-  doesn't open its pictures full size on a tap); each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
+  doesn't open its pictures full size on a tap, only from each picture's 🔍); each is shrunk before upload (`utils/images.ts`). The backend keeps pictures in
   their own image store and the node gets back each one's `/api/images/…` address; `imageSrc` turns
   that (or an older inline data URL) into an `<img>` src. See
   `src/map/nodePanel/InfoTab.tsx` and `ImagesSection.tsx`.
@@ -290,6 +290,14 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   picture card above the node ("Show as card": `makeCardImage`, `Node.cardImage`; inside the card in
   the cards view). A card always shows the whole picture, never cropped, with its longer side twice a
   round node (96px, 72px while selected), so tall and wide paintings both sit in proportion.
+- **Zoom in on a picture** — a small 🔍 on a picture card's or picture icon's top-right corner
+  (there once the node is selected, or while a mouse hovers it) and on each picture in the node
+  panel opens it full screen (`map/PictureViewer.tsx`, math in `utils/pictureZoom.ts`): pinch or the
+  wheel zooms round the fingers or pointer up to 8×, a drag moves a zoomed picture, a double-tap
+  (double-click) goes in at that spot and back out, − ⤢ + and keys + − 0 do the same, ‹ › or ← →
+  step through a node's pictures, and ✕, Escape or a tap off the picture closes it. From the map it
+  starts on the small copy and swaps in the node's full-size pictures once they're fetched
+  (`map/nodeCard/PictureZoomButton.tsx`; [sketch](../../docs/gestures/picture-zoom.md)).
 - **Template pictures** — next to *🖼️ Picture* in a node's pictures, *✨ Template* opens a set of eleven
   ready-made paintings (eyes, clock heads, a smiling martini, fishing for time, a yin-yang yo-yo,
   squeezed time, an orange clock, a puppet hand, a heart and mirror, a light bulb, a cake with a target;

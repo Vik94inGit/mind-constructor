@@ -69,4 +69,16 @@ describe("ImagesSection on a picture card", () => {
     expect(screen.queryByRole("button", { name: s.open })).toBeNull();
     expect(screen.getByTestId("picture-no-zoom")).toBeInTheDocument();
   });
+
+  it("still zooms in on a picture card's picture from its 🔍", async () => {
+    render(
+      <I18nProvider>
+        <ImagesSection images={["data:image/png;base64,AA"]} canEdit={false} busy={false} onAdd={vi.fn()} onRemove={vi.fn()} cardImage="data:image/png;base64,BB" />
+      </I18nProvider>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: s.zoom }));
+    expect(screen.getByTestId("picture-viewer")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: s.close }));
+    expect(screen.queryByTestId("picture-viewer")).toBeNull();
+  });
 });

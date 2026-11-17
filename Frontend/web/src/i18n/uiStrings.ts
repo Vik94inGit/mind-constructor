@@ -657,6 +657,13 @@ export interface UiStrings {
     /** The picture viewer's buttons for the previous / next picture. */
     prev: string;
     next: string;
+    /** The 🔍 button beside a picture card or picture icon on the map, and on each picture in the panel. */
+    zoom: string;
+    /** The full-screen picture viewer (map/PictureViewer.tsx): its name and its zoom buttons. */
+    viewerTitle: string;
+    zoomIn: string;
+    zoomOut: string;
+    zoomFit: string;
     loading: string;
     limit: (max: number) => string;
     tooLarge: string;
@@ -1532,6 +1539,11 @@ const en: UiStrings = {
     close: "Close",
     prev: "Previous picture",
     next: "Next picture",
+    zoom: "Zoom in on the picture",
+    viewerTitle: "Picture",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    zoomFit: "Whole picture",
     loading: "Loading pictures…",
     limit: (max) => `Up to ${max} pictures per node`,
     tooLarge: "That picture couldn't be used — try a smaller one.",
