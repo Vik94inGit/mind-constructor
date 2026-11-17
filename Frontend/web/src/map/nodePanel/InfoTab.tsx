@@ -48,6 +48,8 @@ interface Props {
   autoPacked?: boolean;
   /** Swap with parent: this node takes its parent's place as head of the zone. */
   onSwapWithParent?: () => void;
+  /** Turn into a question: this answered ghost's prompt becomes a Question node it hangs from. */
+  onPromptToQuestion?: () => void;
   /** Move to a map: on an Inbox note, sends it (with its branch) to another map. */
   onMoveToMap?: () => void;
   textareaRef: RefObject<HTMLTextAreaElement>;
@@ -86,7 +88,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, levelLock, levelProgress, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, levelLock, levelProgress, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onPromptToQuestion, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   // Pasted text that didn't fit (utils/nodeText.ts), offered for a new node.
@@ -358,7 +360,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
       )}
       {pictureList}
     <div className="mt-3">
-      {(onChangeParent || onSwapWithParent || onMoveToMap || onAutoPack) && (
+      {(onChangeParent || onSwapWithParent || onPromptToQuestion || onMoveToMap || onAutoPack) && (
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {onAutoPack && (
             <button
@@ -397,6 +399,17 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
               }}
             >
               ⇅ {t.ui.canvas.swapWithParent}
+            </button>
+          )}
+          {onPromptToQuestion && (
+            <button
+              type="button"
+              data-prompt-to-question
+              className="cursor-pointer rounded-md border border-line px-2 py-[0.2rem] text-[0.75rem] font-semibold text-ink hover:bg-surface-2"
+              title={t.ui.canvas.promptToQuestionHint}
+              onClick={onPromptToQuestion}
+            >
+              ❓ {t.ui.canvas.promptToQuestion}
             </button>
           )}
           {onMoveToMap && (

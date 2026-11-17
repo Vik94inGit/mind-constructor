@@ -3,7 +3,9 @@
 // goal (Solution) or a study Question asks, and its ✅ (Success) children are
 // the answer. A study Question answered in place (a template's ghost written
 // in: its prompt the question, its text the answer) is a card of its own.
-// Any other node, or an asking node with no answer, makes no card.
+// A prompt turned into a Question (utils/promptQuestion.ts) asks it there, and
+// the answer under it answers, as one card. Any other node, or an asking node
+// with no answer, makes no card.
 // The marks a reader gives are their own, like feelings (utils/feeling.ts):
 // kept per browser and in their view of the map on the server.
 import { computeSlideOrder } from "./presentation";
@@ -36,11 +38,14 @@ export const QUIZ_IN_PLACE_TYPES: ReadonlySet<NodeType> = new Set<NodeType>(["Qu
 /** The cards a map makes, in the order presentation mode shows its nodes. */
 export function quizCards(nodes: NodeDoc[]): QuizCard[] {
   const answers = new Map<string, NodeDoc[]>();
-  const ids = new Set(nodes.map((n) => n.nodeId));
+  const byId = new Map(nodes.map((n) => [n.nodeId, n] as const));
+  // Answers whose prompt was turned into a Question above them
+  // (utils/promptQuestion.ts): that Question asks, they answer it.
+  const answersPromptQuestion = new Set(nodes.filter((n) => isPromptQuestionAnswer(n, byId)).map((n) => n.nodeId));
   for (const n of nodes) {
-    if (n.type !== QUIZ_ANSWER_TYPE) continue;
+    if (n.type !== QUIZ_ANSWER_TYPE && !answersPromptQuestion.has(n.nodeId)) continue;
     const parent = nodeRefId(n.parentId);
-    if (!parent || !ids.has(parent)) continue;
+    if (!parent || !byId.has(parent)) continue;
     if (!answers.has(parent)) answers.set(parent, []);
     answers.get(parent)!.push(n);
   }
@@ -49,12 +54,14 @@ export function quizCards(nodes: NodeDoc[]): QuizCard[] {
   const rank = new Map(ordered.map((n, i) => [n.nodeId, i] as const));
   for (const n of ordered) {
     if (!QUIZ_QUESTION_TYPES.has(n.type) && !QUIZ_IN_PLACE_TYPES.has(n.type)) continue;
+    // Its question is asked by the Question node above it instead.
+    if (answersPromptQuestion.has(n.nodeId)) continue;
     const question = n.title?.trim() || n.text?.trim() || n.prompt?.trim() || "";
     if (!question) continue;
     const list = (answers.get(n.nodeId) ?? [])
       .slice()
       .sort((a, b) => rank.get(a.nodeId)! - rank.get(b.nodeId)!)
-      .map(label)
+      .map((a) => (answersPromptQuestion.has(a.nodeId) ? answerInPlace(a) : label(a)))
       .filter(Boolean);
     if (list.length > 0) cards.push({ nodeId: n.nodeId, question, answerList: list });
     else if (QUIZ_IN_PLACE_TYPES.has(n.type) && n.prompt?.trim() && answerInPlace(n)) {
@@ -62,6 +69,16 @@ export function quizCards(nodes: NodeDoc[]): QuizCard[] {
     }
   }
   return cards;
+}
+
+/** An answered ghost hanging from a Question that asks its own prompt — what "Turn into a question" makes. */
+function isPromptQuestionAnswer(n: NodeDoc, byId: Map<string, NodeDoc>): boolean {
+  const prompt = n.prompt?.trim().toLowerCase();
+  if (!prompt || !answerInPlace(n) || n.isWeapon || n.isProtection) return false;
+  const parentId = nodeRefId(n.parentId);
+  const parent = parentId ? byId.get(parentId) : undefined;
+  if (!parent || parent.type !== "Question") return false;
+  return (parent.text?.trim().toLowerCase() === prompt) || (parent.title?.trim().toLowerCase() === prompt);
 }
 
 /** What a study Question's own writing answers its template question with: its title and text. */

@@ -48,6 +48,7 @@ export const FEATURES = [
   "zones",
   "change_parent",
   "swap_parent",
+  "prompt_to_question",
   "move_nodes",
   "delete_nodes",
   "link_nodes",

@@ -499,6 +499,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   is an outcome, so like unknown they draw no halo or horns and can't be an attack's or a protection's
   type. A Question, Definition, Example or Summary written into from a template (its ghost's question asking,
   the writing answering) is a ready Quiz me card.
+- **Turn into a question** — once a template's ghost is answered, its question (the prompt) no longer
+  shows anywhere. ❓ *Turn into a question* on the answer's Info tab puts that question on the map as a
+  **Question** node where the answer hung, with the answer now hanging from it, so the map keeps saying
+  what was being answered (`utils/promptQuestion.ts`, `hooks/usePromptToQuestion.ts`). The answer keeps
+  its prompt, and the button goes once the question is above it. In Quiz me the Question asks it and
+  the answer under it answers, as one card.
 - **Map types** — creating a map asks for a starting point: an **Empty map** (a blank canvas, no kind and
   no nodes) or one of six kinds (Problem analysis, Decision, Goal planning, Retrospective, Idea, Study),
   each seeded with a starter structure in your language, and for a mode (Personal, picked unless
