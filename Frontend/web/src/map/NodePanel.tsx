@@ -129,6 +129,8 @@ interface Props {
   autoPacked?: boolean;
   /** Swap with parent: this node takes its parent's place as head of the zone (utils/edgeRedirect.ts takeParentPlace). */
   onSwapWithParent?: () => void;
+  /** Turn into a question: an answered ghost's prompt becomes a Question node the answer hangs from (utils/promptQuestion.ts). */
+  onPromptToQuestion?: () => void;
   /** Move to a map: shown on the Inbox's notes (utils/inbox.ts). */
   onMoveToMap?: () => void;
   /** The ring of ghosts around the opened node, and the 👻 that hides it. */
@@ -193,6 +195,7 @@ export function NodePanel({
   onAutoPack,
   autoPacked,
   onSwapWithParent,
+  onPromptToQuestion,
   onMoveToMap,
   ghostsHidden = false,
   onToggleGhosts,
@@ -664,6 +667,7 @@ export function NodePanel({
           onAutoPack={onAutoPack}
           autoPacked={autoPacked}
           onSwapWithParent={moreTools ? onSwapWithParent : undefined}
+          onPromptToQuestion={onPromptToQuestion}
           onMoveToMap={onMoveToMap}
           textareaRef={textareaRef}
           readonlyTextRef={readonlyTextRef}

@@ -23,6 +23,23 @@ describe("quizCards", () => {
     ]);
   });
 
+  it("asks a prompt turned into a Question there, once, with the answer under it", () => {
+    const cards = quizCards([
+      node("t", { type: "Title", text: "Photosynthesis" }),
+      node("q", { type: "Question", text: "What does the word mean?", parentId: "t" }),
+      node("d", { type: "Definition", prompt: "What does the word mean?", text: "Light into sugar", parentId: "q" }),
+    ]);
+    expect(cards).toEqual([{ nodeId: "q", question: "What does the word mean?", answerList: ["Light into sugar"] }]);
+  });
+
+  it("keeps an answered ghost its own card under a Question that asks something else", () => {
+    const cards = quizCards([
+      node("q", { type: "Question", text: "Another question" }),
+      node("d", { type: "Definition", prompt: "What does the word mean?", text: "Light into sugar", parentId: "q" }),
+    ]);
+    expect(cards).toEqual([{ nodeId: "d", question: "What does the word mean?", answer: "Light into sugar" }]);
+  });
+
   it("leaves children that aren't ✅ out of the answer", () => {
     const [card] = quizCards([
       node("q", { type: "unknown", text: "Why?" }),

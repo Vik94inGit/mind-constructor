@@ -432,6 +432,11 @@ export interface UiStrings {
     newNodeText: string;
     swapWithParent: string;
     swapWithParentHint: string;
+    /** A ghost's prompt, once answered, made a Question node of its own that the answer hangs from (utils/promptQuestion.ts). */
+    promptToQuestion: string;
+    promptToQuestionHint: string;
+    promptToQuestionDone: string;
+    promptToQuestionFailed: string;
     changeParent: string;
     changeParentHint: string;
     reparentPick: (name: string) => string;
@@ -1358,6 +1363,10 @@ const en: UiStrings = {
     newNodeText: "New node",
     swapWithParent: "Swap with parent",
     swapWithParentHint: "It takes its parent's place and heads the zone; the parent hangs from it",
+    promptToQuestion: "Turn into a question",
+    promptToQuestionHint: "Puts the question you answered here on the map as a Question node, with this answer hanging from it",
+    promptToQuestionDone: "The question is on the map now, above its answer",
+    promptToQuestionFailed: "Couldn't turn it into a question",
     changeParent: "Change parent",
     changeParentHint: "Pick another node to hang this one from",
     reparentPick: (name) => `Tap the new parent for “${name}”`,
@@ -1696,6 +1705,7 @@ const en: UiStrings = {
         zones: "Named or styled a zone",
         change_parent: "Changed a node's parent",
         swap_parent: "Swapped a node with its parent",
+        prompt_to_question: "Turned a prompt into a question",
         move_nodes: "Moved nodes",
         delete_nodes: "Deleted nodes",
         link_nodes: "Linked two nodes",

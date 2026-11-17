@@ -105,6 +105,8 @@ import { useClipboardActions } from "../hooks/useClipboardActions";
 import { useLineDrawing } from "../hooks/useLineDrawing";
 import { useNodeDragAndDrop } from "../hooks/useNodeDragAndDrop";
 import { useReparent } from "../hooks/useReparent";
+import { usePromptToQuestion } from "../hooks/usePromptToQuestion";
+import { canTurnPromptIntoQuestion } from "../utils/promptQuestion";
 import { useRestoreView } from "../hooks/useRestoreView";
 import { firstParentPoint, showsAnyNode } from "../utils/openingFocus";
 import { useNodeBursts } from "../hooks/useNodeBursts";
@@ -1020,6 +1022,21 @@ export function MapPage() {
     t,
   });
 
+  // Turn a prompt into a question — see hooks/usePromptToQuestion.ts.
+  const { promptToQuestion } = usePromptToQuestion({
+    mapId,
+    nodes,
+    posFor,
+    placeNode,
+    upsertNode,
+    redirectParent,
+    setCelebrateIds,
+    showNodes,
+    showNotice,
+    setActionError,
+    t,
+  });
+
   // The quick-add ghost ring (and the dimming around it) waits until
   // centerOnNode's pan has landed (selectionSettled), and never shows round a
   // card on the board.
@@ -1277,6 +1294,10 @@ export function MapPage() {
       // Swap with parent: the child takes its parent's place as head of the zone.
       onSwapWithParent={
         isOwnNode(panelFor) && zoneParentId(panelFor) ? () => void headZone(panelFor) : undefined
+      }
+      // Turn into a question: an answered ghost's prompt stays on the map as a Question above it.
+      onPromptToQuestion={
+        isOwnNode(panelFor) && canTurnPromptIntoQuestion(panelFor, nodes) ? () => void promptToQuestion(panelFor) : undefined
       }
       // Move to a map: only on the Inbox, where quick notes wait to be sorted.
       onMoveToMap={
