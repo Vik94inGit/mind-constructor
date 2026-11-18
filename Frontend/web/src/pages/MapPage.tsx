@@ -455,6 +455,9 @@ export function MapPage() {
       ? unpackedNodes
       : unpackedNodes.filter((n) => n.nodeId === selectedId || !fold.hidden.has(n.nodeId));
   }, [unpackedNodes, selectedId, timeLapseNodes, timeLapseStep, replayAttacks, fold, cardZoneIds]);
+  // The ids drawn on the canvas: a drag only lands on, or pulls, one of these,
+  // never a node on another area that shares its spot (hooks/useNodeDragAndDrop.ts).
+  const onCanvasIds = useMemo(() => new Set(visibleNodes.map((n) => n.nodeId)), [visibleNodes]);
   // A node drawn as a puzzle card sits at its own card spot, apart from the
   // icon's — see utils/cardSpace.ts. Worked out from the same display choices
   // modeOf reads below, with zones taken by membership alone (their outline
@@ -957,6 +960,7 @@ export function MapPage() {
   });
   const { onNodePointerDown, magnetize, redirectParent, saveHeadPlan, dragState, groupDragState, dropTarget } = useNodeDragAndDrop({
     nodes,
+    onCanvas: (n) => onCanvasIds.has(n.nodeId),
     positions,
     nodeGroups,
     chooseMode,

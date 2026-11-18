@@ -94,6 +94,14 @@ interface Params {
   isBlockLocked?: (nodeId: string) => boolean;
   /** A drag is about to save: the moved nodes as they were before it, for undo (hooks/useMoveUndo.ts). */
   recordMove?: (before: NodeDoc[]) => void;
+  /**
+   * Whether a node is drawn on the canvas right now. `nodes` is the whole map,
+   * including every other area (utils/mapAreas.ts), packed members, folded
+   * branches and locked template rounds, all sharing the same coordinates: a
+   * drop must never land on, or pull, one of those the person can't see.
+   * Every node counts when absent.
+   */
+  onCanvas?: (node: NodeDoc) => boolean;
 }
 
 // The node drag/drop system: single-node reposition-or-join-a-circle,
@@ -131,6 +139,7 @@ export function useNodeDragAndDrop({
   onHold,
   isBlockLocked,
   recordMove,
+  onCanvas = () => true,
 }: Params) {
   // Held in place: a member of the chosen circle (Node.locked), or a text
   // block its owner locked.
@@ -179,6 +188,9 @@ export function useNodeDragAndDrop({
     let closestDist = Infinity;
     for (const n of nodes) {
       if (n.nodeId === dragged.nodeId || (dragged.isWeapon && !n.isWeapon)) continue;
+      // Only what is on screen: a node on another area sits at the same
+      // canvas spot, unseen, and dropping on it hung the moved node from it.
+      if (!onCanvas(n)) continue;
       const p = positions.get(n.nodeId);
       if (!p) continue;
       const d = dropTargetDistance({ x, y }, p);
@@ -201,7 +213,7 @@ export function useNodeDragAndDrop({
   function pullsFor(moved: Map<string, Pt>, farFactor = MAGNET_FAR_FACTOR): { pulls: Map<string, Pt>; pulled: NodeDoc[] } {
     const canPull = (n: NodeDoc) => {
       const p = positions.get(n.nodeId);
-      return isOwnNode(n) && !n.isWeapon && !held(n) && !!p && !clearSpotFor?.(n, p.x, p.y);
+      return isOwnNode(n) && onCanvas(n) && !n.isWeapon && !held(n) && !!p && !clearSpotFor?.(n, p.x, p.y);
     };
     const pulls = magnetPulls(moved, nodes, positions, canPull, obstaclePoints, viewportBounds(), undefined, undefined, farFactor);
     return { pulls, pulled: nodes.filter((n) => pulls.has(n.nodeId)) };
