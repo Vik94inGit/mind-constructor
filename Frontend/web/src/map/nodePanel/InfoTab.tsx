@@ -167,7 +167,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
                 startEditing();
               }
             }}
-            className={`min-h-[8rem] w-full cursor-text overflow-y-auto bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap break-words text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
+            className={`min-h-[2.75rem] w-full cursor-text overflow-y-auto bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap break-words text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
             style={!expanded && textHeight != null ? { height: textHeight } : undefined}
           >
             <MathText text={textDraft} />
@@ -177,7 +177,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             id="node-text"
             ref={textareaRef}
             aria-label={t.ui.node.textLabel}
-            rows={6}
+            rows={1}
             maxLength={MAX_NODE_TEXT}
             value={textDraft}
             // A ghost's prompt (see NodeDoc.prompt) is the question to answer here.
@@ -226,7 +226,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
               setEditing(false);
               void onTextSave();
             }}
-            className={`block min-h-[8rem] w-full resize-y border-0 bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline-none ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
+            className={`block min-h-[2.75rem] w-full resize-y border-0 bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed font-[inherit] text-ink focus:outline-none ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
             // Remounted after the rendered view: keep the size the panel resize gave it.
             style={!expanded && textHeight != null ? { height: textHeight } : undefined}
           />
@@ -237,7 +237,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             tabIndex={0}
             role="region"
             aria-label={t.ui.node.textLabel}
-            className={`min-h-[8rem] w-full overflow-y-auto bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
+            className={`min-h-[2.75rem] w-full overflow-y-auto bg-transparent px-[0.7rem] py-[0.55rem] text-[0.88rem] leading-relaxed whitespace-pre-wrap text-ink ${expanded || textHeight != null ? "max-h-none" : "max-h-[40vh]"}`}
             style={!expanded && textHeight != null ? { height: textHeight } : undefined}
           >
             {node.text ? <MathText text={node.text} /> : node.prompt ? <span className="text-ink-soft italic">{node.prompt}</span> : null}

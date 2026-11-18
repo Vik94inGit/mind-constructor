@@ -320,7 +320,19 @@ export interface UiStrings {
     onlyOwner: (name: string) => string;
   };
   packed: { empty: string; unpack: string };
-  history: { loading: string; none: string };
+  history: {
+    loading: string;
+    none: string;
+    /** The History tab's list of what the node is tied to (map/nodePanel/ConnectionsList.tsx). */
+    connections: string;
+    parent: string;
+    noParent: string;
+    changeParent: string;
+    pickParent: string;
+    children: (n: number) => string;
+    links: (n: number) => string;
+    attacks: string;
+  };
   errors: {
     clipboard: string;
     symbol: string;
@@ -1230,7 +1242,18 @@ const en: UiStrings = {
     onlyOwner: (name) => `Only ${name} can add a protection node to this one.`,
   },
   packed: { empty: "Nothing packed in here.", unpack: "Unpack" },
-  history: { loading: "Loading…", none: "No attacks yet." },
+  history: {
+    loading: "Loading…",
+    none: "No attacks yet.",
+    connections: "Connections",
+    parent: "Hangs from",
+    noParent: "No parent: it heads its own branch.",
+    changeParent: "Change",
+    pickParent: "Pick a parent",
+    children: (n) => `Its children (${n})`,
+    links: (n) => `Links (${n})`,
+    attacks: "Attacks",
+  },
   errors: {
     clipboard: "Copy failed — this browser blocked clipboard access.",
     symbol: "Failed to update symbol",
