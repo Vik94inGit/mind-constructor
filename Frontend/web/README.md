@@ -407,6 +407,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node in it, in map order), *Extract text…* (the zone and the castles inside it as one document to read or
   copy, the same export as the Info tab of the zone's parent), one *Shape* for your nodes in it, and
   *Delete* for them, above its view, layout and look.
+- **Node panel's top row and its connections** — the big ← → arrows and the panel's tabs (Info, Modify,
+  History, …) share one row at the top of the panel, the tabs scrolling sideways when they don't all fit.
+  The History tab starts with the node's *Connections*: the parent it hangs from and the children hanging
+  from it (the branch a zone is made of, set when a node is added to a zone) and its links. Each can be
+  changed there: tap one to open it, *Change* the parent, or ✕ to take the node off its parent, take a
+  child off, or remove a link (`map/nodePanel/ConnectionsList.tsx`). The text box fits its text.
 - **Copy a node's text, its zone or the tree above it** — the Info tab's *Copy* copies a node alone in
   its branch straight away; a node in a zone or under a parent opens a short list first: *This node*,
   *Whole zone* (the zone it heads, else the one it sits in, castles inside included, as the same outline
