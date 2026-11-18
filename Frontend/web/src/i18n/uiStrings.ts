@@ -261,6 +261,13 @@ export interface UiStrings {
     noLinks: string;
     extractText: string;
     extractTextTitle: string;
+    /** The Copy menu on a node's panel: what to copy as text. */
+    copyWhat: string;
+    copyNode: string;
+    copyZone: string;
+    copyAbove: string;
+    copyZoneTitle: string;
+    copyAboveTitle: string;
     expand: string;
     collapse: string;
     expandTitle: string;
@@ -1157,6 +1164,12 @@ const en: UiStrings = {
     extractText: "Extract text…",
     extractTextTitle:
       "Export this node's own cluster's text — plus any cluster rooted at one of its children, recursively. The whole map's own text export moved to the + toolbar menu.",
+    copyWhat: "What to copy",
+    copyNode: "This node",
+    copyZone: "Whole zone",
+    copyAbove: "Tree above",
+    copyZoneTitle: "Copy the text of every node in this zone, as an outline",
+    copyAboveTitle: "Copy the chain of parents from the top of the branch down to this node",
     expand: "Expand",
     collapse: "Collapse",
     expandTitle: "Expand to show the whole text, no inner scrollbar",

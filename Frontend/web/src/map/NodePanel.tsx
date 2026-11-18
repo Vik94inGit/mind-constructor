@@ -28,6 +28,8 @@ import { moveRovingFocus } from "../utils/roving";
 import { track } from "../utils/usage";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { useMoreTools } from "../hooks/useMoreTools";
+import { readableText, writeClipboardText } from "../utils/copyScopes";
+import type { CopyScope } from "../utils/copyScopes";
 
 // A bottom sheet over the canvas at every screen size; tapping empty canvas
 // closes it too (MapPage's onClick). Docked at half the screen so it opens
@@ -102,6 +104,10 @@ interface Props {
   isClusterParent: boolean;
   /** Asks MapPage to open a text export scoped to this node's own cluster — plus, recursively, any cluster rooted at one of its children (see MapPage's collectClusterSubtree). Only ever called when isClusterParent is true. */
   onExtractText: () => void;
+  /** What the Copy menu offers besides this node: its zone, the tree above it. */
+  copyScopes?: { zone: boolean; above: boolean };
+  /** Copies this node's zone or the tree above it as text; resolves false when the browser refused. */
+  onCopyScope?: (scope: CopyScope) => Promise<boolean>;
   /** Opens "Split into nodes" on this node; absent when its text can't be split (a weapon, a shield, one word). */
   onSplitText?: (text: string) => void;
   /** Text pasted past the node's limit, put into new nodes carrying on from it (see InfoTab). */
@@ -181,6 +187,8 @@ export function NodePanel({
   onUnpacked,
   isClusterParent,
   onExtractText,
+  copyScopes,
+  onCopyScope,
   onSplitText,
   onCarryText,
   cardFill,
@@ -463,9 +471,15 @@ export function NodePanel({
 
   // Copies the node's real text (not the draft, so it works the same for a
   // non-owner) — reading a node's text isn't an edit, so anyone may.
-  async function handleCopyText() {
+  // Its formulas copy as readable text (utils/copyScopes.ts). The zone and the
+  // tree above it come from MapPage, which has the rest of the map.
+  async function handleCopyText(scope: CopyScope = "node") {
     try {
-      await navigator.clipboard.writeText(node.text);
+      if (scope !== "node" && onCopyScope) {
+        if (!(await onCopyScope(scope))) throw new Error("clipboard");
+      } else {
+        await writeClipboardText(readableText(node.text));
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -682,7 +696,8 @@ export function NodePanel({
           onSplitText={moreTools ? onSplitText : undefined}
           onCarryText={onCarryText}
           onStepNode={onStepNode}
-          onCopyText={handleCopyText}
+          onCopyText={(scope) => void handleCopyText(scope)}
+          copyScopes={copyScopes}
           onExtractText={moreTools && isClusterParent ? onExtractText : undefined}
           onDelete={handleDelete}
           onTemplate={handleTemplate}

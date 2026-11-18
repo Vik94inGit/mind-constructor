@@ -571,6 +571,12 @@ const ui: UiStrings = {
     extractText: "Vyextrahovat text…",
     extractTextTitle:
       "Exportovat text clusteru tohoto uzlu — i každého clusteru s kořenem v jeho potomcích. Export textu celé mapy najdete v nabídce + na panelu nástrojů.",
+    copyWhat: "Co zkopírovat",
+    copyNode: "Tento uzel",
+    copyZone: "Celou zónu",
+    copyAbove: "Strom nad ním",
+    copyZoneTitle: "Zkopírovat text všech uzlů v této zóně jako osnovu",
+    copyAboveTitle: "Zkopírovat řetěz rodičů od vrcholu větve až k tomuto uzlu",
     expand: "Rozbalit",
     collapse: "Sbalit",
     expandTitle: "Rozbalit a zobrazit celý text bez vnitřního posuvníku",
