@@ -73,7 +73,7 @@ import { TimeLapseBar, timeLapseOrder } from "../map/TimeLapseBar";
 import { ViewCorner } from "../map/ViewCorner";
 import { ViewPrompt } from "../map/ViewPrompt";
 import { loadMinimapShown, saveMinimapShown } from "../utils/minimapPref";
-import { creationOrder, readingOrder, stepAlong } from "../utils/nodeOrder";
+import { creationOrder, stepAlong, zoneOrder, zoneStepIds } from "../utils/nodeOrder";
 import { useMoveUndo } from "../hooks/useMoveUndo";
 import { useDeletedNodes } from "../hooks/useDeletedNodes";
 import { CanvasBackdrop } from "../map/CanvasBackdrop";
@@ -620,10 +620,14 @@ export function MapPage() {
 
 
   // The selected node's neighbors, ringed round it — see hooks/useRadialFocus.ts.
+  // The node the ← / → arrows last stepped to (useChompRuns reads it).
+  const [steppedToId, setSteppedToId] = useState<string | null>(null);
   const radialBlend = useRadialFocus({
     selectedId,
     multiSelectIds,
-    selectionSettled,
+    // A node the arrows reached leaves its neighbors where they are, so the
+    // zone being stepped through keeps its shape.
+    selectionSettled: selectionSettled && steppedToId !== selectedId,
     ghostsOnOffer: !!selectedNode && isOwnNode(selectedNode) && !chooseMode && !packMode,
     nodes,
     edges,
@@ -1243,9 +1247,10 @@ export function MapPage() {
     },
   });
 
-  // Reads the map node by node (utils/nodeOrder.ts readingOrder): from the
-  // open node to the one before or after it, or, with none open, from the
-  // first (→) or last (←) node. With a zone chosen, the arrows stay inside it
+  // Reads the map zone by zone (utils/nodeOrder.ts zoneOrder), the camera
+  // framing the whole zone of each step (zoneStepIds): from the open node to
+  // the one before or after it, or, with none open, from the first (→) or
+  // last (←) node. With a zone chosen, the arrows stay inside it
   // and go by when each thought was written, newest first (creationOrder
   // reversed), so → walks back into how that thinking grew. The panel's arrows and the
   // keyboard's ← / → both land here; only the text field's own arrows move
@@ -1257,18 +1262,21 @@ export function MapPage() {
       return;
     }
     const zoneIds = map?.selectedCircle?.nodeIds;
+    const inChosenZone = !!zoneIds?.length;
     let order: NodeDoc[];
-    if (zoneIds?.length) {
+    if (inChosenZone) {
       const inZone = collectDescendants(new Set(zoneIds), visibleNodes);
       order = creationOrder(visibleNodes.filter((n) => inZone.has(n.nodeId))).reverse();
     } else {
-      order = readingOrder(visibleNodes);
+      // Zone by zone, the camera on the whole zone (docs/gestures/zone-by-zone.md).
+      order = zoneOrder(visibleNodes);
     }
     const next = stepAlong(order, selectedId, dir);
     if (!next) return;
     setSteppedToId(next);
     setSelectedId(next);
-    centerOnNode(next);
+    if (inChosenZone) centerOnNode(next);
+    else showNodes(zoneStepIds(visibleNodes, next));
     if (focusText) setFocusTextNodeId(next);
   }
 
@@ -1778,8 +1786,6 @@ export function MapPage() {
   // A node just made through the inline input: its panel opens focused on
   // the text (see NodePanel's autoFocusText) — cleared once that's done.
   const [focusTextNodeId, setFocusTextNodeId] = useState<string | null>(null);
-  // The node the ← / → arrows last stepped to (useChompRuns reads it).
-  const [steppedToId, setSteppedToId] = useState<string | null>(null);
   // A node being made is brought to the middle of the screen below its panel,
   // with the emoji ring around it.
   useEffect(() => {

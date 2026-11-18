@@ -1,5 +1,5 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { MAX_ZOOM, MIN_ZOOM } from "../utils/canvasLayout";
+import { isMobileViewport, MAX_ZOOM, MIN_ZOOM, panelReserveFrac } from "../utils/canvasLayout";
 import { nodeFootprint, saveNodeDisplay, zoomToSeparate } from "../utils/nodeDisplay";
 import type { NodeDisplay } from "../utils/nodeDisplay";
 import type { ReadingMode } from "../utils/readingMode";
@@ -110,7 +110,10 @@ export function useCanvasFraming({
     const width = Math.max(...xs) - Math.min(...xs) + PAD * 2;
     const height = Math.max(...ys) - Math.min(...ys) + PAD * 2;
     const middle = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 };
-    const target = Math.max(MIN_ZOOM, Math.min(zoom, wrap.clientWidth / width, wrap.clientHeight / height));
+    // Centered above the panel (the default), the points must fit in the part
+    // of the screen it leaves clear.
+    const clearHeight = opts?.aboveSheet === false ? wrap.clientHeight : wrap.clientHeight * (1 - panelReserveFrac(isMobileViewport()));
+    const target = Math.max(MIN_ZOOM, Math.min(zoom, wrap.clientWidth / width, clearHeight / height));
     if (target < zoom - 0.005) {
       zoomFromCenter(0, target);
       setTimeout(() => centerOnPoint(middle.x, middle.y, opts), 260);

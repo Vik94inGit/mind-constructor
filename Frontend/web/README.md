@@ -282,7 +282,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node (any way) opens `map/NewNodePanel.tsx` with its text field focused — with the feelings offered
   as a ring around the new node, optional — and editing opens the node's panel on its text.
   Big round ← / → arrows at either end of the sheet's top edge step to the previous or next
-  node, with the resize handle between them. The steps include every attack, right after the node it
+  node, with the resize handle between them. They go zone by zone: a parent and all its children,
+  then the zones down the first child's branch, then the next, and the camera frames the whole zone
+  the step is in rather than the one node, staying put while the steps stay inside it
+  (`utils/nodeOrder.ts` `zoneOrder`, `zoneStepIds`; [sketch](../../docs/gestures/zone-by-zone.md)).
+  The steps include every attack, right after the node it
   hit, and each node they reach opens on its Info tab (an attack on your own node otherwise opens on
   Attack, ready to strike back). With a zone chosen, the arrows (and ← / →) stay inside it and go by
   when each thought was written, newest first, so → walks back into how that thinking grew
