@@ -340,18 +340,17 @@ export function NodePanel({
     onPasted: () => setTab("info"),
   });
 
-  // Lifting the cap doesn't grow a textarea by itself: while expanded it is
-  // set to its scrollHeight on every keystroke; collapsing goes back to the
-  // height the panel resize gave it, or to the CSS default.
+  // The text box fits its text: a short note gets a short box, set to its
+  // scrollHeight on every keystroke (the CSS cap of 40vh still holds unless
+  // expanded). A height the panel resize gave it wins while not expanded.
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
-    if (expanded) {
-      ta.style.height = "auto";
-      ta.style.height = `${ta.scrollHeight}px`;
+    if (!expanded && textHeight != null) {
+      ta.style.height = `${textHeight}px`;
     } else {
-      // Back to the size the panel resize gave it, if any.
-      ta.style.height = textHeight != null ? `${textHeight}px` : "";
+      ta.style.height = "auto";
+      ta.style.height = `${ta.scrollHeight + (ta.offsetHeight - ta.clientHeight)}px`;
     }
     // `tab`: the textarea remounts whenever the Info tab is reopened.
   }, [expanded, textDraft, textHeight, tab]);
