@@ -407,6 +407,35 @@ describe("useNodeDragAndDrop", () => {
       expect(nodesApi.updateNode).toHaveBeenCalledWith("a", expect.objectContaining({ parentId: "b" }));
     });
 
+    it("never joins a node that isn't on the canvas (another area at the same spot)", async () => {
+      const dragged = makeNode({ nodeId: "a", x: 0, y: 0, area: 1 });
+      const hidden = makeNode({ nodeId: "b", x: 500, y: 500, area: 0 });
+      const nodes = [dragged, hidden];
+      const positions = new Map<string, Pt>([
+        ["a", { x: 0, y: 0 }],
+        ["b", { x: 500, y: 500 }],
+      ]);
+      const listeners = captureWindowListeners();
+      const { result } = setup({
+        nodes,
+        positions,
+        posFor: (n) => positions.get(n.nodeId)!,
+        onCanvas: (n) => n.nodeId !== "b",
+      });
+
+      act(() => result.current.onNodePointerDown(dragged, fakePointerDownEvent({ clientX: 0, clientY: 0 })));
+      act(() => listeners.pointermove({ clientX: 500, clientY: 500 }));
+      expect(result.current.dropTarget).toBeNull();
+
+      vi.mocked(nodesApi.updateNode).mockResolvedValue({ ...dragged, x: 500, y: 500 });
+      await act(async () => {
+        listeners.pointerup({ clientX: 500, clientY: 500 });
+        await vi.runAllTimersAsync();
+      });
+
+      expect(nodesApi.updateNode).toHaveBeenCalledWith("a", { x: 500, y: 500 });
+    });
+
     it("is a plain move when dropped clear of every card", async () => {
       const dragged = makeNode({ nodeId: "a", x: 0, y: 0 });
       const target = makeNode({ nodeId: "b", x: 500, y: 500 });
