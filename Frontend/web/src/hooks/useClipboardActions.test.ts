@@ -321,3 +321,44 @@ describe("useClipboardActions", () => {
     });
   });
 });
+
+describe("copyNodeScope", () => {
+  const nodes = [
+    makeNode({ nodeId: "a", type: "Problem", text: "", x: 0, y: 0 }),
+    makeNode({ nodeId: "b", type: "Idea", text: "", parentId: "a", x: 0, y: 100 }),
+    makeNode({ nodeId: "c", type: "Solution", text: "", parentId: "a", x: 100, y: 100 }),
+  ];
+  const nodeGroups = [{ rootId: "a", members: nodes }] as unknown as Parameters<typeof useClipboardActions>[0]["nodeGroups"];
+  const originalClipboard = navigator.clipboard;
+  beforeEach(() => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+  });
+  afterEach(() => {
+    Object.assign(navigator, { clipboard: originalClipboard });
+  });
+
+  it("copies the tree above a node, its text loaded first", async () => {
+    const { api, ensureNodeText } = setup({ nodes, nodeGroups });
+    expect(await api.copyNodeScope("b", "above")).toBe(true);
+    expect(ensureNodeText).toHaveBeenCalledWith(["a", "b"]);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Problem: real-a\n  Idea: real-b");
+  });
+
+  it("copies the zone a child sits in", async () => {
+    const { api } = setup({ nodes, nodeGroups });
+    expect(await api.copyNodeScope("c", "zone")).toBe(true);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("## Problem: real-a\n- Idea: real-b\n- Solution: real-c");
+  });
+
+  it("copies nothing for a node in no zone", async () => {
+    const { api } = setup({ nodes: [makeNode({ nodeId: "z" })], nodeGroups: [] });
+    expect(await api.copyNodeScope("z", "zone")).toBe(false);
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
+  it("says so when the browser refuses", async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
+    const { api } = setup({ nodes, nodeGroups });
+    expect(await api.copyNodeScope("a", "node")).toBe(false);
+  });
+});

@@ -18,6 +18,8 @@ import type { NodeDoc } from "../../types";
 import { feature } from "../../utils/usage";
 import { MathText } from "../MathText";
 import { hasMath } from "../../utils/mathText";
+import { CopyMenu } from "./CopyMenu";
+import type { CopyScope } from "../../utils/copyScopes";
 
 export type CardLookPatch = Pick<Partial<NodeDoc>, "cardW" | "cardH" | "cardFont" | "cardShape">;
 /** A card's own look, for its owner to change (Node.cardFont/cardShape/cardW/cardH). */
@@ -63,7 +65,10 @@ interface Props {
   templateKind: NodeTemplateKind | null;
   /** Resolves true unless the save failed. */
   onTextSave: () => Promise<boolean>;
-  onCopyText: () => void;
+  /** Copies this node's text, or (from the Copy menu) its zone's or the tree above it. */
+  onCopyText: (scope: CopyScope) => void;
+  /** What the Copy menu offers besides the node itself. Unset: Copy copies the node straight away. */
+  copyScopes?: { zone: boolean; above: boolean };
   /** "Extract text…" for a zone's parent: the zone's text as one document. Unset on a node that heads no zone. */
   onExtractText?: () => void;
   onDelete: () => void;
@@ -88,7 +93,7 @@ interface Props {
 // NodePanel's Info tab: the node's title and full text (editable in place for
 // its owner), the puzzle card's fill, lock, copy/delete, and — on a node with
 // no branch yet — growing a template from it.
-export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, levelLock, levelProgress, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onPromptToQuestion, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
+export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, textLocked, levelLock, levelProgress, onToggleLock, onMagnet, onChangeParent, onSwapWithParent, onPromptToQuestion, onMoveToMap, onAutoPack, autoPacked = false, textareaRef, readonlyTextRef, textDraft, setTextDraft, expanded, setExpanded, textHeight, copied, templateKind, onTextSave, onCopyText, copyScopes, onExtractText, onDelete, onTemplate, onClose, imagesSection, pictureMap, pictureList, onDropImages, onStepNode, onSplitText, onCarryText }: Props) {
   const { t } = useI18n();
   const [dragOver, setDragOver] = useState(false);
   // Pasted text that didn't fit (utils/nodeText.ts), offered for a new node.
@@ -290,12 +295,7 @@ export function InfoTab({ node, isCreator, busy, cardFill, feeling, cardLook, te
             {textChanged ? t.ui.node.saveText : t.ui.common.edit}
           </button>
         )}
-        <button
-          className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-line bg-surface px-[0.65rem] py-[0.35rem] text-[0.78rem] font-semibold text-ink transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={onCopyText}
-        >
-          {copied ? t.ui.common.copied : t.ui.common.copy}
-        </button>
+        <CopyMenu copied={copied} scopes={copyScopes} onCopy={onCopyText} />
         {onExtractText && (
           <button
             type="button"

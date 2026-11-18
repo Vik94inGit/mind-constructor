@@ -96,6 +96,7 @@ import type { ZoneStylePatch } from "../map/ZoneMenuBody";
 import { InviteMemberModal } from "../components/InviteMemberModal";
 import { ExportTextModal } from "../components/ExportTextModal";
 import { idOf, nodeRefId, zoneParentId } from "../utils/nodeType";
+import { zoneRootFor } from "../utils/copyScopes";
 import { useRadialFocus } from "../hooks/useRadialFocus";
 import { useMapEntrance } from "../hooks/useMapEntrance";
 import { useAutoPack } from "../hooks/useAutoPack";
@@ -1384,6 +1385,11 @@ export function MapPage() {
       onUnpacked={(unpacked) => upsertNode(unpacked)}
       isClusterParent={circleRootSentimentByNode.has(panelFor.nodeId)}
       onExtractText={() => extractClusterText(panelFor.nodeId)}
+      copyScopes={{
+        zone: !!zoneRootFor(nodes, nodeGroups, panelFor.nodeId),
+        above: !!nodeRefId(panelFor.parentId),
+      }}
+      onCopyScope={(scope) => copyNodeScope(panelFor.nodeId, scope)}
       onSplitText={canSplitNode(panelFor) ? (text) => openSplit(panelFor, text) : undefined}
       onCarryText={canCarryText(panelFor) ? (rest) => carryText(panelFor, rest) : undefined}
     />
@@ -1717,6 +1723,7 @@ export function MapPage() {
     openExportText,
     collectClusterSubtree,
     extractClusterText,
+    copyNodeScope,
     pasteClipboard,
   } = useClipboardActions({
     mapId,

@@ -4,7 +4,9 @@ import * as edgesApi from "../api/edges";
 import { ApiRequestError } from "../api/client";
 import { buildNodeClipboard, pastedExtras, readNodeClipboard, writeNodeClipboard } from "../utils/nodeClipboard";
 import { pictureDataUrl } from "../utils/images";
-import { stepPrefix, stepRank } from "../utils/textExport";
+import { buildTreeExport, stepPrefix, stepRank } from "../utils/textExport";
+import { ancestorChain, formatChain, readableText, writeClipboardText, zoneRootFor } from "../utils/copyScopes";
+import type { CopyScope } from "../utils/copyScopes";
 import { avoidOverlap, nodeObstacles, pickNonOverlappingPosition } from "../utils/canvasLayout";
 import type { NodeGroup, Obstacle, ViewportBounds } from "../utils/canvasLayout";
 import type { Translation } from "../i18n/translations";
@@ -199,6 +201,47 @@ export function useClipboardActions({
     setExtractClusterRootId(rootId);
   }
 
+  // The node panel's Copy menu: the node itself, its zone (the one it heads,
+  // else the one it sits in) or the tree above it, as plain text with
+  // formulas readable. The text is put together while the clipboard waits
+  // (writeClipboardText), so a node whose text hasn't loaded yet still copies
+  // in the same tap. Resolves false when there was nothing to copy or the
+  // browser refused.
+  function copyScopeText(nodeId: string, scope: CopyScope): Promise<string> | null {
+    const real = (n: NodeDoc) => !n.isWeapon && !n.isProtection;
+    if (scope === "node") {
+      const node = nodes.find((n) => n.nodeId === nodeId);
+      if (!node) return null;
+      return ensureNodeText([nodeId]).then((byId) => readableText(byId[nodeId] ?? node.text));
+    }
+    if (scope === "above") {
+      const chain = ancestorChain(nodes.filter(real), nodeId);
+      if (chain.length === 0) return null;
+      return ensureNodeText(chain.map((n) => n.nodeId)).then((byId) => formatChain(chain, (n) => byId[n.nodeId] ?? n.text));
+    }
+    const rootId = zoneRootFor(nodes, nodeGroups, nodeId);
+    const zone = rootId ? collectClusterSubtree(rootId).filter(real) : [];
+    if (zone.length === 0) return null;
+    return ensureNodeText(zone.map((n) => n.nodeId)).then((byId) =>
+      buildTreeExport(
+        zone.map((n) => ({ ...n, text: readableText(byId[n.nodeId] ?? n.text) })),
+        positions,
+      ),
+    );
+  }
+
+  async function copyNodeScope(nodeId: string, scope: CopyScope): Promise<boolean> {
+    const text = copyScopeText(nodeId, scope);
+    if (!text) return false;
+    feature("export");
+    try {
+      await writeClipboardText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // Pastes what's on the clipboard (see copyNodes) into this map — this one
   // or a different one — as brand-new nodes, keeping branch parents and the
   // connections among them. `at` (a canvas point, from the canvas menu's
@@ -320,6 +363,7 @@ export function useClipboardActions({
     openExportText,
     collectClusterSubtree,
     extractClusterText,
+    copyNodeScope,
     pasteClipboard,
   };
 }

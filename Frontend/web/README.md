@@ -407,6 +407,12 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   node in it, in map order), *Extract text…* (the zone and the castles inside it as one document to read or
   copy, the same export as the Info tab of the zone's parent), one *Shape* for your nodes in it, and
   *Delete* for them, above its view, layout and look.
+- **Copy a node's text, its zone or the tree above it** — the Info tab's *Copy* copies a node alone in
+  its branch straight away; a node in a zone or under a parent opens a short list first: *This node*,
+  *Whole zone* (the zone it heads, else the one it sits in, castles inside included, as the same outline
+  *Extract text…* gives) and *Tree above* (its parents from the top of the branch down to it, indented).
+  Formulas copy as readable text (`x²`, `d/dx`, `√(x+1)`) rather than LaTeX (`utils/copyScopes.ts`,
+  `map/nodePanel/CopyMenu.tsx`).
 - **Keyboard copy, paste and delete** — with nothing being typed in, Ctrl/Cmd+C copies the chosen
   node or group and Ctrl/Cmd+V pastes it, on this map or another, with its text, pictures, picture
   icon and card, emoji, shape and card size (`utils/nodeClipboard.ts`, `hooks/useClipboardActions.ts`);
