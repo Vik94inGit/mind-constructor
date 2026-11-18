@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { creationOrder, readingOrder, stepAlong, stepNode } from "./nodeOrder";
+import { creationOrder, readingOrder, stepAlong, stepNode, zoneOrder, zoneStepIds } from "./nodeOrder";
 import { makeNode } from "../test/fixtures";
 
 const ref = (nodeId: string) => ({ nodeId, text: "", type: "Option" }) as never;
@@ -72,5 +72,57 @@ describe("creationOrder", () => {
     expect(stepAlong(order, null, 1)).toBe("root");
     expect(stepAlong(order, "elsewhere", -1)).toBe("late");
     expect(stepAlong([], null, 1)).toBeNull();
+  });
+});
+
+describe("zoneOrder", () => {
+  const nodes = [
+    makeNode({ nodeId: "goal", createdAt: "1" }),
+    makeNode({ nodeId: "A", parentId: ref("goal"), createdAt: "2" }),
+    makeNode({ nodeId: "A1", parentId: ref("A"), createdAt: "3" }),
+    makeNode({ nodeId: "A2", parentId: ref("A"), createdAt: "4" }),
+    makeNode({ nodeId: "B", parentId: ref("goal"), createdAt: "5" }),
+    makeNode({ nodeId: "B1", parentId: ref("B"), createdAt: "6" }),
+    makeNode({ nodeId: "B2", parentId: ref("B"), createdAt: "7" }),
+    makeNode({ nodeId: "A1x", parentId: ref("A1"), createdAt: "8" }),
+    makeNode({ nodeId: "C", parentId: ref("goal"), createdAt: "9" }),
+    makeNode({ nodeId: "lone", createdAt: "10" }),
+  ];
+
+  it("finishes each zone before the next, branch by branch", () => {
+    expect(zoneOrder(nodes).map((n) => n.nodeId)).toEqual(["goal", "A", "B", "C", "A1", "A2", "A1x", "B1", "B2", "lone"]);
+  });
+
+  it("keeps every node exactly once, as readingOrder does", () => {
+    expect(zoneOrder(nodes).map((n) => n.nodeId).sort()).toEqual(readingOrder(nodes).map((n) => n.nodeId).sort());
+  });
+
+  it("puts an attack right after the node it hit, outside that node's zone", () => {
+    const withAttack = [
+      ...nodes,
+      makeNode({ nodeId: "hit", createdAt: "11", isWeapon: true, targetNodeId: "A", parentId: ref("A") }),
+    ];
+    const order = zoneOrder(withAttack).map((n) => n.nodeId);
+    expect(order.slice(0, 5)).toEqual(["goal", "A", "hit", "B", "C"]);
+    expect(order.indexOf("A1")).toBeGreaterThan(order.indexOf("C"));
+    expect(zoneStepIds(withAttack, "hit")).toEqual(["goal", "A", "B", "C"]);
+    expect(zoneStepIds(withAttack, "A2")).toEqual(["A", "A1", "A2"]);
+  });
+
+  it("frames a step with its parent's zone, a top node with its own", () => {
+    expect(zoneStepIds(nodes, "goal")).toEqual(["goal", "A", "B", "C"]);
+    expect(zoneStepIds(nodes, "B")).toEqual(["goal", "A", "B", "C"]);
+    expect(zoneStepIds(nodes, "B2")).toEqual(["B", "B1", "B2"]);
+    expect(zoneStepIds(nodes, "A1x")).toEqual(["A1", "A1x"]);
+    expect(zoneStepIds(nodes, "lone")).toEqual(["lone"]);
+    expect(zoneStepIds(nodes, "missing")).toEqual([]);
+  });
+
+  it("survives a parentId loop", () => {
+    const loop = [
+      makeNode({ nodeId: "x", parentId: ref("y") }),
+      makeNode({ nodeId: "y", parentId: ref("x") }),
+    ];
+    expect(zoneOrder(loop).map((n) => n.nodeId).sort()).toEqual(["x", "y"]);
   });
 });
