@@ -174,7 +174,7 @@ export function PresentationOverlay({
               className="line-clamp-2 max-w-[700px] cursor-pointer rounded-md px-2 py-1 text-[0.95rem] break-words text-ink-soft hover:bg-surface-2"
               onClick={() => goTo(parent.nodeId)}
             >
-              ↑ {t.ui.presentation.under(parent.title || parent.text || "")}
+              ↑ <MathText text={t.ui.presentation.under(parent.title || parent.text || "")} compact />
             </button>
           )}
           <SlideHead node={node} compact={children.length > 0} />
@@ -243,11 +243,11 @@ export function PresentationOverlay({
                       </span>
                     </div>
                     <p className="m-0 text-[1.05rem] leading-snug font-semibold break-words text-ink">
-                      {c.title || c.text}
+                      <MathText text={c.title || c.text || ""} />
                     </p>
                     {c.title && (
                       <p className="m-0 text-[0.9rem] break-words text-ink-soft">
-                        {c.text}
+                        <MathText text={c.text || ""} />
                       </p>
                     )}
                     {/* The child's picture card from the map, if it has one;
