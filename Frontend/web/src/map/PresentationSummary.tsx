@@ -192,7 +192,9 @@ function NodeList({ nodes, onPick, hideType }: { nodes: NodeDoc[]; onPick: (id: 
             <span className="text-[0.95rem] font-semibold break-words text-ink">
               <MathText text={n.title || n.text || n.prompt || ""} />
             </span>
-            {n.title && n.text && <span className="line-clamp-3 text-[0.85rem] break-words text-ink-soft">{n.text}</span>}
+            {n.title && n.text && <span className="line-clamp-3 text-[0.85rem] break-words text-ink-soft">
+              <MathText text={n.text} />
+            </span>}
           </button>
         </li>
       ))}

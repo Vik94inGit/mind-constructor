@@ -1,3 +1,4 @@
+import { MathText } from "./MathText";
 import { useI18n } from "../i18n/I18nContext";
 import { NODE_TYPE_COLORS } from "../utils/nodeType";
 import { NodeTypeSymbol } from "./NodeTypeSymbol";
@@ -68,7 +69,9 @@ export function SlideOrderList({ slides, current, savedOrder, onChange, onPick }
                 >
                   <NodeTypeSymbol type={s.node.type} size={14} />
                 </span>
-                <span className="min-w-0 truncate">{label}</span>
+                <span className="min-w-0 truncate">
+                  <MathText text={label} compact />
+                </span>
               </button>
               <button
                 type="button"

@@ -67,6 +67,21 @@ describe("PresentationOverlay", () => {
     expect(onIndexChange).toHaveBeenLastCalledWith(1);
   });
 
+  it("draws formulas in a child's card, not their LaTeX source", async () => {
+    const groups = computeSlideGroups([
+      makeNode({ nodeId: "p", text: "Primes", type: "Title", createdAt: "2026-01-01T00:00:00Z" }),
+      makeNode({ nodeId: "ex", text: "Check \\(2^3 = 8\\) and \\(\\mathbf{3}\\)", type: "Example", parentId: "p", createdAt: "2026-01-02T00:00:00Z" }),
+    ]);
+    render(
+      <I18nProvider>
+        <PresentationOverlay slides={groups} index={0} onIndexChange={() => {}} onExit={() => {}} onOpenNode={() => {}} />
+      </I18nProvider>,
+    );
+    const card = screen.getByRole("listitem");
+    await vi.waitFor(() => expect(card.querySelectorAll('[data-math="inline"]').length).toBe(2));
+    expect(card.textContent).not.toContain("\\(");
+  });
+
   it("goes back up to the parent's slide", () => {
     const { onIndexChange } = setup(1);
     fireEvent.click(screen.getByText(new RegExp(en.ui.presentation.under("Weekend trip"))));
