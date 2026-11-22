@@ -1,18 +1,26 @@
 import { useEffect, useState } from "react";
 import * as authApi from "../api/auth";
+import * as adminApi from "../api/admin";
+import type { AdminUser } from "../api/admin";
 import { useAuth } from "../context/AuthContext";
 import { ApiRequestError } from "../api/client";
 import { useI18n } from "../i18n/I18nContext";
-import type { User } from "../types";
 import { useConfirm } from "../context/ConfirmContext";
 import { UsageSummary } from "../admin/UsageSummary";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { AdminMaps } from "../admin/AdminMaps";
+import { unusedProfiles, namesPreview, shortDate, UNUSED_IDLE_DAYS } from "../admin/cleanup";
 
 export function AdminPage() {
   const confirm = useConfirm();
   const { user: me } = useAuth();
-  const { t } = useI18n();
-  const [users, setUsers] = useState<User[]>([]);
+  const { t, language } = useI18n();
+  const c = t.ui.admin.cleanup;
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Bumped when accounts are deleted, so the maps list drops their maps too.
+  const [mapsKey, setMapsKey] = useState(0);
+  const unused = unusedProfiles(users, me?._id);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -21,7 +29,7 @@ export function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      setUsers(await authApi.listUsers());
+      setUsers(await adminApi.listAdminUsers());
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.errors.loadUsers);
     } finally {
@@ -33,12 +41,12 @@ export function AdminPage() {
     load();
   }, []);
 
-  async function toggleBlock(u: User) {
+  async function toggleBlock(u: AdminUser) {
     setBusyId(u._id);
     setError(null);
     try {
       const updated = u.isBlocked ? await authApi.unblockUser(u._id) : await authApi.blockUser(u._id);
-      setUsers((prev) => prev.map((x) => (x._id === u._id ? updated : x)));
+      setUsers((prev) => prev.map((x) => (x._id === u._id ? { ...x, ...updated } : x)));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.errors.action);
     } finally {
@@ -46,13 +54,36 @@ export function AdminPage() {
     }
   }
 
-  async function remove(u: User) {
+  async function remove(u: AdminUser) {
     if (!(await confirm(t.ui.admin.deleteConfirm(u.username), { confirmLabel: t.ui.common.delete, danger: true }))) return;
     setBusyId(u._id);
     setError(null);
     try {
       await authApi.deleteUser(u._id);
       setUsers((prev) => prev.filter((x) => x._id !== u._id));
+      setMapsKey((k) => k + 1);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.ui.errors.action);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removeUnused() {
+    if (unused.length === 0) return;
+    const { names, more } = namesPreview(unused.map((u) => u.username));
+    if (!(await confirm(c.deleteUnusedConfirm(unused.length, names, more), { confirmLabel: t.ui.common.delete, danger: true })))
+      return;
+    setBusyId("unused");
+    setError(null);
+    setNotice(null);
+    try {
+      const { deleted, skipped } = await adminApi.deleteUnusedUsers(unused.map((u) => u._id));
+      const gone = new Set(deleted);
+      setUsers((prev) => prev.filter((x) => !gone.has(x._id)));
+      setNotice(c.deletedUnused(deleted.length, skipped.length));
+      setMapsKey((k) => k + 1);
+      if (skipped.length > 0) await load();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.errors.action);
     } finally {
@@ -67,6 +98,7 @@ export function AdminPage() {
     try {
       await authApi.wipeDatabase();
       await load();
+      setMapsKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.ui.errors.wipe);
     }
@@ -89,7 +121,19 @@ export function AdminPage() {
 
       <UsageSummary />
 
+      <div className="mt-8 mb-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="m-0 text-[0.85rem] text-ink-soft">{c.unusedHint(UNUSED_IDLE_DAYS)}</p>
+        <button
+          className="inline-flex cursor-pointer items-center justify-center gap-[0.4rem] rounded-lg border border-danger-bg bg-danger-bg px-4 py-[0.45rem] text-[0.85rem] font-semibold text-danger transition-[background-color,border-color,opacity] duration-[120ms] enabled:hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={loading || unused.length === 0 || busyId === "unused"}
+          onClick={removeUnused}
+        >
+          {c.deleteUnused(unused.length)}
+        </button>
+      </div>
+
       <ErrorBanner message={error} />
+      {notice && <p className="mt-0 mb-3 text-[0.85rem] text-success">{notice}</p>}
 
       {loading ? (
         <div className="p-12 text-center text-ink-soft">{t.ui.admin.loading}</div>
@@ -109,6 +153,15 @@ export function AdminPage() {
                 </th>
                 <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase">
                   {t.ui.admin.status}
+                </th>
+                <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase">
+                  {c.maps}
+                </th>
+                <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase">
+                  {c.thoughts}
+                </th>
+                <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase">
+                  {c.lastActive}
                 </th>
                 <th className="border-b border-line bg-surface-2 px-[0.85rem] py-[0.65rem] text-left text-[0.7rem] font-semibold tracking-[0.05em] text-ink-soft uppercase"></th>
               </tr>
@@ -139,7 +192,15 @@ export function AdminPage() {
                           {t.ui.admin.active}
                         </span>
                       )}
+                      {u.unused && !isSelf && (
+                        <span className="ml-1 rounded-[5px] bg-surface-2 px-2 py-[0.15rem] text-[0.7rem] font-bold text-ink-soft">
+                          {c.unused}
+                        </span>
+                      )}
                     </td>
+                    <td className={cell}>{u.ownedMaps}</td>
+                    <td className={cell}>{u.writtenNodes}</td>
+                    <td className={`${cell} whitespace-nowrap text-ink-soft`}>{shortDate(u.lastActiveAt, language) ?? c.never}</td>
                     <td className={cell}>
                       <div style={{ display: "flex", gap: "0.4rem" }}>
                         <button
@@ -165,6 +226,8 @@ export function AdminPage() {
           </table>
         </div>
       )}
+
+      <AdminMaps reloadKey={mapsKey} />
     </div>
   );
 }

@@ -60,6 +60,11 @@ vi.mock("../src/models/Folder.js", () => ({
     updateMany: vi.fn(),
   },
 }));
+vi.mock("../src/models/Attack.js", () => ({
+  Attack: {
+    deleteMany: vi.fn(),
+  },
+}));
 vi.mock("../src/models/Edge.js", () => ({
   Edge: {
     deleteMany: vi.fn(),

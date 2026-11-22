@@ -791,6 +791,28 @@ export interface UiStrings {
     deleteConfirm: (username: string) => string;
     wipeConfirm: string;
     wipeConfirmAgain: string;
+    /** Cleaning up unused accounts and any map (admin/AdminMaps.tsx, AdminPage). */
+    cleanup: {
+      maps: string;
+      thoughts: string;
+      lastActive: string;
+      never: string;
+      unused: string;
+      deleteUnused: (n: number) => string;
+      unusedHint: (days: number) => string;
+      deleteUnusedConfirm: (n: number, names: string, more: number) => string;
+      deletedUnused: (deleted: number, skipped: number) => string;
+      mapsTitle: string;
+      mapsHint: string;
+      mapName: string;
+      owner: string;
+      members: string;
+      changed: string;
+      filter: string;
+      loadingMaps: string;
+      noMaps: string;
+      deleteMapConfirm: (name: string, owner: string, thoughts: number) => string;
+    };
     /** The usage numbers above the user list (admin/UsageSummary.tsx). */
     usage: {
       title: string;
@@ -1692,6 +1714,29 @@ const en: UiStrings = {
     deleteConfirm: (u) => `Delete ${u}? This deletes everything they made: their maps, their nodes and links on other maps, folders, drafts and pictures.`,
     wipeConfirm: "Wipe the ENTIRE database — all users, maps and nodes? This cannot be undone.",
     wipeConfirmAgain: "Are you absolutely sure? Type-of-no-return confirmation #2.",
+    cleanup: {
+      maps: "Maps",
+      thoughts: "Thoughts",
+      lastActive: "Last active",
+      never: "never",
+      unused: "unused",
+      deleteUnused: (n) => `Delete unused profiles (${n})`,
+      unusedHint: (d) => `Unused: not an admin, never wrote a thought, and nothing done for ${d} days.`,
+      deleteUnusedConfirm: (n, names, more) =>
+        `Delete ${n} unused ${n === 1 ? "profile" : "profiles"}? ${names}${more > 0 ? ` and ${more} more` : ""}. Their maps and everything in them go too. This can't be undone.`,
+      deletedUnused: (d, s) => `Deleted ${d} ${d === 1 ? "profile" : "profiles"}.${s > 0 ? ` ${s} skipped because they were used meanwhile.` : ""}`,
+      mapsTitle: "Every map",
+      mapsHint: "All maps in the app, whoever owns them.",
+      mapName: "Map",
+      owner: "Owner",
+      members: "Members",
+      changed: "Changed",
+      filter: "Filter by map or owner",
+      loadingMaps: "Loading maps…",
+      noMaps: "No maps.",
+      deleteMapConfirm: (name, owner, n) =>
+        `Delete “${name}” by ${owner}? Its ${n} written ${n === 1 ? "thought" : "thoughts"}, links and history go for every member. This can't be undone.`,
+    },
     usage: {
       title: "How the app is used",
       hint: "Counted from what signed-in people do, never what their thoughts say. Browsers that ask not to be tracked are left out.",

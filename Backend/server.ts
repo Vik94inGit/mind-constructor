@@ -19,6 +19,7 @@ import folderRoute from "./src/routes/folderRoute.js";
 import imageRoute from "./src/routes/imageRoute.js";
 import userStateRoute from "./src/routes/userStateRoute.js";
 import usageRoute from "./src/routes/usageRoute.js";
+import adminRoute from "./src/routes/adminRoute.js";
 import { initRealtime } from "./src/realtime/io.js";
 import { createRedisClient } from "./src/config/redis.js";
 import { apiLimiter } from "./src/middleware/rateLimit.js";
@@ -146,6 +147,8 @@ app.use("/api/state", userStateRoute);
 app.use("/api/images", imageRoute);
 // Also before the map routes: how the app is used (abl/usageAbl.ts).
 app.use("/api/usage", usageRoute);
+// Admin clean-up (unused accounts, any map) — before the /api/:mapId catch-all.
+app.use("/api/admin", adminRoute);
 app.use("/api", mapRoute);
 
 // Socket.IO attaches to the same HTTP server Express listens on — one
