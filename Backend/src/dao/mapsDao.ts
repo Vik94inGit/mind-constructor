@@ -4,6 +4,7 @@ import { Map, type MAP_KINDS } from "../models/Map.js";
 import { Node, NODE_TYPES, type NodeType } from "../models/Node.js";
 import { Edge } from "../models/Edge.js";
 import { Line } from "../models/Line.js";
+import { Attack } from "../models/Attack.js";
 import { User } from "../models/User.js";
 import { nanoid } from "nanoid";
 import { getHiddenNodesDao } from "./visibilityDao.js";
@@ -288,25 +289,30 @@ export const inviteUserToMapDao = async (
 };
 
 export const deleteMapDao = async (publicMapId: string, userId: string) => {
-  // 1. Find the map AND verify authorization (owner or member) in one query
-  const map = await Map.findOne({
-    mapId: publicMapId,
-    $or: [{ ownerId: userId }],
-  });
+  // Only the owner may delete a map; null when it doesn't exist or isn't theirs.
+  const map = await Map.findOne({ mapId: publicMapId, ownerId: userId });
+  if (!map) return null;
+  return await deleteMapCascadeDao(map);
+};
 
-  if (!map) return null; // Returns null if map doesn't exist OR user lacks permission
+// The admin page's delete: any map, whoever owns it. null if it doesn't exist.
+export const adminDeleteMapDao = async (publicMapId: string) => {
+  const map = await Map.findOne({ mapId: publicMapId });
+  if (!map) return null;
+  return await deleteMapCascadeDao(map);
+};
 
-  // 2. Delete everything scoped to this map's internal MongoDB _id — edges
-  // first, since they reference nodes that are about to disappear too.
+// Everything scoped to the map's internal _id, then the map itself — edges
+// first, since they reference nodes that are about to disappear too.
+const deleteMapCascadeDao = async (map: { _id: mongoose.Types.ObjectId; mapId: string }) => {
   await Edge.deleteMany({ mapId: map._id });
   await Line.deleteMany({ mapId: map._id });
   await Node.deleteMany({ mapId: map._id });
   await NodeRevision.deleteMany({ mapId: map._id });
+  await Attack.deleteMany({ mapId: map._id });
   await deleteImagesByMapDao(map._id);
-  await removeMapFromAllFoldersDao(publicMapId);
-  await removeMapViewStatesDao(publicMapId);
-
-  // 3. Delete the map itself using its internal Mongo _id
+  await removeMapFromAllFoldersDao(map.mapId);
+  await removeMapViewStatesDao(map.mapId);
   return await Map.findByIdAndDelete(map._id);
 };
 

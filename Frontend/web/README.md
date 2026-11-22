@@ -490,7 +490,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   users, wipe the database. Above the user list, **How the app is used**: people active today, in
   7 and 30 days, people who came back another day, new accounts, maps and nodes made, a bar of
   people active each day, **every feature, least used first** (unused ones flagged, so unpopular features stand out; `src/admin/featureRows.ts`), and a table of what they did (last 7, 30 or 90 days, demo accounts left
-  out unless ticked; `src/admin/UsageSummary.tsx`).
+  out unless ticked; `src/admin/UsageSummary.tsx`). The user list shows each account's maps, written
+  thoughts and last activity, flags **unused** ones (not an admin, never wrote a thought, idle 30
+  days) and **Delete unused profiles** removes them all after one confirmation that names them.
+  Below it, **Every map**: every map in the app whoever owns it, filterable by name or owner, each
+  with a Delete that asks first (`src/admin/AdminMaps.tsx`, `src/admin/cleanup.ts`).
 - **Usage numbers** — `src/utils/usage.ts` `track()` notes what a signed-in person does (opened the
   app or a page, signed up or in, quick note, map or node made, search, Think it through started
   and finished, a feeling or check-in, text split, picture drawn, view picked, map shared, attack,
