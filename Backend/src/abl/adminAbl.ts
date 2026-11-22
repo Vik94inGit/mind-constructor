@@ -47,12 +47,12 @@ export const isUnusedProfile = (
 
 // Every account, with how much it's used and whether it counts as unused.
 export const listAdminUsersAbl = async (now = new Date()) => {
-  const users = (await getAllUsersDao()) as { _id: unknown; role?: string; [k: string]: unknown }[];
+  const users = (await getAllUsersDao()) as { _id: unknown; role?: string; username?: string; [k: string]: unknown }[];
   const activity = await listUserActivityDao(users.map((u) => String(u._id)));
   const byId: Record<string, UserActivityRow> = {};
   for (const a of activity) byId[a.userId] = a;
   return users.map((u) => {
-    const { passwordHash: _p, __v: _v, ...rest } = u as Record<string, unknown>;
+    const { passwordHash: _p, __v: _v, ...rest } = u;
     const a = byId[String(u._id)];
     return {
       ...rest,
