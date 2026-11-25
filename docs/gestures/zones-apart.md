@@ -1,6 +1,6 @@
 # Zones stay apart on a drop
 
-Date: 2026-11-25 · PR: (linked once open)
+Date: 2026-11-25 · PR: https://github.com/Vik94inGit/mind-constructor/pull/259
 
 ## What the user wants to do
 
