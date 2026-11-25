@@ -15,8 +15,12 @@ type Pt = { x: number; y: number };
 //     or one in no zone at all, stays outside the zone's outline and clear of
 //     its lines. This also holds for the zone itself: moving one of its
 //     members can't stretch the outline over a node that isn't in it.
-//  2. Zones don't cross. Two zones only touch at a node they share (a child
-//     zone hanging off a member of its parent zone).
+//  2. Zones don't overlap. Two zones only touch at a node they share (a child
+//     zone hanging off a member of its parent zone): their lines don't cross
+//     and neither holds a corner of the other. A zone wrapping a whole branch
+//     (ZoneLayout "nested") is the one exception, it holds its sub-zones.
+//     This one holds for a drag the person aimed too (free mode): a dropped
+//     node never stretches its zone over another one.
 //  3. No wasted space. A placed node ends up no more than MAX_ZONE_GAP from
 //     the nearest node or zone line, and never closer than MIN_NODE_GAP to
 //     another node.
@@ -52,7 +56,7 @@ export interface ExtraNode {
 }
 
 export interface ZoneRule {
-  /** Rules 1 and 2, plus moving nodes not landing on other nodes. */
+  /** Rules 1 and 2 (only 2 when free), plus moving nodes not landing on other nodes. */
   fits(p: Pt): boolean;
   /** Rule 3's upper bound. */
   compact(p: Pt): boolean;
@@ -62,6 +66,8 @@ interface Zone {
   rootId: string;
   memberIds: Set<string>;
   outline: Pt[];
+  /** The node at each corner of `outline`. */
+  outlineIds: string[];
 }
 
 function distToSegment(p: Pt, a: Pt, b: Pt): number {
@@ -115,9 +121,24 @@ function footprintsOverlap(a: Pt, b: Pt): boolean {
   return Math.abs(a.x - b.x) < NODE_FOOTPRINT.w && Math.abs(a.y - b.y) < NODE_FOOTPRINT.h;
 }
 
-function shareMember(a: Zone, b: Zone): boolean {
-  for (const id of a.memberIds) if (b.memberIds.has(id)) return true;
-  return false;
+function holdsAll(big: Zone, small: Zone): boolean {
+  for (const id of small.memberIds) if (!big.memberIds.has(id)) return false;
+  return true;
+}
+
+/** One zone's corner inside the other or right on its line, a node they share aside. */
+function cornerInside(a: Zone, b: Zone): boolean {
+  return a.outline.some((p, i) => !b.memberIds.has(a.outlineIds[i]) && intrudes(p, b));
+}
+
+/**
+ * Rule 2: whether two zones cover any of the same ground, past the node they
+ * may share, or a corner of one sits on the other's line (so they never read
+ * as one shape). A nested zone and a sub-zone it wraps never count.
+ */
+function zonesOverlap(a: Zone, b: Zone): boolean {
+  if (holdsAll(a, b) || holdsAll(b, a)) return false;
+  return outlinesCross(a.outline, b.outline) || cornerInside(a, b) || cornerInside(b, a);
 }
 
 /**
@@ -133,7 +154,7 @@ export function makeZoneRule(
   extra: ExtraNode[] = [],
   reach: number = getZoneReach(),
   layouts: ZoneLayouts = {},
-  /** Only keep the moving nodes off other nodes: no zone rules, no rule 3. */
+  /** A drag the person aimed: keep the moving nodes off other nodes and zones off each other (rule 2), nothing else. */
   free = false,
   /** Zones the moving nodes may never enter, free or not: another player's castles in a discussion. */
   offLimits?: (zoneRootId: string) => boolean,
@@ -169,7 +190,7 @@ export function makeZoneRule(
   // Same membership computeNodeGroups draws.
   const zoneMembers = zoneMemberships(childrenOf, (id) => parentOf.has(id), (id) => parentOf.get(id), layouts);
 
-  const outlineOf = (zone: ZoneMembership, posOf: (id: string) => Pt | undefined): Pt[] | null => {
+  const zoneAt = (zone: ZoneMembership, memberIds: Set<string>, posOf: (id: string) => Pt | undefined): Zone | null => {
     const pts: Pt[] = [];
     for (const id of zone.ids) {
       const p = posOf(id);
@@ -178,7 +199,8 @@ export function makeZoneRule(
     }
     // ids[0] is the root. Same shape the map draws (see zoneShape).
     const order = zoneShape(zone, pts, reach);
-    return order.length ? order.map((i) => pts[i]) : null;
+    if (!order.length) return null;
+    return { rootId: zone.rootId, memberIds, outline: order.map((i) => pts[i]), outlineIds: order.map((i) => zone.ids[i]) };
   };
 
   // Zones none of the moving nodes are in keep their shape wherever they go.
@@ -189,12 +211,35 @@ export function makeZoneRule(
     if (z.ids.some((id) => offsetOf.has(id))) {
       movingZones.push({ zone: z, memberIds });
     } else {
-      const outline = outlineOf(z, (id) => fixedPos.get(id));
-      if (outline) fixedZones.push({ rootId: z.rootId, memberIds, outline });
+      const fixed = zoneAt(z, memberIds, (id) => fixedPos.get(id));
+      if (fixed) fixedZones.push(fixed);
     }
+  }
+  // Zones a moving one already overlaps where it stands now: the map broke
+  // rule 2 before this move, so that pair alone doesn't block it (moving them
+  // apart stays possible, and the rest of the rule still holds).
+  const overlappedBefore = new Map<string, Set<string>>();
+  const rejoining = new Set(moving.filter((m) => m.parentId !== undefined).map((m) => m.nodeId));
+  for (const mz of movingZones) {
+    // A node joining or leaving this zone: its shape now says nothing about before.
+    if (mz.zone.ids.some((id) => rejoining.has(id))) continue;
+    const now = zoneAt(mz.zone, mz.memberIds, (id) => positions.get(id) ?? extra.find((e) => e.nodeId === id)?.pos);
+    if (!now) continue;
+    overlappedBefore.set(mz.zone.rootId, new Set(fixedZones.filter((z) => zonesOverlap(now, z)).map((z) => z.rootId)));
   }
   const fixedPoints = Array.from(fixedPos, ([id, p]) => ({ id, p })).filter((e) => !weapons.has(e.id));
   const fixedLines = fixedZones.map((z) => z.outline);
+
+  // A moving node that is part of a zone (its parent, or a member), and the
+  // zones it already sits in where it stands now (an overlap the map had
+  // before this move, which doesn't block it).
+  const inZone = new Set<string>();
+  for (const mz of movingZones) for (const id of mz.memberIds) if (offsetOf.has(id)) inZone.add(id);
+  const insideBefore = new Map<string, Set<string>>();
+  for (const id of inZone) {
+    const p = positions.get(id);
+    if (p) insideBefore.set(id, new Set(fixedZones.filter((z) => intrudes(p, z)).map((z) => z.rootId)));
+  }
 
   const movingAt = (p: Pt) => moving.map((m) => {
     const o = offsetOf.get(m.nodeId)!;
@@ -212,20 +257,27 @@ export function makeZoneRule(
       // first moving node is held to that by the caller's own obstacles).
       for (const f of fixedPoints) if (footprintsOverlap(m.p, f.p)) return false;
       if (offLimits) for (const z of fixedZones) if (!z.memberIds.has(m.id) && offLimits(z.rootId) && intrudes(m.p, z)) return false;
-      if (free) continue;
+      if (free) {
+        // Rule 2 for a node of a zone: it doesn't carry its zone into
+        // another one, not even by reaching so far its own outline lets go.
+        if (inZone.has(m.id))
+          for (const z of fixedZones) if (!z.memberIds.has(m.id) && !insideBefore.get(m.id)?.has(z.rootId) && intrudes(m.p, z)) return false;
+        continue;
+      }
       // Rule 1: not in a zone it isn't part of.
       for (const z of fixedZones) if (!z.memberIds.has(m.id) && intrudes(m.p, z)) return false;
     }
-    if (free) return true;
     for (const mz of movingZones) {
-      const outline = outlineOf(mz.zone, posOf);
-      if (!outline) continue;
-      const zone: Zone = { rootId: mz.zone.rootId, memberIds: mz.memberIds, outline };
-      // Rule 1, the other way round: the reshaped zone doesn't swallow anyone.
-      for (const f of fixedPoints) if (!zone.memberIds.has(f.id) && intrudes(f.p, zone)) return false;
-      for (const m of placed) if (!zone.memberIds.has(m.id) && intrudes(m.p, zone)) return false;
-      // Rule 2: no crossing another zone, unless the two hang together.
-      for (const z of fixedZones) if (!shareMember(zone, z) && outlinesCross(outline, z.outline)) return false;
+      const zone = zoneAt(mz.zone, mz.memberIds, posOf);
+      if (!zone) continue;
+      if (!free) {
+        // Rule 1, the other way round: the reshaped zone doesn't swallow anyone.
+        for (const f of fixedPoints) if (!zone.memberIds.has(f.id) && intrudes(f.p, zone)) return false;
+        for (const m of placed) if (!zone.memberIds.has(m.id) && intrudes(m.p, zone)) return false;
+      }
+      // Rule 2, free or not: no zone laid over another one.
+      const before = overlappedBefore.get(zone.rootId);
+      for (const z of fixedZones) if (!before?.has(z.rootId) && zonesOverlap(zone, z)) return false;
     }
     return true;
   }

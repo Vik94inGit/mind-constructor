@@ -387,7 +387,11 @@ The backend must be running (`npm run dev` in `Backend/`) and reachable at `VITE
   Refused, with why, when a node that would change isn't yours or the child is an attack. One undo
   puts the parents and spots back; a save that fails puts everything back at once.
 - **Moving nodes** — a dragged node (or group) lands where it was let go, nudged only so it doesn't
-  cover another node or its text; the zone rules (`utils/zoneRules.ts`) still place new nodes, except
+  cover another node or its text, and so no zone ends up over another: if the drop would stretch its
+  zone across a neighbour's (or put a zone's node inside another zone), it lands at the nearest spot
+  where the zones stay apart, with a small gap between them. A child zone hanging off a member of its
+  parent zone may touch it at that node only. Zones that already overlapped don't block a move that
+  pulls them apart. The zone rules (`utils/zoneRules.ts`) still place new nodes, except
   a type dragged out of a node's ring, which lands where it was let go too. Dropping a node anywhere on
   another node's card (plus a small margin, `canvasLayout.ts` `dropTargetDistance`) joins that node's
   zone, and it then lands at the nearest spot that covers nothing; a member stays in its own zone until

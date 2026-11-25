@@ -109,6 +109,83 @@ describe("makeZoneRule", () => {
     expect(rule.fits({ x: 1000, y: 800 })).toBe(false);
   });
 
+  it("won't let a child zone swing across its parent zone, though they share a node", () => {
+    const { nodes, positions } = triangleMap([
+      { node: makeNode({ nodeId: "a1", parentId: "a" }), pos: { x: 400, y: 600 } },
+      { node: makeNode({ nodeId: "a2", parentId: "a" }), pos: { x: 500, y: 1200 } },
+    ]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: "a2" }], [], WIDE);
+    // a2 below the a–b edge: the edge a1–a2 cuts the parent triangle near a.
+    expect(rule.fits({ x: 1000, y: 1100 })).toBe(false);
+  });
+
+  it("keeps zones apart even for a drag the person aimed (free mode)", () => {
+    const { nodes, positions } = triangleMap([
+      { node: makeNode({ nodeId: "r2", parentId: null }), pos: { x: 1700, y: 400 } },
+      { node: makeNode({ nodeId: "c", parentId: "r2" }), pos: { x: 1600, y: 900 } },
+      { node: makeNode({ nodeId: "d", parentId: "r2" }), pos: { x: 2000, y: 900 } },
+    ]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: "c" }], [], WIDE, {}, true);
+    // Under the first triangle, its zone's line crosses the other's.
+    expect(rule.fits({ x: 900, y: 1150 })).toBe(false);
+    // Inside the first triangle, its zone covers part of it.
+    expect(rule.fits({ x: 1000, y: 750 })).toBe(false);
+    // Anywhere on its own side is still up to the person.
+    expect(rule.fits({ x: 1700, y: 1300 })).toBe(true);
+  });
+
+  it("won't let a dragged member dissolve its own zone's outline to sit in another zone", () => {
+    const nodes = [
+      makeNode({ nodeId: "r", parentId: null }),
+      makeNode({ nodeId: "a", parentId: "r" }),
+      makeNode({ nodeId: "b", parentId: "r" }),
+      makeNode({ nodeId: "r2", parentId: null }),
+      makeNode({ nodeId: "c", parentId: "r2" }),
+      makeNode({ nodeId: "d", parentId: "r2" }),
+    ];
+    const positions = new Map<string, Pt>([
+      ["r", { x: 900, y: 500 }],
+      ["a", { x: 780, y: 710 }],
+      ["b", { x: 1120, y: 710 }],
+      ["r2", { x: 1280, y: 500 }],
+      ["c", { x: 1330, y: 760 }],
+      ["d", { x: 1500, y: 700 }],
+    ]);
+    // Out at (960, 620) c is past its root's reach, so its zone draws no
+    // outline, but c is still that zone's member: it stays out of the other.
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: "c" }], [], undefined, {}, true);
+    expect(rule.fits({ x: 960, y: 620 })).toBe(false);
+    // A node in no zone may still be dropped there.
+    const lone = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], undefined, {}, true);
+    expect(lone.fits({ x: 960, y: 620 })).toBe(true);
+  });
+
+  it("keeps a whole zone dragged as one off another zone", () => {
+    const { nodes, positions } = triangleMap([
+      { node: makeNode({ nodeId: "r2", parentId: null }), pos: { x: 1700, y: 400 } },
+      { node: makeNode({ nodeId: "c", parentId: "r2" }), pos: { x: 1600, y: 900 } },
+      { node: makeNode({ nodeId: "d", parentId: "r2" }), pos: { x: 2000, y: 900 } },
+    ]);
+    const moving = [
+      { nodeId: "r2" },
+      { nodeId: "c", offset: { x: -100, y: 500 } },
+      { nodeId: "d", offset: { x: 300, y: 500 } },
+    ];
+    const rule = makeZoneRule(nodes, positions, moving, [], WIDE, {}, true);
+    expect(rule.fits({ x: 1250, y: 400 })).toBe(false);
+    expect(rule.fits({ x: 1800, y: 400 })).toBe(true);
+  });
+
+  it("lets a drag pull apart two zones that already overlapped", () => {
+    const { nodes, positions } = triangleMap([
+      { node: makeNode({ nodeId: "r2", parentId: null }), pos: { x: 1700, y: 400 } },
+      { node: makeNode({ nodeId: "c", parentId: "r2" }), pos: { x: 1000, y: 700 } },
+      { node: makeNode({ nodeId: "d", parentId: "r2" }), pos: { x: 2000, y: 900 } },
+    ]);
+    const rule = makeZoneRule(nodes, positions, [{ nodeId: "d" }], [], WIDE, {}, true);
+    expect(rule.fits({ x: 2100, y: 1000 })).toBe(true);
+  });
+
   it("calls a spot compact only within ~2 cm of a node or zone line", () => {
     const { nodes, positions } = triangleMap();
     const rule = makeZoneRule(nodes, positions, [{ nodeId: NEW_NODE_ID, parentId: null }], [], WIDE);
