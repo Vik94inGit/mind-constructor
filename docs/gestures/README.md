@@ -40,7 +40,7 @@ node) must be told apart by something the user can see before they let go.
 | Ring of ghosts, ⋯ ghost | Tap | Click | Shows every type on the ring instead of only the map kind's own; again goes back ([sketch](ring-types-by-kind.md)) |
 | Toolbar ☑, then a node | Tap | Click | Select mode: picks or drops just that node, any kind, anyone's; no panel, no drag. Empty canvas, zones, Enter and Esc do nothing; only *Done* or ☑ leaves ([sketch](select-mode.md)) |
 | Picked node, ☑ and ✥ both on | Drag | Drag | Moves every picked node of yours together; a tap still picks or drops one; unpicked nodes never drag ([sketch](select-move.md)) |
-| Node, Move mode (✥) | Drag | Drag | Moves it; glues to a card it lands beside; joins a zone it's dropped on (a card in the cards view only moves clear of other cards) |
+| Node, Move mode (✥) | Drag | Drag | Moves it; glues to a card it lands beside; joins a zone it's dropped on; never lays its zone over another zone, landing at the nearest spot that keeps them apart ([sketch](zones-apart.md)) (a card in the cards view only moves clear of other cards) |
 | Node, Move mode | Hold still, lift | Shift+click | Adds it to a group selection (or opens a card's menu) |
 | Group member | Drag | Drag | Moves the group, the others following its path |
 | Node, not Move mode | Swipe | Drag | Pans the map |

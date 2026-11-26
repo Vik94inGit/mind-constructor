@@ -78,8 +78,8 @@ npm run build        # tsc -b && vite build
   Protect, Packed, History; pictures in `useNodeImages`), `SiegePanel` (the imitated opponent's turn), `HistoryPanel` (the map's
   discussion history), `FinishedBanner`, `TimeLapseBar`, zone menus and style pickers.
 - **`utils/`** — pure logic, each with a `*.test.ts` beside it: `zoneRules.ts` (where a new node
-  may go: no node inside a zone it doesn't belong to, zones never cross, no wasted space; a node the
-  user drags only keeps off other nodes, its `free` mode),
+  may go: no node inside a zone it doesn't belong to, zones never overlap, no wasted space; a node the
+  user drags only keeps off other nodes and keeps zones apart, its `free` mode),
   `canvasLayout.ts`, `siege.ts` (opponent strategies and moves), `finish.ts` (mirrors the backend's
   `finishRule` so the Finish button can say why it waits; the server still decides), `nodeType.ts`
   (mirrors `allowedAttackTypes`), `seedMap.ts`/`templates.ts` (starter structures as ghosts, in the
